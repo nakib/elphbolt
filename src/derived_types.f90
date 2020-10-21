@@ -1,7 +1,7 @@
 module derived_types
   !! Module containing the derived data types.
 
-  use params, only: dp, k4, twopi
+  use params, only: dp, k4
   
   implicit none
 
@@ -54,17 +54,19 @@ module derived_types
      !! Number of spacegroup symmetries.
      integer(k4) :: nsymm_rot
      !! Number of rotations.
-     !Rotation matrices without time-reversal:
-     integer(k4), allocatable :: rotations_orig(:,:,:) !Real space, crystal coordinates
-     real(dp), allocatable :: crotations_orig(:,:,:) !Real space, cartesian coordinates
-     real(dp), allocatable :: qrotations_orig(:,:,:) !Reciprocal space, crystal coordinates
+     integer(k4), allocatable :: rotations_orig(:,:,:)
+     !! Rotations without time-reversal, real space, crystal coordinates.
+     real(dp), allocatable :: crotations_orig(:,:,:)
+     !! Rotations without time-reversal, real space, Cartesian coordinates.
+     real(dp), allocatable :: qrotations_orig(:,:,:)
+     !! Rotations without time-reversal, reciprocal space, crystal coordinates.
      !And with time-reversal (time reversed sector is the 2nd half of last axis):
      integer(k4), allocatable :: rotations(:,:,:) 
-     !! Rotation matrices: real space, crystal coordinates.
+     !! Rotations with time-reversal, real space, crystal coordinates.
      real(dp), allocatable :: crotations(:,:,:)
-     !! Rotation matrices: real space, cartesian coordinates.
+     !! Rotations with time-reversal, real space, Cartesian coordinates.
      real(dp), allocatable :: qrotations(:,:,:)
-     !! Rotation matrices:: reciprocal space, crystal coordinates.
+     !! Rotations with time-reversal, reciprocal space, crystal coordinates.
      integer(k4), allocatable :: equiv_map(:,:)
      !! Map of equivalent points under rotations.
      !! Axis 1 runs over rotations.
@@ -86,19 +88,19 @@ module derived_types
      !! Coarse wave vector mesh.
      integer(kind = 4) :: fine_mesh(3)
      !! Fine wave vector mesh.
-     integer(k4) :: nq
-     !! Number of electron wave vectors in the full Brillouin zone (FBZ).
-     integer(k4) :: nq_irred
-     !! Number of electron wave vectors in the irreducible wedge of Brillouin zone (IBZ).
+     integer(k4) :: nk
+     !! Number of fine electron wave vectors in the full Brillouin zone (FBZ).
+     integer(k4) :: nk_irred
+     !! Number of fine electron wave vectors in the irreducible wedge of Brillouin zone (IBZ).
      integer(k4) :: nstates_inwindow
      !! Number of electron wave vectors within transport window.
      integer(k4) :: nstates_irred_inwindow
      !! Number of IBZ wedge electron wave vectors within transport window.
      integer(k4), allocatable :: IBZ_inwindow_states(:,:)
      !! List of irreducible wedge states within transport window.
-     real(dp), allocatable :: wavevecs(:, :)
+     real(dp), allocatable :: wavevecs(:,:)
      !! List of all electron wave vectors (crystal coordinates).
-     real(dp), allocatable :: wavevecs_irred(:, :)
+     real(dp), allocatable :: wavevecs_irred(:,:)
      !! List of irreducible electron wave vectors (crystal coordinates).
      integer(k4), allocatable :: indexlist(:)
      !! List of muxed indices of the FBZ wave vectors.
@@ -106,34 +108,115 @@ module derived_types
      !! List of muxed indices of the IBZ wedge.
      integer(k4), allocatable :: nequiv(:)
      !! List of the number of equivalent points for each IBZ point.
-     integer(k4), allocatable :: ibz2fbz_map(:, :, :)
+     integer(k4), allocatable :: ibz2fbz_map(:,:,:)
      !! Map from an IBZ electron point to its images.
      !! The third axis contains the pair (symmetry index, image).
      integer(k4), allocatable :: fbz2ibz_map(:)
      !! Map from an FBZ electron point to its IBZ wedge image.
-     real(dp), allocatable :: ens(:, :)
+     real(dp), allocatable :: ens(:,:)
      !! List of electron energies on FBZ.
-     real(dp), allocatable :: ens_irred(:, :)
+     real(dp), allocatable :: ens_irred(:,:)
      !! List of electron energies on IBZ.
-     real(dp), allocatable :: vels(:, :, :)
-     !! List of electron velocities on FBZ
-     real(dp), allocatable :: vels_irred(:, :, :)
-     !! List of electron velicites on IBZ.
-     complex(dp), allocatable :: evecs(:, :, :)
+     real(dp), allocatable :: vels(:,:,:)
+     !! List of electron velocities on FBZ.
+     real(dp), allocatable :: vels_irred(:,:,:)
+     !! List of electron velocites on IBZ.
+     complex(dp), allocatable :: evecs(:,:,:)
      !! List of all electron eigenvectors.
-     complex(dp), allocatable :: evecs_irred(:, :, :)
+     complex(dp), allocatable :: evecs_irred(:,:,:)
      !! List of IBZ wedge electron eigenvectors.
   end type electron_data
 
-  !type phonon_data
-     !! Container for electronic data.
+  type phonon_data
+     !! Container for phononic data.
 
-     
-  !end type phonon_data
+     integer(k4) :: numbranches
+     !! Total number of phonon branches.
+     integer(kind = 4) :: mesh(3)
+     !! Wave vector mesh.
+     integer(k4) :: nq
+     !! Number of phonon wave vectors in the full Brillouin zone (FBZ).
+     integer(k4) :: nq_irred
+     !! Number of phonon wave vectors in the irreducible wedge of Brillouin zone (IBZ).
+     real(dp), allocatable :: wavevecs(:,:)
+     !! List of all phonon wave vectors (crystal coordinates).
+     real(dp), allocatable :: wavevecs_irred(:,:)
+     !! List of irreducible phonon wave vectors (crystal coordinates).
+     integer(k4), allocatable :: indexlist(:)
+     !! List of muxed indices of the FBZ wave vectors.
+     integer(k4), allocatable :: indexlist_irred(:)
+     !! List of muxed indices of the IBZ wedge.
+     integer(k4), allocatable :: nequiv(:)
+     !! List of the number of equivalent points for each IBZ point.
+     integer(k4), allocatable :: ibz2fbz_map(:,:,:)
+     !! Map from an IBZ phonon point to its images.
+     !! The third axis contains the pair (symmetry index, image).
+     integer(k4), allocatable :: fbz2ibz_map(:)
+     !! Map from an FBZ phonon point to its IBZ wedge image.
+     real(dp), allocatable :: ens(:,:)
+     !! List of phonon energies on FBZ.
+     real(dp), allocatable :: ens_irred(:,:)
+     !! List of phonon energies on IBZ.
+     real(dp), allocatable :: vels(:,:,:)
+     !! List of phonon velocities on FBZ.
+     real(dp), allocatable :: vels_irred(:,:,:)
+     !! List of phonon velocites on IBZ.
+     complex(dp), allocatable :: evecs(:,:,:)
+     !! List of all phonon eigenvectors.
+     complex(dp), allocatable :: evecs_irred(:,:,:)
+     !! List of IBZ wedge phonon eigenvectors.     
+  end type phonon_data
 
-  !type directories
-     !! Container for i/o directories
-  !end type directories
+  type EPW_data
+     !! Container for the EPW Wannier representation data.
+
+     integer(k4) :: numwannbands
+     !! Number of Wannier bands.
+     integer(k4) :: numbranches
+     !! Number of phonon branches.
+     integer(k4) :: nwsk
+     !! Number of real space cells for electrons.
+     integer(k4) :: nwsq
+     !! Number of real space cells for phonons.
+     integer(k4) :: nwsg
+     !! Number of real space cells for electron-phonon vertex.
+     integer(k4), allocatable :: rcells_k(:, :)
+     !! Real space cell locations for electrons.
+     integer(k4), allocatable :: rcells_q(:, :)
+     !! Real space cell locations for phonons.
+     integer(k4), allocatable :: rcells_g(:, :)
+     !! Real space cell locations for electron-phonon vertex.     
+     integer(k4), allocatable :: elwsdeg(:)
+     !! Real space cell multiplicity for electrons.
+     integer(k4), allocatable :: phwsdeg(:)
+     !! Real space cell multiplicity for phonons.
+     integer(k4), allocatable :: gwsdeg(:)
+     !! Real space cell multiplicity for electron-phonon vertex.
+     complex(dp), allocatable :: Hwann(:, :, :)
+     !! Hamiltonian in Wannier representation.
+     complex(dp), allocatable :: Dphwann(:, :, :)
+     !! Dynamical matrix in Wannier representation.
+     complex(dp), allocatable :: gwann(:, :, :, :, :)
+     !! e-ph vertex in Wannier representation.
+  end type EPW_data
+
+  type control_data
+     !! Container for i/o directories and system control flags.
+
+     character(:), allocatable :: cwd
+     !! Current working directory.
+     character(:), allocatable :: datadumpdir
+     !! Runtime data dump repository.
+     character(:), allocatable :: g2dir
+     !! Directory for e-ph vertex.
+     character(:), allocatable :: Vdir
+     !! Directory for ph-ph vertex.
+
+     logical :: read_g2
+     !! Choose if earlier e-ph vertex is to be used.
+     logical :: read_V
+     !! Choose if earlier p-ph vertex is to be used.
+  end type control_data
 end module derived_types
 
 

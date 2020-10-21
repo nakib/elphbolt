@@ -25,3 +25,9 @@
 &numerics
  qmesh = 10 10 10
 /
+
+&control
+ datadumpdir = './dump/'
+ read_g2 = .false.
+ read_V = .false.
+/

@@ -2,8 +2,9 @@ module config
   !! Module containing crystal information and subroutines related to the calculation.
 
   use params, only: dp, k4, twopi
-  use derived_types, only: crystal_data, reciprocal_lattice_data, symmetry_data, electron_data
-  use misc, only: cross_product, mux_vector, demux_mesh
+  use derived_types, only: crystal_data, reciprocal_lattice_data, symmetry_data, &
+       electron_data, phonon_data, control_data
+  use misc, only: cross_product, mux_vector, demux_mesh, exit_with_message
   use spglib_wrapper, only: get_operations, get_cartesian_operations, get_num_operations
   
   implicit none
@@ -13,7 +14,7 @@ module config
     
 contains
 
-  subroutine initialize_system(crys,reclat,sym,el)
+  subroutine initialize_system(crys,reclat,sym,el,ph,con)
     !! Subroutine to read input.nml file and set up the calculation environment.
     !! Outputs crystal of type crystal_data and reciprocal_lattice of type
     !! reciprocal_lattice_date.
@@ -22,7 +23,8 @@ contains
     type(reciprocal_lattice_data), intent(out) :: reclat
     type(symmetry_data), intent(out) :: sym
     type(electron_data), intent(out) :: el
-    !type(phonon_data), intent(out) :: ph
+    type(phonon_data), intent(out) :: ph
+    type(control_data), intent(out) :: con
 
     !Local variables:
     integer(k4) :: i, j, k, numelements, numatoms, qmesh(3)
@@ -30,12 +32,15 @@ contains
     character(len=3), allocatable :: elements(:)
     real(dp), allocatable :: masses(:), basis(:,:), basis_cart(:,:)
     real(dp) :: lattvecs(3,3)
+    character(len=500) :: cwd, datadumpdir
+    logical :: read_g2, read_V
 
     !Namelists:
     namelist /allocations/ numelements, numatoms
     namelist /crystal_info/ elements, atomtypes, basis, lattvecs
     namelist /numerics/ qmesh
-
+    namelist /control/ datadumpdir, read_g2, read_V
+    
     if(this_image() == 1) print*, 'Reading input.nml...'
     
     !Open input file
@@ -45,12 +50,12 @@ contains
     ! Read allocations.
     read(1, nml = allocations)
     if(numelements < 1 .or. numatoms < 1 .or. numatoms > numelements) then
-       !TODO Catch error
-       print*, 'Bad input(s) in allocations.'
+       call exit_with_message('Bad input(s) in allocations.')
     end if
 
     crys%numelements = numelements
     crys%numatoms = numatoms
+    ph%numbranches = 3*numatoms
         
     allocate(elements(numelements), atomtypes(numatoms), &
          masses(numatoms), basis(3,numatoms))
@@ -58,8 +63,7 @@ contains
     ! Read crystal_info.
     read(1, nml = crystal_info)
     if(any(atomtypes < 1) .or. any(masses < 0)) then
-       !TODO Catch error
-       print*, 'Bad input(s) in crystal_info.'
+       call exit_with_message('Bad input(s) in crystal_info.')
     end if
     
     allocate(crys%elements(numelements), crys%atomtypes(numatoms), &
@@ -85,22 +89,82 @@ contains
     reclat%reclattvecs(:,:) = &
          reclat%volume_bz*reclat%reclattvecs(:,:)
 
-    ! Read mesh information.
+    ! Read numerics information.
     qmesh = (/0, 0, 0/)
     read(1, nml = numerics)
     if(any(qmesh <= 0)) then
-       !TODO Catch error
-       print*, 'Bad input(s) in numerics.'
+       call exit_with_message('Bad input(s) in numerics.')
     end if
+    ph%mesh = qmesh
+    ph%nq = product(ph%mesh)
     el%coarse_mesh = qmesh !Coarse electron mesh is the same as the phonon mesh.
+
+    ! Read control information.
+    datadumpdir = './'
+    read_g2 = .false.
+    read_V = .false.
+    read(1, nml = control)
+    con%datadumpdir = trim(datadumpdir)
+    ! Create data dump directory
+    if(this_image() == 1) call system('mkdir ' // trim(adjustl(datadumpdir)))
+
+    ! Create matrix elements data directories
+    con%g2dir = trim(adjustl(con%datadumpdir))//'g2'
+    if(this_image() == 1) call system('mkdir ' // trim(adjustl(con%g2dir)))
+    con%Vdir = trim(adjustl(con%datadumpdir))//'V'
+    if(this_image() == 1) call system('mkdir ' // trim(adjustl(con%Vdir)))
+    
+    con%read_g2 = read_g2
+    con%read_V = read_V
     
     !Close input file.
     close(1) 
 
+    !Set current work directory.
+    call getcwd(cwd)
+    con%cwd = trim(cwd)
+
+    !Print out run-specific information.
+    if(this_image() == 1) then
+       print*, 'Working directory: ', con%cwd
+       print*, 'Data dump directory: ', con%datadumpdir
+       print*, 'e-ph vertex data directory: ', con%g2dir
+       print*, 'ph-ph vertex data directory: ', con%Vdir
+       if(con%read_g2) then
+          print*, 'Previous e-ph vertex will be read from disk.'
+       else
+          print*, 'e-ph vertex will be calculated.'
+       end if
+       if(con%read_V) then
+          print*, 'Previous ph-ph vertex will be read from disk.'
+       else
+          print*, 'ph-ph vertex will be calculated.'
+       end if
+    end if
+    
+    !Print out crystal and reciprocal lattice information.
+    if(this_image() == 1) then
+       print*, 'Lattice vectors [nm]:'
+       print*, crys%lattvecs(:,1)
+       print*, crys%lattvecs(:,2)
+       print*, crys%lattvecs(:,3)
+       print*, 'Primitive cell volume =', crys%volume, 'nm^3'
+
+       print*, 'Reciprocal lattice vectors [1/nm]:'
+       print*, reclat%reclattvecs(:,1)
+       print*, reclat%reclattvecs(:,2)
+       print*, reclat%reclattvecs(:,3)
+       print*, 'Brillouin zone volume =', reclat%volume_bz, '1/nm^3'
+
+       print*, 'Phonon wave vector mesh = ', ph%mesh
+       print*, 'Number of phonon wave vectors = ', ph%nq
+       
+       print*, 'Coarse electron wave vector mesh = ', el%coarse_mesh
+       print*, 'Number of coarse electron wave vectors = ', product(el%coarse_mesh)
+    end if
+    
     !Calculate all symmetry related information.
     call calculate_symmetries(crys,sym,qmesh)
-    
-    !!!
   end subroutine initialize_system
 
   subroutine calculate_symmetries(crys,sym,qmesh)
@@ -143,7 +207,7 @@ contains
 
     if(this_image() == 1) then
        print*, "Symmetry group = ", trim(sym%international)
-       write(*,*) "Number of symmetries (without time-reversal) = ", sym%nsymm
+       print*, "Number of symmetries (without time-reversal) = ", sym%nsymm
     end if
 
     !Get symmertry operations in Cartesian basis.
@@ -195,11 +259,11 @@ contains
        end do
     end do
     if(this_image() == 1 .and. ll == 0) then
-       print*, ll, "Duplicated rotations will be discarded."
+       print*, "Number of duplicated rotations to be discarded = ", ll
     end if
 
-    ! Filter out those rotations through a series of move_alloc calls.
-    ! Arrays to take into account: rotations,crotations,qrotations.
+    !Filter out those rotations through a series of move_alloc calls.
+    !Arrays to take into account: rotations,crotations,qrotations.
     if(ll + jj /= 0) then
        allocate(rtmp(3,3,sym%nsymm_rot - ll - jj))
        allocate(crtmp(3,3,sym%nsymm_rot - ll - jj))

@@ -141,7 +141,8 @@ contains
     ctypes=types
     cpositions=positions
     cnops=nops
-
+    intertmp = '          ' !Empty spaces
+    
     ! If nops changes value, something went wrong. Checking
     ! this condition is up to the user.
     newnops = spg_get_symmetry(crotations,ctranslations,cnops,&

@@ -7,6 +7,25 @@ module misc
 
 contains
 
+  subroutine exit_with_message(message)
+    !! Exit with error message.
+
+    character(len=*), intent(in) :: message
+
+    if(this_image() == 1) then
+       print*, trim(message)
+       stop
+    end if
+  end subroutine exit_with_message
+
+  subroutine print_message(message)
+    !! Print message.
+    
+    character(len=*), intent(in) :: message
+
+    if(this_image() == 1) print*, trim(message)
+  end subroutine print_message
+
   subroutine int_div(num,denom,q,r)
     !! Quotient(q) and remainder(r) of the integer division num/denom.
 
@@ -38,10 +57,9 @@ contains
     integer(k4), intent(in) :: v(3), mesh(3), base
     integer(k4) :: mux_vector 
 
-    !TODO catch error
-    !if(base < 0 .or. base > 1) then
-    !   call exit_with_message("Base has to be either 0 or 1 in index.f90:mux_vector")
-    !end if
+    if(base < 0 .or. base > 1) then
+       call exit_with_message("Base has to be either 0 or 1 in index.f90:mux_vector")
+    end if
 
     if(base == 0) then
        mux_vector = (v(3)*mesh(2) + v(2))*mesh(1) + v(1) + 1
@@ -62,10 +80,9 @@ contains
     integer(k4), intent(out) :: v(3)
     integer(k4) :: aux
 
-    !TODO Catch error
-    !if(base < 0 .or. base > 1) then
-    !   call exit_with_message("Base has to be either 0 or 1 in index.f90:demux_vector")
-    !end if
+    if(base < 0 .or. base > 1) then
+       call exit_with_message("Base has to be either 0 or 1 in index.f90:demux_vector")
+    end if
 
     call int_div(i - 1, mesh(1), aux, v(1))
     call int_div(aux, mesh(2), v(3), v(2))
