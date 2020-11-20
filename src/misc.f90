@@ -47,6 +47,38 @@ contains
     cross_product(3) = A(1)*B(2) - A(2)*B(1)
   end function cross_product
 
+  function expix(x)
+    !! Calculate exp(i*x) = cos(x) + isin(x)
+    implicit none
+
+    real(dp), intent(in) :: x
+    complex(dp) :: expix
+
+    expix = cmplx(cos(x), sin(x))
+  end function expix
+
+  subroutine sort_int(list)
+    !! Swap sort list of integers
+
+    integer(k4), intent(inout) :: list(:)
+    integer(k4) :: i, j, n
+    integer(k4) :: aux, tmp
+    
+    n = size(list)
+
+    do i = 1, n
+       aux = list(i)
+       do j = i + 1, n
+          if (aux > list(j)) then
+             tmp = list(j)
+             list(j) = aux
+             list(i) = tmp
+             aux = tmp
+          end if
+       end do
+    end do
+  end subroutine sort_int
+  
   function mux_vector(v,mesh,base)
     !! Multiplex index of a single wave vector.
     !! v is the demultiplexed triplet of a wave vector.
@@ -111,4 +143,32 @@ contains
        end if
     end do
   end subroutine demux_mesh
+
+  function mux_state(nbands, iband, ik)
+    !! Multiplex a (band index, wave vector index) pair into a state index 
+    !!
+    !! nbands is the number of bands
+    !! iband is the band index
+    !! ik is the wave vector index
+    
+    integer(k4), intent(in) :: nbands, ik, iband 
+    integer(k4) :: mux_state
+
+    mux_state = (ik - 1)*nbands + iband
+  end function mux_state
+
+  subroutine demux_state(m, nbands, iband, ik)
+    !!Demultiplex a state index into (band index, wave vector index) pair
+    !!
+    !! m is the multiplexed state index
+    !! nbands is the number of bands
+    !! iband is the band index
+    !! ik is the wave vector index
+    
+    integer(k4), intent(in) :: m, nbands
+    integer(k4), intent(out) :: ik, iband 
+
+    iband = modulo(m - 1, nbands) + 1
+    ik = int((m - 1)/nbands) + 1
+  end subroutine demux_state
 end module misc

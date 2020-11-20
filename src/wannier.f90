@@ -1,9 +1,11 @@
 module wannier
   !! Subroutines for reading Wannier information and Wannier->Bloch transformations
 
-  use params, only: dp, k4 !, Ryd2eV, Ryd2amu
-  use derived_types, only: epw_data
-  use misc, only: print_message
+  use params, only: dp, k4 , Ryd2eV, Ryd2radTHz, oneI, twopi!, Ryd2amu
+  use misc, only: exit_with_message, print_message, expix
+  use data, only: numwannbands, numbranches, nwsk, nwsq, nwsg, &
+       rcells_k, rcells_q, rcells_g, elwsdeg, phwsdeg, &
+       gwsdeg, Hwann, Dphwann, gwann, lattvecs
   
   implicit none
 
@@ -24,42 +26,35 @@ module wannier
 
 contains
 
-  subroutine read_EPW_Wannier(epw)
+  subroutine read_EPW_Wannier
     !! Read Wannier representation of the hamiltonian, dynamical matrix, and the
     !! e-ph matrix elements from file epwdata.fmt.
 
-    type(epw_data), intent(out) :: epw
-    integer(kind = 4) :: iuc, ib, jb
+    integer(k4) :: iuc, ib, jb, numbranches_dummy
 
     open(1,file=filename_epwdata,status='old')
     read(1,*) !ef
-    read(1,*) epw%numwannbands, epw%nwsk, epw%numbranches, epw%nwsq, epw%nwsg
+    read(1,*) numwannbands, nwsk, numbranches_dummy, nwsq, nwsg
     read(1,*) !zstar, epsil: non-zero only for polar materials
-
-!!$    if(nwannbands /= numwannbands) &
-!!$         call exit_with_message("Wrong number of Wannier bands in EPW Wannier data.")
-!!$
-!!$    if(nbranches /= numbranches) &
-!!$         call exit_with_message("Wrong number of phonon branches in EPW Wannier data.")
 
     !Read real space hamiltonian
     call print_message("Reading Wannier rep. Hamiltonian...")
-    allocate(epw%Hwann(epw%nwsk,epw%numwannbands,epw%numwannbands))
-    do ib = 1,epw%numwannbands
-       do jb = 1,epw%numwannbands
-          do iuc = 1,epw%nwsk !Number of real space electron cells
-             read (1, *) epw%Hwann(iuc,ib,jb)
+    allocate(Hwann(nwsk,numwannbands,numwannbands))
+    do ib = 1,numwannbands
+       do jb = 1,numwannbands
+          do iuc = 1,nwsk !Number of real space electron cells
+             read (1, *) Hwann(iuc,ib,jb)
           end do
        end do
     end do
 
     !Read real space dynamical matrix
     call print_message("Reading Wannier rep. dynamical matrix...")
-    allocate(epw%Dphwann(epw%nwsq,epw%numbranches,epw%numbranches))
-    do ib = 1,epw%numbranches
-       do jb = 1,epw%numbranches
-          do iuc = 1,epw%nwsq !Number of real space phonon cells
-             read (1, *) epw%Dphwann(iuc,ib,jb)
+    allocate(Dphwann(nwsq,numbranches,numbranches))
+    do ib = 1,numbranches
+       do jb = 1,numbranches
+          do iuc = 1,nwsq !Number of real space phonon cells
+             read (1, *) Dphwann(iuc,ib,jb)
           end do
        end do
     end do
@@ -68,131 +63,132 @@ contains
     !Read real space matrix elements
     call print_message("Reading Wannier rep. e-ph vertex...")
     open(1, file = filename_epwgwann, status = 'old', access = 'stream')
-    allocate(epw%gwann(epw%numwannbands,epw%numwannbands,epw%nwsk,epw%numbranches,epw%nwsg))
-    epw%gwann = 0.0_dp
-    read(1) epw%gwann
+    allocate(gwann(numwannbands,numwannbands,nwsk,numbranches,nwsg))
+    gwann = 0.0_dp
+    read(1) gwann
     close(1)
 
     !Read cell maps of q, k, g meshes.
     call print_message("Reading Wannier cells and multiplicities...")
-    allocate(epw%rcells_k(epw%nwsk,3))
-    allocate(epw%elwsdeg(epw%nwsk))
+    allocate(rcells_k(nwsk,3))
+    allocate(elwsdeg(nwsk))
     open(1, file = filename_elwscells, status = "old")
     open(2, file = filename_elwsdeg, status = "old")
-    do iuc = 1,epw%nwsk
-       read(1, *) epw%rcells_k(iuc, :)
-       read(2, *) epw%elwsdeg(iuc)
+    do iuc = 1,nwsk
+       read(1, *) rcells_k(iuc, :)
+       read(2, *) elwsdeg(iuc)
     end do
     close(1)
     close(2)
 
-    allocate(epw%rcells_q(epw%nwsq, 3))
-    allocate(epw%phwsdeg(epw%nwsq))
+    allocate(rcells_q(nwsq, 3))
+    allocate(phwsdeg(nwsq))
     open(1, file = filename_phwscells, status = "old")
     open(2, file = filename_phwsdeg, status = "old")
-    do iuc = 1,epw%nwsq
-       read(1, *) epw%rcells_q(iuc, :)
-       read(2, *) epw%phwsdeg(iuc)
+    do iuc = 1,nwsq
+       read(1, *) rcells_q(iuc, :)
+       read(2, *) phwsdeg(iuc)
     end do
     close(1)
     close(2)
 
-    allocate(epw%rcells_g(epw%nwsg, 3))
-    allocate(epw%gwsdeg(epw%nwsg))
+    allocate(rcells_g(nwsg, 3))
+    allocate(gwsdeg(nwsg))
     open(1, file = filename_gwscells, status = "old")
     open(2, file = filename_gwsdeg, status = "old")
-    do iuc = 1,epw%nwsg
-       read(1, *) epw%rcells_g(iuc, :)
-       read(2, *) epw%gwsdeg(iuc)
+    do iuc = 1,nwsg
+       read(1, *) rcells_g(iuc, :)
+       read(2, *) gwsdeg(iuc)
     end do
     close(1)
     close(2)
   end subroutine read_EPW_Wannier
   
-!!$  subroutine el_wann_epw(nk, kvecs, energies, velocities, evecs)
-!!$    !! Wannier interpolate electrons on list of arb. k-vecs
-!!$    use configuration, only: nwsk, rcells_k, elwsdeg, &
-!!$         Hwann, lattvecs, numwannbands
-!!$    
-!!$    implicit none
-!!$
-!!$    integer(kind = 4), intent(in) :: nk
-!!$    real(dp), intent(in) :: kvecs(nk, 3) !Crystal coordinates
-!!$    real(dp), intent(out) :: energies(nk, numwannbands)
-!!$    real(dp), optional, intent(out) :: velocities(nk, numwannbands, 3)
-!!$    complex(dp), optional, intent(out) :: evecs(nk, numwannbands, numwannbands)
-!!$    integer(kind = 4) :: iuc, ib, jb, ipol, ik, nwork, tmp
-!!$    real(dp) :: rcart(3)
-!!$    real(dp),  allocatable :: rwork(:)
-!!$    complex(dp), allocatable :: work(:)
-!!$    complex(dp) :: caux, H(numwannbands, numwannbands), dH(3, numwannbands, numwannbands)
-!!$
-!!$    !Catch error for optional velocity calculation
-!!$    if(present(velocities) .and. .not. present(evecs)) &
-!!$         call exit_with_message("In Wannier, velocity is present but not eigenvecs.")
-!!$    
-!!$    nwork = 1
-!!$    allocate(work(nwork))
-!!$    allocate(rwork(max(1, 7*numwannbands)))
-!!$    
-!!$    do ik = 1, nk
-!!$       !Form Hamiltonian (H) and k-derivative of H (dH) 
-!!$       !from Hwann, rcells_k, and elwsdeg
-!!$       H = 0
-!!$       dH = 0
-!!$       do iuc = 1, nwsk
-!!$          caux = cis(twopi*dot_product(kvecs(ik, :), rcells_k(iuc, :)))&
-!!$               /elwsdeg(iuc)
-!!$          H = H + caux*Hwann(iuc, :, :)
-!!$
-!!$          if(present(velocities)) then
-!!$             rcart = matmul(lattvecs, rcells_k(iuc, :))
-!!$             do ipol = 1, 3
-!!$                dH(ipol, :, :) = dH(ipol, :, :) + &
-!!$                     oneI*rcart(ipol)*caux*Hwann(iuc, :, :)
-!!$             end do
-!!$          end if
-!!$       end do
-!!$
-!!$       !Force Hermiticity
-!!$       do ib = 1, numwannbands
-!!$          do jb = ib + 1, numwannbands
-!!$             H(ib, jb) = (H(ib, jb) + conjg(H(jb, ib)))*0.5_dp
-!!$             H(jb, ib) = H(ib, jb)
-!!$          end do
-!!$       end do
-!!$
-!!$       !Diagonalize H
-!!$       call zheev("V", "U", numwannbands, H(:, :), numwannbands, energies(ik, :), work, -1, rwork, tmp)
-!!$       if(real(work(1)) > nwork) then
-!!$          nwork = nint(2*real(work(1)))
-!!$          deallocate(work)
-!!$          allocate(work(nwork))
-!!$       end if
-!!$       call zheev("V", "U", numwannbands, H(:, :), numwannbands, energies(ik, :), work, nwork, rwork, tmp)
-!!$
-!!$       if(present(evecs)) then
-!!$          evecs(ik, :, :)=transpose(H(:, :))
-!!$       end if
-!!$
-!!$       if(present(velocities)) then
-!!$          !Calculate velocities using Feynman-Hellmann thm
-!!$          do ib = 1, numwannbands
-!!$             do ipol = 1, 3
-!!$                velocities(ik, ib, ipol)=real(dot_product(evecs(ik, ib, :), &
-!!$                     matmul(dH(ipol, :, :), evecs(ik, ib, :))))
-!!$             end do
-!!$          end do
-!!$       end if
-!!$
-!!$       !energies(ik, :) = energies(ik, :)*Rydberg2radTHz !2piTHz
-!!$       energies(ik, :) = energies(ik, :)*Rydberg2eV !eV
-!!$
-!!$       if(present(velocities)) then
-!!$          velocities(ik, :, :) = velocities(ik, :, :)*Rydberg2radTHz !nmTHz = Km/s
-!!$       end if
-!!$    end do !ik
-!!$  end subroutine el_wann_epw
+  !subroutine el_wann_epw(nk, kvecs, energies, velocities, evecs)
+  subroutine el_wann_epw(nk, kvecs, energies, velocities, evecs)
+    !! Wannier interpolate electrons on list of arb. k-vecs
+    
+    integer(k4), intent(in) :: nk
+    real(dp), intent(in) :: kvecs(nk,3) !Crystal coordinates
+    real(dp), intent(out) :: energies(nk,numwannbands)
+    real(dp), optional, intent(out) :: velocities(nk,numwannbands,3)
+    complex(dp), optional, intent(out) :: evecs(nk,numwannbands,numwannbands)
+    integer(k4) :: iuc, ib, jb, ipol, ik, nwork, tmp
+    real(dp) :: rcart(3)
+    real(dp),  allocatable :: rwork(:)
+    complex(dp), allocatable :: work(:)
+    complex(dp) :: caux, H(numwannbands,numwannbands), &
+         dH(3,numwannbands,numwannbands)
+
+    !Catch error for optional velocity calculation
+    if(present(velocities) .and. .not. present(evecs)) &
+         call exit_with_message("In Wannier, velocity is present but not eigenvecs.")
+    
+    nwork = 1
+    allocate(work(nwork))
+    allocate(rwork(max(1,7*numwannbands)))
+    
+    do ik = 1,nk
+       !Form Hamiltonian (H) and k-derivative of H (dH) 
+       !from Hwann, rcells_k, and elwsdeg
+       H = 0
+       dH = 0
+       do iuc = 1,nwsk
+          caux = expix(twopi*dot_product(kvecs(ik,:),rcells_k(iuc,:)))&
+               /elwsdeg(iuc)
+          H = H + caux*Hwann(iuc,:,:)
+
+          if(present(velocities)) then
+             rcart = matmul(lattvecs,rcells_k(iuc,:))
+             do ipol = 1,3
+                dH(ipol,:,:) = dH(ipol,:,:) + &
+                     oneI*rcart(ipol)*caux*Hwann(iuc,:,:)
+             end do
+          end if
+       end do
+
+       !Force Hermiticity
+       do ib = 1,numwannbands
+          do jb = ib + 1,numwannbands
+             H(ib,jb) = (H(ib,jb) + conjg(H(jb,ib)))*0.5_dp
+             H(jb,ib) = H(ib,jb)
+          end do
+       end do
+
+       !Diagonalize H
+       call zheev("V", "U", numwannbands, H(:,:), numwannbands, energies(ik,:), &
+            work, -1, rwork, tmp)
+       if(real(work(1)) > nwork) then
+          nwork = nint(2*real(work(1)))
+          deallocate(work)
+          allocate(work(nwork))
+       end if
+       call zheev("V", "U", numwannbands, H(:,:), numwannbands, energies(ik,:), &
+            work, nwork, rwork, tmp)
+
+       if(present(evecs)) then
+          evecs(ik,:,:)=transpose(H(:,:))
+       end if
+
+       if(present(velocities)) then
+          !Calculate velocities using Feynman-Hellmann thm
+          do ib = 1,numwannbands
+             do ipol = 1,3
+                velocities(ik,ib,ipol)=real(dot_product(evecs(ik,ib,:), &
+                     matmul(dH(ipol,:,:), evecs(ik,ib,:))))
+             end do
+          end do
+       end if
+
+       !energies(ik,:) = energies(ik,:)*Rydberg2radTHz !2piTHz
+       energies(ik,:) = energies(ik,:)*Ryd2eV !eV
+
+       if(present(velocities)) then
+          velocities(ik,:,:) = velocities(ik,:,:)*Ryd2radTHz !nmTHz = Km/s
+       end if
+    end do !ik
+  end subroutine el_wann_epw
+
 !!$
 !!$  subroutine ph_wann_epw(nq, qvecs, energies, velocities, evecs)
 !!$    !! Wannier interpolate phonons on list of arb. q-vec
@@ -227,7 +223,7 @@ contains
 !!$       dynmat = 0
 !!$       ddynmat = 0
 !!$       do iuc = 1, nwsq
-!!$          caux = cis(twopi*dot_product(qvecs(iq, :), rcells_q(iuc, :)))&
+!!$          caux = expix(twopi*dot_product(qvecs(iq, :), rcells_q(iuc, :)))&
 !!$               /phwsdeg(iuc)
 !!$          dynmat = dynmat + caux*Dphwann(iuc, :, :)
 !!$
@@ -559,7 +555,7 @@ contains
 !!$    !Fourier transform to k-space
 !!$    gmixed = 0
 !!$    do iuc = 1, nwsk
-!!$       caux = cis(twopi*dot_product(kvec, rcells_k(iuc, :))) &
+!!$       caux = expix(twopi*dot_product(kvec, rcells_k(iuc, :))) &
 !!$            /elwsdeg(iuc)
 !!$       gmixed(:, :, :, :) = gmixed(:, :, :, :) + &
 !!$            caux*gwann(:, :, iuc, :, :)
