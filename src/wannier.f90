@@ -1,11 +1,11 @@
 module wannier
   !! Subroutines for reading Wannier information and Wannier->Bloch transformations
 
-  use params, only: dp, k4 , Ryd2eV, Ryd2radTHz, oneI, twopi!, Ryd2amu
-  use misc, only: exit_with_message, print_message, expix
+  use params, only: dp, k4 , Ryd2eV, Ryd2radTHz, oneI, twopi, Ryd2amu
+  use misc, only: exit_with_message, print_message, expi
   use data, only: numwannbands, numbranches, nwsk, nwsq, nwsg, &
-       rcells_k, rcells_q, rcells_g, elwsdeg, phwsdeg, &
-       gwsdeg, Hwann, Dphwann, gwann, lattvecs
+       rcells_k, rcells_q, rcells_g, elwsdeg, phwsdeg, atomtypes, &
+       gwsdeg, Hwann, Dphwann, gwann, lattvecs, numatoms, qmesh, masses
   
   implicit none
 
@@ -104,7 +104,6 @@ contains
     close(2)
   end subroutine read_EPW_Wannier
   
-  !subroutine el_wann_epw(nk, kvecs, energies, velocities, evecs)
   subroutine el_wann_epw(nk, kvecs, energies, velocities, evecs)
     !! Wannier interpolate electrons on list of arb. k-vecs
     
@@ -113,6 +112,7 @@ contains
     real(dp), intent(out) :: energies(nk,numwannbands)
     real(dp), optional, intent(out) :: velocities(nk,numwannbands,3)
     complex(dp), optional, intent(out) :: evecs(nk,numwannbands,numwannbands)
+
     integer(k4) :: iuc, ib, jb, ipol, ik, nwork, tmp
     real(dp) :: rcart(3)
     real(dp),  allocatable :: rwork(:)
@@ -134,7 +134,7 @@ contains
        H = 0
        dH = 0
        do iuc = 1,nwsk
-          caux = expix(twopi*dot_product(kvecs(ik,:),rcells_k(iuc,:)))&
+          caux = expi(twopi*dot_product(kvecs(ik,:),rcells_k(iuc,:)))&
                /elwsdeg(iuc)
           H = H + caux*Hwann(iuc,:,:)
 
@@ -189,131 +189,233 @@ contains
     end do !ik
   end subroutine el_wann_epw
 
-!!$
-!!$  subroutine ph_wann_epw(nq, qvecs, energies, velocities, evecs)
-!!$    !! Wannier interpolate phonons on list of arb. q-vec
-!!$    use configuration, only: qmesh, nwsq, rcells_q, phwsdeg, &
-!!$         Dphwann, lattvecs, numbranches, numatoms, atomtypes, masses
-!!$
-!!$    implicit none
-!!$
-!!$    integer(kind = 4), intent(in) :: nq
-!!$    real(dp), intent(in) :: qvecs(nq, 3) !Crystal coordinates
-!!$    real(dp), intent(out) :: energies(nq, numbranches)
-!!$    real(dp), intent(out), optional :: velocities(nq, numbranches, 3)
-!!$    complex(dp), intent(out), optional :: evecs(nq, numbranches, numbranches)
-!!$    integer(kind = 4) :: iuc, ib, jb, ipol, iq, na, nb, nwork, aux
-!!$    complex(dp) :: caux
-!!$    real(dp), allocatable :: rwork(:)
-!!$    complex(dp), allocatable :: work(:)
-!!$    real(dp) :: omega2(numbranches), rcart(3), massnorm
-!!$    complex(dp) :: dynmat(numbranches, numbranches), ddynmat(3, numbranches, numbranches)
-!!$
-!!$    !Catch error for optional velocity calculation
-!!$    if(present(velocities) .and. .not. present(evecs)) &
-!!$         call exit_with_message("In Wannier, velocity is present but not eigenvecs.")
+  subroutine ph_wann_epw(nq, qvecs, energies, velocities, evecs)
+    !! Wannier interpolate phonons on list of arb. q-vec
+  
+    integer(k4), intent(in) :: nq
+    real(dp), intent(in) :: qvecs(nq, 3) !Crystal coordinates
+    real(dp), intent(out) :: energies(nq, numbranches)
+    real(dp), intent(out), optional :: velocities(nq, numbranches, 3)
+    complex(dp), intent(out), optional :: evecs(nq, numbranches, numbranches)
+
+    integer(k4) :: iuc, ib, jb, ipol, iq, na, nb, nwork, aux
+    complex(dp) :: caux
+    real(dp), allocatable :: rwork(:)
+    complex(dp), allocatable :: work(:)
+    real(dp) :: omega2(numbranches), rcart(3), massnorm
+    complex(dp) :: dynmat(numbranches, numbranches), ddynmat(3, numbranches, numbranches)
+
+    !Catch error for optional velocity calculation
+    if(present(velocities) .and. .not. present(evecs)) &
+         call exit_with_message("In Wannier, velocity is present but not eigenvecs.")
+    
+    nwork = 1
+    allocate(work(nwork))
+    allocate(rwork(max(1, 9*numatoms-2)))
+    
+    do iq = 1, nq
+       !Form dynamical matrix (dynmat) and q-derivative of dynmat (ddynmat) 
+       !from Dphwann, rcells_q, and phwsdeg
+       dynmat = 0
+       ddynmat = 0
+       do iuc = 1, nwsq
+          caux = expi(twopi*dot_product(qvecs(iq, :), rcells_q(iuc, :)))&
+               /phwsdeg(iuc)
+          dynmat = dynmat + caux*Dphwann(iuc, :, :)
+
+          if(present(velocities)) then
+             rcart = matmul(lattvecs, rcells_q(iuc, :))
+             do ipol=1, 3
+                ddynmat(ipol, :, :) = ddynmat(ipol, :, :) + &
+                     oneI*rcart(ipol)*caux*Dphwann(iuc, :, :)
+             end do
+          end if
+       end do
+
+       !Non-analytic correction
+       !if(polar) then
+       !   call dyn_nonanalytic(matmul(rlattvec,qvecs(iq,:))*bohr2nm, dynmat, ddynmat)
+       !end if
+
+       !Force Hermiticity
+       do ib = 1, numbranches
+          do jb = ib + 1, numbranches
+             dynmat(ib, jb) = (dynmat(ib, jb) + conjg(dynmat(jb, ib)))*0.5_dp
+             dynmat(jb, ib) = dynmat(ib, jb)
+          end do
+       end do
+       
+       !Mass normalize
+       do na = 1, numatoms
+          do nb = 1, numatoms
+             massnorm = 1.d0/sqrt(masses(atomtypes(na))*masses(atomtypes(nb)))*Ryd2amu
+             dynmat(3*(na-1)+1:3*na, 3*(nb-1)+1:3*nb) = &
+                  dynmat(3*(na-1)+1:3*na, 3*(nb-1)+1:3*nb)*massnorm
+             if(present(velocities)) then
+                do ipol=1, 3
+                   ddynmat(ipol, 3*(na-1)+1:3*na, 3*(nb-1)+1:3*nb) = &
+                        ddynmat(ipol, 3*(na-1)+1:3*na, 3*(nb-1)+1:3*nb)*massnorm
+                end do
+             end if
+          end do
+       end do
+       
+       !Diagonalize dynmat
+       call zheev("V", "U", numbranches, dynmat(:, :), numbranches, omega2, work, -1, rwork, aux)
+       if(real(work(1)) > nwork) then
+          nwork = nint(2*real(work(1)))
+          deallocate(work)
+          allocate(work(nwork))
+       end if
+       call zheev("V", "U", numbranches, dynmat(:, :), numbranches, omega2, work, nwork, rwork, aux)
+       
+       energies(iq, :) = sign(sqrt(abs(omega2)), omega2)
+       if(present(evecs)) then
+          evecs(iq, :, :) = transpose(dynmat(:, :))
+       end if
+
+       if(present(velocities)) then
+          !Calculate velocities using Feynman-Hellmann thm
+          do ib = 1, numbranches
+             do ipol = 1, 3
+                velocities(iq, ib, ipol) = real(dot_product(dynmat(:, ib), &
+                     matmul(ddynmat(ipol, :, :), dynmat(:, ib))))
+             end do
+             velocities(iq, ib, :) = velocities(iq, ib, :)/(2.0_dp*energies(iq, ib))
+          end do
+       end if
+
+       !energies(iq, :) = energies(iq, :)*Rydberg2radTHz !2piTHz
+       !energies(iq, :) = energies(iq, :)*Rydberg2eV*1.0e3_dp !meV
+       energies(iq, :) = energies(iq, :)*Ryd2eV !eV
+       if(present(velocities)) then
+          velocities(iq, :, :) = velocities(iq, :, :)*Ryd2radTHz !nmTHz = Km/s
+       end if
+       
+       !Take care of gamma point.
+       if(nq == product(qmesh) .or. all(qvecs(1,:) == 0)) then
+          energies(1, 1:3) = 0
+          if(present(velocities)) then
+             velocities(1, :, :) = 0
+          end if
+       end if
+
+       !Handle negative energy phonons
+       do ib = 1, numbranches
+          if(energies(iq,ib) < -0.005_dp) then
+             print*, 'Oh no!'
+             call exit_with_message('Large negative phonon energy found! Stopping!')
+             
+          else if(energies(iq,ib) < 0 .and. energies(iq,ib) > -0.005_dp) then
+             print*, 'Warning! Small negative phonon energy for q-point, branch =', &
+                  iq, ib
+             print*, 'Setting it to zero. Please check Wannier parameters.'
+             energies(iq,ib) = 0
+          end if
+       end do
+    end do !iq
+  end subroutine ph_wann_epw
+
+!!$  subroutine dyn_nonanalytic(q, dyn, ddyn)
+!!$    !! Calculate the long-range correction to the
+!!$    !! dynamical matrix and its derivative for a given phonon mode.
+!!$    !!
+!!$    !! q is the phonon wvec in Cartesian coords., Bohr^-1
+!!$    !! (d)dyn is the (derivative of)dynamical matrix
 !!$    
-!!$    nwork = 1
-!!$    allocate(work(nwork))
-!!$    allocate(rwork(max(1, 9*numatoms-2)))
-!!$    
-!!$    do iq = 1, nq
-!!$       !Form dynamical matrix (dynmat) and q-derivative of dynmat (ddynamat) 
-!!$       !from Dphwann, rcells_q, and phwsdeg
-!!$       dynmat = 0
-!!$       ddynmat = 0
-!!$       do iuc = 1, nwsq
-!!$          caux = expix(twopi*dot_product(qvecs(iq, :), rcells_q(iuc, :)))&
-!!$               /phwsdeg(iuc)
-!!$          dynmat = dynmat + caux*Dphwann(iuc, :, :)
+!!$    real(dp), intent(in) :: q(3) !Cartesian
+!!$    complex(dp), intent(inout) :: dyn(nbranches,nbranches)
+!!$    complex(dp), intent(inout) :: ddyn(3,nbranches,nbranches)
 !!$
-!!$          if(present(velocities)) then
-!!$             rcart = matmul(lattvecs, rcells_q(iuc, :))
-!!$             do ipol=1, 3
-!!$                ddynmat(ipol, :, :) = ddynmat(ipol, :, :) + &
-!!$                     oneI*rcart(ipol)*caux*Dphwann(iuc, :, :)
-!!$             end do
-!!$          end if
-!!$       end do
+!!$    complex(dp) :: dyn_l(nbranches,nbranches)
+!!$    complex(dp) :: ddyn_l(3,nbranches,nbranches)
+!!$    real(dp) :: qeq,     &! <q+g| epsilon |q+g>
+!!$         arg, zag(3),zbg(3), g(3), gmax, alph, geg,&
+!!$         tpiba,dgeg(3),fnat(3),rr(natoms,natoms,3)
+!!$    integer(kind=4) :: na,nb,i,idim,jdim,ipol,jpol,m1,m2,m3,nq1,nq2,nq3
+!!$    complex(dp) :: fac, facqd, facq
 !!$
-!!$       !Force Hermiticity
-!!$       do ib = 1, numbranches
-!!$          do jb = ib + 1, numbranches
-!!$             dynmat(ib, jb) = (dynmat(ib, jb) + conjg(dynmat(jb, ib)))*0.5_dp
-!!$             dynmat(jb, ib) = dynmat(ib, jb)
-!!$          end do
-!!$       end do
-!!$       
-!!$       !Mass normalize
-!!$       do na = 1, numatoms
-!!$          do nb = 1, numatoms
-!!$             massnorm = 1.d0/sqrt(masses(atomtypes(na))*masses(atomtypes(nb)))*Rydberg2amu
-!!$             dynmat(3*(na-1)+1:3*na, 3*(nb-1)+1:3*nb) = &
-!!$                  dynmat(3*(na-1)+1:3*na, 3*(nb-1)+1:3*nb)*massnorm
-!!$             if(present(velocities)) then
-!!$                do ipol=1, 3
-!!$                   ddynmat(ipol, 3*(na-1)+1:3*na, 3*(nb-1)+1:3*nb) = &
-!!$                        ddynmat(ipol, 3*(na-1)+1:3*na, 3*(nb-1)+1:3*nb)*massnorm
+!!$    tpiba = twopi/normtwo(lattvec(:,1))*bohr2nm
+!!$
+!!$    !Recall that the phonon supercell in elphBolt is the
+!!$    !same as the EPW coarse phonon mesh.
+!!$    nq1 = scell(1)
+!!$    nq2 = scell(2)
+!!$    nq3 = scell(3)
+!!$
+!!$    gmax= 14.d0 !dimensionless
+!!$    alph= tpiba**2 !bohr^-2
+!!$    geg = gmax*alph*4.0d0
+!!$    !In Ry units, qe = sqrt(2.0)
+!!$    fac = 8.d0*pi/(V/bohr2nm**3)
+!!$
+!!$    dyn_l = 0.d0
+!!$    ddyn_l = 0.d0
+!!$    do m1 = -nq1,nq1
+!!$       do m2 = -nq2,nq2
+!!$          do m3 = -nq3,nq3
+!!$             g(:) = (m1*rlattvec(:,1)+m2*rlattvec(:,2)+m3*rlattvec(:,3))*bohr2nm
+!!$             qeq = dot_product(g,matmul(epsilon,g))
+!!$             
+!!$             if (qeq > 0.d0 .and. qeq/alph/4.d0 < gmax ) then
+!!$                facqd = exp(-qeq/alph/4.0d0)/qeq
+!!$
+!!$                do na = 1,natoms
+!!$                   zag(:)=matmul(g,born(:,:,na))
+!!$                   fnat(:)=0.d0
+!!$                   do nb = 1,natoms
+!!$                      rr(na,nb,:) = (cartesian(:,na)-cartesian(:,nb))/bohr2nm
+!!$                      arg = dot_product(g,rr(na,nb,:))
+!!$                      zbg(:) = matmul(g,born(:,:,nb))
+!!$                      fnat(:) = fnat(:) + zbg(:)*phexp(arg)
+!!$                   end do
+!!$                   do jpol=1,3
+!!$                      jdim=(na-1)*3+jpol
+!!$                      do ipol=1,3
+!!$                         idim=(na-1)*3+ipol
+!!$                         dyn_l(idim,jdim) = dyn_l(idim,jdim) - facqd * &
+!!$                              zag(ipol) * fnat(jpol)
+!!$                      end do
+!!$                   end do
+!!$                end do
+!!$             end if
+!!$
+!!$             g = g + q
+!!$             qeq = dot_product(g,matmul(epsilon,g))
+!!$             if (qeq > 0.d0 .and. qeq/alph/4.d0 < gmax ) then
+!!$                facqd = exp(-qeq/alph/4.0d0)/qeq
+!!$                dgeg=matmul(epsilon+transpose(epsilon),g)
+!!$                do nb = 1,natoms
+!!$                   zbg(:)=matmul(g,born(:,:,nb))
+!!$                   do na = 1,natoms
+!!$                      rr(na,nb,:) = (cartesian(:,na)-cartesian(:,nb))/bohr2nm
+!!$                      zag(:)=matmul(g,born(:,:,na))
+!!$                      arg = dot_product(g,rr(na,nb,:))
+!!$                      facq = facqd*phexp(arg)
+!!$                      do jpol=1,3
+!!$                         jdim=(nb-1)*3+jpol
+!!$                         do ipol=1,3
+!!$                            idim=(na-1)*3+ipol
+!!$                            dyn_l(idim,jdim) = dyn_l(idim,jdim) + facq * &
+!!$                                 zag(ipol)*zbg(jpol)
+!!$                            !Correction to derivative of dynmat
+!!$                            ddyn_l(:,idim,jdim)=ddyn_l(:,idim,jdim)+&
+!!$                                 facq*&
+!!$                                 ( zbg(jpol)*born(:,ipol,na)+zag(ipol)*born(:,jpol,nb)+&
+!!$                                 zag(ipol)*zbg(jpol)*(iunit*rr(na,nb,:)-&
+!!$                                 dgeg(:)/alph/4.0-dgeg(:)/qeq) )
+!!$                         end do
+!!$                      end do
+!!$                   end do
 !!$                end do
 !!$             end if
 !!$          end do
 !!$       end do
-!!$       
-!!$       !Diagonalize dynmat
-!!$       call zheev("V", "U", numbranches, dynmat(:, :), numbranches, omega2, work, -1, rwork, aux)
-!!$       if(real(work(1)) > nwork) then
-!!$          nwork = nint(2*real(work(1)))
-!!$          deallocate(work)
-!!$          allocate(work(nwork))
-!!$       end if
-!!$       call zheev("V", "U", numbranches, dynmat(:, :), numbranches, omega2, work, nwork, rwork, aux)
-!!$       
-!!$       energies(iq, :) = sign(sqrt(abs(omega2)), omega2)
-!!$       if(present(evecs)) then
-!!$          evecs(iq, :, :) = transpose(dynmat(:, :))
-!!$       end if
-!!$
-!!$       if(present(velocities)) then
-!!$          !Calculate velocities using Feynman-Hellmann thm
-!!$          do ib = 1, numbranches
-!!$             do ipol = 1, 3
-!!$                velocities(iq, ib, ipol) = real(dot_product(dynmat(:, ib), &
-!!$                     matmul(ddynmat(ipol, :, :), dynmat(:, ib))))
-!!$             end do
-!!$             velocities(iq, ib, :) = velocities(iq, ib, :)/(2.0_dp*energies(iq, ib))
-!!$          end do
-!!$       end if
-!!$
-!!$       !energies(iq, :) = energies(iq, :)*Rydberg2radTHz !2piTHz
-!!$       !energies(iq, :) = energies(iq, :)*Rydberg2eV*1.0e3_dp !meV
-!!$       energies(iq, :) = energies(iq, :)*Rydberg2eV !eV
-!!$       if(present(velocities)) then
-!!$          velocities(iq, :, :) = velocities(iq, :, :)*Rydberg2radTHz !nmTHz = Km/s
-!!$       end if
-!!$       
-!!$       !Take care of gamma point.
-!!$       if(nq == product(qmesh) .or. all(qvecs(1,:) == 0)) then
-!!$          energies(1, 1:3) = 0
-!!$          if(present(velocities)) then
-!!$             velocities(1, :, :) = 0
-!!$          end if
-!!$       end if
-!!$
-!!$       !Handle negative energy phonons
-!!$       do ib = 1, numbranches
-!!$          if(energies(iq,ib) < -0.005_dp) then
-!!$             print*, 'DANGER! DANGER! DANGER!'
-!!$             call exit_with_message('Large negative phonon energy found! Stopping!')
-!!$             
-!!$          else if(energies(iq,ib) < 0 .and. energies(iq,ib) > -0.005_dp) then
-!!$             print*, 'Warning! Small negative phonon energy for qpoint, branch =', &
-!!$                  iq, ib
-!!$             print*, 'Setting it to zero. Please check Wannier parameters.'
-!!$             energies(iq,ib) = 0
-!!$          end if
-!!$       end do
-!!$    end do !iq
-!!$  end subroutine ph_wann_epw
+!!$    end do
+!!$    dyn = dyn + dyn_l*fac
+!!$    ddyn = ddyn + ddyn_l*fac
+!!$  end subroutine dyn_nonanalytic
+  
 !!$
 !!$  function g2_epw(qvec, el_evec_k, el_evec_kp, ph_evec_q, ph_en, gmixed_ik)
 !!$    !! Function to calculate |g|^2.
@@ -412,7 +514,7 @@ contains
 !!$
 !!$    implicit none
 !!$
-!!$    integer(kind = 4) :: nstates_irred, istate, m, ik, ik_muxed, n, ikp, s, &
+!!$    integer(k4) :: nstates_irred, istate, m, ik, ik_muxed, n, ikp, s, &
 !!$         iq, start, end, chunk, ierr, k_indvec(3), kp_indvec(3), &
 !!$         q_indvec(3), count, g2size
 !!$    real(dp) :: k(3), kp(3), q(3)
@@ -540,8 +642,8 @@ contains
 !!$
 !!$    implicit none
 !!$    
-!!$    integer(kind = 4), intent(in) :: ik
-!!$    integer(kind = 4) :: iuc
+!!$    integer(k4), intent(in) :: ik
+!!$    integer(k4) :: iuc
 !!$    complex(dp) :: caux
 !!$    complex(dp), allocatable:: gmixed(:, :, :, :)
 !!$    real(dp) :: kvec(3)
@@ -555,7 +657,7 @@ contains
 !!$    !Fourier transform to k-space
 !!$    gmixed = 0
 !!$    do iuc = 1, nwsk
-!!$       caux = expix(twopi*dot_product(kvec, rcells_k(iuc, :))) &
+!!$       caux = expi(twopi*dot_product(kvec, rcells_k(iuc, :))) &
 !!$            /elwsdeg(iuc)
 !!$       gmixed(:, :, :, :) = gmixed(:, :, :, :) + &
 !!$            caux*gwann(:, :, iuc, :, :)
@@ -582,7 +684,7 @@ contains
 !!$
 !!$    implicit none
 !!$
-!!$    integer(kind = 4) :: ik, ikstart, ikend, chunk, ierr
+!!$    integer(k4) :: ik, ikstart, ikend, chunk, ierr
 !!$
 !!$    call print_message("Doing g(Re,Rp) -> g(k,Rp) for all IBZ k...")
 !!$
@@ -611,7 +713,7 @@ contains
 !!$
 !!$    implicit none
 !!$    
-!!$    integer(kind = 4) :: iuc
+!!$    integer(k4) :: iuc
 !!$    complex(dp) :: caux
 !!$    complex(dp), allocatable:: gmixed(:, :, :, :)
 !!$    character(len = 1024) :: filename

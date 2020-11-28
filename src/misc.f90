@@ -47,15 +47,15 @@ contains
     cross_product(3) = A(1)*B(2) - A(2)*B(1)
   end function cross_product
 
-  function expix(x)
+  function expi(x)
     !! Calculate exp(i*x) = cos(x) + isin(x)
     implicit none
 
     real(dp), intent(in) :: x
-    complex(dp) :: expix
+    complex(dp) :: expi
 
-    expix = cmplx(cos(x), sin(x))
-  end function expix
+    expi = cmplx(cos(x), sin(x))
+  end function expi
 
   subroutine sort_int(list)
     !! Swap sort list of integers

@@ -8,7 +8,7 @@ program elphBolt
   !! interactions computed ab initio.
 
   use config, only: initialize_system
-  use mesh, only: calculate_electrons
+  use mesh, only: calculate_electrons, calculate_phonons
   
   implicit none
   
@@ -23,7 +23,7 @@ program elphBolt
   call calculate_electrons
 
   !Calculate phonons
-  !TODO call calculate_phonons(ph)
+  call calculate_phonons
 
   !Calculate real space e-ph vertex
   !TODO call calculate_g_real(wann,eph)
