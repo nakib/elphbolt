@@ -18,6 +18,12 @@ module data
   !! Integer tagging unique elements in the basis.
   real(dp), allocatable :: masses(:)
   !! Masses of the basis atoms.
+  logical :: polar
+  !! Is the system polar?
+  real(dp) :: epsilon(3,3)
+  !! Dielectric tensor
+  real(dp), allocatable :: born(:,:,:)
+  !! Born effective charge
   real(dp), allocatable :: basis(:,:)
   !! Basis vectors (crystal coordinates).
   real(dp), allocatable :: basis_cart(:,:)

@@ -22,7 +22,8 @@ contains
 
     !Namelists:
     namelist /allocations/ numelements, numatoms
-    namelist /crystal_info/ elements, atomtypes, basis, lattvecs
+    namelist /crystal_info/ elements, atomtypes, basis, lattvecs, polar, &
+         born, epsilon
     namelist /numerics/ qmesh, mesh_ref, fsthick
     namelist /control/ datadumpdir, read_g2, read_V
     namelist /electrons/ enref
@@ -42,10 +43,13 @@ contains
     ! Set number of phonon branches.
     numbranches = 3*numatoms
         
-    allocate(elements(numelements), atomtypes(numatoms), &
+    allocate(elements(numelements), atomtypes(numatoms), born(3,3,numatoms), &
          masses(numatoms), basis(3,numatoms), basis_cart(3,numatoms))
     
     ! Read crystal_info.
+    polar = .false.
+    epsilon = 0.0_dp
+    born = 0.0_dp
     read(1, nml = crystal_info)
     if(any(atomtypes < 1) .or. any(masses < 0)) then
        call exit_with_message('Bad input(s) in crystal_info.')

@@ -49,13 +49,27 @@ contains
 
   function expi(x)
     !! Calculate exp(i*x) = cos(x) + isin(x)
-    implicit none
 
     real(dp), intent(in) :: x
     complex(dp) :: expi
 
     expi = cmplx(cos(x), sin(x))
   end function expi
+
+  function twonorm(v)
+    !! 2-norm of a vector
+
+    real(dp), intent(in) :: v(:)
+    integer(k4) :: i, s
+    real(dp) :: twonorm
+
+    s = size(v)
+    twonorm = 0.0_dp
+    do i = 1, s
+       twonorm = v(i)**2 + twonorm
+    end do
+    twonorm = sqrt(twonorm)
+  end function twonorm
 
   subroutine sort_int(list)
     !! Swap sort list of integers

@@ -33,7 +33,8 @@ module params
   real(dp), parameter :: Ryd2eV = 0.5_dp*Hartree2eV !Rydberg to eV
   real(dp), parameter :: Ryd2meV = Ryd2eV*1.0e3_dp !Rydberg to meV
   real(dp), parameter :: Ryd2amu = 2.0_dp*me/amu !Rydberg mass to amu
-
+  real(dp), parameter :: bohr2nm=0.052917721092_dp !Bohr to nm
+  
   !Miscellaneous
   complex(dp), parameter :: oneI = (0.0_dp,1.0_dp)
   complex(dp), parameter :: twopiI = twopi*oneI

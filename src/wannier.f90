@@ -1,11 +1,12 @@
 module wannier
   !! Subroutines for reading Wannier information and Wannier->Bloch transformations
 
-  use params, only: dp, k4 , Ryd2eV, Ryd2radTHz, oneI, twopi, Ryd2amu
-  use misc, only: exit_with_message, print_message, expi
+  use params, only: dp, k4 , Ryd2eV, Ryd2radTHz, oneI, pi, twopi, Ryd2amu, bohr2nm
+  use misc, only: exit_with_message, print_message, expi, twonorm
   use data, only: numwannbands, numbranches, nwsk, nwsq, nwsg, &
        rcells_k, rcells_q, rcells_g, elwsdeg, phwsdeg, atomtypes, &
-       gwsdeg, Hwann, Dphwann, gwann, lattvecs, numatoms, qmesh, masses
+       gwsdeg, Hwann, Dphwann, gwann, lattvecs, numatoms, qmesh, masses, &
+       reclattvecs, born, epsilon, basis_cart, volume, polar
   
   implicit none
 
@@ -233,9 +234,9 @@ contains
        end do
 
        !Non-analytic correction
-       !if(polar) then
-       !   call dyn_nonanalytic(matmul(rlattvec,qvecs(iq,:))*bohr2nm, dynmat, ddynmat)
-       !end if
+       if(polar) then
+          call dyn_nonanalytic(matmul(reclattvecs,qvecs(iq,:))*bohr2nm, dynmat, ddynmat)
+       end if
 
        !Force Hermiticity
        do ib = 1, numbranches
@@ -316,105 +317,105 @@ contains
     end do !iq
   end subroutine ph_wann_epw
 
-!!$  subroutine dyn_nonanalytic(q, dyn, ddyn)
-!!$    !! Calculate the long-range correction to the
-!!$    !! dynamical matrix and its derivative for a given phonon mode.
-!!$    !!
-!!$    !! q is the phonon wvec in Cartesian coords., Bohr^-1
-!!$    !! (d)dyn is the (derivative of)dynamical matrix
-!!$    
-!!$    real(dp), intent(in) :: q(3) !Cartesian
-!!$    complex(dp), intent(inout) :: dyn(nbranches,nbranches)
-!!$    complex(dp), intent(inout) :: ddyn(3,nbranches,nbranches)
-!!$
-!!$    complex(dp) :: dyn_l(nbranches,nbranches)
-!!$    complex(dp) :: ddyn_l(3,nbranches,nbranches)
-!!$    real(dp) :: qeq,     &! <q+g| epsilon |q+g>
-!!$         arg, zag(3),zbg(3), g(3), gmax, alph, geg,&
-!!$         tpiba,dgeg(3),fnat(3),rr(natoms,natoms,3)
-!!$    integer(kind=4) :: na,nb,i,idim,jdim,ipol,jpol,m1,m2,m3,nq1,nq2,nq3
-!!$    complex(dp) :: fac, facqd, facq
-!!$
-!!$    tpiba = twopi/normtwo(lattvec(:,1))*bohr2nm
-!!$
-!!$    !Recall that the phonon supercell in elphBolt is the
-!!$    !same as the EPW coarse phonon mesh.
-!!$    nq1 = scell(1)
-!!$    nq2 = scell(2)
-!!$    nq3 = scell(3)
-!!$
-!!$    gmax= 14.d0 !dimensionless
-!!$    alph= tpiba**2 !bohr^-2
-!!$    geg = gmax*alph*4.0d0
-!!$    !In Ry units, qe = sqrt(2.0)
-!!$    fac = 8.d0*pi/(V/bohr2nm**3)
-!!$
-!!$    dyn_l = 0.d0
-!!$    ddyn_l = 0.d0
-!!$    do m1 = -nq1,nq1
-!!$       do m2 = -nq2,nq2
-!!$          do m3 = -nq3,nq3
-!!$             g(:) = (m1*rlattvec(:,1)+m2*rlattvec(:,2)+m3*rlattvec(:,3))*bohr2nm
-!!$             qeq = dot_product(g,matmul(epsilon,g))
-!!$             
-!!$             if (qeq > 0.d0 .and. qeq/alph/4.d0 < gmax ) then
-!!$                facqd = exp(-qeq/alph/4.0d0)/qeq
-!!$
-!!$                do na = 1,natoms
-!!$                   zag(:)=matmul(g,born(:,:,na))
-!!$                   fnat(:)=0.d0
-!!$                   do nb = 1,natoms
-!!$                      rr(na,nb,:) = (cartesian(:,na)-cartesian(:,nb))/bohr2nm
-!!$                      arg = dot_product(g,rr(na,nb,:))
-!!$                      zbg(:) = matmul(g,born(:,:,nb))
-!!$                      fnat(:) = fnat(:) + zbg(:)*phexp(arg)
-!!$                   end do
-!!$                   do jpol=1,3
-!!$                      jdim=(na-1)*3+jpol
-!!$                      do ipol=1,3
-!!$                         idim=(na-1)*3+ipol
-!!$                         dyn_l(idim,jdim) = dyn_l(idim,jdim) - facqd * &
-!!$                              zag(ipol) * fnat(jpol)
-!!$                      end do
-!!$                   end do
-!!$                end do
-!!$             end if
-!!$
-!!$             g = g + q
-!!$             qeq = dot_product(g,matmul(epsilon,g))
-!!$             if (qeq > 0.d0 .and. qeq/alph/4.d0 < gmax ) then
-!!$                facqd = exp(-qeq/alph/4.0d0)/qeq
-!!$                dgeg=matmul(epsilon+transpose(epsilon),g)
-!!$                do nb = 1,natoms
-!!$                   zbg(:)=matmul(g,born(:,:,nb))
-!!$                   do na = 1,natoms
-!!$                      rr(na,nb,:) = (cartesian(:,na)-cartesian(:,nb))/bohr2nm
-!!$                      zag(:)=matmul(g,born(:,:,na))
-!!$                      arg = dot_product(g,rr(na,nb,:))
-!!$                      facq = facqd*phexp(arg)
-!!$                      do jpol=1,3
-!!$                         jdim=(nb-1)*3+jpol
-!!$                         do ipol=1,3
-!!$                            idim=(na-1)*3+ipol
-!!$                            dyn_l(idim,jdim) = dyn_l(idim,jdim) + facq * &
-!!$                                 zag(ipol)*zbg(jpol)
-!!$                            !Correction to derivative of dynmat
-!!$                            ddyn_l(:,idim,jdim)=ddyn_l(:,idim,jdim)+&
-!!$                                 facq*&
-!!$                                 ( zbg(jpol)*born(:,ipol,na)+zag(ipol)*born(:,jpol,nb)+&
-!!$                                 zag(ipol)*zbg(jpol)*(iunit*rr(na,nb,:)-&
-!!$                                 dgeg(:)/alph/4.0-dgeg(:)/qeq) )
-!!$                         end do
-!!$                      end do
-!!$                   end do
-!!$                end do
-!!$             end if
-!!$          end do
-!!$       end do
-!!$    end do
-!!$    dyn = dyn + dyn_l*fac
-!!$    ddyn = ddyn + ddyn_l*fac
-!!$  end subroutine dyn_nonanalytic
+  subroutine dyn_nonanalytic(q, dyn, ddyn)
+    !! Calculate the long-range correction to the
+    !! dynamical matrix and its derivative for a given phonon mode.
+    !!
+    !! q is the phonon wave vector in Cartesian coords., Bohr^-1
+    !! (d)dyn is the (derivative of) dynamical matrix
+
+    real(dp), intent(in) :: q(3) !Cartesian
+    complex(dp), intent(inout) :: dyn(numbranches,numbranches)
+    complex(dp), intent(inout) :: ddyn(3,numbranches,numbranches)
+
+    complex(dp) :: dyn_l(numbranches,numbranches)
+    complex(dp) :: ddyn_l(3,numbranches,numbranches)
+    real(dp) :: qeq,     &! <q+g| epsilon |q+g>
+         arg, zag(3),zbg(3), g(3), gmax, alph, geg,&
+         tpiba,dgeg(3),fnat(3),rr(numatoms,numatoms,3)
+    integer(kind=4) :: na,nb,i,idim,jdim,ipol,jpol,m1,m2,m3,nq1,nq2,nq3
+    complex(dp) :: fac, facqd, facq
+
+    tpiba = twopi/twonorm(lattvecs(:,1))*bohr2nm
+
+    !Recall that the phonon supercell in elphBolt is the
+    !same as the EPW coarse phonon mesh.
+    nq1 = qmesh(1)
+    nq2 = qmesh(2)
+    nq3 = qmesh(3)
+
+    gmax= 14.d0 !dimensionless
+    alph= tpiba**2 !bohr^-2
+    geg = gmax*alph*4.0d0
+    !In Ry units, qe = sqrt(2.0)
+    fac = 8.d0*pi/(volume/bohr2nm**3)
+
+    dyn_l = 0.d0
+    ddyn_l = 0.d0
+    do m1 = -nq1,nq1
+       do m2 = -nq2,nq2
+          do m3 = -nq3,nq3
+             g(:) = (m1*reclattvecs(:,1)+m2*reclattvecs(:,2)+m3*reclattvecs(:,3))*bohr2nm
+             qeq = dot_product(g,matmul(epsilon,g))
+
+             if (qeq > 0.d0 .and. qeq/alph/4.d0 < gmax ) then
+                facqd = exp(-qeq/alph/4.0d0)/qeq
+
+                do na = 1,numatoms
+                   zag(:)=matmul(g,born(:,:,na))
+                   fnat(:)=0.d0
+                   do nb = 1,numatoms
+                      rr(na,nb,:) = (basis_cart(:,na)-basis_cart(:,nb))/bohr2nm
+                      arg = dot_product(g,rr(na,nb,:))
+                      zbg(:) = matmul(g,born(:,:,nb))
+                      fnat(:) = fnat(:) + zbg(:)*expi(arg)
+                   end do
+                   do jpol=1,3
+                      jdim=(na-1)*3+jpol
+                      do ipol=1,3
+                         idim=(na-1)*3+ipol
+                         dyn_l(idim,jdim) = dyn_l(idim,jdim) - facqd * &
+                              zag(ipol) * fnat(jpol)
+                      end do
+                   end do
+                end do
+             end if
+
+             g = g + q
+             qeq = dot_product(g,matmul(epsilon,g))
+             if (qeq > 0.d0 .and. qeq/alph/4.d0 < gmax ) then
+                facqd = exp(-qeq/alph/4.0d0)/qeq
+                dgeg=matmul(epsilon+transpose(epsilon),g)
+                do nb = 1,numatoms
+                   zbg(:)=matmul(g,born(:,:,nb))
+                   do na = 1,numatoms
+                      rr(na,nb,:) = (basis_cart(:,na)-basis_cart(:,nb))/bohr2nm
+                      zag(:)=matmul(g,born(:,:,na))
+                      arg = dot_product(g,rr(na,nb,:))
+                      facq = facqd*expi(arg)
+                      do jpol=1,3
+                         jdim=(nb-1)*3+jpol
+                         do ipol=1,3
+                            idim=(na-1)*3+ipol
+                            dyn_l(idim,jdim) = dyn_l(idim,jdim) + facq * &
+                                 zag(ipol)*zbg(jpol)
+                            !Correction to derivative of dynmat
+                            ddyn_l(:,idim,jdim)=ddyn_l(:,idim,jdim)+&
+                                 facq*&
+                                 ( zbg(jpol)*born(:,ipol,na)+zag(ipol)*born(:,jpol,nb)+&
+                                 zag(ipol)*zbg(jpol)*(oneI*rr(na,nb,:)-&
+                                 dgeg(:)/alph/4.0-dgeg(:)/qeq) )
+                         end do
+                      end do
+                   end do
+                end do
+             end if
+          end do
+       end do
+    end do
+    dyn = dyn + dyn_l*fac
+    ddyn = ddyn + ddyn_l*fac
+  end subroutine dyn_nonanalytic
   
 !!$
 !!$  function g2_epw(qvec, el_evec_k, el_evec_kp, ph_evec_q, ph_en, gmixed_ik)
