@@ -9,6 +9,7 @@ program elphBolt
 
   use config, only: initialize_system
   use mesh, only: calculate_electrons, calculate_phonons
+  use wannier, only: calculate_g_mixed
   
   implicit none
   
@@ -25,8 +26,8 @@ program elphBolt
   !Calculate phonons
   call calculate_phonons
 
-  !Calculate real space e-ph vertex
-  !TODO call calculate_g_real(wann,eph)
+  !Calculate mixed Bloch-Wannier space e-ph vertex
+  call calculate_g_mixed
 
   !Calculate Bloch space e-ph vertex
   !TODO call calculate_g_bloch(wann,eph)

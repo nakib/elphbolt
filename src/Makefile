@@ -11,7 +11,7 @@ data.o data.mod: params.mod
 mesh.o mesh.mod: params.mod data.mod misc.mod wannier.mod
 wannier.o wannier.mod: params.mod data.mod misc.mod
 config.o config.mod: params.mod misc.mod data.mod spglib_wrapper.mod wannier.mod
-elphbolt.o elphbolt.mod: params.mod data.mod config.mod mesh.mod
+elphbolt.o elphbolt.mod: params.mod data.mod config.mod mesh.mod wannier.mod
 %.o %.mod: %.f90
 	$(FC) $(FFLAGS) -c -o $*.o $<
 	touch $*.mod

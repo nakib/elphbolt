@@ -2,11 +2,12 @@ module wannier
   !! Subroutines for reading Wannier information and Wannier->Bloch transformations
 
   use params, only: dp, k4 , Ryd2eV, Ryd2radTHz, oneI, pi, twopi, Ryd2amu, bohr2nm
-  use misc, only: exit_with_message, print_message, expi, twonorm
+  use misc, only: exit_with_message, print_message, expi, twonorm, distribute_points
   use data, only: numwannbands, numbranches, nwsk, nwsq, nwsg, &
        rcells_k, rcells_q, rcells_g, elwsdeg, phwsdeg, atomtypes, &
        gwsdeg, Hwann, Dphwann, gwann, lattvecs, numatoms, qmesh, masses, &
-       reclattvecs, born, epsilon, basis_cart, volume, polar
+       reclattvecs, born, epsilon, basis_cart, volume, polar, nk_irred, &
+       el_wavevecs_irred, cwd, g2dir
   
   implicit none
 
@@ -304,9 +305,7 @@ contains
        !Handle negative energy phonons
        do ib = 1, numbranches
           if(energies(iq,ib) < -0.005_dp) then
-             print*, 'Oh no!'
-             call exit_with_message('Large negative phonon energy found! Stopping!')
-             
+             call exit_with_message('Large negative phonon energy found! Stopping!')             
           else if(energies(iq,ib) < 0 .and. energies(iq,ib) > -0.005_dp) then
              print*, 'Warning! Small negative phonon energy for q-point, branch =', &
                   iq, ib
@@ -633,75 +632,69 @@ contains
 !!$    call mpi_barrier(mpi_comm_world, ierr)
 !!$  end subroutine calc_all_gk2
 !!$
-!!$  subroutine gmixed_epw(ik)
-!!$    !! Calculate the Bloch-Wannier mixed rep. e-ph matrix elements g(k,Rp),
-!!$    !! where k is an IBZ electron wave vector and Rp is a phonon unit cell.
-!!$    !! Note: this step *DOES NOT* perform the rotation over the Wannier bands space.
-!!$    !The result will be saved to disk.
-!!$    use configuration, only: numwannbands, numbranches, nwsk, nwsq, &
-!!$         rcells_k, elwsdeg, el_wavevecs_irred, gdir, gwann, cwd
-!!$
-!!$    implicit none
-!!$    
-!!$    integer(k4), intent(in) :: ik
-!!$    integer(k4) :: iuc
-!!$    complex(dp) :: caux
-!!$    complex(dp), allocatable:: gmixed(:, :, :, :)
-!!$    real(dp) :: kvec(3)
-!!$    character(len = 1024) :: filename
-!!$
-!!$    allocate(gmixed(numwannbands, numwannbands, numbranches, nwsq))
-!!$    
-!!$    !Electron wave vector (crystal coords.) in IBZ blocks 
-!!$    kvec = el_wavevecs_irred(ik, :)
-!!$
-!!$    !Fourier transform to k-space
-!!$    gmixed = 0
-!!$    do iuc = 1, nwsk
-!!$       caux = expi(twopi*dot_product(kvec, rcells_k(iuc, :))) &
-!!$            /elwsdeg(iuc)
-!!$       gmixed(:, :, :, :) = gmixed(:, :, :, :) + &
-!!$            caux*gwann(:, :, iuc, :, :)
-!!$    end do
-!!$
-!!$    !Change to data output directory
-!!$    call chdir(trim(adjustl(gdir)))
-!!$
-!!$    !Write data in binary format
-!!$    !Note: this will overwrite existing data!
-!!$    write (filename, '(I6)') ik
-!!$    filename = 'gmixed.ik'//trim(adjustl(filename))
-!!$    open(1, file = trim(filename), status = 'replace', access = 'stream')
-!!$    write(1) gmixed
-!!$    close(1)
-!!$
-!!$    !Change back to working directory
-!!$    call chdir(cwd)
-!!$  end subroutine gmixed_epw
-!!$
-!!$  subroutine gmixed_epw_driver
-!!$    !! MPI parallizer of gmixed_epw over IBZ electron wave vectors
-!!$    use configuration, only: nk_irred
-!!$
-!!$    implicit none
-!!$
-!!$    integer(k4) :: ik, ikstart, ikend, chunk, ierr
-!!$
-!!$    call print_message("Doing g(Re,Rp) -> g(k,Rp) for all IBZ k...")
-!!$
-!!$    call mpi_chunk(nk_irred, chunk, ikstart, ikend)
-!!$
-!!$    if(procid == 0) then
-!!$       print*, "   #k = ", nk_irred
-!!$       print*, "   #k/process = ", chunk
-!!$    end if
-!!$
-!!$    do ik = ikstart, ikend
-!!$       call gmixed_epw(ik)
-!!$    end do
-!!$
-!!$    call mpi_barrier(mpi_comm_world, ierr)
-!!$  end subroutine gmixed_epw_driver
+  subroutine gmixed_epw(ik)
+    !! Calculate the Bloch-Wannier mixed rep. e-ph matrix elements g(k,Rp),
+    !! where k is an IBZ electron wave vector and Rp is a phonon unit cell.
+    !! Note: this step *DOES NOT* perform the rotation over the Wannier bands space.
+    !! The result will be saved to disk tagged with k-index.
+
+    !use configuration, only: numwannbands, numbranches, nwsk, nwsq, &
+    !     rcells_k, elwsdeg, el_wavevecs_irred, gdir, gwann, cwd
+    
+    integer(k4), intent(in) :: ik
+    integer(k4) :: iuc
+    complex(dp) :: caux
+    complex(dp), allocatable:: gmixed(:,:,:,:)
+    real(dp) :: kvec(3)
+    character(len = 1024) :: filename
+
+    allocate(gmixed(numwannbands, numwannbands, numbranches, nwsq))
+    
+    !Electron wave vector (crystal coords.) in IBZ blocks 
+    kvec = el_wavevecs_irred(ik, :)
+
+    !Fourier transform to k-space
+    gmixed = 0
+    do iuc = 1,nwsk
+       caux = expi(twopi*dot_product(kvec, rcells_k(iuc,:)))/elwsdeg(iuc)
+       gmixed(:,:,:,:) = gmixed(:,:,:,:) + caux*gwann(:,:,iuc,:,:)
+    end do
+
+    !Change to data output directory
+    call chdir(trim(adjustl(g2dir)))
+
+    !Write data in binary format
+    !Note: this will overwrite existing data!
+    write (filename, '(I6)') ik
+    filename = 'gmixed.ik'//trim(adjustl(filename))
+    open(1, file = trim(filename), status = 'replace', access = 'stream')
+    write(1) gmixed
+    close(1)
+
+    !Change back to working directory
+    call chdir(cwd)
+  end subroutine gmixed_epw
+
+  subroutine calculate_g_mixed
+    !! Parallel driver of gmixed_epw over IBZ electron wave vectors
+
+    integer(k4) :: ik, ikstart, ikend, chunk, ierr
+
+    call print_message("Doing g(Re,Rp) -> g(k,Rp) for all IBZ k...")
+
+    call distribute_points(nk_irred, chunk, ikstart, ikend)
+
+    if(this_image() == 1) then
+       print*, "   #k = ", nk_irred
+       print*, "   #k/process = ", chunk
+    end if
+
+    do ik = ikstart, ikend
+       call gmixed_epw(ik)
+    end do
+
+    sync all
+  end subroutine calculate_g_mixed
 !!$
 !!$  !For testing and debugging:
 !!$
