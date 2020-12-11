@@ -324,8 +324,8 @@ contains
     !! Calculate the long-range correction to the
     !! dynamical matrix and its derivative for a given phonon mode.
     !!
-    !! q is the phonon wave vector in Cartesian coords., Bohr^-1
-    !! (d)dyn is the (derivative of) dynamical matrix
+    !! q: the phonon wave vector in Cartesian coords., Bohr^-1
+    !! (d)dyn: the (derivative of) dynamical matrix
 
     real(dp), intent(in) :: q(3) !Cartesian
     complex(dp), intent(inout) :: dyn(numbranches,numbranches)
@@ -419,6 +419,60 @@ contains
     dyn = dyn + dyn_l*fac
     ddyn = ddyn + ddyn_l*fac
   end subroutine dyn_nonanalytic
+
+  subroutine long_range_prefac(q, uqs, glprefac)
+    !! Calculate the long-range correction prefactor of
+    !! the e-ph matrix element for a given phonon mode.
+    !! q: phonon wvec in Cartesian coords., Bohr^-1
+    !! uqs: phonon eigenfn for mode (s,q)
+    !! glprefac: is the output in Ry units (EPW/QE)
+    real(dp), intent(in) :: q(3) !Cartesian
+    complex(dp), intent(in) :: uqs(numbranches)
+    complex(dp), intent(inout) :: glprefac
+
+    real(dp) :: qeq,     &! <q+g| epsilon |q+g>
+         arg, zaq, g(3), gmax, alph, geg,tpiba
+    integer(k4) :: na,ipol, m1,m2,m3,nq1,nq2,nq3
+    complex(dp) :: fac, facqd, facq
+
+    tpiba = twopi/twonorm(lattvecs(:,1))*bohr2nm
+
+    !Recall that the phonon supercell in elphBolt is the
+    !same as the EPW coarse phonon mesh.
+    nq1 = qmesh(1)
+    nq2 = qmesh(2)
+    nq3 = qmesh(3)
+
+    gmax= 14.d0 !dimensionless
+    alph= tpiba**2 !bohr^-2
+    geg = gmax*alph*4.0d0
+    !In Ry units, qe = sqrt(2.0)
+    fac = 8.d0*pi/(volume/bohr2nm**3)*oneI
+    glprefac = (0.d0,0.d0)
+    
+    do m1 = -nq1,nq1
+       do m2 = -nq2,nq2
+          do m3 = -nq3,nq3
+             g(:) = (m1*reclattvecs(:,1)+m2*reclattvecs(:,2)+m3*reclattvecs(:,3))*bohr2nm + q
+             qeq = dot_product(g,matmul(epsilon,g))
+             
+             if (qeq > 0.d0 .and. qeq/alph/4.d0 < gmax ) then
+                facqd = exp(-qeq/alph/4.0d0)/qeq
+
+                do na = 1,numatoms
+                   arg = -dot_product(g,basis_cart(:,na))/bohr2nm
+                   facq = facqd*expi(arg)
+                   do ipol=1,3
+                      zaq = dot_product(g,born(:,ipol,na))
+                      glprefac = glprefac + facq*zaq*uqs(3*(na-1)+ipol)
+                   end do
+                end do
+             end if
+          end do
+       end do
+    end do
+    glprefac = glprefac*fac
+  end subroutine long_range_prefac
   
   function g2_epw(qvec, el_evec_k, el_evec_kp, ph_evec_q, ph_en, gmixed_ik)
     !! Function to calculate |g|^2.
@@ -435,8 +489,8 @@ contains
          gmixed_ik(numwannbands, numwannbands, numbranches, nwsq)
     integer(kind=4) :: ip, ig, np, mp, sp, mtype
     complex(dp) :: caux, u(numbranches), UkpgkUk(numbranches, nwsq), &
-         UkpgkUkuq(nwsq), gbloch, overlap(numwannbands,numwannbands)
-    real(dp) :: g2_epw
+         UkpgkUkuq(nwsq), gbloch, overlap(numwannbands,numwannbands), glprefac
+    real(dp) :: g2_epw, unm
 
     !Mass normalize the phonon matrix
     do ip = 1, numbranches ! d.o.f of basis atoms
@@ -484,6 +538,12 @@ contains
                /gwsdeg(ig)
           gbloch = gbloch + caux*UkpgkUkuq(ig)
        end do
+
+       if(polar) then !Long-range correction
+          unm = dot_product(conjg(el_evec_k),el_evec_kp)
+          call long_range_prefac(matmul(reclattvecs,qvec)*bohr2nm,u,glprefac)
+          gbloch = gbloch + glprefac*unm
+       end if
        
        g2_epw = 0.5_dp*real(gbloch*conjg(gbloch))/ &
             ph_en*g2unitfactor !eV^2
