@@ -1,13 +1,17 @@
 module wannier
   !! Subroutines for reading Wannier information and Wannier->Bloch transformations
 
-  use params, only: dp, k4 , Ryd2eV, Ryd2radTHz, oneI, pi, twopi, Ryd2amu, bohr2nm
-  use misc, only: exit_with_message, print_message, expi, twonorm, distribute_points
+  use params, only: dp, k4 , Ryd2eV, Ryd2radTHz, oneI, pi, twopi, twopiI, &
+       Ryd2amu, bohr2nm
+  use misc, only: exit_with_message, print_message, expi, twonorm, &
+       distribute_points, demux_state, mux_vector
   use data, only: numwannbands, numbranches, nwsk, nwsq, nwsg, &
        rcells_k, rcells_q, rcells_g, elwsdeg, phwsdeg, atomtypes, &
        gwsdeg, Hwann, Dphwann, gwann, lattvecs, numatoms, qmesh, masses, &
        reclattvecs, born, epsilon, basis_cart, volume, polar, nk_irred, &
-       el_wavevecs_irred, cwd, g2dir
+       el_wavevecs_irred, cwd, g2dir, el_wavevecs, enref, fsthick, kmesh, nk, &
+       nstates_inwindow, el_indexlist_irred, el_ens_irred, el_ens, el_evecs, &
+       el_evecs_irred, ph_evecs, ph_ens
   
   implicit none
 
@@ -24,7 +28,7 @@ module wannier
   character(len=*), parameter :: filename_gwsdeg = "wsdeg_g"
 
   !Unit conversion constant
-  !real(dp), parameter :: g2unitfactor = Rydberg2eV**3*Rydberg2amu
+  real(dp), parameter :: g2unitfactor = Ryd2eV**3*Ryd2amu
 
 contains
 
@@ -416,230 +420,201 @@ contains
     ddyn = ddyn + ddyn_l*fac
   end subroutine dyn_nonanalytic
   
-!!$
-!!$  function g2_epw(qvec, el_evec_k, el_evec_kp, ph_evec_q, ph_en, gmixed_ik)
-!!$    !! Function to calculate |g|^2.
-!!$    !! This works with EPW real space data
-!!$    !! qvec: phonon wave vector in crystal coords
-!!$    !! el_evec_k(kp): initial(final) electron eigenvector in bands m(n) 
-!!$    !! ph_evec_q: phonon eigenvector branch s 
-!!$    !! ph_en: phonon energy in mode (s,qvec)
-!!$    !! gmixed_ik: e-ph matrix element
-!!$    use configuration, only: numbranches, numwannbands, nwsq, nwsg, masses, & 
-!!$         atomtypes, rcells_g, gwsdeg
-!!$
-!!$    implicit none
-!!$
-!!$    real(dp),intent(in) :: qvec(3), ph_en
-!!$    complex(dp),intent(in) :: el_evec_k(numwannbands),&
-!!$         el_evec_kp(numwannbands), ph_evec_q(numbranches), &
-!!$         gmixed_ik(numwannbands, numwannbands, numbranches, nwsq)
-!!$    integer(kind=4) :: ip, ig, np, mp, sp, mtype
-!!$    complex(dp) :: caux, u(numbranches), UkpgkUk(numbranches, nwsq), &
-!!$         UkpgkUkuq(nwsq), gbloch, overlap(numwannbands,numwannbands)
-!!$    real(dp) :: g2_epw
-!!$
-!!$    !Mass normalize the phonon matrix
-!!$    do ip = 1, numbranches ! d.o.f of basis atoms
-!!$       !demux atom type from d.o.f
-!!$       mtype = (ip - 1)/3 + 1 
-!!$       !normalize and conjugate eigenvector
-!!$       u(ip) = ph_evec_q(ip)/sqrt(masses(atomtypes(mtype)))
-!!$    end do
-!!$    
-!!$    if(ph_en == 0) then !zero out matrix elements at Gamma
-!!$       g2_epw = 0
-!!$    else
-!!$       UkpgkUk = 0 !g(k,Rp) rotated by the electron U(k), U(k') matrices
-!!$       UkpgkUkuq = 0 !above quantity rotated by the phonon u(q) matrix
-!!$       gbloch = 0
-!!$
-!!$       !Copy data to accelerator device
-!!$       !$acc data copyin(UkpgkUk(:,:), UkpgkUkuq(:), el_evec_k(:), el_evec_kp(:), u(:), overlap(:,:))
-!!$       !$acc kernels present(gmixed_ik(:,:,:,:), gwsdeg(:), rcells_g(:,:))
-!!$
-!!$       !Create the <n'|m'> overlap matrix
-!!$       do np = 1, numwannbands !over final electron band
-!!$          do mp = 1, numwannbands !over initial electron band
-!!$             overlap(mp,np) = conjg(el_evec_kp(np))*el_evec_k(mp)
-!!$          end do
-!!$       end do
-!!$
-!!$       do ig = 1, nwsg !over matrix elements WS cell
-!!$          !Apply electron rotations
-!!$          do sp = 1, numbranches
-!!$             caux = 0
-!!$             do np = 1, numwannbands !over final electron band
-!!$                do mp = 1, numwannbands !over initial electron band
-!!$                   caux = caux + overlap(mp,np)*gmixed_ik(np, mp, sp, ig)
-!!$                end do
-!!$             end do
-!!$             UkpgkUk(sp, ig) = UkpgkUk(sp, ig) + caux
-!!$          end do
-!!$       end do
-!!$       
-!!$       do ig = 1, nwsg !over matrix elements WS cell
-!!$          !Apply phonon rotation
-!!$          UkpgkUkuq(ig) = UkpgkUkuq(ig) + dot_product(conjg(u),UkpgkUk(:, ig))
-!!$       end do
-!!$
-!!$       do ig = 1, nwsg !over matrix elements WS cell
-!!$          !Fourier transform to q-space
-!!$          caux = exp(twopiI*dot_product(qvec, rcells_g(ig, :)))&
-!!$               /gwsdeg(ig)
-!!$          gbloch = gbloch + caux*UkpgkUkuq(ig)
-!!$       end do
-!!$       
-!!$       !$acc end kernels
-!!$       !$acc end data
-!!$       
-!!$       g2_epw = 0.5_dp*real(gbloch*conjg(gbloch))/ &
-!!$            ph_en*g2unitfactor !eV^2
-!!$    end if
-!!$  end function g2_epw
-!!$
-!!$  subroutine calc_all_gk2
-!!$    !! MPI parallelizer of g2_epw over IBZ electron states within the Fermi window.
-!!$    !In the FBZ and IBZ blocks a wave vector was retained when at least one
-!!$    !band belonged within the energy window. Here the bands outside energy window
-!!$    !will be skipped in the calculation as they are irrelevant for transport.
-!!$    !This subroutine will calculate the full Bloch rep. matrix elements for
-!!$    !all the energy window restricted electron-phonon processes for a given
-!!$    !irreducible initial electron state = (band, wave vector). 
-!!$    !This list will be written to disk in files tagged with the muxed state index. 
-!!$    use configuration, only: nk, nk_irred, procid, numwannbands, &
-!!$         numbranches, el_ens_irred, enref, fsthick, kmesh, el_wavevecs_irred, &
-!!$         el_wavevecs, el_ens, el_evecs, el_evecs_irred, ph_evecs, ph_ens, gdir, &
-!!$         cwd, nwsq, el_indexlist_irred, nstates_inwindow, gwsdeg, rcells_g
-!!$
-!!$    implicit none
-!!$
-!!$    integer(k4) :: nstates_irred, istate, m, ik, ik_muxed, n, ikp, s, &
-!!$         iq, start, end, chunk, ierr, k_indvec(3), kp_indvec(3), &
-!!$         q_indvec(3), count, g2size
-!!$    real(dp) :: k(3), kp(3), q(3)
-!!$    real(dp), allocatable :: g2_istate(:)
-!!$    complex(dp) :: gmixed_ik(numwannbands, numwannbands, numbranches, nwsq)
-!!$    character(len = 1024) :: filename
-!!$
-!!$    call print_message("Doing g(k,Rp) -> |g(k,q)|^2 for all IBZ states...")
-!!$
-!!$    !Length of g2_istate
-!!$    g2size = nstates_inwindow*numbranches
-!!$    allocate(g2_istate(g2size))
-!!$
-!!$    !Total number of IBZ blocks states
-!!$    nstates_irred = nk_irred*numwannbands
-!!$    
-!!$    call mpi_chunk(nstates_irred, chunk, start, end)
-!!$
-!!$    if(procid == 0) then
-!!$       print*, "   #states = ", nstates_irred
-!!$       print*, "   #states/process = ", chunk
-!!$    end if
-!!$
-!!$    !Copy gwsdeg to accelerator
-!!$    !$acc data copyin(gwsdeg(:),rcells_g(:,:))
-!!$
-!!$    count = 0
-!!$    do istate = start, end !over IBZ blocks states
-!!$       !Initialize eligible process counter for this state
-!!$       count = 0
-!!$
-!!$       !Demux state index into band (m) and wave vector (ik) indices
-!!$       call demux_state(istate, numwannbands, m, ik)
-!!$       
-!!$       !Get the muxed index of wave vector from the IBZ blocks index list
-!!$       ik_muxed = el_indexlist_irred(ik)
-!!$
-!!$       !Apply energy window to initial (IBZ blocks) electron
-!!$       if(abs(el_ens_irred(ik, m) - enref) > fsthick) cycle
-!!$
-!!$       !Load gmixed(ik) here for use inside the loops below
-!!$       call chdir(trim(adjustl(gdir)))
-!!$       write (filename, '(I6)') ik
-!!$       filename = 'gmixed.ik'//trim(adjustl(filename))
-!!$       open(1,file=filename,status="old",access='stream')
-!!$       read(1) gmixed_ik
-!!$       close(1)
-!!$       call chdir(cwd)
-!!$
-!!$       !Copy gmixed.ik to accelerator
-!!$       !$acc data copyin(gmixed_ik(:,:,:,:))
-!!$       
-!!$       !Initial (IBZ blocks) wave vector (crystal coords.)
-!!$       k = el_wavevecs_irred(ik, :)
-!!$
-!!$       !Convert from crystal to 0-based index vector
-!!$       k_indvec = nint(k*kmesh)
-!!$       
-!!$       !Run over final (FBZ blocks) electron wave vectors
-!!$       do ikp = 1, nk
-!!$          !Final wave vector (crystal coords.)
-!!$          kp = el_wavevecs(ikp, :)
-!!$
-!!$          !Convert from crystal to 0-based index vector
-!!$          kp_indvec = nint(kp*kmesh)
-!!$          
-!!$          !Run over final electron bands
-!!$          do n = 1, numwannbands
-!!$             !Apply energy window to final electron
-!!$             if(abs(el_ens(ikp, n) - enref) > fsthick) cycle
-!!$
-!!$             !Find interacting phonon wave vector
-!!$             !Note that q, k, and k' are all on the same mesh
-!!$             q_indvec = modulo(kp_indvec - k_indvec, kmesh) !0-based index vector
-!!$             q = q_indvec/dble(kmesh) !crystal coords.
-!!$
-!!$             !Muxed index of q
-!!$             iq = mux_vector(q_indvec, kmesh, 0)
-!!$             
-!!$             !Run over phonon branches
-!!$             do s = 1, numbranches
-!!$                !Increment g2 processes counter
-!!$                count = count + 1
-!!$
-!!$                !Calculate |g_mns(<k>,q)|^2
-!!$                g2_istate(count) = g2_epw(q, el_evecs_irred(ik, m, :), &
-!!$                     el_evecs(ikp, n, :), ph_evecs(iq, s, :), &
-!!$                     ph_ens(iq, s), gmixed_ik)
-!!$             end do !s
-!!$          end do !n
-!!$       end do !ikp
-!!$
-!!$       !$acc end data
-!!$
-!!$       !Change to data output directory
-!!$       call chdir(trim(adjustl(gdir)))
-!!$
-!!$       !Write data in binary format
-!!$       !Note: this will overwrite existing data!
-!!$       write (filename, '(I6)') istate
-!!$       filename = 'g2.istate'//trim(adjustl(filename))
-!!$       open(1, file = trim(filename), status = 'replace', access = 'stream')
-!!$       write(1) g2_istate
-!!$       close(1)
-!!$
-!!$       !Change back to working directory
-!!$       call chdir(cwd)
-!!$    end do
-!!$
-!!$    !$acc end data
-!!$
-!!$    !TODO at this point we can delete the gmixed disk data
-!!$    !call clear_gmixed_cache
-!!$
-!!$    call mpi_barrier(mpi_comm_world, ierr)
-!!$  end subroutine calc_all_gk2
-!!$
+  function g2_epw(qvec, el_evec_k, el_evec_kp, ph_evec_q, ph_en, gmixed_ik)
+    !! Function to calculate |g|^2.
+    !! This works with EPW real space data
+    !! qvec: phonon wave vector in crystal coords
+    !! el_evec_k(kp): initial(final) electron eigenvector in bands m(n) 
+    !! ph_evec_q: phonon eigenvector branch s 
+    !! ph_en: phonon energy in mode (s,qvec)
+    !! gmixed_ik: e-ph matrix element
+
+    real(dp),intent(in) :: qvec(3), ph_en
+    complex(dp),intent(in) :: el_evec_k(numwannbands),&
+         el_evec_kp(numwannbands), ph_evec_q(numbranches), &
+         gmixed_ik(numwannbands, numwannbands, numbranches, nwsq)
+    integer(kind=4) :: ip, ig, np, mp, sp, mtype
+    complex(dp) :: caux, u(numbranches), UkpgkUk(numbranches, nwsq), &
+         UkpgkUkuq(nwsq), gbloch, overlap(numwannbands,numwannbands)
+    real(dp) :: g2_epw
+
+    !Mass normalize the phonon matrix
+    do ip = 1, numbranches ! d.o.f of basis atoms
+       !demux atom type from d.o.f
+       mtype = (ip - 1)/3 + 1 
+       !normalize and conjugate eigenvector
+       u(ip) = ph_evec_q(ip)/sqrt(masses(atomtypes(mtype)))
+    end do
+    
+    if(ph_en == 0) then !zero out matrix elements at Gamma
+       g2_epw = 0
+    else
+       UkpgkUk = 0 !g(k,Rp) rotated by the electron U(k), U(k') matrices
+       UkpgkUkuq = 0 !above quantity rotated by the phonon u(q) matrix
+       gbloch = 0
+
+       !Create the <n'|m'> overlap matrix
+       do np = 1, numwannbands !over final electron band
+          do mp = 1, numwannbands !over initial electron band
+             overlap(mp,np) = conjg(el_evec_kp(np))*el_evec_k(mp)
+          end do
+       end do
+
+       do ig = 1, nwsg !over matrix elements WS cell
+          !Apply electron rotations
+          do sp = 1, numbranches
+             caux = 0
+             do np = 1, numwannbands !over final electron band
+                do mp = 1, numwannbands !over initial electron band
+                   caux = caux + overlap(mp,np)*gmixed_ik(np, mp, sp, ig)
+                end do
+             end do
+             UkpgkUk(sp, ig) = UkpgkUk(sp, ig) + caux
+          end do
+       end do
+       
+       do ig = 1, nwsg !over matrix elements WS cell
+          !Apply phonon rotation
+          UkpgkUkuq(ig) = UkpgkUkuq(ig) + dot_product(conjg(u),UkpgkUk(:, ig))
+       end do
+
+       do ig = 1, nwsg !over matrix elements WS cell
+          !Fourier transform to q-space
+          caux = exp(twopiI*dot_product(qvec, rcells_g(ig, :)))&
+               /gwsdeg(ig)
+          gbloch = gbloch + caux*UkpgkUkuq(ig)
+       end do
+       
+       g2_epw = 0.5_dp*real(gbloch*conjg(gbloch))/ &
+            ph_en*g2unitfactor !eV^2
+    end if
+  end function g2_epw
+
+  subroutine calculate_g_bloch
+    !! MPI parallelizer of g2_epw over IBZ electron states within the Fermi window.
+    !
+    !In the FBZ and IBZ blocks a wave vector was retained when at least one
+    !band belonged within the energy window. Here the bands outside energy window
+    !will be skipped in the calculation as they are irrelevant for transport.
+    !This subroutine will calculate the full Bloch rep. matrix elements for
+    !all the energy window restricted electron-phonon processes for a given
+    !irreducible initial electron state = (band, wave vector). 
+    !This list will be written to disk in files tagged with the muxed state index.
+    
+    integer(k4) :: nstates_irred, istate, m, ik, ik_muxed, n, ikp, s, &
+         iq, start, end, chunk, ierr, k_indvec(3), kp_indvec(3), &
+         q_indvec(3), count, g2size
+    real(dp) :: k(3), kp(3), q(3)
+    real(dp), allocatable :: g2_istate(:)
+    complex(dp) :: gmixed_ik(numwannbands,numwannbands,numbranches,nwsq)
+    character(len = 1024) :: filename
+
+    call print_message("Doing g(k,Rp) -> |g(k,q)|^2 for all IBZ states...")
+
+    !Length of g2_istate
+    g2size = nstates_inwindow*numbranches
+    allocate(g2_istate(g2size))
+
+    !Total number of IBZ blocks states
+    nstates_irred = nk_irred*numwannbands
+    
+    call distribute_points(nstates_irred, chunk, start, end)
+
+    if(this_image() == 1) then
+       print*, "   #states = ", nstates_irred
+       print*, "   #states/process = ", chunk
+    end if
+
+    count = 0
+    do istate = start, end !over IBZ blocks states
+       !Initialize eligible process counter for this state
+       count = 0
+
+       !Demux state index into band (m) and wave vector (ik) indices
+       call demux_state(istate,numwannbands,m,ik)
+       
+       !Get the muxed index of wave vector from the IBZ blocks index list
+       ik_muxed = el_indexlist_irred(ik)
+
+       !Apply energy window to initial (IBZ blocks) electron
+       if(abs(el_ens_irred(ik, m) - enref) > fsthick) cycle
+
+       !Load gmixed(ik) here for use inside the loops below
+       call chdir(trim(adjustl(g2dir)))
+       write (filename, '(I6)') ik
+       filename = 'gmixed.ik'//trim(adjustl(filename))
+       open(1,file=filename,status="old",access='stream')
+       read(1) gmixed_ik
+       close(1)
+       call chdir(cwd)
+
+       !Initial (IBZ blocks) wave vector (crystal coords.)
+       k = el_wavevecs_irred(ik, :)
+
+       !Convert from crystal to 0-based index vector
+       k_indvec = nint(k*kmesh)
+       
+       !Run over final (FBZ blocks) electron wave vectors
+       do ikp = 1, nk
+          !Final wave vector (crystal coords.)
+          kp = el_wavevecs(ikp, :)
+
+          !Convert from crystal to 0-based index vector
+          kp_indvec = nint(kp*kmesh)
+          
+          !Run over final electron bands
+          do n = 1, numwannbands
+             !Apply energy window to final electron
+             if(abs(el_ens(ikp, n) - enref) > fsthick) cycle
+
+             !Find interacting phonon wave vector
+             !Note that q, k, and k' are all on the same mesh
+             q_indvec = modulo(kp_indvec - k_indvec, kmesh) !0-based index vector
+             q = q_indvec/dble(kmesh) !crystal coords.
+
+             !Muxed index of q
+             iq = mux_vector(q_indvec, kmesh, 0_dp)
+             
+             !Run over phonon branches
+             do s = 1, numbranches
+                !Increment g2 processes counter
+                count = count + 1
+
+                !Calculate |g_mns(<k>,q)|^2
+                g2_istate(count) = g2_epw(q, el_evecs_irred(ik, m, :), &
+                     el_evecs(ikp, n, :), ph_evecs(iq, s, :), &
+                     ph_ens(iq, s), gmixed_ik)
+             end do !s
+          end do !n
+       end do !ikp
+
+       !Change to data output directory
+       call chdir(trim(adjustl(g2dir)))
+
+       !Write data in binary format
+       !Note: this will overwrite existing data!
+       write (filename, '(I6)') istate
+       filename = 'g2.istate'//trim(adjustl(filename))
+       open(1, file = trim(filename), status = 'replace', access = 'stream')
+       write(1) g2_istate
+       close(1)
+
+       !Change back to working directory
+       call chdir(cwd)
+    end do
+
+    !TODO at this point we can delete the gmixed disk data
+    !call clear_gmixed_cache
+
+    sync all
+  end subroutine calculate_g_bloch
+
   subroutine gmixed_epw(ik)
     !! Calculate the Bloch-Wannier mixed rep. e-ph matrix elements g(k,Rp),
     !! where k is an IBZ electron wave vector and Rp is a phonon unit cell.
     !! Note: this step *DOES NOT* perform the rotation over the Wannier bands space.
-    !! The result will be saved to disk tagged with k-index.
-
-    !use configuration, only: numwannbands, numbranches, nwsk, nwsq, &
-    !     rcells_k, elwsdeg, el_wavevecs_irred, gdir, gwann, cwd
+    !
+    !The result will be saved to disk tagged with k-index.
     
     integer(k4), intent(in) :: ik
     integer(k4) :: iuc
@@ -703,7 +678,7 @@ contains
 !!$  !This is for the electron at gamma.
 !!$  subroutine gmixed_epw_gamma
 !!$    use configuration, only: numwannbands, numbranches, nwsk, nwsq, &
-!!$         elwsdeg, gdir, gwann, cwd
+!!$         elwsdeg, g2dir, gwann, cwd
 !!$
 !!$    implicit none
 !!$    
@@ -723,7 +698,7 @@ contains
 !!$    end do
 !!$
 !!$    !Change to data output directory
-!!$    call chdir(trim(adjustl(gdir)))
+!!$    call chdir(trim(adjustl(g2dir)))
 !!$
 !!$    !Write data in binary format
 !!$    !Note: this will overwrite existing data!

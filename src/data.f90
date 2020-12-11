@@ -38,12 +38,6 @@ module data
   !! Reciprocal lattice vectors.
   real(dp) :: volume_bz
   !! Brillouin zone volume (nm^-3).
-  integer(k4) :: qmesh(3) 
-  !! Coarse phonon wave vector mesh.
-  integer(k4) :: qmesh_fine(3) 
-  !! Fine phonon wave vector mesh.
-  integer(k4) :: kmesh(3)
-  !! Electron wave vector mesh.
 
   !Symmetry related data.
   integer(k4) :: nsymm
@@ -79,6 +73,8 @@ module data
   !! Total number of electronic bands.
   integer(k4) :: mesh_ref
   !! Electron mesh refinement factor compared to the phonon mesh.
+  integer(k4) :: kmesh(3)
+  !! Electron wave vector mesh.
   integer(k4) :: nk
   !! Number of fine electron wave vectors in the full Brillouin zone (FBZ).
   integer(k4) :: nk_irred
@@ -128,6 +124,10 @@ module data
   !! Number of phonon wave vectors in the full Brillouin zone (FBZ).
   integer(k4) :: nq_irred
   !! Number of phonon wave vectors in the irreducible wedge of Brillouin zone (IBZ).
+  integer(k4) :: qmesh(3) 
+  !! Coarse phonon wave vector mesh.
+  integer(k4) :: qmesh_fine(3) 
+  !! Fine phonon wave vector mesh.
   real(dp), allocatable :: ph_wavevecs(:,:)
   !! List of all phonon wave vectors (crystal coordinates).
   real(dp), allocatable :: ph_wavevecs_irred(:,:)

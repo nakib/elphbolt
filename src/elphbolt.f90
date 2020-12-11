@@ -9,7 +9,7 @@ program elphBolt
 
   use config, only: initialize_system
   use mesh, only: calculate_electrons, calculate_phonons
-  use wannier, only: calculate_g_mixed
+  use wannier, only: calculate_g_mixed, calculate_g_bloch
   
   implicit none
   
@@ -30,7 +30,7 @@ program elphBolt
   call calculate_g_mixed
 
   !Calculate Bloch space e-ph vertex
-  !TODO call calculate_g_bloch(wann,eph)
+  call calculate_g_bloch
 
   !Calculate ph-ph vertex
   !TODO call calculate_V
