@@ -730,44 +730,39 @@ contains
 
     sync all
   end subroutine calculate_g_mixed
-!!$
-!!$  !For testing and debugging:
-!!$
-!!$  !Calculate the Bloch-Wannier mixed rep. e-ph matrix elements g(k,Rp),
-!!$  !where k is an IBZ electron wave vector and Rp is a phonon unit cell.
-!!$  !This is for the electron at gamma.
-!!$  subroutine gmixed_epw_gamma
-!!$    use configuration, only: numwannbands, numbranches, nwsk, nwsq, &
-!!$         elwsdeg, g2dir, gwann, cwd
-!!$
-!!$    implicit none
-!!$    
-!!$    integer(k4) :: iuc
-!!$    complex(dp) :: caux
-!!$    complex(dp), allocatable:: gmixed(:, :, :, :)
-!!$    character(len = 1024) :: filename
-!!$
-!!$    allocate(gmixed(numwannbands, numwannbands, numbranches, nwsq))
-!!$    
-!!$    !Fourier transform to k-space
-!!$    gmixed = 0
-!!$    do iuc = 1, nwsk
-!!$       caux = (1.0_dp,0.0_dp)/elwsdeg(iuc)           
-!!$       gmixed(:, :, :, :) = gmixed(:, :, :, :) + &
-!!$            caux*gwann(:, :, iuc, :, :)
-!!$    end do
-!!$
-!!$    !Change to data output directory
-!!$    call chdir(trim(adjustl(g2dir)))
-!!$
-!!$    !Write data in binary format
-!!$    !Note: this will overwrite existing data!
-!!$    filename = 'gmixed.gamma'//trim(adjustl(filename))
-!!$    open(1, file = trim(filename), status = 'replace', access = 'stream')
-!!$    write(1) gmixed
-!!$    close(1)
-!!$
-!!$    !Change back to working directory
-!!$    call chdir(cwd)
-!!$  end subroutine gmixed_epw_gamma
+
+  !For testing and debugging:
+  subroutine gmixed_epw_gamma
+    !! Calculate the Bloch-Wannier mixed rep. e-ph matrix elements g(k,Rp),
+    !! where k is an IBZ electron wave vector and Rp is a phonon unit cell.
+    !! This is for the electron at gamma.
+    
+    integer(k4) :: iuc
+    complex(dp) :: caux
+    complex(dp), allocatable:: gmixed(:, :, :, :)
+    character(len = 1024) :: filename
+
+    allocate(gmixed(numwannbands, numwannbands, numbranches, nwsq))
+    
+    !Fourier transform to k-space
+    gmixed = 0
+    do iuc = 1, nwsk
+       caux = (1.0_dp,0.0_dp)/elwsdeg(iuc)           
+       gmixed(:, :, :, :) = gmixed(:, :, :, :) + &
+            caux*gwann(:, :, iuc, :, :)
+    end do
+
+    !Change to data output directory
+    call chdir(trim(adjustl(g2dir)))
+
+    !Write data in binary format
+    !Note: this will overwrite existing data!
+    filename = 'gmixed.gamma' !//trim(adjustl(filename))
+    open(1, file = trim(filename), status = 'replace', access = 'stream')
+    write(1) gmixed
+    close(1)
+
+    !Change back to working directory
+    call chdir(cwd)
+  end subroutine gmixed_epw_gamma
 end module wannier

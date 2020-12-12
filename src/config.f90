@@ -23,7 +23,7 @@ contains
     !Namelists:
     namelist /allocations/ numelements, numatoms
     namelist /crystal_info/ elements, atomtypes, basis, lattvecs, polar, &
-         born, epsilon
+         born, epsilon, masses
     namelist /numerics/ qmesh, mesh_ref, fsthick
     namelist /control/ datadumpdir, read_g2, read_V
     namelist /electrons/ enref
