@@ -5,7 +5,7 @@ module config
   use params, only: dp, k4, twopi
   use misc, only: cross_product, mux_vector, demux_mesh, exit_with_message
   use spglib_wrapper, only: get_operations, get_cartesian_operations, get_num_operations
-  use wannier, only: read_EPW_Wannier
+  !use wannier, only: read_EPW_Wannier
   
   implicit none
 
@@ -148,7 +148,7 @@ contains
     call calculate_symmetries
 
     !Read EPW data
-    call read_EPW_Wannier()
+    !call read_EPW_Wannier()
   end subroutine initialize_system
 
   subroutine calculate_symmetries

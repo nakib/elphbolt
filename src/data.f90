@@ -156,33 +156,33 @@ module data
   complex(dp), allocatable :: ph_evecs_irred(:,:,:)
   !! List of IBZ wedge phonon eigenvectors.     
 
-  !EPW Wannier representation data.
-  integer(k4) :: numwannbands
-  !! Number of Wannier bands.
-  integer(k4) :: nwsk
-  !! Number of real space cells for electrons.
-  integer(k4) :: nwsq
-  !! Number of real space cells for phonons.
-  integer(k4) :: nwsg
-  !! Number of real space cells for electron-phonon vertex.
-  integer(k4), allocatable :: rcells_k(:, :)
-  !! Real space cell locations for electrons.
-  integer(k4), allocatable :: rcells_q(:, :)
-  !! Real space cell locations for phonons.
-  integer(k4), allocatable :: rcells_g(:, :)
-  !! Real space cell locations for electron-phonon vertex.     
-  integer(k4), allocatable :: elwsdeg(:)
-  !! Real space cell multiplicity for electrons.
-  integer(k4), allocatable :: phwsdeg(:)
-  !! Real space cell multiplicity for phonons.
-  integer(k4), allocatable :: gwsdeg(:)
-  !! Real space cell multiplicity for electron-phonon vertex.
-  complex(dp), allocatable :: Hwann(:, :, :)
-  !! Hamiltonian in Wannier representation.
-  complex(dp), allocatable :: Dphwann(:, :, :)
-  !! Dynamical matrix in Wannier representation.
-  complex(dp), allocatable :: gwann(:, :, :, :, :)
-  !! e-ph vertex in Wannier representation.
+!!$  !EPW Wannier representation data.
+!!$  integer(k4) :: numwannbands
+!!$  !! Number of Wannier bands.
+!!$  integer(k4) :: nwsk
+!!$  !! Number of real space cells for electrons.
+!!$  integer(k4) :: nwsq
+!!$  !! Number of real space cells for phonons.
+!!$  integer(k4) :: nwsg
+!!$  !! Number of real space cells for electron-phonon vertex.
+!!$  integer(k4), allocatable :: rcells_k(:, :)
+!!$  !! Real space cell locations for electrons.
+!!$  integer(k4), allocatable :: rcells_q(:, :)
+!!$  !! Real space cell locations for phonons.
+!!$  integer(k4), allocatable :: rcells_g(:, :)
+!!$  !! Real space cell locations for electron-phonon vertex.     
+!!$  integer(k4), allocatable :: elwsdeg(:)
+!!$  !! Real space cell multiplicity for electrons.
+!!$  integer(k4), allocatable :: phwsdeg(:)
+!!$  !! Real space cell multiplicity for phonons.
+!!$  integer(k4), allocatable :: gwsdeg(:)
+!!$  !! Real space cell multiplicity for electron-phonon vertex.
+!!$  complex(dp), allocatable :: Hwann(:, :, :)
+!!$  !! Hamiltonian in Wannier representation.
+!!$  complex(dp), allocatable :: Dphwann(:, :, :)
+!!$  !! Dynamical matrix in Wannier representation.
+!!$  complex(dp), allocatable :: gwann(:, :, :, :, :)
+!!$  !! e-ph vertex in Wannier representation.
 
   !I/O directories and system control flags.
   character(len=500) :: cwd
