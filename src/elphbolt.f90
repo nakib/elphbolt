@@ -7,28 +7,40 @@ program elphBolt
   !! and arXiv:2008.08722 (2020) with both the electron-phonon and phonon-phonon
   !! interactions computed ab initio.
 
-  use config, only: initialize_system
+  use numerics_module, only: numerics
+  use crystal_module, only: crystal
+  use symmetry_module, only: symmetry
+  !use config, only: initialize_system
   !use mesh, only: calculate_electrons, calculate_phonons
   !use wannier, only: calculate_g_mixed, calculate_g_bloch, gmixed_epw_gamma
-  use wannier, only: epw_wannier
+  use wannier_module, only: epw_wannier
   
   implicit none
-
+  
+  type(numerics) :: num
+  type(crystal) :: crys
+  type(symmetry) :: sym
   type(epw_wannier) :: wann
   
   if(this_image() == 1) then
      print*, 'Number of images = ', num_images()
   end if
 
-
-  call wann%read
+  !Set up numerical data
+  call num%initialize
   
-  !Read inputs, find symmetry operations, and set up calculation environment.
-  call initialize_system
+  !Set up crystal
+  call crys%initialize
+
+  !Calculate crystal and BZ symmetries
+  call sym%calculate_symmetries(crys, num%qmesh)
+
+  !Read EPW Wannier data
+  call wann%read
 
   !Test electron bands, phonon dispersions, and g along path.
   if(this_image() == 1) then
-     call wann%test_wannier
+     call wann%test_wannier(crys, num)
   end if
   
 !!$  !Calculate electrons

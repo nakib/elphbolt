@@ -485,37 +485,37 @@ contains
     end if
   end subroutine calculate_electrons
 
-  subroutine calculate_phonons
-    !! Calculate phonon quantities on the FBZ and IBZ meshes.
-
-    integer(k4) :: iq
-    !Switch for mesh utilites with or without energy restriction
-    logical :: blocks
-    blocks = .false.
-
-    call print_message("Calculating phonon FBZ quantities...")
-
-    allocate(ph_indexlist(nq))
-    do iq = 1, nq
-       ph_indexlist(iq) = iq
-    end do
-    
-    !Calculate FBZ mesh
-    call calc_wavevectors_full(qmesh, ph_wavevecs, blocks)
-
-    !Calculate FBZ phonon quantities
-    allocate(ph_ens(nq, numbranches))
-    allocate(ph_vels(nq, numbranches, 3))
-    allocate(ph_evecs(nq, numbranches, numbranches))    
-    call ph_wann_epw(nq, ph_wavevecs, ph_ens, ph_vels, ph_evecs)
-
-    !Calculate IBZ mesh
-    call print_message("Calculating IBZ and IBZ -> FBZ mappings...")
-    call find_irred_wedge(qmesh, nq_irred, ph_wavevecs_irred, &
-         ph_indexlist_irred, ph_nequiv, nsymm_rot, qrotations, ph_ibz2fbz_map, blocks)
-
-    !Create FBZ to IBZ map
-    call print_message("Calculating FBZ -> IBZ mappings...")
-    call create_fbz2ibz_map(ph_fbz2ibz_map, nq, nq_irred, ph_indexlist, ph_nequiv, ph_ibz2fbz_map)
-  end subroutine calculate_phonons
+!!$  subroutine calculate_phonons
+!!$    !! Calculate phonon quantities on the FBZ and IBZ meshes.
+!!$
+!!$    integer(k4) :: iq
+!!$    !Switch for mesh utilites with or without energy restriction
+!!$    logical :: blocks
+!!$    blocks = .false.
+!!$
+!!$    call print_message("Calculating phonon FBZ quantities...")
+!!$
+!!$    allocate(ph_indexlist(nq))
+!!$    do iq = 1, nq
+!!$       ph_indexlist(iq) = iq
+!!$    end do
+!!$    
+!!$    !Calculate FBZ mesh
+!!$    call calc_wavevectors_full(qmesh, ph_wavevecs, blocks)
+!!$
+!!$    !Calculate FBZ phonon quantities
+!!$    allocate(ph_ens(nq, numbranches))
+!!$    allocate(ph_vels(nq, numbranches, 3))
+!!$    allocate(ph_evecs(nq, numbranches, numbranches))    
+!!$    call ph_wann_epw(nq, ph_wavevecs, ph_ens, ph_vels, ph_evecs)
+!!$
+!!$    !Calculate IBZ mesh
+!!$    call print_message("Calculating IBZ and IBZ -> FBZ mappings...")
+!!$    call find_irred_wedge(qmesh, nq_irred, ph_wavevecs_irred, &
+!!$         ph_indexlist_irred, ph_nequiv, nsymm_rot, qrotations, ph_ibz2fbz_map, blocks)
+!!$
+!!$    !Create FBZ to IBZ map
+!!$    call print_message("Calculating FBZ -> IBZ mappings...")
+!!$    call create_fbz2ibz_map(ph_fbz2ibz_map, nq, nq_irred, ph_indexlist, ph_nequiv, ph_ibz2fbz_map)
+!!$  end subroutine calculate_phonons
 end module mesh
