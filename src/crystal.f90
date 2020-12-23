@@ -2,12 +2,12 @@ module crystal_module
   !! Module containing type and procedures related to the crystal structure.
 
   use params, only: dp, k4, twopi
-  use misc, only: exit_with_message, print_message, cross_product
+  use misc, only: exit_with_message, print_message, cross_product, demux_vector
 
   implicit none
 
   private
-  public crystal
+  public crystal, calculate_wavevectors_full
 
   type crystal
      !! Data and procedures related to the crystal structure.
@@ -139,4 +139,37 @@ contains
        print*, 'Brillouin zone volume =', c%volume_bz, '1/nm^3'
     end if
   end subroutine read_input_and_setup_crystal
+
+  subroutine calculate_wavevectors_full(mesh,wavevecs,blocks,indexlist)
+    !! Calculate wave vectors (crystal coords.) of the full Brillouin zone (FBZ)
+    !!
+    !! mesh is the array of number of points along the reciprocal lattice vectors
+    !! wavevecs is the list of all the wave vectors
+
+    integer(k4), intent(in) :: mesh(3)
+    logical, intent(in) :: blocks
+    integer(k4), optional, intent(in) :: indexlist(:)
+    real(dp), allocatable, intent(out) :: wavevecs(:,:)
+    integer(k4) :: nwavevecs, ijk(3), i, imux
+
+    if(blocks .and. .not. present(indexlist)) &
+         call exit_with_message("If blocks is true then indexlist must be present")
+
+    if(blocks) then
+       nwavevecs = size(indexlist)
+    else
+       nwavevecs = product(mesh)
+    end if
+
+    allocate(wavevecs(nwavevecs, 3))
+    do i = 1, nwavevecs !run over total number of vectors
+       if(blocks) then
+          imux = indexlist(i)
+       else
+          imux = i
+       end if
+       call demux_vector(imux, ijk, mesh, 0_k4) !get 0-based (i,j,k) indices
+       wavevecs(i,:) = dble(ijk)/mesh !wave vectors in crystal coordinates
+    end do
+  end subroutine calculate_wavevectors_full
 end module crystal_module

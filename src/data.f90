@@ -68,54 +68,54 @@ module data
 !!$  character(len=10) :: international
 !!$  !! Spacegroup in Hermann–Mauguin (or international) notation.
 
-  !Electronic data.
-  integer(k4) :: numbands
-  !! Total number of electronic bands.
-  integer(k4) :: mesh_ref
-  !! Electron mesh refinement factor compared to the phonon mesh.
-  integer(k4) :: kmesh(3)
-  !! Electron wave vector mesh.
-  integer(k4) :: nk
-  !! Number of fine electron wave vectors in the full Brillouin zone (FBZ).
-  integer(k4) :: nk_irred
-  !! Number of fine electron wave vectors in the irreducible wedge of Brillouin zone (IBZ).
-  integer(k4) :: nstates_inwindow
-  !! Number of electron wave vectors within transport window.
-  integer(k4) :: nstates_irred_inwindow
-  !! Number of IBZ wedge electron wave vectors within transport window.
-  integer(k4), allocatable :: IBZ_inwindow_states(:,:)
-  !! List of irreducible wedge states within transport window.
-  real(dp) :: enref
-  !! Electron reference energy (eV).
-  real(dp) :: fsthick
-  !! Fermi surface thickness in (eV).
-  real(dp), allocatable :: el_wavevecs(:,:)
-  !! List of all electron wave vectors (crystal coordinates).
-  real(dp), allocatable :: el_wavevecs_irred(:,:)
-  !! List of irreducible electron wave vectors (crystal coordinates).
-  integer(k4), allocatable :: el_indexlist(:)
-  !! List of muxed indices of the FBZ wave vectors.
-  integer(k4), allocatable :: el_indexlist_irred(:)
-  !! List of muxed indices of the IBZ wedge.
-  integer(k4), allocatable :: el_nequiv(:)
-  !! List of the number of equivalent points for each IBZ point.
-  integer(k4), allocatable :: el_ibz2fbz_map(:,:,:)
-  !! Map from an IBZ electron point to its images.
-  !! The third axis contains the pair (symmetry index, image).
-  integer(k4), allocatable :: el_fbz2ibz_map(:)
-  !! Map from an FBZ electron point to its IBZ wedge image.
-  real(dp), allocatable :: el_ens(:,:)
-  !! List of electron energies on FBZ.
-  real(dp), allocatable :: el_ens_irred(:,:)
-  !! List of electron energies on IBZ.
-  real(dp), allocatable :: el_vels(:,:,:)
-  !! List of electron velocities on FBZ.
-  real(dp), allocatable :: el_vels_irred(:,:,:)
-  !! List of electron velocites on IBZ.
-  complex(dp), allocatable :: el_evecs(:,:,:)
-  !! List of all electron eigenvectors.
-  complex(dp), allocatable :: el_evecs_irred(:,:,:)
-  !! List of IBZ wedge electron eigenvectors.
+!!$  !Electronic data.
+!!$  integer(k4) :: numbands
+!!$  !! Total number of electronic bands.
+!!$  integer(k4) :: mesh_ref
+!!$  !! Electron mesh refinement factor compared to the phonon mesh.
+!!$  integer(k4) :: kmesh(3)
+!!$  !! Electron wave vector mesh.
+!!$  integer(k4) :: nk
+!!$  !! Number of fine electron wave vectors in the full Brillouin zone (FBZ).
+!!$  integer(k4) :: nk_irred
+!!$  !! Number of fine electron wave vectors in the irreducible wedge of Brillouin zone (IBZ).
+!!$  integer(k4) :: nstates_inwindow
+!!$  !! Number of electron wave vectors within transport window.
+!!$  integer(k4) :: nstates_irred_inwindow
+!!$  !! Number of IBZ wedge electron wave vectors within transport window.
+!!$  integer(k4), allocatable :: IBZ_inwindow_states(:,:)
+!!$  !! List of irreducible wedge states within transport window.
+!!$  real(dp) :: enref
+!!$  !! Electron reference energy (eV).
+!!$  real(dp) :: fsthick
+!!$  !! Fermi surface thickness in (eV).
+!!$  real(dp), allocatable :: el_wavevecs(:,:)
+!!$  !! List of all electron wave vectors (crystal coordinates).
+!!$  real(dp), allocatable :: el_wavevecs_irred(:,:)
+!!$  !! List of irreducible electron wave vectors (crystal coordinates).
+!!$  integer(k4), allocatable :: el_indexlist(:)
+!!$  !! List of muxed indices of the FBZ wave vectors.
+!!$  integer(k4), allocatable :: el_indexlist_irred(:)
+!!$  !! List of muxed indices of the IBZ wedge.
+!!$  integer(k4), allocatable :: el_nequiv(:)
+!!$  !! List of the number of equivalent points for each IBZ point.
+!!$  integer(k4), allocatable :: el_ibz2fbz_map(:,:,:)
+!!$  !! Map from an IBZ electron point to its images.
+!!$  !! The third axis contains the pair (symmetry index, image).
+!!$  integer(k4), allocatable :: el_fbz2ibz_map(:)
+!!$  !! Map from an FBZ electron point to its IBZ wedge image.
+!!$  real(dp), allocatable :: el_ens(:,:)
+!!$  !! List of electron energies on FBZ.
+!!$  real(dp), allocatable :: el_ens_irred(:,:)
+!!$  !! List of electron energies on IBZ.
+!!$  real(dp), allocatable :: el_vels(:,:,:)
+!!$  !! List of electron velocities on FBZ.
+!!$  real(dp), allocatable :: el_vels_irred(:,:,:)
+!!$  !! List of electron velocites on IBZ.
+!!$  complex(dp), allocatable :: el_evecs(:,:,:)
+!!$  !! List of all electron eigenvectors.
+!!$  complex(dp), allocatable :: el_evecs_irred(:,:,:)
+!!$  !! List of IBZ wedge electron eigenvectors.
 
 !!$  !Phononic data.
 !!$  integer(k4) :: numbranches

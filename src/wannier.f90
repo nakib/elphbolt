@@ -11,7 +11,7 @@ module wannier_module
   implicit none
 
   private
-  public epw_wannier 
+  public epw_wannier
 
   !EPW File names
   character(len=*), parameter :: filename_epwdata = "epwdata.fmt"
@@ -62,7 +62,7 @@ module wannier_module
 
    contains
 
-     procedure :: read=>read_EPW_Wannier !, el_wann_epw, ph_wann_epw, calculate_g_bloch, &
+     procedure :: read=>read_EPW_Wannier, el_wann_epw !, ph_wann_epw, calculate_g_bloch, &
      !gmixed_epw, gmixed_epw_gamma, g2_epw, test_wannier
      procedure :: test_wannier
 
@@ -172,21 +172,20 @@ contains
 
     class(epw_wannier), intent(in) :: wann
     type(crystal), intent(in) :: crys
-    
-    !Local variables
     integer(k4), intent(in) :: nk
     real(dp), intent(in) :: kvecs(nk,3) !Crystal coordinates
     real(dp), intent(out) :: energies(nk,wann%numwannbands)
     real(dp), optional, intent(out) :: velocities(nk,wann%numwannbands,3)
     complex(dp), optional, intent(out) :: evecs(nk,wann%numwannbands,wann%numwannbands)
 
+    !Local variables
     integer(k4) :: iuc, ib, jb, ipol, ik, nwork, tmp
     real(dp) :: rcart(3)
     real(dp),  allocatable :: rwork(:)
     complex(dp), allocatable :: work(:)
     complex(dp) :: caux, H(wann%numwannbands,wann%numwannbands), &
          dH(3,wann%numwannbands,wann%numwannbands)
-
+    
     !Catch error for optional velocity calculation
     if(present(velocities) .and. .not. present(evecs)) &
          call exit_with_message("In Wannier, velocity is present but not eigenvecs.")
@@ -194,7 +193,7 @@ contains
     nwork = 1
     allocate(work(nwork))
     allocate(rwork(max(1,7*wann%numwannbands)))
-
+    
     do ik = 1,nk
        !Form Hamiltonian (H) and k-derivative of H (dH) 
        !from Hwann, rcells_k, and elwsdeg
@@ -963,7 +962,7 @@ contains
        !print*, el_ens_kp(n), ph_ens_path(i,s)*1e3, sqrt(g2_qpath(i))*1.0d3
     end do
 
-    print*, 'done calculating g'
+!!$    print*, 'done calculating g'
     !open(1,file='g_qpath_123',status="replace")
     open(1,file='g_qpath_116',status="replace")
     write(1,*) '#|g_SE| [eV]'
