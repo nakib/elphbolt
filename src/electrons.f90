@@ -6,8 +6,7 @@ module electron_module
   use numerics_module, only: numerics
   use wannier_module, only: epw_wannier
   use crystal_module, only: crystal, calculate_wavevectors_full
-  use symmetry_module, only: symmetry, find_equiv_map, find_irred_wedge, &
-       create_fbz2ibz_map, fbz2ibz
+  use symmetry_module, only: symmetry, find_irred_wedge, create_fbz2ibz_map
   
   implicit none
 

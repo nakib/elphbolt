@@ -11,8 +11,7 @@ program elphBolt
   use crystal_module, only: crystal
   use symmetry_module, only: symmetry
   use electron_module, only: electron
-  !use config, only: initialize_system
-  !use mesh, only: calculate_electrons, calculate_phonons
+  use phonon_module, only: phonon
   !use wannier, only: calculate_g_mixed, calculate_g_bloch, gmixed_epw_gamma
   use wannier_module, only: epw_wannier
   
@@ -23,6 +22,7 @@ program elphBolt
   type(symmetry) :: sym
   type(epw_wannier) :: wann
   type(electron) :: el
+  type(phonon) :: ph
   
   if(this_image() == 1) then
      print*, 'Number of images = ', num_images()
@@ -48,8 +48,8 @@ program elphBolt
   !Calculate electrons
   call el%initialize(wann, crys, sym, num)
 
-!!$  !Calculate phonons
-!!$  call calculate_phonons
+  !Calculate phonons
+  call ph%initialize(wann, crys, sym, num)
 !!$
 !!$  !Calculate mixed Bloch-Wannier space e-ph vertex
 !!$  call calculate_g_mixed
