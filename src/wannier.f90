@@ -62,8 +62,8 @@ module wannier_module
 
    contains
 
-     procedure :: read=>read_EPW_Wannier, el_wann_epw, ph_wann_epw !, calculate_g_bloch, &
-     !gmixed_epw, gmixed_epw_gamma, g2_epw, test_wannier
+     procedure :: read=>read_EPW_Wannier, el_wann_epw, ph_wann_epw, &
+          gmixed_epw, g2_epw !, calculate_g_bloch
      procedure :: test_wannier
 
   end type epw_wannier
@@ -569,8 +569,8 @@ contains
             ph_en*g2unitfactor !eV^2
     end if
   end function g2_epw
-
-    subroutine long_range_prefac(wann, crys, q, uqs, glprefac)
+  
+  subroutine long_range_prefac(wann, crys, q, uqs, glprefac)
     !! Calculate the long-range correction prefactor of
     !! the e-ph matrix element for a given phonon mode.
     !! q: phonon wvec in Cartesian coords., Bohr^-1
@@ -627,191 +627,50 @@ contains
     end do
     glprefac = glprefac*fac
   end subroutine long_range_prefac
-!!$
-!!$  subroutine calculate_g_bloch(wann)
-!!$    !! MPI parallelizer of g2_epw over IBZ electron states within the Fermi window.
-!!$    !
-!!$    !In the FBZ and IBZ blocks a wave vector was retained when at least one
-!!$    !band belonged within the energy window. Here the bands outside energy window
-!!$    !will be skipped in the calculation as they are irrelevant for transport.
-!!$    !This subroutine will calculate the full Bloch rep. matrix elements for
-!!$    !all the energy window restricted electron-phonon processes for a given
-!!$    !irreducible initial electron state = (band, wave vector). 
-!!$    !This list will be written to disk in files tagged with the muxed state index.
-!!$
-!!$    class(epw_wannier), intent(in) :: wann
-!!$    integer(k4) :: nstates_irred, istate, m, ik, ik_muxed, n, ikp, s, &
-!!$         iq, start, end, chunk, ierr, k_indvec(3), kp_indvec(3), &
-!!$         q_indvec(3), count, g2size
-!!$    real(dp) :: k(3), kp(3), q(3)
-!!$    real(dp), allocatable :: g2_istate(:)
-!!$    complex(dp) :: gmixed_ik(wann%numwannbands,wann%numwannbands,wann%numbranches,wann%nwsq)
-!!$    character(len = 1024) :: filename
-!!$
-!!$    call print_message("Doing g(k,Rp) -> |g(k,q)|^2 for all IBZ states...")
-!!$
-!!$    !Length of g2_istate
-!!$    g2size = nstates_inwindow*wann%numbranches
-!!$    allocate(g2_istate(g2size))
-!!$
-!!$    !Total number of IBZ blocks states
-!!$    nstates_irred = nk_irred*wann%numwannbands
-!!$
-!!$    call distribute_points(nstates_irred, chunk, start, end)
-!!$
-!!$    if(this_image() == 1) then
-!!$       print*, "   #states = ", nstates_irred
-!!$       print*, "   #states/mpi process = ", chunk
-!!$    end if
-!!$
-!!$    count = 0
-!!$    do istate = start, end !over IBZ blocks states
-!!$       !Initialize eligible process counter for this state
-!!$       count = 0
-!!$
-!!$       !Demux state index into band (m) and wave vector (ik) indices
-!!$       call demux_state(istate,wann%numwannbands,m,ik)
-!!$
-!!$       !Get the muxed index of wave vector from the IBZ blocks index list
-!!$       ik_muxed = el_indexlist_irred(ik)
-!!$
-!!$       !Apply energy window to initial (IBZ blocks) electron
-!!$       if(abs(el_ens_irred(ik, m) - enref) > fsthick) cycle
-!!$
-!!$       !Load gmixed(ik) here for use inside the loops below
-!!$       call chdir(trim(adjustl(g2dir)))
-!!$       write (filename, '(I6)') ik
-!!$       filename = 'gmixed.ik'//trim(adjustl(filename))
-!!$       open(1,file=filename,status="old",access='stream')
-!!$       read(1) gmixed_ik
-!!$       close(1)
-!!$       call chdir(cwd)
-!!$
-!!$       !Initial (IBZ blocks) wave vector (crystal coords.)
-!!$       k = el_wavevecs_irred(ik, :)
-!!$
-!!$       !Convert from crystal to 0-based index vector
-!!$       k_indvec = nint(k*kmesh)
-!!$
-!!$       !Run over final (FBZ blocks) electron wave vectors
-!!$       do ikp = 1, nk
-!!$          !Final wave vector (crystal coords.)
-!!$          kp = el_wavevecs(ikp, :)
-!!$
-!!$          !Convert from crystal to 0-based index vector
-!!$          kp_indvec = nint(kp*kmesh)
-!!$
-!!$          !Run over final electron bands
-!!$          do n = 1, wann%numwannbands
-!!$             !Apply energy window to final electron
-!!$             if(abs(el_ens(ikp, n) - enref) > fsthick) cycle
-!!$
-!!$             !Find interacting phonon wave vector
-!!$             !Note that q, k, and k' are all on the same mesh
-!!$             q_indvec = modulo(kp_indvec - k_indvec, kmesh) !0-based index vector
-!!$             q = q_indvec/dble(kmesh) !crystal coords.
-!!$
-!!$             !Muxed index of q
-!!$             iq = mux_vector(q_indvec, kmesh, 0_dp)
-!!$
-!!$             !Run over phonon branches
-!!$             do s = 1, wann%numbranches
-!!$                !Increment g2 processes counter
-!!$                count = count + 1
-!!$
-!!$                !Calculate |g_mns(<k>,q)|^2
-!!$                g2_istate(count) = g2_epw(w, q, el_evecs_irred(ik, m, :), &
-!!$                     el_evecs(ikp, n, :), ph_evecs(iq, s, :), &
-!!$                     ph_ens(iq, s), gmixed_ik)
-!!$             end do !s
-!!$          end do !n
-!!$       end do !ikp
-!!$
-!!$       !Change to data output directory
-!!$       call chdir(trim(adjustl(g2dir)))
-!!$
-!!$       !Write data in binary format
-!!$       !Note: this will overwrite existing data!
-!!$       write (filename, '(I6)') istate
-!!$       filename = 'g2.istate'//trim(adjustl(filename))
-!!$       open(1, file = trim(filename), status = 'replace', access = 'stream')
-!!$       write(1) g2_istate
-!!$       close(1)
-!!$
-!!$       !Change back to working directory
-!!$       call chdir(cwd)
-!!$    end do
-!!$
-!!$    !TODO at this point we can delete the gmixed disk data
-!!$    !call clear_gmixed_cache
-!!$
-!!$    sync all
-!!$  end subroutine calculate_g_bloch
-!!$
-!!$  subroutine gmixed_epw(wann, ik)
-!!$    !! Calculate the Bloch-Wannier mixed rep. e-ph matrix elements g(k,Rp),
-!!$    !! where k is an IBZ electron wave vector and Rp is a phonon unit cell.
-!!$    !! Note: this step *DOES NOT* perform the rotation over the Wannier bands space.
-!!$    !
-!!$    !The result will be saved to disk tagged with k-index.
-!!$
-!!$    class(epw_wannier), intent(in) :: wann
-!!$    integer(k4), intent(in) :: ik
-!!$    integer(k4) :: iuc
-!!$    complex(dp) :: caux
-!!$    complex(dp), allocatable:: gmixed(:,:,:,:)
-!!$    real(dp) :: kvec(3)
-!!$    character(len = 1024) :: filename
-!!$
-!!$    allocate(gmixed(wann%numwannbands, wann%numwannbands, wann%numbranches, wann%nwsq))
-!!$
-!!$    !Electron wave vector (crystal coords.) in IBZ blocks 
-!!$    kvec = el_wavevecs_irred(ik, :)
-!!$
-!!$    !Fourier transform to k-space
-!!$    gmixed = 0
-!!$    do iuc = 1,wann%nwsk
-!!$       caux = expi(twopi*dot_product(kvec, wann%rcells_k(iuc,:)))/wann%elwsdeg(iuc)
-!!$       gmixed(:,:,:,:) = gmixed(:,:,:,:) + caux*wann%gwann(:,:,iuc,:,:)
-!!$    end do
-!!$
-!!$    !Change to data output directory
-!!$    call chdir(trim(adjustl(g2dir)))
-!!$
-!!$    !Write data in binary format
-!!$    !Note: this will overwrite existing data!
-!!$    write (filename, '(I6)') ik
-!!$    filename = 'gmixed.ik'//trim(adjustl(filename))
-!!$    open(1, file = trim(filename), status = 'replace', access = 'stream')
-!!$    write(1) gmixed
-!!$    close(1)
-!!$
-!!$    !Change back to working directory
-!!$    call chdir(cwd)
-!!$  end subroutine gmixed_epw
-!!$
-!!$  subroutine calculate_g_mixed(w)
-!!$    !! Parallel driver of gmixed_epw over IBZ electron wave vectors
-!!$
-!!$    class(epw_wannier), intent(in) :: w
-!!$    integer(k4) :: ik, ikstart, ikend, chunk, ierr
-!!$
-!!$    call print_message("Doing g(Re,Rp) -> g(k,Rp) for all IBZ k...")
-!!$
-!!$    call distribute_points(nk_irred, chunk, ikstart, ikend)
-!!$
-!!$    if(this_image() == 1) then
-!!$       print*, "   #k = ", nk_irred
-!!$       print*, "   #k/mpi process = ", chunk
-!!$    end if
-!!$
-!!$    do ik = ikstart, ikend
-!!$       call gmixed_epw(w, ik)
-!!$    end do
-!!$
-!!$    sync all
-!!$  end subroutine calculate_g_mixed
-!!$
+
+  subroutine gmixed_epw(wann, num, ik, kvec)
+    !! Calculate the Bloch-Wannier mixed rep. e-ph matrix elements g(k,Rp),
+    !! where kvec is an IBZ electron wave vector and Rp is a phonon unit cell.
+    !! Note: this step *DOES NOT* perform the rotation over the Wannier bands space.
+    !!
+    !! The result will be saved to disk tagged with k-index.
+
+    class(epw_wannier), intent(in) :: wann
+    type(numerics), intent(in) :: num
+    integer(k4), intent(in) :: ik
+    real(dp), intent(in) :: kvec(3)
+
+    !Local variables
+    integer(k4) :: iuc
+    complex(dp) :: caux
+    complex(dp), allocatable:: gmixed(:,:,:,:)
+
+    character(len = 1024) :: filename
+
+    allocate(gmixed(wann%numwannbands, wann%numwannbands, wann%numbranches, wann%nwsq))
+
+    !Fourier transform to k-space
+    gmixed = 0
+    do iuc = 1,wann%nwsk
+       caux = expi(twopi*dot_product(kvec, wann%rcells_k(iuc,:)))/wann%elwsdeg(iuc)
+       gmixed(:,:,:,:) = gmixed(:,:,:,:) + caux*wann%gwann(:,:,iuc,:,:)
+    end do
+
+    !Change to data output directory
+    call chdir(trim(adjustl(num%g2dir)))
+
+    !Write data in binary format
+    !Note: this will overwrite existing data!
+    write (filename, '(I9)') ik
+    filename = 'gmixed.ik'//trim(adjustl(filename))
+    open(1, file = trim(filename), status = 'replace', access = 'stream')
+    write(1) gmixed
+    close(1)
+
+    !Change back to working directory
+    call chdir(num%cwd)
+  end subroutine gmixed_epw
+
   !For testing and debugging:
   subroutine gmixed_epw_gamma(wann, num)
     !! Calculate the Bloch-Wannier mixed rep. e-ph matrix elements g(k,Rp),
@@ -841,7 +700,7 @@ contains
 
     !Write data in binary format
     !Note: this will overwrite existing data!
-    filename = 'gmixed.gamma' !//trim(adjustl(filename))
+    filename = 'gmixed.gamma'
     open(1, file = trim(filename), status = 'replace', access = 'stream')
     write(1) gmixed
     close(1)
@@ -849,12 +708,10 @@ contains
     !Change back to working directory
     call chdir(num%cwd)
   end subroutine gmixed_epw_gamma
-
-  !Unit tester for Wannier interpolation with EPW inputs.
+  
   subroutine test_wannier(wann, crys, num)
-    !use params
-    !use data
-
+    !! Unit tester for Wannier interpolation with EPW inputs.
+    
     class(epw_wannier), intent(in) :: wann
     type(numerics), intent(in) :: num
     type(crystal), intent(in) :: crys

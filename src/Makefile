@@ -1,6 +1,6 @@
 include thinkpad_arch.make
 
-objects:= params.o misc.o spglib_wrapper.o numerics.o crystal.o symmetries.o wannier.o electrons.o phonons.o elphbolt.o
+objects:= params.o misc.o spglib_wrapper.o numerics.o crystal.o symmetries.o wannier.o electrons.o phonons.o interactions.o elphbolt.o
 
 all: ../elphbolt
 ../elphbolt: $(objects)
@@ -13,7 +13,8 @@ symmetries.o symmetries.mod: params.mod misc.mod numerics.mod crystal.mod spglib
 wannier.o wannier.mod: params.mod misc.mod crystal.mod numerics.mod
 electrons.o electrons.mod: params.mod misc.mod numerics.mod crystal.mod symmetries.o wannier.mod
 phonons.o phonons.mod: params.mod misc.mod numerics.mod crystal.mod symmetries.o wannier.mod
-elphbolt.o elphbolt.mod: params.mod numerics.mod crystal.mod wannier.mod symmetries.mod electrons.mod phonons.mod
+interactions.o interactions.mod: params.mod misc.mod wannier.mod crystal.mod electrons.mod phonons.mod numerics.mod
+elphbolt.o elphbolt.mod: params.mod numerics.mod crystal.mod wannier.mod symmetries.mod electrons.mod phonons.mod interactions.mod
 %.o %.mod: %.f90
 	$(FC) $(FFLAGS) -c -o $*.o $<
 	touch $*.mod

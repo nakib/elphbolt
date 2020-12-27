@@ -12,8 +12,8 @@ program elphBolt
   use symmetry_module, only: symmetry
   use electron_module, only: electron
   use phonon_module, only: phonon
-  !use wannier, only: calculate_g_mixed, calculate_g_bloch, gmixed_epw_gamma
   use wannier_module, only: epw_wannier
+  use interaction_module, only:  calculate_g_mixed, calculate_g_bloch
   
   implicit none
   
@@ -50,12 +50,12 @@ program elphBolt
 
   !Calculate phonons
   call ph%initialize(wann, crys, sym, num)
-!!$
-!!$  !Calculate mixed Bloch-Wannier space e-ph vertex
-!!$  call calculate_g_mixed
-!!$
-!!$  !Calculate Bloch space e-ph vertex
-!!$  call calculate_g_bloch
+
+  !Calculate mixed Bloch-Wannier space e-ph vertex
+  call calculate_g_mixed(wann, el, num)
+
+  !Calculate Bloch space e-ph vertex
+  call calculate_g_bloch(wann, crys, el, ph, num)
 
   !Calculate ph-ph vertex
   !TODO call calculate_V
