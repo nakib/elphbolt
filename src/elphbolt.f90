@@ -13,7 +13,7 @@ program elphBolt
   use electron_module, only: electron
   use phonon_module, only: phonon
   use wannier_module, only: epw_wannier
-  use interaction_module, only:  calculate_g_mixed, calculate_g_bloch
+  use interactions, only:  calculate_g_mixed, calculate_g_bloch
   
   implicit none
   
