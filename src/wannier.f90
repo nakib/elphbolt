@@ -63,7 +63,7 @@ module wannier_module
    contains
 
      procedure :: read=>read_EPW_Wannier, el_wann_epw, ph_wann_epw, &
-          gmixed_epw, g2_epw !, calculate_g_bloch
+          gmixed_epw, g2_epw
      procedure :: test_wannier
 
   end type epw_wannier
