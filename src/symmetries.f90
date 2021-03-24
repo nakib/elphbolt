@@ -231,8 +231,8 @@ contains
 
   subroutine find_irred_wedge(mesh,nwavevecs_irred,wavevecs_irred, &
        indexlist_irred,nequivalent,nsymm_rot,qrotations,ibz2fbz_map,blocks,indexlist)
-    !! Find the irreducible wedge of the FBZ and other quantities
-    !! Wedge finding algorithm is inspired by ShengBTE
+    !! Find the irreducible wedge of the FBZ and other quantities.
+    !! Wedge finding algorithm is inspired by ShengBTE.
     !!
     !! mesh is the array of number of points along the reciprocal lattice vectors
     !! nwavevecs_irred is the number of irreducible vectors

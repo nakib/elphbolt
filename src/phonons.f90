@@ -41,17 +41,25 @@ module phonon_module
      !! Map from an FBZ phonon point to its IBZ wedge image.
      real(dp), allocatable :: ens(:,:)
      !! List of phonon energies on FBZ.
-     real(dp), allocatable :: ens_irred(:,:)
-     !! List of phonon energies on IBZ.
+!!$     real(dp), allocatable :: ens_irred(:,:)
+!!$     !! List of phonon energies on IBZ.
      real(dp), allocatable :: vels(:,:,:)
      !! List of phonon velocities on FBZ.
-     real(dp), allocatable :: vels_irred(:,:,:)
-     !! List of phonon velocites on IBZ.
+!!$     real(dp), allocatable :: vels_irred(:,:,:)
+!!$     !! List of phonon velocites on IBZ.
      complex(dp), allocatable :: evecs(:,:,:)
      !! List of all phonon eigenvectors.
-     complex(dp), allocatable :: evecs_irred(:,:,:)
-     !! List of IBZ wedge phonon eigenvectors.
-
+!!$     complex(dp), allocatable :: evecs_irred(:,:,:)
+!!$     !! List of IBZ wedge phonon eigenvectors.
+     real(dp), allocatable :: ifc3(:,:,:,:)
+     !! Third order force constants (ifc3) tensor.
+     integer(k4) :: numtriplets
+     !! Number of triplets in the ifc3 file.
+     real(dp), allocatable :: R_j(:,:), R_k(:,:)
+     !! Position of the 2nd and 3rd atoms in supercell for an ifc3 triplet.
+     integer(k4), allocatable :: Index_i(:), Index_j(:), Index_k(:)
+     !! Label of primitive cell atoms in the ifc3 triplet.
+      
    contains
 
      procedure :: initialize
@@ -61,7 +69,8 @@ module phonon_module
 contains
 
   subroutine initialize(ph, wann, crys, sym, num)
-    !! Initialize the phonon data type and calculate ground state phonon properties.
+    !! Initialize the phonon data type, calculate ground state phonon properties,
+    !! and read 3rd order force constants data. 
 
     class(phonon), intent(out) :: ph
     type(epw_wannier), intent(in) :: wann
@@ -76,7 +85,11 @@ contains
     !Set number of phonon wave vectors
     ph%nq = product(ph%qmesh(:))
 
+    !Calculate harmonic properties
     call calculate_phonons(ph, wann, crys, sym, num)
+
+    !Read ifc3s and related quantities
+    call read_ifc3(ph, crys)
     
   end subroutine initialize
   
@@ -122,4 +135,46 @@ contains
     call create_fbz2ibz_map(ph%fbz2ibz_map, ph%nq, ph%nq_irred, ph%indexlist, &
          ph%nequiv, ph%ibz2fbz_map)
   end subroutine calculate_phonons
+
+  subroutine read_ifc3(ph, crys)
+    !! Read the 3rd order force constants in the thirdorder.py format.
+    !! This subroutine is adapted from ShengBTE.
+
+    class(phonon), intent(inout) :: ph
+    type(crystal), intent(in) :: crys
+    
+    !Local variables
+    real(dp) :: tmp(3,3)
+    integer(k4) :: ii, jj, ll, mm, nn, ltem, mtem, ntem, info, P(3)
+
+    !The file is in a simple sparse format, described in detail in
+    !the user documentation. See Doc/ShengBTE.pdf.
+    open(1, file = 'FORCE_CONSTANTS_3RD', status = "old")
+    read(1, *) ph%numtriplets
+    allocate(ph%Index_i(ph%numtriplets), ph%Index_j(ph%numtriplets), ph%Index_k(ph%numtriplets))
+    allocate(ph%ifc3(3, 3, 3, ph%numtriplets), ph%R_j(3, ph%numtriplets), ph%R_k(3,ph%numtriplets))
+    do ii = 1, ph%numtriplets
+       read(1, *) jj
+       read(1, *) ph%R_j(:, ii) !Ang
+       read(1, *) ph%R_k(:, ii) !Ang
+       read(1, *) ph%Index_i(ii), ph%Index_j(ii), ph%Index_k(ii)
+       do ll = 1, 3
+          do mm = 1, 3
+             do nn = 1, 3
+                read(1, *) ltem, mtem, ntem, ph%ifc3(ll, mm, nn, ii)
+             end do
+          end do
+       end do
+    end do
+    close(1)
+
+    !Each vector is rounded to the nearest lattice vector.
+    tmp = crys%lattvecs
+    call dgesv(3, ph%numtriplets, tmp, 3, P, ph%R_j, 3, info)
+    ph%R_j = matmul(crys%lattvecs, anint(ph%R_j/10.0_dp)) !nm
+    tmp = crys%lattvecs
+    call dgesv(3, ph%numtriplets, tmp, 3, P, ph%R_k, 3, info)
+    ph%R_k = matmul(crys%lattvecs, anint(ph%R_k/10.0_dp)) !nm
+  end subroutine read_ifc3
+      
 end module phonon_module

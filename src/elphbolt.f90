@@ -13,7 +13,7 @@ program elphBolt
   use electron_module, only: electron
   use phonon_module, only: phonon
   use wannier_module, only: epw_wannier
-  use interactions, only:  calculate_g_mixed, calculate_g2_bloch
+  use interactions, only:  calculate_g_mixed, calculate_g2_bloch, calculate_V_3ph
   
   implicit none
   
@@ -58,7 +58,7 @@ program elphBolt
   call calculate_g2_bloch(wann, crys, el, ph, num)
 
   !Calculate ph-ph vertex
-  !TODO call calculate_V_3ph
+  call calculate_V_3ph(ph, crys, num)
 
   !Calculate transition probabilities
 
