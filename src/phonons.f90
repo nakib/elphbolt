@@ -39,6 +39,13 @@ module phonon_module
      !! The third axis contains the pair (symmetry index, image).
      integer(k4), allocatable :: fbz2ibz_map(:)
      !! Map from an FBZ phonon point to its IBZ wedge image.
+     integer(k4), allocatable :: tetra(:,:)
+     !! List of all the wave vector mesh tetrahedra vertices.
+     !! First axis list tetraheda and the second axis list the vertices.
+     integer(k4), allocatable :: tetracount(:)
+     !! The number of tetrahedra in which a wave vector belongs.
+     integer(k4), allocatable :: tetramap(:,:,:)
+     !! Mapping from a wave vector to the (tetrahedron, vertex) where it belongs.
      real(dp), allocatable :: ens(:,:)
      !! List of phonon energies on FBZ.
 !!$     real(dp), allocatable :: ens_irred(:,:)

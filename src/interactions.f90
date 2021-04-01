@@ -2,7 +2,8 @@ module interactions
   !! Module containing the procedures related to the computation of interactions.
 
   use params, only: k4, dp
-  use misc, only: print_message, distribute_points, demux_state, mux_vector, expi
+  use misc, only: exit_with_message, print_message, distribute_points, &
+       demux_state, mux_vector, mux_state, expi
   use wannier_module, only: epw_wannier
   use crystal_module, only: crystal
   use electron_module, only: electron
@@ -12,138 +13,11 @@ module interactions
   implicit none
 
   private
-  public calculate_g_mixed, calculate_g2_bloch, calculate_V_3ph
+  public calculate_g_mixed, calculate_g2_bloch, calculate_3ph_interaction
 
 contains
-  
-  subroutine calculate_V_phases(ph, crys, phases)
-    !! Parallel calculator of the mass-normalized phase factor
-    !! needed for the 3-phonon vertex.
-    !!
-    !! Warning: precalculation of phases requires a massive amount of ram.
-    !! TODO: Think about whether the phases should be saved to disk instead.
     
-    type(phonon), intent(in) :: ph
-    type(crystal), intent(in) :: crys
-    complex(dp), intent(out) :: phases(ph%numtriplets, ph%nq, ph%nq)
-
-    !Local variables
-    integer(k4) :: chunk, it, counter, im, iq2, iq3
-    integer(k4), allocatable :: start[:], end[:]
-    real(dp) :: q2_cart(3), q3_cart(3), massfac
-    complex(dp), allocatable :: phases_chunk(:,:,:)[:]
-
-    !Allocate the start and end coarrays
-    allocate(start[*], end[*])
-    
-    !Divide number of triplets among images
-    call distribute_points(ph%numtriplets, chunk, start, end)
-    
-    !Allocate small work variable chunk for each image
-    allocate(phases_chunk(end-start+1, ph%nq, ph%nq)[*])
-
-    !Calculate phases
-    counter = 0
-    do it = start, end
-       counter = counter + 1
-       massfac = 1.0_dp/sqrt(&
-            crys%masses(crys%atomtypes(ph%Index_i(it)))*&
-            crys%masses(crys%atomtypes(ph%Index_j(it)))*&
-            crys%masses(crys%atomtypes(ph%Index_k(it))))
-       do iq2 = 1, ph%nq
-          q2_cart = matmul(crys%reclattvecs, ph%wavevecs(iq2,:))
-          do iq3 = 1, ph%nq
-             q3_cart = matmul(crys%reclattvecs, ph%wavevecs(iq3,:))
-             phases_chunk(counter, iq2, iq3) = massfac*&
-                  expi(-dot_product(q2_cart, ph%R_j(:,it)))*&
-                  expi(-dot_product(q3_cart, ph%R_k(:,it)))
-          end do
-       end do
-    end do
-    sync all
-    
-    !Collect chunks into globally accessible phases
-    do im = 1, num_images()
-       phases(start[im]:end[im],:,:) = phases_chunk(:,:,:)[im]
-    end do
-    sync all        
-  end subroutine calculate_V_phases
-
-!!$  subroutine test_phase_calculator(ph, crys)
-!!$    type(phonon), intent(in) :: ph
-!!$    type(crystal), intent(in) :: crys
-!!$    complex(dp) :: phases(ph%numtriplets, ph%nq, ph%nq)
-!!$
-!!$    phases(:,:,:) = (-1.0_dp,1.0_dp)
-!!$    
-!!$    call calculate_V_phases(ph, crys, phases)
-!!$
-!!$    if(this_image() == 1) then
-!!$       print*, '....'
-!!$       print*, phases(1:5,ph%nq,ph%nq)
-!!$       print*, phases(1:5,1,ph%nq)
-!!$       print*, phases(1:5,ph%nq,1)
-!!$       print*, phases(ph%numtriplets,ph%nq,ph%nq)
-!!$    end if
-!!$  end subroutine test_phase_calculator
-  
-!!$  function Vp_minus(i,j,k,q,qprime,qdprime,realqprime,realqdprime,eigenvect,&
-!!$       Ntri,Phi,R_j,R_k,Index_i,Index_j,Index_k)
-!!$    implicit none
-!!$
-!!$    integer(kind=4),intent(in) :: i
-!!$    integer(kind=4),intent(in) :: j
-!!$    integer(kind=4),intent(in) :: k
-!!$    integer(kind=4),intent(in) :: q
-!!$    integer(kind=4),intent(in) :: qprime
-!!$    integer(kind=4),intent(in) :: qdprime
-!!$    real(kind=8),intent(in) :: realqprime(3)
-!!$    real(kind=8),intent(in) :: realqdprime(3)    
-!!$    complex(kind=8),intent(in) :: eigenvect(nptq,Nbranches,Nbranches)
-!!$    integer(kind=4),intent(in) :: Ntri
-!!$    real(kind=8),intent(in) :: Phi(3,3,3,Ntri)
-!!$    real(kind=8),intent(in) :: R_j(3,Ntri)
-!!$    real(kind=8),intent(in) :: R_k(3,Ntri)
-!!$    integer(kind=4),intent(in) :: Index_i(Ntri)
-!!$    integer(kind=4),intent(in) :: Index_j(Ntri)
-!!$    integer(kind=4),intent(in) :: Index_k(Ntri)
-!!$
-!!$    !complex(kind=8) :: Vp_minus
-!!$    complex(kind=8) :: aux
-!!$    real(kind=8) :: Vp_minus
-!!$
-!!$    integer(kind=4) :: ll
-!!$    integer(kind=4) :: rr
-!!$    integer(kind=4) :: ss
-!!$    integer(kind=4) :: tt
-!!$    complex(kind=8) :: prefactor
-!!$    complex(kind=8) :: Vp0
-!!$
-!!$    Vp_minus=0.d0
-!!$
-!!$    do ll=1,Ntri
-!!$       prefactor=1.d0/sqrt(masses(types(Index_i(ll)))*&
-!!$            masses(types(Index_j(ll)))*masses(types(Index_k(ll))))*&
-!!$            phexp(-dot_product(realqprime,R_j(:,ll)))*&
-!!$            phexp(-dot_product(realqdprime,R_k(:,ll)))
-!!$       Vp0=0.
-!!$       do rr=1,3
-!!$          do ss=1,3
-!!$             do tt=1,3
-!!$                Vp0=Vp0+Phi(tt,ss,rr,ll)*&
-!!$                     eigenvect(q,i,tt+3*(Index_i(ll)-1))*&
-!!$                     conjg(eigenvect(qprime,j,ss+3*(Index_j(ll)-1)))*&
-!!$                     conjg(eigenvect(qdprime,k,rr+3*(Index_k(ll)-1)))
-!!$             end do
-!!$          end do
-!!$       end do
-!!$       !Vp_minus=Vp_minus+prefactor*Vp0
-!!$       aux=aux+prefactor*Vp0
-!!$    end do
-!!$    Vp_minus=abs(aux)**2
-!!$  end function Vp_minus
-!!$  
-  function Vm2_3ph(ph, s1, s2, s3, iq1, iq2, iq3, phases_q2q3)
+  pure function Vm2_3ph(ph, s1, s2, s3, iq1, iq2, iq3, phases_q2q3)
     !! Function to calculate the 3-ph interaction vertex |V-|^2.
     !! TODO This is a bottleneck. Think about how to speed this function up.
     
@@ -153,49 +27,55 @@ contains
     real(dp) :: Vm2_3ph
 
     !Local variables
-    integer(k4) :: it, a, b, c
-    complex(dp) :: aux, V0
+    integer(k4) :: it, a, b, c, aind, bind, cind
+    complex(dp) :: aux1, aux2, V0
 
-    aux = (0.0_dp, 0.0_dp)
+    aux1 = (0.0_dp, 0.0_dp)
     do it = 1, ph%numtriplets
        V0 = (0.0_dp, 0.0_dp)
        do a = 1, 3
+          aind = a + 3*(ph%Index_k(it) - 1)
           do b = 1, 3
+             bind = b + 3*(ph%Index_j(it) - 1)
+             aux2 = conjg(ph%evecs(iq2, s2, bind)*ph%evecs(iq3, s3, aind))
              do c = 1, 3
+                cind = c + 3*(ph%Index_i(it) - 1)
                 V0 = V0 + ph%ifc3(c, b, a, it)*&
-                     ph%evecs(iq1, s1, c + 3*(ph%Index_i(it) - 1))*&
-                     conjg(ph%evecs(iq2, s2, b + 3*(ph%Index_j(it) - 1)))*&
-                     conjg(ph%evecs(iq3, s3, a + 3*(ph%Index_k(it) - 1)))
+                     ph%evecs(iq1, s1, cind)*aux2
              end do
           end do
        end do
-       aux = aux + V0*phases_q2q3(it)
+       aux1 = aux1 + V0*phases_q2q3(it)
     end do
-    Vm2_3ph = abs(aux)**2
+    Vm2_3ph = abs(aux1)**2
   end function Vm2_3ph
   
-  subroutine calculate_V_3ph(ph, crys, num)
+  subroutine calculate_3ph_interaction(ph, crys, num, key)
     !! Parallel driver of the 3-ph vertex calculator for all IBZ phonon wave vectors.
     !! This subroutine calculates |V-(<q1>|q2,q3)|^2 for each irreducible phonon
     !! and saves the result to disk.
+    !!
+    !! key = 'V', 'W' for vertex, scattering rate calculation, respectively.
 
     type(phonon), intent(in) :: ph
     type(crystal), intent(in) :: crys
     type(numerics), intent(in) :: num
+    character(len = 1), intent(in) :: key
     
     !Local variables
     integer(k4) :: start, end, chunk, istate1, nstates_irred, nstates, &
          s1, s2, s3, iq1_ibz, iq1, iq2, iq3, count, it, &
          q1_indvec(3), q2_indvec(3), q3_indvec(3)
     real(dp) :: en1, en2, en3, massfac, q1(3), q2(3), q3(3), q2_cart(3), q3_cart(3)
-    real(dp), allocatable :: Vm2(:)
+    real(dp), allocatable :: Vm2(:), Vp2(:)
     complex(dp) :: phases_q2q3(ph%numtriplets)
     character(len = 1024) :: filename
+
+    if(key /= 'V' .and. key /= 'W') then
+       call exit_with_message("Invalid value of key in call to calculate_3ph_interaction. Exiting.")
+    end if
     
     call print_message("Calculating 3-ph vertices for all IBZ q...")
-
-!!$    !Calculate mass-normalized phases needed for the V calculation
-!!$    call calculate_V_phases(ph)
     
     !Total number of IBZ blocks states
     nstates_irred = ph%nq_irred*ph%numbranches
@@ -203,12 +83,14 @@ contains
     !Total number of processes for a given initial phonon state
     nstates = ph%nq*ph%numbranches**2
 
+    !Allocate |V^-|^2 and, if needed, |V^+|^2
     allocate(Vm2(nstates))
+    if(key == 'W') allocate(Vp2(nstates))
 
     !Divide phonon states among images
     call distribute_points(nstates_irred, chunk, start, end)
 
-     if(this_image() == 1) then
+    if(this_image() == 1) then
        print*, "   #states = ", nstates_irred
        print*, "   #states/image = ", chunk
     end if
@@ -231,8 +113,26 @@ contains
        !Convert from crystal to 0-based index vector
        q1_indvec = nint(q1*ph%qmesh)
 
-       !Energy of phonon 1
-       en1 = ph%ens(iq1, s1)
+       if(key == 'W') then
+          !Energy of phonon 1
+          en1 = ph%ens(iq1, s1)
+       end if
+
+       !Load |V^-|^2 from disk for scattering rates calculation
+       if(key == 'W') then
+          !Change to data output directory
+          call chdir(trim(adjustl(num%Vdir)))
+
+          !Read data in binary format
+          write (filename, '(I9)') istate1
+          filename = 'Vm2.istate'//trim(adjustl(filename))
+          open(1, file = trim(filename), status = 'old', access = 'stream')
+          read(1) Vm2
+          close(1)
+
+          !Change back to working directory
+          call chdir(num%cwd)
+       end if
        
        !Run over second (FBZ) phonon wave vectors
        do iq2 = 1, ph%nq
@@ -247,30 +147,36 @@ contains
           q3 = q3_indvec/dble(ph%qmesh) !crystal coords.
 
           !Muxed index of q3
-          iq3 = mux_vector(q3_indvec, ph%qmesh, 0_dp)
+          iq3 = mux_vector(q3_indvec, ph%qmesh, 0_k4)
           
-          !Calculate the numtriplet number of mass-normalized phases for this (q2,q3) pair
-          do it = 1, ph%numtriplets
-             massfac = 1.0_dp/sqrt(&
-                  crys%masses(crys%atomtypes(ph%Index_i(it)))*&
-                  crys%masses(crys%atomtypes(ph%Index_j(it)))*&
-                  crys%masses(crys%atomtypes(ph%Index_k(it))))
-             q2_cart = matmul(crys%reclattvecs, ph%wavevecs(iq2,:))
-             q3_cart = matmul(crys%reclattvecs, ph%wavevecs(iq3,:))
-             phases_q2q3(it) = massfac*&
-                  expi(-dot_product(q2_cart, ph%R_j(:,it)))*&
-                  expi(-dot_product(q3_cart, ph%R_k(:,it)))
-          end do
+          if(key == 'V') then
+             !Calculate the numtriplet number of mass-normalized phases for this (q2,q3) pair
+             do it = 1, ph%numtriplets
+                massfac = 1.0_dp/sqrt(&
+                     crys%masses(crys%atomtypes(ph%Index_i(it)))*&
+                     crys%masses(crys%atomtypes(ph%Index_j(it)))*&
+                     crys%masses(crys%atomtypes(ph%Index_k(it))))
+                q2_cart = matmul(crys%reclattvecs, q2)
+                q3_cart = matmul(crys%reclattvecs, q3)
+                phases_q2q3(it) = massfac*&
+                     expi(-dot_product(q2_cart, ph%R_j(:,it)))*&
+                     expi(-dot_product(q3_cart, ph%R_k(:,it)))
+             end do
+          end if
           
           !Run over branches of second phonon
           do s2 = 1, ph%numbranches
-             !Energy of phonon 2
-             en2 = ph%ens(iq2, s2)
+             if(key == 'W') then
+                !Energy of phonon 2
+                en2 = ph%ens(iq2, s2)
+             end if
 
              !Run over branches of third phonon
              do s3 = 1, ph%numbranches
-                !Energy of phonon 3
-                en3 = ph%ens(iq3, s3)
+                if(key == 'W') then
+                   !Energy of phonon 3
+                   en3 = ph%ens(iq3, s3)
+                end if
                 
                 !Count process
                 count = count + 1
@@ -278,35 +184,63 @@ contains
                 !Minus process index
                 !index_minus = (iq2 - 1)*nstates + (s2 - 1)*ph%numbranches + s3
                 
-                !Calculate the minus process vertex
-                Vm2(count) = Vm2_3ph(ph, s1, s2, s3, iq1, iq2, iq3, phases_q2q3)
+                if(key == 'V') then
+                   !Calculate the minus process vertex
+                   Vm2(count) = Vm2_3ph(ph, s1, s2, s3, iq1, iq2, iq3, phases_q2q3)
+                end if
 
+!!$                if(key == 'W') then
+!!$                   !TODO calculate W-
+!!$
+!!$                   !TODO Evaluate delta function
+!!$                   delta = delta_fn(en1 - en3, s2, iq2)
+!!$
+!!$                   !Save 2nd and 3rd phonon states
+!!$                   istate2 = mux_state(ph%numbranches, s2, iq2)
+!!$                   istate3 = mux_state(ph%numbranches, s3, iq3)
+!!$
+!!$                   !Temperature dependent occupation factor
+!!$                   !TODO Need Bose factor function in misc.f90
+!!$                   !occup_fac = ...
+!!$                   !Wm(count) = ...
+!!$                   
+!!$                end if
+                
 !!$                !Calculate corresponding plus process using
 !!$                !V-(s1q1|s2q2,s3q3) = V+(s1q1|s2-q2,s3q3)
 !!$                neg_q2_indvec = modulo(-q2_indvec, ph%qmesh)
-!!$                neg_iq2 = mux_vector(neg_q2_indvec, ph%qmesh, 0_dp)
+!!$                neg_iq2 = mux_vector(neg_q2_indvec, ph%qmesh, 0_k4)
 !!$                index_plus = (neg_iq2 - 1)*nstates + (s2 - 1)*ph%numbranches + s3
-!!$                Vp2(index_plus) = Vm2(index_minus)                
+!!$                Vp2(index_plus) = Vm2(index_minus)
              end do !s3
           end do !s2
        end do !iq2
+       !TODO multiply constant factor, unit factor, etc.
+       !Wm = ...*Wm
+       !Wp = ...*Wp
 
-       !Change to data output directory
-       call chdir(trim(adjustl(num%Vdir)))
+       if(key == 'V') then
+          !Change to data output directory
+          call chdir(trim(adjustl(num%Vdir)))
 
-       !Write data in binary format
-       !Note: this will overwrite existing data!
-       write (filename, '(I9)') istate1
-       filename = 'Vm2.istate'//trim(adjustl(filename))
-       open(1, file = trim(filename), status = 'replace', access = 'stream')
-       write(1) Vm2
-       close(1)
+          !Write data in binary format
+          !Note: this will overwrite existing data!
+          write (filename, '(I9)') istate1
+          filename = 'Vm2.istate'//trim(adjustl(filename))
+          open(1, file = trim(filename), status = 'replace', access = 'stream')
+          write(1) Vm2
+          close(1)
 
-       !Change back to working directory
-       call chdir(num%cwd)
+          !Change back to working directory
+          call chdir(num%cwd)
+       end if
+
+       if(key == 'W') then
+          !TODO Write W+ and W- to disk
+       end if
     end do !istate1
     sync all
-  end subroutine calculate_V_3ph
+  end subroutine calculate_3ph_interaction
 
   subroutine calculate_g_mixed(wann, el, num)
     !! Parallel driver of gmixed_epw over IBZ electron wave vectors.
@@ -342,8 +276,8 @@ contains
     !! This list will be written to disk in files tagged with the muxed state index.
     !
     !In the FBZ and IBZ blocks a wave vector was retained when at least one
-    !band belonged within the energy window. Here the bands outside energy window
-    !will be skipped in the calculation as they are irrelevant for transport.
+    !band belonged within the energy window. Here the bands outside the energy
+    !window will be skipped in the calculation as they are irrelevant for transport.
 
     type(epw_wannier), intent(in) :: wann
     type(crystal), intent(in) :: crys

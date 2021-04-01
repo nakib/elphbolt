@@ -42,6 +42,8 @@ module crystal_module
      !! Reciprocal lattice vectors.
      real(dp) :: volume_bz
      !! Brillouin zone volume (nm^-3).
+     real(dp) :: T
+     !! Crystal temperature (T).
 
    contains
 
@@ -59,14 +61,14 @@ contains
     integer(k4) :: i, j, k, numelements, numatoms
     integer(k4), allocatable :: atomtypes(:)
     real(dp), allocatable :: masses(:), born(:,:,:), basis(:,:), basis_cart(:,:)
-    real(dp) :: epsilon(3,3), lattvecs(3,3), volume, reclattvecs(3,3), volume_bz
+    real(dp) :: epsilon(3,3), lattvecs(3,3), volume, reclattvecs(3,3), volume_bz, T
     character(len=3), allocatable :: elements(:)
     character(len=100) :: name
     logical :: polar
     
     namelist /allocations/ numelements, numatoms
     namelist /crystal_info/ name, elements, atomtypes, basis, lattvecs, &
-         polar, born, epsilon, masses
+         polar, born, epsilon, masses, T
 
     if(this_image() == 1) print*, 'Setting up crystal...'
 
@@ -92,8 +94,9 @@ contains
     c%polar = .false.
     c%epsilon = 0.0_dp
     c%born = 0.0_dp
+    c%T = -1.0_dp
     read(1, nml = crystal_info)
-    if(any(atomtypes < 1) .or. any(masses < 0)) then
+    if(any(atomtypes < 1) .or. any(masses < 0) .or. T < 0.0_dp) then
        call exit_with_message('Bad input(s) in crystal_info.')
     end if
 
@@ -108,6 +111,7 @@ contains
     c%basis = basis
     c%polar = polar
     c%lattvecs = lattvecs
+    c%T = T
 
     !Calculate atomic basis in Cartesian coordinates
     c%basis_cart(:,:) = matmul(c%lattvecs,c%basis)
@@ -137,6 +141,8 @@ contains
        print*, c%reclattvecs(:,2)
        print*, c%reclattvecs(:,3)
        print*, 'Brillouin zone volume =', c%volume_bz, '1/nm^3'
+
+       print*, 'Crystal temperature =', c%T, 'K'
     end if
   end subroutine read_input_and_setup_crystal
 

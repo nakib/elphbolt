@@ -26,7 +26,7 @@ contains
     if(this_image() == 1) print*, trim(message)
   end subroutine print_message
 
-  subroutine int_div(num,denom,q,r)
+  subroutine int_div(num, denom, q, r)
     !! Quotient(q) and remainder(r) of the integer division num/denom.
 
     integer(k4), intent(in) :: num, denom
@@ -50,7 +50,7 @@ contains
     iend = min(chunk*this_image(),npts)
   end subroutine distribute_points
   
-  function cross_product(A,B)
+  function cross_product(A, B)
     !! Cross product of A and B.
 
     real(dp), intent(in) :: A(3), B(3)
@@ -106,8 +106,35 @@ contains
        end do
     end do
   end subroutine sort_int
+
+  subroutine binsearch(array, e, m)
+    !! Binary search in a list of integers and return index.
+    
+    integer(k4), intent(in) :: array(:), e
+    integer(k4), intent(out) :: m
+    integer(k4) :: a, b, mid
+
+    a = 1
+    b = size(array)
+    m = (b + a)/2
+    mid = array(m)
+
+    do while(mid /= e)
+       if(e > mid) then
+          a = m + 1
+       else if(e < mid) then
+          b = m - 1
+       end if
+       if(a > b) then
+          m = -1
+          exit
+       end if
+       m = (b + a)/2
+       mid = array(m)
+    end do
+  end subroutine binsearch
   
-  function mux_vector(v,mesh,base)
+  function mux_vector(v, mesh, base)
     !! Multiplex index of a single wave vector.
     !! v is the demultiplexed triplet of a wave vector.
     !! i is the multiplexed index of a wave vector (always 1-based).
@@ -118,7 +145,7 @@ contains
     integer(k4) :: mux_vector 
 
     if(base < 0 .or. base > 1) then
-       call exit_with_message("Base has to be either 0 or 1 in index.f90:mux_vector")
+       call exit_with_message("Base has to be either 0 or 1 in misc.f90:mux_vector")
     end if
 
     if(base == 0) then
@@ -128,12 +155,11 @@ contains
     end if
   end function mux_vector
 
-  subroutine demux_vector(i,v,mesh,base)
+  subroutine demux_vector(i, v, mesh, base)
     !! Demultiplex index of a single wave vector.
     !! i is the multiplexed index of a wave vector (always 1-based).
     !! v is the demultiplexed triplet of a wave vector.
-    !! mesh is the number of wave vectors along the three.
-    !! reciprocal lattice vectors.
+    !! mesh is the number of wave vectors along the three reciprocal lattice vectors.
     !! base chooses whether v has 0- or 1-based indexing.
     
     integer(k4), intent(in) :: i, mesh(3), base
@@ -141,7 +167,7 @@ contains
     integer(k4) :: aux
 
     if(base < 0 .or. base > 1) then
-       call exit_with_message("Base has to be either 0 or 1 in index.f90:demux_vector")
+       call exit_with_message("Base has to be either 0 or 1 in misc.f90:demux_vector")
     end if
 
     call int_div(i - 1, mesh(1), aux, v(1))

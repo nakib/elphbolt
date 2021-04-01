@@ -7,6 +7,7 @@ module electron_module
   use wannier_module, only: epw_wannier
   use crystal_module, only: crystal, calculate_wavevectors_full
   use symmetry_module, only: symmetry, find_irred_wedge, create_fbz2ibz_map
+  use delta, only: form_tetrahedra_3d
   
   implicit none
 
@@ -64,6 +65,13 @@ module electron_module
      !! The third axis contains the pair (symmetry index, image).
      integer(k4), allocatable :: fbz2ibz_map(:)
      !! Map from an FBZ electron point to its IBZ wedge image.
+     integer(k4), allocatable :: tetra(:,:)
+     !! List of all the wave vector mesh tetrahedra vertices.
+     !! First axis list tetraheda and the second axis list the vertices.
+     integer(k4), allocatable :: tetracount(:)
+     !! The number of tetrahedra in which a wave vector belongs.
+     integer(k4), allocatable :: tetramap(:,:,:)
+     !! Mapping from a wave vector to the (tetrahedron, vertex) where it belongs.
      real(dp), allocatable :: ens(:,:)
      !! List of electron energies on FBZ.
      real(dp), allocatable :: ens_irred(:,:)
@@ -336,6 +344,10 @@ contains
        end do
        close(1)
     end if
+
+    !Calculate electron tetrahedra
+    if(num%tetrahedra) call form_tetrahedra_3d(el%nk, el%kmesh, el%tetra, el%tetracount, &
+         el%tetramap, .true., el%indexlist)
   end subroutine calculate_electrons
 
   subroutine apply_energy_window(nk, indexlist, energies, enref, fsthick)
