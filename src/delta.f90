@@ -8,9 +8,179 @@ module delta
   implicit none
 
   private
-  public form_tetrahedra_3d, fill_tetrahedra_3d!, delta_fn
+  public form_tetrahedra_3d, fill_tetrahedra_3d, delta_fn_tetra
   
 contains
+
+  pure real(dp) function delta_fn_tetra(e, ik, ib, mesh, tetramap, tetracount, tetra_evals)
+    !! Calculate delta function using the tetraheron method.
+    !!
+    !! e Sample energy
+    !! ik Wave vector index
+    !! ib Band index
+    !! mesh Wave vector grid
+    !! tetramap Wave vector to (tetrahedron, vertex) mapping
+    !! tetracount Number of tetrahedra in which a wave vector belongs
+    !! tetra_evals Tetrahedra populated with the eigenvalues
+
+    real(dp), intent(in) :: e
+    integer(k4), intent(in) :: ik, ib
+    integer(k4), intent(in) :: mesh(3), tetramap(:,:,:), tetracount(:)
+    real(dp), intent(in) :: tetra_evals(:,:,:)
+
+    !Local variables
+    integer(k4) :: iv, it, itk, num, numtetra
+    logical :: c1, c2, c3
+    real(dp) :: e1, e2, e3, e4, e1e, e2e, e3e, e4e, &
+         e21, e31, e41, e32, e42, e43, tmp ! eji \equiv ej - ei
+
+    tmp = 0.0_dp
+    delta_fn_tetra = 0.0_dp
+
+    !Total number of tetrahedra in the system
+    numtetra = product(mesh)*6.0_dp
+    
+    !Grab number of tetrahedra in which wave vector belongs
+    num = tetracount(ik)
+
+    do itk = 1, num !Run over tetrahedra
+       it = tetramap(1, ik, itk) !Grab tetrahedron
+       iv = tetramap(2, ik, itk) !Grab vertex
+
+       !Grab vertex energies
+       e1 = tetra_evals(it, ik, 1)
+       e2 = tetra_evals(it, ik, 2)
+       e3 = tetra_evals(it, ik, 3)
+       e4 = tetra_evals(it, ik, 4)
+
+       !Define the energy differences
+       e1e = e1 - e
+       e2e = e2 - e
+       e3e = e3 - e
+       e4e = e4 - e
+       e21 = e2 - e1
+       e31 = e3 - e1
+       e41 = e4 - e1
+       e32 = e3 - e2
+       e42 = e4 - e2
+       e43 = e4 - e3
+
+       !Evaluate the three cases
+       c1 = e1 <= e .and. e <= e2
+       c2 = e2 <= e .and. e <= e3
+       c3 = e3 <= e .and. e <= e4
+
+       if(.not. (e < e1 .or. e > e4)) then
+          !Evaluate the expressions for the three cases
+          select case(iv)
+          case(1)
+             if(c1) then
+                tmp = (e2e/e21 + e3e/e31 + e4e/e41)*(e1e**2)/e41/e31/e21
+
+                if(e1 == e2) then
+                   tmp = 0.0_dp
+                end if
+
+             else if(c2) then
+                tmp = -0.5_dp*(e3e/(e31**2)*(e3e*e2e/e42/e32 + e4e*e1e/e41/e42 + e3e*e1e/e32/e41) &
+                     + e4e/(e41**2)*(e4e*e1e/e42/e31 + e4e*e2e/e42/e32 + e3e*e1e/e31/e32))
+
+                if(e2 == e3) then
+                   tmp = -0.5_dp*(e4e*e1e/e41/e42 + e1e/e41 &
+                        + e4e/(e41**2)*(e4e*e1e/e42/e31 + e4e/e42 + e1e/e31))
+                end if
+
+             else if(c3) then
+                tmp = (e4e**3)/(e41**2)/e42/e43
+
+                if(e3 == e4) then
+                   tmp = (e4e**2)/(e41**2)/e42
+                end if
+
+             end if
+          case(2)
+             if(c1) then
+                tmp = -(e1e**3)/(e21**2)/e31/e41
+
+                if(e1 == e2) then
+                   tmp = 0.0_dp
+                end if
+
+             else if(c2) then
+                tmp = -0.5_dp*(e3e/(e32**2)*(e3e*e2e/e42/e31 + e4e*e2e/e42/e41 + e3e*e1e/e31/e41) &
+                     + e4e/(e42**2)*(e3e*e2e/e32/e31 + e4e*e1e/e41/e31 + e4e*e2e/e32/e41))
+
+                if(e2 == e3) then
+                   tmp = -0.5_dp*(0.0 + e4e/e42/e41 + 0.0 &
+                        + e4e/(e42**2)*(0.0 + e4e*e1e/e41/e31 + 1.0))
+                end if
+
+             else if(c3) then
+                tmp = (e4e**3)/e41/(e42**2)/e43
+
+                if(e3 == e4) then
+                   tmp = 0.0_dp
+                end if
+             end if
+          case(3)
+             if(c1) then
+                tmp = -(e1e**3)/e21/(e31**2)/e41
+
+                if(e1 == e2) then
+                   tmp = 0.0_dp
+                end if
+
+             else if(c2) then
+                tmp = 0.5_dp*(e2e/(e32**2)*(e3e*e2e/e42/e31 + e4e*e2e/e42/e41 + e3e*e1e/e31/e41) &
+                     + e1e/(e31**2)*(e3e*e2e/e42/e32 + e4e*e1e/e41/e42 + e3e*e1e/e32/e41))
+
+                if(e2 == e3) then
+                   tmp = 0.5_dp*(0.0 + e4e/e42/e41 + e1e/e31/e41 &
+                        + e1e/(e31**2)*(0.0 + e4e*e1e/e41/e42 + e1e/e41))
+                end if
+
+             else if(c3) then
+                tmp = (e4e**3)/e41/e42/(e43**2)
+
+                if(e3 == e4) then
+                   tmp = 0.0_dp
+                end if
+             end if
+          case(4)
+             if(c1) then
+                tmp = -(e1e**3)/e21/e31/(e41**2)
+                if(e1 == e2) then
+                   tmp = 0.0_dp
+                end if
+             else if(c2) then
+                tmp = 0.5_dp*(e2e/(e42**2)*(e3e*e2e/e32/e31 + e4e*e1e/e41/e31 + e4e*e2e/e32/e41) &
+                     + e1e/(e41**2)*(e4e*e1e/e42/e31 + e4e*e2e/e42/e32 + e3e*e1e/e31/e32))
+
+                if(e2 == e3) then
+                   tmp = 0.5_dp*(0.0 &
+                        + e1e/(e41**2)*(e4e*e1e/e42/e31 + e4e/e42 + e1e/e31))
+                end if
+
+             else if(c3) then
+                tmp = -(e3e/e43 + e2e/e42 + e1e/e41)*(e4e**2)/e41/e42/e43
+
+                if(e3 == e4) then
+                   tmp = 0.0_dp
+                end if
+             end if
+          end select
+
+          if ((e1 == e2) .and. (e1 == e3) .and. (e1 == e4) .and. (e == e1)) then
+             tmp = 0.25_dp
+          end if
+
+          delta_fn_tetra = delta_fn_tetra + tmp
+       end if ! .not. (e <= e1 .or. e >= e4)
+    end do !itk
+
+    !Normalize with the total number of tetrahedra
+    delta_fn_tetra = delta_fn_tetra/numtetra
+  end function delta_fn_tetra
   
   subroutine form_tetrahedra_3d(nk, mesh, tetra, tetracount, tetramap, &
        blocks, indexlist)
@@ -57,10 +227,10 @@ contains
     tetramap(:,:,:) = 0
     count = 1 !tetrahedron counter
     
-    do ik = 1, nk !run over all wave vectors in FBZ
-       if(blocks) then !for energy window restricted FBZ
+    do ik = 1, nk !Run over all wave vectors in FBZ
+       if(blocks) then !For energy window restricted FBZ
           call demux_vector(indexlist(ik) - 1, ijk, mesh, 1_k4)
-       else !for unrestristed FBZ
+       else !For unrestristed FBZ
           call demux_vector(ik, ijk, mesh, 1_k4)
        end if
        i = ijk(1)
@@ -86,7 +256,7 @@ contains
           kp1 = k + 1
        end if
 
-       !For each subcell get the vertices
+       !For each subcell save the vertices
        scvol_vertices = reshape((/ &
             i,   j,   k,   &
             ip1, j,   k,   &
@@ -98,9 +268,9 @@ contains
             ip1, jp1, kp1 /), &
             shape(scvol_vertices), order = (/2, 1/))
 
-       do tk = 1, 6 ! run over 6 tetrahedra
-          do tl = 1, 4 ! run over the labels of the vertices that
-             !Make up each tetrahedron
+       do tk = 1, 6 !Run over 6 tetrahedra
+          do tl = 1, 4 !Run over the labels of the vertices that
+             !make up each tetrahedron
              aux = tetra_vertices_labels(tk, tl)
              ii = scvol_vertices(aux,1)
              jj = scvol_vertices(aux,2)
@@ -161,182 +331,4 @@ contains
        end do
     end do
   end subroutine fill_tetrahedra_3d
-
-!!$  !populate coefficients tetra_c for given energy e and a single band combo, for a single q index
-!!$  subroutine fillTetraWeight_e_iq(e,i,iq,weight,sp)
-!!$    real(kind=8), intent(in) :: e
-!!$    integer(kind=4), intent(in) :: i
-!!$    integer(kind=4), intent(in) :: iq
-!!$    integer(kind=4), intent(in) :: sp !0 for phonons, 1 for electrons
-!!$
-!!$    real(kind=8), intent(out) :: weight
-!!$
-!!$    integer(kind=4) :: iv,itet,itetq,num
-!!$    logical :: c1,c2,c3
-!!$    real(kind=8) :: e21,e31,e41,e32,e42,e43,tmp ! eji \equiv ej - ei
-!!$
-!!$    tmp = 0.0
-!!$    weight = 0.0
-!!$
-!!$    if(sp .eq. 0) then
-!!$       num = q2tetcount(iq)
-!!$    else
-!!$       num = q2tetcount_blocks(iq)
-!!$    end if
-!!$
-!!$    do itetq = 1,num
-!!$       if(sp .eq. 0) then
-!!$          itet = q2tet(1,iq,itetq)
-!!$          iv = q2tet(2,iq,itetq)
-!!$       else
-!!$          itet = q2tet_blocks(1,iq,itetq)
-!!$          iv = q2tet_blocks(2,iq,itetq)
-!!$       end if
-!!$
-!!$       if(sp .eq. 0) then !phonons
-!!$          e1 = tetra_evals_ph(itet,i,1)
-!!$          e2 = tetra_evals_ph(itet,i,2)
-!!$          e3 = tetra_evals_ph(itet,i,3)
-!!$          e4 = tetra_evals_ph(itet,i,4)
-!!$       else
-!!$          e1 = tetra_evals_el(itet,i,1)
-!!$          e2 = tetra_evals_el(itet,i,2)
-!!$          e3 = tetra_evals_el(itet,i,3)
-!!$          e4 = tetra_evals_el(itet,i,4)
-!!$       end if
-!!$
-!!$       e1e = e1-e
-!!$       e2e = e2-e
-!!$       e3e = e3-e
-!!$       e4e = e4-e
-!!$       e21 = e2-e1
-!!$       e31 = e3-e1
-!!$       e41 = e4-e1
-!!$       e32 = e3-e2
-!!$       e42 = e4-e2
-!!$       e43 = e4-e3
-!!$
-!!$       !eval the three cases
-!!$       c1 = e1 <= e .and. e <= e2
-!!$       c2 = e2 <= e .and. e <= e3
-!!$       c3 = e3 <= e .and. e <= e4
-!!$
-!!$       if(.not. (e < e1 .or. e > e4)) then
-!!$
-!!$          select case(iv)
-!!$          case(1)
-!!$             if(c1) then
-!!$                tmp = (e2e/e21 + e3e/e31 + e4e/e41)*(e1e**2)/e41/e31/e21
-!!$
-!!$                if(e1 .eq. e2) then
-!!$                   tmp = 0.0
-!!$                end if
-!!$
-!!$             else if(c2) then
-!!$                tmp = -0.5*(e3e/(e31**2)*(e3e*e2e/e42/e32 + e4e*e1e/e41/e42 + e3e*e1e/e32/e41) &
-!!$                     + e4e/(e41**2)*(e4e*e1e/e42/e31 + e4e*e2e/e42/e32 + e3e*e1e/e31/e32))
-!!$
-!!$                if(e2 .eq. e3) then
-!!$                   tmp = -0.5*(e4e*e1e/e41/e42 + e1e/e41 &
-!!$                        + e4e/(e41**2)*(e4e*e1e/e42/e31 + e4e/e42 + e1e/e31))
-!!$                end if
-!!$
-!!$             else if(c3) then
-!!$                tmp = (e4e**3)/(e41**2)/e42/e43
-!!$
-!!$                if(e3 .eq. e4) then
-!!$                   tmp = (e4e**2)/(e41**2)/e42
-!!$                end if
-!!$
-!!$             end if
-!!$          case(2)
-!!$             if(c1) then
-!!$                tmp = -(e1e**3)/(e21**2)/e31/e41
-!!$
-!!$                if(e1 .eq. e2) then
-!!$                   tmp = 0.0
-!!$                end if
-!!$
-!!$             else if(c2) then
-!!$                tmp = -0.5*(e3e/(e32**2)*(e3e*e2e/e42/e31 + e4e*e2e/e42/e41 + e3e*e1e/e31/e41) &
-!!$                     + e4e/(e42**2)*(e3e*e2e/e32/e31 + e4e*e1e/e41/e31 + e4e*e2e/e32/e41))
-!!$
-!!$                if(e2 .eq. e3) then
-!!$                   tmp = -0.5*(0.0 + e4e/e42/e41 + 0.0 &
-!!$                        + e4e/(e42**2)*(0.0 + e4e*e1e/e41/e31 + 1.0))
-!!$                end if
-!!$
-!!$             else if(c3) then
-!!$                tmp = (e4e**3)/e41/(e42**2)/e43
-!!$
-!!$                if(e3 .eq. e4) then
-!!$                   tmp = 0.0
-!!$                end if
-!!$             end if
-!!$          case(3)
-!!$             if(c1) then
-!!$                tmp = -(e1e**3)/e21/(e31**2)/e41
-!!$
-!!$                if(e1 .eq. e2) then
-!!$                   tmp = 0.0
-!!$                end if
-!!$
-!!$             else if(c2) then
-!!$                tmp = 0.5*(e2e/(e32**2)*(e3e*e2e/e42/e31 + e4e*e2e/e42/e41 + e3e*e1e/e31/e41) &
-!!$                     + e1e/(e31**2)*(e3e*e2e/e42/e32 + e4e*e1e/e41/e42 + e3e*e1e/e32/e41))
-!!$
-!!$                if(e2 .eq. e3) then
-!!$                   tmp = 0.5*(0.0 + e4e/e42/e41 + e1e/e31/e41 &
-!!$                        + e1e/(e31**2)*(0.0 + e4e*e1e/e41/e42 + e1e/e41))
-!!$                end if
-!!$
-!!$             else if(c3) then
-!!$                tmp = (e4e**3)/e41/e42/(e43**2)
-!!$
-!!$                if(e3 .eq. e4) then
-!!$                   tmp = 0.0
-!!$                end if
-!!$             end if
-!!$          case(4)
-!!$             if(c1) then
-!!$                tmp = -(e1e**3)/e21/e31/(e41**2)
-!!$                if(e1 .eq. e2) then
-!!$                   tmp = 0.0
-!!$                end if
-!!$             else if(c2) then
-!!$                tmp = 0.5*(e2e/(e42**2)*(e3e*e2e/e32/e31 + e4e*e1e/e41/e31 + e4e*e2e/e32/e41) &
-!!$                     + e1e/(e41**2)*(e4e*e1e/e42/e31 + e4e*e2e/e42/e32 + e3e*e1e/e31/e32))
-!!$
-!!$                if(e2 .eq. e3) then
-!!$                   tmp = 0.5*(0.0 &
-!!$                        + e1e/(e41**2)*(e4e*e1e/e42/e31 + e4e/e42 + e1e/e31))
-!!$                end if
-!!$
-!!$             else if(c3) then
-!!$                tmp = -(e3e/e43 + e2e/e42 + e1e/e41)*(e4e**2)/e41/e42/e43
-!!$
-!!$                if(e3 .eq. e4) then
-!!$                   tmp = 0.0
-!!$                end if
-!!$             end if
-!!$          end select
-!!$
-!!$          if ((e1 .eq. e2) .and. (e1 .eq. e3) .and. (e1 .eq. e4) .and. (e .eq. e1)) then
-!!$             tmp = 0.25
-!!$          end if
-!!$
-!!$          weight = weight + tmp
-!!$
-!!$       end if ! .not. (e <= e1 .or. e >= e4)
-!!$    end do !itetq
-!!$
-!!$    if(weight < 1.d-12) weight = 0.d0
-!!$
-!!$    if(sp .eq. 0) then !phonons
-!!$       weight = weight/ntetra
-!!$    else
-!!$       weight = weight/product(kfgrid)/6.d0
-!!$    end if
-!!$
-!!$  end subroutine fillTetraWeight_e_iq
 end module delta
