@@ -2,12 +2,12 @@ module electron_module
   !! Module containing types and procedures related to the electronic properties.
 
   use params, only: dp, k4
-  use misc, only: exit_with_message, print_message, demux_state, sort_int
+  use misc, only: exit_with_message, print_message, demux_state, sort
   use numerics_module, only: numerics
   use wannier_module, only: epw_wannier
   use crystal_module, only: crystal, calculate_wavevectors_full
   use symmetry_module, only: symmetry, find_irred_wedge, create_fbz2ibz_map
-  use delta, only: form_tetrahedra_3d
+  use delta, only: form_tetrahedra_3d, fill_tetrahedra_3d
   
   implicit none
 
@@ -72,6 +72,8 @@ module electron_module
      !! The number of tetrahedra in which a wave vector belongs.
      integer(k4), allocatable :: tetramap(:,:,:)
      !! Mapping from a wave vector to the (tetrahedron, vertex) where it belongs.
+     real(k4), allocatable :: tetra_evals(:,:,:)
+     !! Tetrahedra vertices filled with eigenvalues.
      real(dp), allocatable :: ens(:,:)
      !! List of electron energies on FBZ.
      real(dp), allocatable :: ens_irred(:,:)
@@ -250,7 +252,7 @@ contains
     
     ! 6. Sort index list and related quanties of FBZ blocks
     call print_message("Sorting FBZ blocks index list...")
-    call sort_int(el%indexlist)
+    call sort(el%indexlist)
 
     ! 7. Get FBZ blocks wave vectors, energies, velocities and eigenvectors
     !    After this step, el%wavevecs, el%ens, el%vels, and el%evecs
@@ -346,8 +348,12 @@ contains
     end if
 
     !Calculate electron tetrahedra
-    if(num%tetrahedra) call form_tetrahedra_3d(el%nk, el%kmesh, el%tetra, el%tetracount, &
-         el%tetramap, .true., el%indexlist)
+    if(num%tetrahedra) then
+       call print_message("Calculating electron mesh tetrahedra...")
+       call form_tetrahedra_3d(el%nk, el%kmesh, el%tetra, el%tetracount, &
+            el%tetramap, .true., el%indexlist)
+       call fill_tetrahedra_3d(el%tetra, el%ens, el%tetra_evals)
+    end if
   end subroutine calculate_electrons
 
   subroutine apply_energy_window(nk, indexlist, energies, enref, fsthick)

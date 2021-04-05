@@ -5,12 +5,19 @@ module misc
 
   implicit none
 
+  public
+  private :: sort_int, sort_real
+
+  interface sort
+     module procedure :: sort_int, sort_real
+  end interface sort
+  
 contains
 
   subroutine exit_with_message(message)
     !! Exit with error message.
 
-    character(len=*), intent(in) :: message
+    character(len = *), intent(in) :: message
 
     if(this_image() == 1) then
        print*, trim(message)
@@ -21,7 +28,7 @@ contains
   subroutine print_message(message)
     !! Print message.
     
-    character(len=*), intent(in) :: message
+    character(len = *), intent(in) :: message
 
     if(this_image() == 1) print*, trim(message)
   end subroutine print_message
@@ -107,6 +114,28 @@ contains
     end do
   end subroutine sort_int
 
+  subroutine sort_real(list)
+    !! Swap sort list of reals
+    
+    real(dp), intent(inout) :: list(:)
+    real(kind=8) :: aux, tmp
+    integer(k4) :: i, j, n
+
+    n = size(list)
+
+    do i = 1, n
+       aux = list(i)
+       do j = i + 1, n
+          if (aux > list(j)) then
+             tmp = list(j)
+             list(j) = aux
+             list(i) = tmp
+             aux = tmp
+          end if
+       end do
+    end do
+  end subroutine sort_real
+
   subroutine binsearch(array, e, m)
     !! Binary search in a list of integers and return index.
     
@@ -179,7 +208,7 @@ contains
     end if
   end subroutine demux_vector
   
-  subroutine demux_mesh(index_mesh,nmesh,mesh,base,indexlist)
+  subroutine demux_mesh(index_mesh, nmesh, mesh, base, indexlist)
     !! Demultiplex all wave vector indices 
     !! (optionally, from a list of indices).
     !! Internally uses demux_vector.

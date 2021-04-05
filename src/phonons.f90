@@ -7,6 +7,7 @@ module phonon_module
   use wannier_module, only: epw_wannier
   use crystal_module, only: crystal, calculate_wavevectors_full
   use symmetry_module, only: symmetry, find_irred_wedge, create_fbz2ibz_map
+  use delta, only: form_tetrahedra_3d, fill_tetrahedra_3d
   
   implicit none
 
@@ -46,6 +47,8 @@ module phonon_module
      !! The number of tetrahedra in which a wave vector belongs.
      integer(k4), allocatable :: tetramap(:,:,:)
      !! Mapping from a wave vector to the (tetrahedron, vertex) where it belongs.
+     real(k4), allocatable :: tetra_evals(:,:,:)
+     !! Tetrahedra vertices filled with eigenvalues.
      real(dp), allocatable :: ens(:,:)
      !! List of phonon energies on FBZ.
 !!$     real(dp), allocatable :: ens_irred(:,:)
@@ -96,8 +99,7 @@ contains
     call calculate_phonons(ph, wann, crys, sym, num)
 
     !Read ifc3s and related quantities
-    call read_ifc3(ph, crys)
-    
+    call read_ifc3(ph, crys)    
   end subroutine initialize
   
   subroutine calculate_phonons(ph, wann, crys, sym, num)
@@ -141,6 +143,14 @@ contains
     call print_message("Calculating FBZ -> IBZ mappings...")
     call create_fbz2ibz_map(ph%fbz2ibz_map, ph%nq, ph%nq_irred, ph%indexlist, &
          ph%nequiv, ph%ibz2fbz_map)
+
+    !Calculate phonon tetrahedra
+    if(num%tetrahedra) then
+       call print_message("Calculating phonon mesh tetrahedra...")
+       call form_tetrahedra_3d(ph%nq, ph%qmesh, ph%tetra, ph%tetracount, &
+            ph%tetramap, .false.)
+       call fill_tetrahedra_3d(ph%tetra, ph%ens, ph%tetra_evals)
+    end if
   end subroutine calculate_phonons
 
   subroutine read_ifc3(ph, crys)
