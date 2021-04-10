@@ -17,6 +17,8 @@ module phonon_module
   type phonon
      !! Data and procedures related to phonons.
 
+     character(len = 2) :: prefix = 'ph'
+     !! Prefix idenitfying particle type.
      integer(k4) :: numbranches
      !! Total number of phonon branches.
      integer(k4) :: nq
@@ -69,6 +71,8 @@ module phonon_module
      !! Position of the 2nd and 3rd atoms in supercell for an ifc3 triplet.
      integer(k4), allocatable :: Index_i(:), Index_j(:), Index_k(:)
      !! Label of primitive cell atoms in the ifc3 triplet.
+     real(dp), allocatable :: dos(:,:)
+     !! Branch resolved density of states.
       
    contains
 
@@ -115,6 +119,7 @@ contains
     integer(k4) :: iq
     !Switch for mesh utilites with or without energy restriction
     logical :: blocks
+    character(len = 1024) :: numcols
 
     blocks = .false.
 
@@ -144,6 +149,17 @@ contains
     call create_fbz2ibz_map(ph%fbz2ibz_map, ph%nq, ph%nq_irred, ph%indexlist, &
          ph%nequiv, ph%ibz2fbz_map)
 
+    !Print out irreducible phonon energies
+    write(numcols, "(I0)") ph%numbranches
+    if(this_image() == 1) then
+       open(1, file = "ph.ens", status = "replace")
+       do iq = 1, ph%nq_irred
+          write(1, "(" // trim(adjustl(numcols)) // "E20.10)") &
+               ph%ens(ph%indexlist_irred(iq), :)
+       end do
+       close(1)
+    end if
+    
     !Calculate phonon tetrahedra
     if(num%tetrahedra) then
        call print_message("Calculating phonon mesh tetrahedra...")

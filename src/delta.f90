@@ -48,10 +48,10 @@ contains
        iv = tetramap(2, ik, itk) !Grab vertex
 
        !Grab vertex energies
-       e1 = tetra_evals(it, ik, 1)
-       e2 = tetra_evals(it, ik, 2)
-       e3 = tetra_evals(it, ik, 3)
-       e4 = tetra_evals(it, ik, 4)
+       e1 = tetra_evals(it, ib, 1)
+       e2 = tetra_evals(it, ib, 2)
+       e3 = tetra_evals(it, ib, 3)
+       e4 = tetra_evals(it, ib, 4)
 
        !Define the energy differences
        e1e = e1 - e
@@ -80,7 +80,6 @@ contains
                 if(e1 == e2) then
                    tmp = 0.0_dp
                 end if
-
              else if(c2) then
                 tmp = -0.5_dp*(e3e/(e31**2)*(e3e*e2e/e42/e32 + e4e*e1e/e41/e42 + e3e*e1e/e32/e41) &
                      + e4e/(e41**2)*(e4e*e1e/e42/e31 + e4e*e2e/e42/e32 + e3e*e1e/e31/e32))
@@ -89,14 +88,12 @@ contains
                    tmp = -0.5_dp*(e4e*e1e/e41/e42 + e1e/e41 &
                         + e4e/(e41**2)*(e4e*e1e/e42/e31 + e4e/e42 + e1e/e31))
                 end if
-
              else if(c3) then
                 tmp = (e4e**3)/(e41**2)/e42/e43
 
                 if(e3 == e4) then
                    tmp = (e4e**2)/(e41**2)/e42
                 end if
-
              end if
           case(2)
              if(c1) then
@@ -105,7 +102,6 @@ contains
                 if(e1 == e2) then
                    tmp = 0.0_dp
                 end if
-
              else if(c2) then
                 tmp = -0.5_dp*(e3e/(e32**2)*(e3e*e2e/e42/e31 + e4e*e2e/e42/e41 + e3e*e1e/e31/e41) &
                      + e4e/(e42**2)*(e3e*e2e/e32/e31 + e4e*e1e/e41/e31 + e4e*e2e/e32/e41))
@@ -114,7 +110,6 @@ contains
                    tmp = -0.5_dp*(0.0 + e4e/e42/e41 + 0.0 &
                         + e4e/(e42**2)*(0.0 + e4e*e1e/e41/e31 + 1.0))
                 end if
-
              else if(c3) then
                 tmp = (e4e**3)/e41/(e42**2)/e43
 
@@ -129,7 +124,6 @@ contains
                 if(e1 == e2) then
                    tmp = 0.0_dp
                 end if
-
              else if(c2) then
                 tmp = 0.5_dp*(e2e/(e32**2)*(e3e*e2e/e42/e31 + e4e*e2e/e42/e41 + e3e*e1e/e31/e41) &
                      + e1e/(e31**2)*(e3e*e2e/e42/e32 + e4e*e1e/e41/e42 + e3e*e1e/e32/e41))
@@ -138,7 +132,6 @@ contains
                    tmp = 0.5_dp*(0.0 + e4e/e42/e41 + e1e/e31/e41 &
                         + e1e/(e31**2)*(0.0 + e4e*e1e/e41/e42 + e1e/e41))
                 end if
-
              else if(c3) then
                 tmp = (e4e**3)/e41/e42/(e43**2)
 
@@ -160,7 +153,6 @@ contains
                    tmp = 0.5_dp*(0.0 &
                         + e1e/(e41**2)*(e4e*e1e/e42/e31 + e4e/e42 + e1e/e31))
                 end if
-
              else if(c3) then
                 tmp = -(e3e/e43 + e2e/e42 + e1e/e41)*(e4e**2)/e41/e42/e43
 

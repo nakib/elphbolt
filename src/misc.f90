@@ -33,6 +33,28 @@ contains
     if(this_image() == 1) print*, trim(message)
   end subroutine print_message
 
+  subroutine write2file_rank2_real(filename, data)
+    !! Write rank-2 data to file.
+
+    character(len = *), intent(in) :: filename
+    real(dp), intent(in) :: data(:,:)
+
+    integer(k4) :: ik, nk
+    character(len = 1024) :: numcols
+
+    nk = size(data(:, 1))
+    write(numcols, "(I0)") size(data(1, :))
+
+    if(this_image() == 1) then
+       open(1, file = trim(filename), status = "replace")
+       do ik = 1, nk
+          write(1, "(" // trim(adjustl(numcols)) // "E20.10)") &
+               data(ik, :)
+       end do
+       close(1)
+    end if
+  end subroutine write2file_rank2_real
+
   subroutine int_div(num, denom, q, r)
     !! Quotient(q) and remainder(r) of the integer division num/denom.
 

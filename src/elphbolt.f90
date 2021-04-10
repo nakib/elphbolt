@@ -7,12 +7,14 @@ program elphBolt
   !! and Phys. Rev. B 102, 245202 (2020) with both the electron-phonon and phonon-phonon
   !! interactions computed ab initio.
 
+  use params, only: k4
   use numerics_module, only: numerics
   use crystal_module, only: crystal
   use symmetry_module, only: symmetry
   use electron_module, only: electron
   use phonon_module, only: phonon
   use wannier_module, only: epw_wannier
+  use bz_sums, only: calculate_dos
   use interactions, only:  calculate_g_mixed, calculate_g2_bloch, calculate_3ph_interaction
   
   implicit none
@@ -48,20 +50,26 @@ program elphBolt
   !Calculate electrons
   call el%initialize(wann, crys, sym, num)
 
+  !Calculate electron density of states
+  call calculate_dos(el, num%tetrahedra)
+  
   !Calculate phonons
   call ph%initialize(wann, crys, sym, num)
 
-  !Calculate mixed Bloch-Wannier space e-ph vertex
-  call calculate_g_mixed(wann, el, num)
+  !Calculate phonon density of states
+  call calculate_dos(ph, num%tetrahedra)
+  
+!!$  !Calculate mixed Bloch-Wannier space e-ph vertex
+!!$  call calculate_g_mixed(wann, el, num)
+!!$
+!!$  !Calculate Bloch space e-ph vertex
+!!$  !TODO call calculate_g2_bloch(wann, crys, el, ph, num)
 
-  !Calculate Bloch space e-ph vertex
-  call calculate_g2_bloch(wann, crys, el, ph, num)
-
-  !Calculate ph-ph vertex
-  call calculate_3ph_interaction(ph, crys, num, 'V')
-
-  !Calculate transition probabilities
-  call calculate_3ph_interaction(ph, crys, num, 'W')
+!!$  !Calculate ph-ph vertex
+!!$  call calculate_3ph_interaction(ph, crys, num, 'V')
+!!$
+!!$  !Calculate transition probabilities
+!!$  call calculate_3ph_interaction(ph, crys, num, 'W')
 
   !Iterate BTEs
 end program elphBolt

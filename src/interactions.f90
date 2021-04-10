@@ -359,15 +359,18 @@ contains
              !Muxed index of q
              iq = mux_vector(q_indvec, el%kmesh, 0_dp)
 
+             !TODO Here need to 
+             
              !Run over phonon branches
              do s = 1, wann%numbranches
                 !Increment g2 processes counter
                 count = count + 1
                 
-                !Calculate |g_mns(<k>,q)|^2
-                g2_istate(count) = wann%g2_epw(crys, q, el%evecs_irred(ik, m, :), &
-                     el%evecs(ikp, n, :), ph%evecs(iq, s, :), &
-                     ph%ens(iq, s), gmixed_ik)
+                !TODO Calculate |g_mns(<k>,q)|^2
+!!$                g2_istate(count) = wann%g2_epw(crys, q, el%evecs_irred(ik, m, :), &
+!!$                     el%evecs(ikp, n, :), ph%evecs(iq, s, :), &
+!!$                     ph%ens(iq, s), gmixed_ik)
+                !NOTE: The above will crash for unequal k and q meshes.
              end do !s
           end do !n
        end do !ikp

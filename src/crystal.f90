@@ -107,6 +107,7 @@ contains
     c%elements = elements
     c%atomtypes = atomtypes
     c%born = born
+    c%epsilon = epsilon
     c%masses = masses
     c%basis = basis
     c%polar = polar
@@ -142,6 +143,14 @@ contains
        print*, c%reclattvecs(:,3)
        print*, 'Brillouin zone volume =', c%volume_bz, '1/nm^3'
 
+       print*, 'System is polar. ', c%polar
+       if(c%polar) then
+          print*, 'Dielectric tensor:'
+          print*, c%epsilon(:,1)
+          print*, c%epsilon(:,2)
+          print*, c%epsilon(:,3)
+       end if
+       
        print*, 'Crystal temperature =', c%T, 'K'
     end if
   end subroutine read_input_and_setup_crystal

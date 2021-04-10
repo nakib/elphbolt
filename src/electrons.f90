@@ -17,6 +17,8 @@ module electron_module
   type electron
      !! Data and procedures related to the electronic properties.
 
+     character(len = 2) :: prefix = 'el'
+     !! Prefix idenitfying particle type.
      integer(k4) :: spindeg
      !! Spin degeneracy.
      integer(k4) :: numbands
@@ -89,7 +91,9 @@ module electron_module
      logical :: metallic
      !! Is the system metallic?
      !! Semimetals and semiconductors require providing conduction and/or valence bands.
-          
+     real(dp), allocatable :: dos(:,:)
+     !! Band resolved density of states.
+     
    contains
 
      procedure :: initialize=>read_input_and_setup
@@ -178,7 +182,7 @@ contains
 
     call calculate_electrons(el, wann, crys, sym, num)
   end subroutine read_input_and_setup
-
+  
   subroutine calculate_electrons(el, wann, crys, sym, num)
     !! Calculate electron energy window restricted wave vector meshes
     !! and the electronic properties on them
@@ -343,6 +347,17 @@ contains
        write(1,*) "#k-vec index     band index"
        do i = 1, el%nstates_irred_inwindow
           write(1,"("//trim(adjustl(numcols))//"I10)") el%IBZ_inwindow_states(i,:)
+       end do
+       close(1)
+    end if
+
+    !Print out irreducible electron energies
+    write(numcols, "(I0)") el%numbands
+    if(this_image() == 1) then
+       open(1, file = "el.ens", status = "replace")
+       do i = 1, el%nk_irred
+          write(1, "(" // trim(adjustl(numcols)) // "E20.10)") &
+               el%ens_irred(i, :)
        end do
        close(1)
     end if

@@ -30,7 +30,7 @@
 *.exe
 *.out
 *.app
-elphbolt
+*.x
 
 # Temporary files
 *~

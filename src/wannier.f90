@@ -279,7 +279,7 @@ contains
     !Catch error for optional velocity calculation
     if(present(velocities) .and. .not. present(evecs)) &
          call exit_with_message("In Wannier, velocity is present but not eigenvecs.")
-
+    
     nwork = 1
     allocate(work(nwork))
     allocate(rwork(max(1, 9*crys%numatoms-2)))
@@ -404,39 +404,39 @@ contains
     complex(dp) :: dyn_l(wann%numbranches,wann%numbranches)
     complex(dp) :: ddyn_l(3,wann%numbranches,wann%numbranches)
     real(dp) :: qeq,     &! <q+g| epsilon |q+g>
-         arg, zag(3),zbg(3), g(3), gmax, alph, geg,&
-         tpiba,dgeg(3),fnat(3),rr(crys%numatoms,crys%numatoms,3)
-    integer(kind=4) :: na,nb,i,idim,jdim,ipol,jpol,m1,m2,m3,nq1,nq2,nq3
+         arg, zag(3), zbg(3), g(3), gmax, alph, geg,&
+         tpiba, dgeg(3), fnat(3), rr(crys%numatoms,crys%numatoms,3)
+    integer(k4) :: na,nb,i,idim,jdim,ipol,jpol,m1,m2,m3,nq1,nq2,nq3
     complex(dp) :: fac, facqd, facq
 
     tpiba = twopi/twonorm(crys%lattvecs(:,1))*bohr2nm
 
-    !Recall that the phonon supercell in elphBolt is the
+    !Recall that the phonon supercell in elphbolt is the
     !same as the EPW coarse phonon mesh.
     nq1 = wann%coarse_qmesh(1)
     nq2 = wann%coarse_qmesh(2)
     nq3 = wann%coarse_qmesh(3)
 
-    gmax= 14.d0 !dimensionless
+    gmax= 14.0_dp !dimensionless
     alph= tpiba**2 !bohr^-2
     geg = gmax*alph*4.0d0
     !In Ry units, qe = sqrt(2.0)
-    fac = 8.d0*pi/(crys%volume/bohr2nm**3)
+    fac = 8.0_dp*pi/(crys%volume/bohr2nm**3)
 
-    dyn_l = 0.d0
-    ddyn_l = 0.d0
+    dyn_l = 0.0_dp
+    ddyn_l = 0.0_dp
     do m1 = -nq1,nq1
        do m2 = -nq2,nq2
           do m3 = -nq3,nq3
              g(:) = (m1*crys%reclattvecs(:,1)+m2*crys%reclattvecs(:,2)+m3*crys%reclattvecs(:,3))*bohr2nm
              qeq = dot_product(g,matmul(crys%epsilon,g))
 
-             if (qeq > 0.d0 .and. qeq/alph/4.d0 < gmax ) then
-                facqd = exp(-qeq/alph/4.0d0)/qeq
+             if (qeq > 0.0_dp .and. qeq/alph/4.0_dp < gmax ) then
+                facqd = exp(-qeq/alph/4.0_dp)/qeq
 
                 do na = 1,crys%numatoms
                    zag(:)=matmul(g,crys%born(:,:,na))
-                   fnat(:)=0.d0
+                   fnat(:)=0.0_dp
                    do nb = 1,crys%numatoms
                       rr(na,nb,:) = (crys%basis_cart(:,na)-crys%basis_cart(:,nb))/bohr2nm
                       arg = dot_product(g,rr(na,nb,:))
@@ -456,7 +456,7 @@ contains
 
              g = g + q
              qeq = dot_product(g,matmul(crys%epsilon,g))
-             if (qeq > 0.d0 .and. qeq/alph/4.d0 < gmax ) then
+             if (qeq > 0.0_dp .and. qeq/alph/4.0_dp < gmax ) then
                 facqd = exp(-qeq/alph/4.0d0)/qeq
                 dgeg=matmul(crys%epsilon+transpose(crys%epsilon),g)
                 do nb = 1,crys%numatoms
@@ -477,7 +477,7 @@ contains
                                  facq*&
                                  ( zbg(jpol)*crys%born(:,ipol,na)+zag(ipol)*crys%born(:,jpol,nb)+&
                                  zag(ipol)*zbg(jpol)*(oneI*rr(na,nb,:)-&
-                                 dgeg(:)/alph/4.0-dgeg(:)/qeq) )
+                                 dgeg(:)/alph/4.0_dp-dgeg(:)/qeq) )
                          end do
                       end do
                    end do
@@ -591,7 +591,7 @@ contains
 
     tpiba = twopi/twonorm(crys%lattvecs(:,1))*bohr2nm
 
-    !Recall that the phonon supercell in elphBolt is the
+    !Recall that the phonon supercell in elphbolt is the
     !same as the EPW coarse phonon mesh.
     nq1 = wann%coarse_qmesh(1)
     nq2 = wann%coarse_qmesh(2)
@@ -828,5 +828,4 @@ contains
     end do
     close(1)
   end subroutine test_wannier
-
 end module wannier_module
