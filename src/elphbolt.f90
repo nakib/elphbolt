@@ -64,12 +64,13 @@ program elphBolt
 !!$
 !!$  !Calculate Bloch space e-ph vertex
 !!$  !TODO call calculate_g2_bloch(wann, crys, el, ph, num)
+!!$  !TODO need to fix this for unequal k and q meshes
 
-!!$  !Calculate ph-ph vertex
-!!$  call calculate_3ph_interaction(ph, crys, num, 'V')
-!!$
-!!$  !Calculate transition probabilities
-!!$  call calculate_3ph_interaction(ph, crys, num, 'W')
+  !Calculate ph-ph vertex
+  call calculate_3ph_interaction(ph, crys, num, 'V')
+
+  !Calculate transition probabilities
+  !call calculate_3ph_interaction(ph, crys, num, 'W')
 
   !Iterate BTEs
 end program elphBolt

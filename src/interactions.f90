@@ -17,36 +17,80 @@ module interactions
 
 contains
     
-  pure function Vm2_3ph(ph, s1, s2, s3, iq1, iq2, iq3, phases_q2q3)
+!!$  pure real(dp) function Vm2_3ph(ph, s1, s2, s3, iq1, iq2, iq3, phases_q2q3)
+!!$    !! Function to calculate the 3-ph interaction vertex |V-|^2.
+!!$    !! TODO This is a bottleneck. Think about how to speed this function up.
+!!$    
+!!$    type(phonon), intent(in) :: ph
+!!$    integer(k4), intent(in) :: s1, s2, s3, iq1, iq2, iq3
+!!$    complex(dp), intent(in) :: phases_q2q3(ph%numtriplets)
+!!$    !real(dp) :: Vm2_3ph
+!!$
+!!$    !Local variables
+!!$    integer(k4) :: it, a, b, c, aind, bind, cind
+!!$    complex(dp) :: aux1, aux2, V0, ev1(ph%numbranches, ph%numbranches), &
+!!$         ev2(ph%numbranches, ph%numbranches), ev3(ph%numbranches, ph%numbranches)
+!!$    real(dp) :: ifc3it(3, 3, 3)
+!!$
+!!$    ev1(:,:) = ph%evecs(iq1,:,:)
+!!$    ev2(:,:) = ph%evecs(iq2,:,:)
+!!$    ev3(:,:) = ph%evecs(iq3,:,:)
+!!$    
+!!$    aux1 = (0.0_dp, 0.0_dp)
+!!$    do it = 1, ph%numtriplets
+!!$       ifc3it(:,:,:) = ph%ifc3(:,:,:,it)
+!!$       V0 = (0.0_dp, 0.0_dp)
+!!$       do a = 1, 3
+!!$          aind = a + 3*(ph%Index_k(it) - 1)
+!!$          do b = 1, 3
+!!$             bind = b + 3*(ph%Index_j(it) - 1)
+!!$             !aux2 = conjg(ph%evecs(iq2, s2, bind)*ph%evecs(iq3, s3, aind))
+!!$             aux2 = conjg(ev2(s2, bind)*ev3(s3, aind))
+!!$             do c = 1, 3
+!!$                cind = c + 3*(ph%Index_i(it) - 1)
+!!$                !V0 = V0 + ph%ifc3(c, b, a, it)*&
+!!$                !     ph%evecs(iq1, s1, cind)*aux2
+!!$                V0 = V0 + ifc3it(c, b, a)*ev1(s1, cind)*aux2
+!!$             end do
+!!$          end do
+!!$       end do
+!!$       aux1 = aux1 + V0*phases_q2q3(it)
+!!$    end do
+!!$    Vm2_3ph = abs(aux1)**2
+!!$  end function Vm2_3ph
+
+  pure real(dp) function Vm2_3ph(s1, s2, s3, ev1, ev2, ev3, &
+       Index_i, Index_j, Index_k, ifc3, phases_q2q3)
     !! Function to calculate the 3-ph interaction vertex |V-|^2.
     !! TODO This is a bottleneck. Think about how to speed this function up.
     
-    type(phonon), intent(in) :: ph
-    integer(k4), intent(in) :: s1, s2, s3, iq1, iq2, iq3
-    complex(dp), intent(in) :: phases_q2q3(ph%numtriplets)
-    real(dp) :: Vm2_3ph
+    integer(k4), intent(in) :: s1, s2, s3, Index_i(:), Index_j(:), Index_k(:)
+    complex(dp), intent(in) :: phases_q2q3(:), ev1(:,:), ev2(:,:), ev3(:,:)
+    real(dp), intent(in) :: ifc3(:,:,:,:)
 
     !Local variables
-    integer(k4) :: it, a, b, c, aind, bind, cind
+    integer(k4) :: it, a, b, c, aind, bind, cind, nb
     complex(dp) :: aux1, aux2, V0
 
+    nb = size(ev1(:,1))
+    
     aux1 = (0.0_dp, 0.0_dp)
-    do it = 1, ph%numtriplets
+    do it = 1, nb
        V0 = (0.0_dp, 0.0_dp)
        do a = 1, 3
-          aind = a + 3*(ph%Index_k(it) - 1)
+          aind = a + 3*(Index_k(it) - 1)
           do b = 1, 3
-             bind = b + 3*(ph%Index_j(it) - 1)
-             aux2 = conjg(ph%evecs(iq2, s2, bind)*ph%evecs(iq3, s3, aind))
+             bind = b + 3*(Index_j(it) - 1)
+             aux2 = conjg(ev2(s2, bind)*ev3(s3, aind))
              do c = 1, 3
-                cind = c + 3*(ph%Index_i(it) - 1)
-                V0 = V0 + ph%ifc3(c, b, a, it)*&
-                     ph%evecs(iq1, s1, cind)*aux2
+                cind = c + 3*(Index_i(it) - 1)
+                V0 = V0 + ifc3(c, b, a, it)*ev1(s1, cind)*aux2
              end do
           end do
        end do
        aux1 = aux1 + V0*phases_q2q3(it)
     end do
+
     Vm2_3ph = abs(aux1)**2
   end function Vm2_3ph
   
@@ -186,7 +230,10 @@ contains
                 
                 if(key == 'V') then
                    !Calculate the minus process vertex
-                   Vm2(count) = Vm2_3ph(ph, s1, s2, s3, iq1, iq2, iq3, phases_q2q3)
+                   !Vm2(count) = Vm2_3ph(ph, s1, s2, s3, iq1, iq2, iq3, phases_q2q3)
+                   Vm2(count) = Vm2_3ph(s1, s2, s3, ph%evecs(iq1,:,:), &
+                        ph%evecs(iq2,:,:), ph%evecs(iq3,:,:), ph%Index_i(:), &
+                        ph%Index_j(:), ph%Index_k(:), ph%ifc3(:,:,:,:), phases_q2q3)
                 end if
 
 !!$                if(key == 'W') then
