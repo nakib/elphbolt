@@ -1,7 +1,7 @@
 module misc
   !! Module containing miscellaneous math and numerics related functions and subroutines.
 
-  use params, only: dp, k4
+  use params, only: dp, k4, kB
 
   implicit none
 
@@ -90,21 +90,19 @@ contains
     cross_product(3) = A(1)*B(2) - A(2)*B(1)
   end function cross_product
 
-  function expi(x)
+  pure complex(dp) function expi(x)
     !! Calculate exp(i*x) = cos(x) + isin(x)
 
     real(dp), intent(in) :: x
-    complex(dp) :: expi
 
     expi = cmplx(cos(x), sin(x))
   end function expi
 
-  function twonorm(v)
+  pure real(dp) function twonorm(v)
     !! 2-norm of a vector
 
     real(dp), intent(in) :: v(:)
     integer(k4) :: i, s
-    real(dp) :: twonorm
 
     s = size(v)
     twonorm = 0.0_dp
@@ -193,7 +191,7 @@ contains
     !! base states whether v has 0- or 1-based indexing.
 
     integer(k4), intent(in) :: v(3), mesh(3), base
-    integer(k4) :: mux_vector 
+    integer(k4) :: mux_vector
 
     if(base < 0 .or. base > 1) then
        call exit_with_message("Base has to be either 0 or 1 in misc.f90:mux_vector")
@@ -249,7 +247,7 @@ contains
     end do
   end subroutine demux_mesh
 
-  function mux_state(nbands, iband, ik)
+  pure integer(k4) function mux_state(nbands, iband, ik)
     !! Multiplex a (band index, wave vector index) pair into a state index 
     !!
     !! nbands is the number of bands
@@ -257,7 +255,6 @@ contains
     !! ik is the wave vector index
     
     integer(k4), intent(in) :: nbands, ik, iband 
-    integer(k4) :: mux_state
 
     mux_state = (ik - 1)*nbands + iband
   end function mux_state
@@ -276,4 +273,13 @@ contains
     iband = modulo(m - 1, nbands) + 1
     ik = int((m - 1)/nbands) + 1
   end subroutine demux_state
+
+  pure real(dp) function Bose(e, T)
+    !! e Energy in eV
+    !! T temperature in K
+
+    real(dp), intent(in) :: e, T
+    
+    Bose = 1.0_dp/(exp(e/kB/T) - 1.0_dp)
+  end function Bose
 end module misc

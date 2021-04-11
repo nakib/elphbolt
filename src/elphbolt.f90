@@ -70,7 +70,7 @@ program elphBolt
   call calculate_3ph_interaction(ph, crys, num, 'V')
 
   !Calculate transition probabilities
-  !call calculate_3ph_interaction(ph, crys, num, 'W')
+  call calculate_3ph_interaction(ph, crys, num, 'W')
 
   !Iterate BTEs
 end program elphBolt

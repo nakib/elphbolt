@@ -16,7 +16,9 @@ module params
   real(dp), parameter :: amu = 1.66053906660e-27_dp
   !! Atomic mass unit (Kg)
   real(dp), parameter :: hbar = 1.05457172647e-22_dp
-  !! Reduced Planck's constant (J/THz)
+  !! Reduced Planck's constant (J/THz = J.ps)
+  real(dp), parameter :: hbar_eVps = hbar/qe
+  !! Reduced Planck's constant (eV/THz = eV.ps)
   real(kind=8), parameter :: perm0 =  8.854187817e-12_dp
   !! Permittivity of free space (F/m)
   real(kind=8), parameter :: kB = 1.380649e-23_dp/qe

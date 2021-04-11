@@ -200,6 +200,7 @@ contains
        end do
     end do
     close(1)
+    !IFC3 units are eV/Ang^3
 
     !Each vector is rounded to the nearest lattice vector.
     tmp = crys%lattvecs

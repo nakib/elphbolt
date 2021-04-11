@@ -1,14 +1,15 @@
 module interactions
   !! Module containing the procedures related to the computation of interactions.
 
-  use params, only: k4, dp
+  use params, only: k4, dp, pi, amu, qe, hbar_eVps
   use misc, only: exit_with_message, print_message, distribute_points, &
-       demux_state, mux_vector, mux_state, expi
+       demux_state, mux_vector, mux_state, expi, Bose
   use wannier_module, only: epw_wannier
   use crystal_module, only: crystal
   use electron_module, only: electron
   use phonon_module, only: phonon
   use numerics_module, only: numerics
+  use delta, only: delta_fn_tetra
 
   implicit none
 
@@ -16,53 +17,10 @@ module interactions
   public calculate_g_mixed, calculate_g2_bloch, calculate_3ph_interaction
 
 contains
-    
-!!$  pure real(dp) function Vm2_3ph(ph, s1, s2, s3, iq1, iq2, iq3, phases_q2q3)
-!!$    !! Function to calculate the 3-ph interaction vertex |V-|^2.
-!!$    !! TODO This is a bottleneck. Think about how to speed this function up.
-!!$    
-!!$    type(phonon), intent(in) :: ph
-!!$    integer(k4), intent(in) :: s1, s2, s3, iq1, iq2, iq3
-!!$    complex(dp), intent(in) :: phases_q2q3(ph%numtriplets)
-!!$    !real(dp) :: Vm2_3ph
-!!$
-!!$    !Local variables
-!!$    integer(k4) :: it, a, b, c, aind, bind, cind
-!!$    complex(dp) :: aux1, aux2, V0, ev1(ph%numbranches, ph%numbranches), &
-!!$         ev2(ph%numbranches, ph%numbranches), ev3(ph%numbranches, ph%numbranches)
-!!$    real(dp) :: ifc3it(3, 3, 3)
-!!$
-!!$    ev1(:,:) = ph%evecs(iq1,:,:)
-!!$    ev2(:,:) = ph%evecs(iq2,:,:)
-!!$    ev3(:,:) = ph%evecs(iq3,:,:)
-!!$    
-!!$    aux1 = (0.0_dp, 0.0_dp)
-!!$    do it = 1, ph%numtriplets
-!!$       ifc3it(:,:,:) = ph%ifc3(:,:,:,it)
-!!$       V0 = (0.0_dp, 0.0_dp)
-!!$       do a = 1, 3
-!!$          aind = a + 3*(ph%Index_k(it) - 1)
-!!$          do b = 1, 3
-!!$             bind = b + 3*(ph%Index_j(it) - 1)
-!!$             !aux2 = conjg(ph%evecs(iq2, s2, bind)*ph%evecs(iq3, s3, aind))
-!!$             aux2 = conjg(ev2(s2, bind)*ev3(s3, aind))
-!!$             do c = 1, 3
-!!$                cind = c + 3*(ph%Index_i(it) - 1)
-!!$                !V0 = V0 + ph%ifc3(c, b, a, it)*&
-!!$                !     ph%evecs(iq1, s1, cind)*aux2
-!!$                V0 = V0 + ifc3it(c, b, a)*ev1(s1, cind)*aux2
-!!$             end do
-!!$          end do
-!!$       end do
-!!$       aux1 = aux1 + V0*phases_q2q3(it)
-!!$    end do
-!!$    Vm2_3ph = abs(aux1)**2
-!!$  end function Vm2_3ph
-
+  
   pure real(dp) function Vm2_3ph(s1, s2, s3, ev1, ev2, ev3, &
        Index_i, Index_j, Index_k, ifc3, phases_q2q3)
     !! Function to calculate the 3-ph interaction vertex |V-|^2.
-    !! TODO This is a bottleneck. Think about how to speed this function up.
     
     integer(k4), intent(in) :: s1, s2, s3, Index_i(:), Index_j(:), Index_k(:)
     complex(dp), intent(in) :: phases_q2q3(:), ev1(:,:), ev2(:,:), ev3(:,:)
@@ -96,8 +54,8 @@ contains
   
   subroutine calculate_3ph_interaction(ph, crys, num, key)
     !! Parallel driver of the 3-ph vertex calculator for all IBZ phonon wave vectors.
-    !! This subroutine calculates |V-(<q1>|q2,q3)|^2 for each irreducible phonon
-    !! and saves the result to disk.
+    !! This subroutine calculates |V-(s1<q1>|s2q2,s3q3)|^2, W+(s1<q1>|s2q2,s3q3),
+    !! and W+(s1<q1>|s2q2,s3q3) for each irreducible phonon and saves the results to disk.
     !!
     !! key = 'V', 'W' for vertex, scattering rate calculation, respectively.
 
@@ -107,29 +65,49 @@ contains
     character(len = 1), intent(in) :: key
     
     !Local variables
-    integer(k4) :: start, end, chunk, istate1, nstates_irred, nstates, &
-         s1, s2, s3, iq1_ibz, iq1, iq2, iq3, count, it, &
-         q1_indvec(3), q2_indvec(3), q3_indvec(3)
-    real(dp) :: en1, en2, en3, massfac, q1(3), q2(3), q3(3), q2_cart(3), q3_cart(3)
-    real(dp), allocatable :: Vm2(:), Vp2(:)
+    integer(k4) :: start, end, chunk, istate1, nstates_irred, &
+         nprocs, s1, s2, s3, iq1_ibz, iq1, iq2, iq3_minus, it, &
+         q1_indvec(3), q2_indvec(3), q3_minus_indvec(3), index_minus, index_plus, &
+         neg_iq1, neg_iq2, neg_q2_indvec(3)
+    real(dp) :: en1, en2, en3, massfac, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
+         delta, occup_fac, Vp2_index_plus, const
+    real(dp), allocatable :: Vm2(:), Wm(:), Wp(:)
+    integer(k4), allocatable :: istate2_plus(:), istate3_plus(:), istate2_minus(:), istate3_minus(:)
     complex(dp) :: phases_q2q3(ph%numtriplets)
     character(len = 1024) :: filename
 
     if(key /= 'V' .and. key /= 'W') then
        call exit_with_message("Invalid value of key in call to calculate_3ph_interaction. Exiting.")
     end if
-    
-    call print_message("Calculating 3-ph vertices for all IBZ q...")
-    
+
+    if(key == 'V') then
+       call print_message("Calculating 3-ph vertices for all IBZ q...")
+    else
+       call print_message("Calculating 3-ph scattering rates for all IBZ q...")
+    end if
+
+    !Conversion factor in transition probability expression
+    const = pi/4.0_dp*hbar_eVps**5*(qe/amu)**3*1.0d-12
+
     !Total number of IBZ blocks states
     nstates_irred = ph%nq_irred*ph%numbranches
 
-    !Total number of processes for a given initial phonon state
-    nstates = ph%nq*ph%numbranches**2
+    !Total number of 3-phonon processes for a given initial phonon state
+    nprocs = ph%nq*ph%numbranches**2
 
-    !Allocate |V^-|^2 and, if needed, |V^+|^2
-    allocate(Vm2(nstates))
-    if(key == 'W') allocate(Vp2(nstates))
+    !Allocate |V^-|^2 and, if needed, W- and W+
+    allocate(Vm2(nprocs))
+    if(key == 'W') then
+       allocate(Wp(nprocs), Wm(nprocs))
+       allocate(istate2_plus(nprocs), istate3_plus(nprocs),&
+            istate2_minus(nprocs),istate3_minus(nprocs))
+       Wp(:) = 0.0_dp
+       Wm(:) = 0.0_dp
+       istate2_plus(:) = 0_k4
+       istate3_plus(:) = 0_k4
+       istate2_minus(:) = 0_k4
+       istate3_minus(:) = 0_k4
+    end if
 
     !Divide phonon states among images
     call distribute_points(nstates_irred, chunk, start, end)
@@ -141,9 +119,6 @@ contains
 
     !Run over first phonon IBZ states
     do istate1 = start, end
-       !Initialize process counter for this state
-       count = 0
-
        !Demux state index into branch (s) and wave vector (iq) indices
        call demux_state(istate1, ph%numbranches, s1, iq1_ibz)
 
@@ -157,10 +132,11 @@ contains
        !Convert from crystal to 0-based index vector
        q1_indvec = nint(q1*ph%qmesh)
 
-       if(key == 'W') then
-          !Energy of phonon 1
-          en1 = ph%ens(iq1, s1)
-       end if
+       !Energy of phonon 1
+       en1 = ph%ens(iq1, s1)
+
+       !Avoid Gamma point acoustic phonon
+       if(en1 == 0.0_dp) cycle
 
        !Load |V^-|^2 from disk for scattering rates calculation
        if(key == 'W') then
@@ -187,11 +163,11 @@ contains
           q2_indvec = nint(q2*ph%qmesh)
 
           !Folded final phonon wave vector
-          q3_indvec = modulo(q1_indvec - q2_indvec, ph%qmesh) !0-based index vector
-          q3 = q3_indvec/dble(ph%qmesh) !crystal coords.
+          q3_minus_indvec = modulo(q1_indvec - q2_indvec, ph%qmesh) !0-based index vector
+          q3_minus = q3_minus_indvec/dble(ph%qmesh) !crystal coords.
 
-          !Muxed index of q3
-          iq3 = mux_vector(q3_indvec, ph%qmesh, 0_k4)
+          !Muxed index of q3_minus
+          iq3_minus = mux_vector(q3_minus_indvec, ph%qmesh, 0_k4)
           
           if(key == 'V') then
              !Calculate the numtriplet number of mass-normalized phases for this (q2,q3) pair
@@ -201,70 +177,80 @@ contains
                      crys%masses(crys%atomtypes(ph%Index_j(it)))*&
                      crys%masses(crys%atomtypes(ph%Index_k(it))))
                 q2_cart = matmul(crys%reclattvecs, q2)
-                q3_cart = matmul(crys%reclattvecs, q3)
+                q3_minus_cart = matmul(crys%reclattvecs, q3_minus)
                 phases_q2q3(it) = massfac*&
-                     expi(-dot_product(q2_cart, ph%R_j(:,it)))*&
-                     expi(-dot_product(q3_cart, ph%R_k(:,it)))
+                     expi(-dot_product(q2_cart, ph%R_j(:,it)) -&
+                     dot_product(q3_minus_cart, ph%R_k(:,it)))
              end do
           end if
           
           !Run over branches of second phonon
           do s2 = 1, ph%numbranches
-             if(key == 'W') then
-                !Energy of phonon 2
-                en2 = ph%ens(iq2, s2)
-             end if
+             !Energy of phonon 2
+             en2 = ph%ens(iq2, s2)
 
+             !Avoid Gamma point acoustic phonon
+             if(en2 == 0.0_dp) cycle
+             
              !Run over branches of third phonon
              do s3 = 1, ph%numbranches
-                if(key == 'W') then
-                   !Energy of phonon 3
-                   en3 = ph%ens(iq3, s3)
-                end if
-                
-                !Count process
-                count = count + 1
+                !Energy of phonon 3
+                en3 = ph%ens(iq3_minus, s3)
 
+                !Avoid Gamma point acoustic phonon
+                if(en3 == 0.0_dp) cycle
+                
                 !Minus process index
-                !index_minus = (iq2 - 1)*nstates + (s2 - 1)*ph%numbranches + s3
+                index_minus = ((iq2 - 1)*ph%numbranches + (s2 - 1))*ph%numbranches + s3
                 
                 if(key == 'V') then
                    !Calculate the minus process vertex
-                   !Vm2(count) = Vm2_3ph(ph, s1, s2, s3, iq1, iq2, iq3, phases_q2q3)
-                   Vm2(count) = Vm2_3ph(s1, s2, s3, ph%evecs(iq1,:,:), &
-                        ph%evecs(iq2,:,:), ph%evecs(iq3,:,:), ph%Index_i(:), &
+                   Vm2(index_minus) = Vm2_3ph(s1, s2, s3, ph%evecs(iq1,:,:), &
+                        ph%evecs(iq2,:,:), ph%evecs(iq3_minus,:,:), ph%Index_i(:), &
                         ph%Index_j(:), ph%Index_k(:), ph%ifc3(:,:,:,:), phases_q2q3)
                 end if
 
-!!$                if(key == 'W') then
-!!$                   !TODO calculate W-
-!!$
-!!$                   !TODO Evaluate delta function
-!!$                   delta = delta_fn(en1 - en3, s2, iq2)
-!!$
-!!$                   !Save 2nd and 3rd phonon states
-!!$                   istate2 = mux_state(ph%numbranches, s2, iq2)
-!!$                   istate3 = mux_state(ph%numbranches, s3, iq3)
-!!$
-!!$                   !Temperature dependent occupation factor
-!!$                   !TODO Need Bose factor function in misc.f90
-!!$                   !occup_fac = ...
-!!$                   !Wm(count) = ...
-!!$                   
-!!$                end if
-                
-!!$                !Calculate corresponding plus process using
-!!$                !V-(s1q1|s2q2,s3q3) = V+(s1q1|s2-q2,s3q3)
-!!$                neg_q2_indvec = modulo(-q2_indvec, ph%qmesh)
-!!$                neg_iq2 = mux_vector(neg_q2_indvec, ph%qmesh, 0_k4)
-!!$                index_plus = (neg_iq2 - 1)*nstates + (s2 - 1)*ph%numbranches + s3
-!!$                Vp2(index_plus) = Vm2(index_minus)
+                if(key == 'W') then
+                   !Calculate W-:
+
+                   !Evaluate delta function
+                   delta = delta_fn_tetra(en1 - en3, iq2, s2, ph%qmesh, ph%tetramap, &
+                        ph%tetracount, ph%tetra_evals)
+
+                   !Temperature dependent occupation factor
+                   occup_fac = (Bose(en1, crys%T) + 1.0_dp)*Bose(en2, crys%T)*Bose(en3, crys%T)
+
+                   !Save W-
+                   Wm(index_minus) = Vm2(index_minus)*occup_fac*delta/en1/en2/en3
+
+                   !Calculate W+:
+
+                   !Grab corresponding plus process using
+                   !V-(s1q1|s2q2,s3q3) = V+(s1q1|s2-q2,s3q3)
+                   neg_q2_indvec = modulo(-q2_indvec, ph%qmesh)
+                   neg_iq2 = mux_vector(neg_q2_indvec, ph%qmesh, 0_k4)
+                   index_plus = ((neg_iq2 - 1)*ph%numbranches + (s2 - 1))*ph%numbranches + s3
+                   Vp2_index_plus = Vm2(index_minus)
+                   
+                   !Evaluate delta function
+                   delta = delta_fn_tetra(en3 - en1, iq2, s2, ph%qmesh, ph%tetramap, &
+                        ph%tetracount, ph%tetra_evals)
+
+                   !Temperature dependent occupation factor
+                   occup_fac = (Bose(en1, crys%T) + 1.0_dp)*(Bose(en2, crys%T) + 1.0_dp)*Bose(en3, crys%T)
+                   
+                   !Save W+
+                   Wp(index_plus) = Vp2_index_plus*occup_fac*delta/en1/en2/en3
+
+                   !Save 2nd and 3rd phonon states
+                   istate2_minus(index_minus) = mux_state(ph%numbranches, s2, iq2)
+                   istate2_plus(index_plus) = mux_state(ph%numbranches, s2, neg_iq2)
+                   istate3_minus(index_minus) = mux_state(ph%numbranches, s3, iq3_minus)
+                   istate3_plus(index_plus) = istate3_minus(index_minus)
+                end if
              end do !s3
           end do !s2
        end do !iq2
-       !TODO multiply constant factor, unit factor, etc.
-       !Wm = ...*Wm
-       !Wp = ...*Wp
 
        if(key == 'V') then
           !Change to data output directory
@@ -283,7 +269,34 @@ contains
        end if
 
        if(key == 'W') then
-          !TODO Write W+ and W- to disk
+          !Multiply constant factor, unit factor, etc.
+          Wm(:) = const*Wm(:) !THz
+          Wp(:) = const*Wp(:) !THz
+
+          !Write W+ and W- to disk
+          !Change to data output directory
+          call chdir(trim(adjustl(num%Vdir)))
+
+          !Write data in binary format
+          !Note: this will overwrite existing data!
+          write (filename, '(I9)') istate1
+
+          filename = 'Wm.istate'//trim(adjustl(filename))
+          open(1, file = trim(filename), status = 'replace', access = 'stream')
+          write(1) istate2_minus
+          write(1) istate3_minus
+          write(1) Wm
+          close(1)
+
+          filename = 'Wp.istate'//trim(adjustl(filename))
+          open(1, file = trim(filename), status = 'replace', access = 'stream')
+          write(1) istate2_plus
+          write(1) istate3_plus
+          write(1) Wp
+          close(1)
+
+          !Change back to working directory
+          call chdir(num%cwd)
        end if
     end do !istate1
     sync all
