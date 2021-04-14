@@ -14,7 +14,8 @@ module interactions
   implicit none
 
   private
-  public calculate_g_mixed, calculate_g2_bloch, calculate_3ph_interaction
+  public calculate_g_mixed, calculate_g2_bloch, calculate_3ph_interaction, &
+       calculate_ph_rta_rates
 
 contains
   
@@ -70,11 +71,11 @@ contains
          q1_indvec(3), q2_indvec(3), q3_minus_indvec(3), index_minus, index_plus, &
          neg_iq1, neg_iq2, neg_q2_indvec(3)
     real(dp) :: en1, en2, en3, massfac, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
-         delta, occup_fac, Vp2_index_plus, const
+         delta, occup_fac, Vp2_index_plus, const, bose2, bose3
     real(dp), allocatable :: Vm2(:), Wm(:), Wp(:)
     integer(k4), allocatable :: istate2_plus(:), istate3_plus(:), istate2_minus(:), istate3_minus(:)
     complex(dp) :: phases_q2q3(ph%numtriplets)
-    character(len = 1024) :: filename
+    character(len = 1024) :: filename, filename_Wm, filename_Wp, Wdir, tag
 
     if(key /= 'V' .and. key /= 'W') then
        call exit_with_message("Invalid value of key in call to calculate_3ph_interaction. Exiting.")
@@ -86,6 +87,15 @@ contains
        call print_message("Calculating 3-ph scattering rates for all IBZ q...")
     end if
 
+    !Set output directory of transition probilities
+    write(tag, "(E9.3)") crys%T
+    Wdir = trim(adjustl(num%datadumpdir))//'W_T'//trim(adjustl(tag))
+    if(this_image() == 1 .and. key == 'W') then
+       !Create directory
+       call system('mkdir '//trim(adjustl(Wdir)))
+    end if
+    sync all
+   
     !Conversion factor in transition probability expression
     const = pi/4.0_dp*hbar_eVps**5*(qe/amu)**3*1.0d-12
 
@@ -101,12 +111,6 @@ contains
        allocate(Wp(nprocs), Wm(nprocs))
        allocate(istate2_plus(nprocs), istate3_plus(nprocs),&
             istate2_minus(nprocs),istate3_minus(nprocs))
-       Wp(:) = 0.0_dp
-       Wm(:) = 0.0_dp
-       istate2_plus(:) = 0_k4
-       istate3_plus(:) = 0_k4
-       istate2_minus(:) = 0_k4
-       istate3_minus(:) = 0_k4
     end if
 
     !Divide phonon states among images
@@ -119,24 +123,31 @@ contains
 
     !Run over first phonon IBZ states
     do istate1 = start, end
+       !Initialize transition probabilities
+       if(key == 'W') then
+          Wp(:) = 0.0_dp
+          Wm(:) = 0.0_dp
+          istate2_plus(:) = 0_k4
+          istate3_plus(:) = 0_k4
+          istate2_minus(:) = 0_k4
+          istate3_minus(:) = 0_k4
+       end if
+
        !Demux state index into branch (s) and wave vector (iq) indices
        call demux_state(istate1, ph%numbranches, s1, iq1_ibz)
 
        !Muxed index of wave vector from the IBZ index list.
        !This will be used to access IBZ information from the FBZ quantities.
        iq1 = ph%indexlist_irred(iq1_ibz)
+
+       !Energy of phonon 1
+       en1 = ph%ens(iq1, s1)
        
        !Initial (IBZ blocks) wave vector (crystal coords.)
        q1 = ph%wavevecs(iq1, :)
 
        !Convert from crystal to 0-based index vector
        q1_indvec = nint(q1*ph%qmesh)
-
-       !Energy of phonon 1
-       en1 = ph%ens(iq1, s1)
-
-       !Avoid Gamma point acoustic phonon
-       if(en1 == 0.0_dp) cycle
 
        !Load |V^-|^2 from disk for scattering rates calculation
        if(key == 'W') then
@@ -189,16 +200,16 @@ contains
              !Energy of phonon 2
              en2 = ph%ens(iq2, s2)
 
-             !Avoid Gamma point acoustic phonon
-             if(en2 == 0.0_dp) cycle
+             !Bose factor for phonon 2
+             bose2 = Bose(en2, crys%T)
              
              !Run over branches of third phonon
              do s3 = 1, ph%numbranches
                 !Energy of phonon 3
                 en3 = ph%ens(iq3_minus, s3)
 
-                !Avoid Gamma point acoustic phonon
-                if(en3 == 0.0_dp) cycle
+                !Bose factor for phonon 3
+                bose3 = Bose(en3, crys%T)
                 
                 !Minus process index
                 index_minus = ((iq2 - 1)*ph%numbranches + (s2 - 1))*ph%numbranches + s3
@@ -218,10 +229,15 @@ contains
                         ph%tetracount, ph%tetra_evals)
 
                    !Temperature dependent occupation factor
-                   occup_fac = (Bose(en1, crys%T) + 1.0_dp)*Bose(en2, crys%T)*Bose(en3, crys%T)
+                   !occup_fac = (bose1 + 1.0_dp)*bose2*bose3
+                   occup_fac = (bose2 + bose3 + 1.0_dp)
 
                    !Save W-
-                   Wm(index_minus) = Vm2(index_minus)*occup_fac*delta/en1/en2/en3
+                   !Note that here we divided through by bose1(bose1 + 1) and
+                   !used the fact that bose2*bose3/bose1 = bose2 + bose3 + 1.
+                   if(en1*en2*en3 /= 0.0_dp) then
+                      Wm(index_minus) = Vm2(index_minus)*occup_fac*delta/en1/en2/en3
+                   end if
 
                    !Calculate W+:
 
@@ -237,11 +253,16 @@ contains
                         ph%tetracount, ph%tetra_evals)
 
                    !Temperature dependent occupation factor
-                   occup_fac = (Bose(en1, crys%T) + 1.0_dp)*(Bose(en2, crys%T) + 1.0_dp)*Bose(en3, crys%T)
+                   !occup_fac = (bose1 + 1.0_dp)*(bose2 + 1.0_dp)*bose3
+                   occup_fac = (bose2 - bose3)
                    
                    !Save W+
-                   Wp(index_plus) = Vp2_index_plus*occup_fac*delta/en1/en2/en3
-
+                   !Note that here we divided through by bose1(bose1 + 1) and
+                   !used the fact that (bose2 + 1)*bose3/bose1 = bose2 - bose3.
+                   if(en1*en2*en3 /= 0.0_dp) then
+                      Wp(index_plus) = Vp2_index_plus*occup_fac*delta/en1/en2/en3
+                   end if
+                   
                    !Save 2nd and 3rd phonon states
                    istate2_minus(index_minus) = mux_state(ph%numbranches, s2, iq2)
                    istate2_plus(index_plus) = mux_state(ph%numbranches, s2, neg_iq2)
@@ -275,24 +296,24 @@ contains
 
           !Write W+ and W- to disk
           !Change to data output directory
-          call chdir(trim(adjustl(num%Vdir)))
+          call chdir(trim(adjustl(Wdir)))
 
           !Write data in binary format
           !Note: this will overwrite existing data!
           write (filename, '(I9)') istate1
 
-          filename = 'Wm.istate'//trim(adjustl(filename))
-          open(1, file = trim(filename), status = 'replace', access = 'stream')
+          filename_Wm = 'Wm.istate'//trim(adjustl(filename))
+          open(1, file = trim(filename_Wm), status = 'replace', access = 'stream')
+          write(1) Wm
           write(1) istate2_minus
           write(1) istate3_minus
-          write(1) Wm
           close(1)
 
-          filename = 'Wp.istate'//trim(adjustl(filename))
-          open(1, file = trim(filename), status = 'replace', access = 'stream')
+          filename_Wp = 'Wp.istate'//trim(adjustl(filename))
+          open(1, file = trim(filename_Wp), status = 'replace', access = 'stream')
+          write(1) Wp
           write(1) istate2_plus
           write(1) istate3_plus
-          write(1) Wp
           close(1)
 
           !Change back to working directory
@@ -302,6 +323,103 @@ contains
     sync all
   end subroutine calculate_3ph_interaction
 
+  subroutine calculate_ph_rta_rates(ph, num, crys, rta_rates)
+    !! Subroutine for parallel reading of the 3-ph transition probabilities
+    !! from disk and calculating the relaxation time approximation (RTA)
+    !! scattering rates for phonons.
+
+    type(phonon), intent(in) :: ph
+    type(numerics), intent(in) :: num
+    type(crystal), intent(in) :: crys
+    real(dp), allocatable, intent(out) :: rta_rates(:,:)
+
+    !Local variables
+    integer(k4) :: nstates_irred, procs, istate, nprocs, iproc, chunk, s, &
+         iq, im
+    integer(k4), allocatable :: start[:], end[:]
+    real(dp), allocatable :: rta_rates_psum(:,:)[:], W(:)
+    character(len = 1024) :: filepath_Wm, filepath_Wp, Wdir, tag
+    
+    !Set output directory of transition probilities
+    write(tag, "(E9.3)") crys%T
+    Wdir = trim(adjustl(num%datadumpdir))//'W_T'//trim(adjustl(tag))
+    
+    !Total number of IBZ blocks states
+    nstates_irred = ph%nq_irred*ph%numbranches
+
+    !Total number of 3-phonon processes for a given phonon state
+    nprocs = ph%nq*ph%numbranches**2
+
+    !Allocate start and end coarrays
+    allocate(start[*], end[*])
+    
+    !Divide phonon states among images
+    call distribute_points(nstates_irred, chunk, start, end)
+
+    !Allocate and initialize scattering rates coarrays
+    allocate(rta_rates_psum(ph%nq_irred, ph%numbranches)[*])
+    rta_rates_psum(:, :) = 0.0_dp
+    
+    !Allocate and initialize scattering rates
+    allocate(rta_rates(ph%nq_irred, ph%numbranches))
+    rta_rates(:, :) = 0.0_dp
+    
+    !Allocate transition probabilities variable
+    allocate(W(nprocs))
+    
+    !Run over first phonon IBZ states
+    do istate = start, end
+       !Demux state index into branch (s) and wave vector (iq) indices
+       call demux_state(istate, ph%numbranches, s, iq)
+
+       !Set W+ filename
+       write(tag, '(I9)') istate
+       filepath_Wp = trim(adjustl(Wdir))//'/Wp.istate'//trim(adjustl(tag))
+       
+       !Read W+ from file
+       call read_transition_probabilities(trim(adjustl(filepath_Wp)), W)
+
+       do iproc = 1, nprocs
+          rta_rates_psum(iq, s) = rta_rates_psum(iq, s) + W(iproc) 
+       end do
+
+       !Set W- filename
+       filepath_Wm = trim(adjustl(Wdir))//'/Wm.istate'//trim(adjustl(tag))
+       
+       !Read W- from file
+       call read_transition_probabilities(trim(adjustl(filepath_Wm)), W)
+
+       do iproc = 1, nprocs
+          rta_rates_psum(iq, s) = rta_rates_psum(iq, s) + 0.5_dp*W(iproc) 
+       end do
+    end do
+
+    sync all
+
+    !Reduce coarray partial sums
+    do im = 1, num_images()
+       rta_rates(:,:) = rta_rates(:,:) + rta_rates_psum(:,:)[im]
+    end do
+    sync all
+  end subroutine calculate_ph_rta_rates
+
+  subroutine read_transition_probabilities(filepath, W, istate2, istate3)
+    !! Subroutine to read the phonon transition probabilities from disk.
+
+    character(len = *), intent(in) :: filepath
+    real(dp), intent(out) :: W(:)
+    integer(k4), optional, intent(out) :: istate2(:), istate3(:)
+
+    !Read data
+    open(1, file = trim(adjustl(filepath)), status = 'old', access = 'stream')
+    read(1) W
+    if(present(istate2) .and. present(istate3)) then
+       read(1) istate2
+       read(1) istate3
+    end if
+    close(1)
+  end subroutine read_transition_probabilities
+  
   subroutine calculate_g_mixed(wann, el, num)
     !! Parallel driver of gmixed_epw over IBZ electron wave vectors.
 

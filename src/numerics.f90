@@ -18,22 +18,22 @@ module numerics_module
      !! Electron mesh refinement factor compared to the phonon mesh.
      real(dp) :: fsthick
      !! Fermi surface thickness in (eV).
-     character(len=500) :: cwd
+     character(len = 1024) :: cwd
      !character, allocatable :: cwd(:)
      !! Current working directory.
-     character(len=500) ::datadumpdir
+     character(len = 1024) ::datadumpdir
      !character, allocatable ::datadumpdir(:)
      !! Runtime data dump repository.
-     character(len=500) :: g2dir
+     character(len = 1024) :: g2dir
      !character, allocatable :: g2dir(:)
      !! Directory for e-ph vertex.
-     character(len=500) :: Vdir
+     character(len = 1024) :: Vdir
      !character, allocatable :: Vdir(:)
      !! Directory for ph-ph vertex.
      logical :: read_g2
-     !! Choose if earlier e-ph vertex is to be used.
+     !! Choose if earlier e-ph vertices are to be used.
      logical :: read_V
-     !! Choose if earlier p-ph vertex is to be used.
+     !! Choose if earlier ph-ph vertices are to be used.
      logical :: tetrahedra
      !! Choose is the tetrahedron method for delta function evaluation will be used.
    
@@ -53,7 +53,7 @@ contains
     !Local variables
     integer(k4) :: mesh_ref, qmesh(3)
     real(dp) :: fsthick
-    character(len=500) :: datadumpdir
+    character(len = 1024) :: datadumpdir
     logical :: read_g2, read_V, tetrahedra
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_g2, read_V, &
@@ -82,15 +82,15 @@ contains
     n%read_V = read_V
     n%tetrahedra = tetrahedra
     
-    ! Create data dump directory
+    !Create data dump directory
     if(this_image() == 1) call system('mkdir ' // trim(adjustl(n%datadumpdir)))
 
-    ! Create matrix elements data directories
+    !Create matrix elements data directories
     n%g2dir = trim(adjustl(n%datadumpdir))//'g2'
     if(this_image() == 1) call system('mkdir ' // trim(adjustl(n%g2dir)))
     n%Vdir = trim(adjustl(n%datadumpdir))//'V'
     if(this_image() == 1) call system('mkdir ' // trim(adjustl(n%Vdir)))
-
+    
     !Close input file
     close(1)
 

@@ -7,13 +7,14 @@ program elphBolt
   !! and Phys. Rev. B 102, 245202 (2020) with both the electron-phonon and phonon-phonon
   !! interactions computed ab initio.
 
-  use params, only: k4
+  use params, only: k4, dp
   use numerics_module, only: numerics
   use crystal_module, only: crystal
   use symmetry_module, only: symmetry
   use electron_module, only: electron
   use phonon_module, only: phonon
   use wannier_module, only: epw_wannier
+  use bte_module, only: bte
   use bz_sums, only: calculate_dos
   use interactions, only:  calculate_g_mixed, calculate_g2_bloch, calculate_3ph_interaction
   
@@ -25,17 +26,18 @@ program elphBolt
   type(epw_wannier) :: wann
   type(electron) :: el
   type(phonon) :: ph
-  
+  type(bte) :: bt
+
   if(this_image() == 1) then
      print*, 'Number of images = ', num_images()
   end if
 
+  !Set up crystal
+  call crys%initialize
+  
   !Set up numerics data
   call num%initialize
   
-  !Set up crystal
-  call crys%initialize
-
   !Calculate crystal and BZ symmetries
   call sym%calculate_symmetries(crys, num%qmesh)
 
@@ -66,11 +68,17 @@ program elphBolt
 !!$  !TODO call calculate_g2_bloch(wann, crys, el, ph, num)
 !!$  !TODO need to fix this for unequal k and q meshes
 
-  !Calculate ph-ph vertex
-  call calculate_3ph_interaction(ph, crys, num, 'V')
-
+  if(.not. num%read_V) then
+     !Calculate ph-ph vertex
+     call calculate_3ph_interaction(ph, crys, num, 'V')
+  end if
+  
   !Calculate transition probabilities
   call calculate_3ph_interaction(ph, crys, num, 'W')
 
-  !Iterate BTEs
+  !Calculate RTA scattering rates
+  !call calculate_ph_rta_rates(ph, num, crys, bt%ph_rta_rates)
+  
+  !RTA solution
+  call bt%solve_rta_ph(num, crys, ph)
 end program elphBolt
