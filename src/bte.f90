@@ -51,12 +51,15 @@ contains
     
     !Calculate RTA scattering rates
     call calculate_ph_rta_rates(ph, num, crys, bt%ph_rta_rates)
-
-    !Write RTA scattering rates to file
-    call write2file_rank2_real('ph.W_rta', bt%ph_rta_rates)
     
     !TODO Calculate RTA term F0 
 
     !TODO Calculate transport coefficients
+
+    !Change to data output directory
+    call chdir(trim(adjustl(Tdir)))
+
+    !Write RTA scattering rates to file
+    call write2file_rank2_real('ph.W_rta', bt%ph_rta_rates)
   end subroutine solve_rta_ph
 end module bte_module

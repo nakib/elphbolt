@@ -4,7 +4,7 @@ module phonon_module
   use params, only: dp, k4
   use misc, only: print_message
   use numerics_module, only: numerics
-  use wannier_module, only: epw_wannier
+  use wannier_module, only: epw_wannier, phonon_espresso
   use crystal_module, only: crystal, calculate_wavevectors_full
   use symmetry_module, only: symmetry, find_irred_wedge, create_fbz2ibz_map
   use delta, only: form_tetrahedra_3d, fill_tetrahedra_3d
@@ -138,7 +138,11 @@ contains
     allocate(ph%vels(ph%nq, ph%numbranches, 3))
     allocate(ph%evecs(ph%nq, ph%numbranches, ph%numbranches))    
     call wann%ph_wann_epw(crys, ph%nq, ph%wavevecs, ph%ens, ph%vels, ph%evecs)
-
+!!$    !!test
+!!$    !call phonon_espresso(crys, wann%coarse_qmesh, ph%wavevecs, &
+!!$    !     ph%ens, ph%vels, ph%evecs)
+!!$    !!test
+    
     !Calculate IBZ mesh
     call print_message("Calculating IBZ and IBZ -> FBZ mappings...")
     call find_irred_wedge(ph%qmesh, ph%nq_irred, ph%wavevecs_irred, &

@@ -19,9 +19,9 @@ module params
   !! Reduced Planck's constant (J/THz = J.ps)
   real(dp), parameter :: hbar_eVps = hbar/qe
   !! Reduced Planck's constant (eV/THz = eV.ps)
-  real(kind=8), parameter :: perm0 =  8.854187817e-12_dp
+  real(dp), parameter :: perm0 =  8.854187817e-12_dp
   !! Permittivity of free space (F/m)
-  real(kind=8), parameter :: kB = 1.380649e-23_dp/qe
+  real(dp), parameter :: kB = 1.380649e-23_dp/qe
   !! Boltzmann constant (eV/K)
   real(dp), parameter :: pi = 4.0_dp*atan(1.0_dp)
   !! Value of pi

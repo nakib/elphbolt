@@ -28,13 +28,13 @@ contains
     real(dp), intent(in) :: ifc3(:,:,:,:)
 
     !Local variables
-    integer(k4) :: it, a, b, c, aind, bind, cind, nb
+    integer(k4) :: it, a, b, c, aind, bind, cind, ntrip
     complex(dp) :: aux1, aux2, V0
 
-    nb = size(ev1(:,1))
+    ntrip = size(Index_k(:))
     
     aux1 = (0.0_dp, 0.0_dp)
-    do it = 1, nb
+    do it = 1, ntrip
        V0 = (0.0_dp, 0.0_dp)
        do a = 1, 3
           aind = a + 3*(Index_k(it) - 1)
@@ -55,7 +55,7 @@ contains
   
   subroutine calculate_3ph_interaction(ph, crys, num, key)
     !! Parallel driver of the 3-ph vertex calculator for all IBZ phonon wave vectors.
-    !! This subroutine calculates |V-(s1<q1>|s2q2,s3q3)|^2, W+(s1<q1>|s2q2,s3q3),
+    !! This subroutine calculates |V-(s1<q1>|s2q2,s3q3)|^2, W-(s1<q1>|s2q2,s3q3),
     !! and W+(s1<q1>|s2q2,s3q3) for each irreducible phonon and saves the results to disk.
     !!
     !! key = 'V', 'W' for vertex, scattering rate calculation, respectively.
@@ -69,7 +69,7 @@ contains
     integer(k4) :: start, end, chunk, istate1, nstates_irred, &
          nprocs, s1, s2, s3, iq1_ibz, iq1, iq2, iq3_minus, it, &
          q1_indvec(3), q2_indvec(3), q3_minus_indvec(3), index_minus, index_plus, &
-         neg_iq1, neg_iq2, neg_q2_indvec(3)
+         neg_iq2, neg_q2_indvec(3)
     real(dp) :: en1, en2, en3, massfac, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
          delta, occup_fac, Vp2_index_plus, const, bose2, bose3
     real(dp), allocatable :: Vm2(:), Wm(:), Wp(:)
@@ -197,70 +197,88 @@ contains
           
           !Run over branches of second phonon
           do s2 = 1, ph%numbranches
-             !Energy of phonon 2
-             en2 = ph%ens(iq2, s2)
+             if(key == 'W') then
+                !Energy of phonon 2
+                en2 = ph%ens(iq2, s2)
 
-             !Bose factor for phonon 2
-             bose2 = Bose(en2, crys%T)
+                !Bose factor for phonon 2
+                bose2 = Bose(en2, crys%T)
+
+                !Get index of -q2
+                neg_q2_indvec = modulo(-q2_indvec, ph%qmesh)
+                neg_iq2 = mux_vector(neg_q2_indvec, ph%qmesh, 0_k4)
+             end if
              
              !Run over branches of third phonon
-             do s3 = 1, ph%numbranches
-                !Energy of phonon 3
-                en3 = ph%ens(iq3_minus, s3)
-
-                !Bose factor for phonon 3
-                bose3 = Bose(en3, crys%T)
-                
+             do s3 = 1, ph%numbranches                
                 !Minus process index
                 index_minus = ((iq2 - 1)*ph%numbranches + (s2 - 1))*ph%numbranches + s3
-                
+
                 if(key == 'V') then
                    !Calculate the minus process vertex
                    Vm2(index_minus) = Vm2_3ph(s1, s2, s3, ph%evecs(iq1,:,:), &
                         ph%evecs(iq2,:,:), ph%evecs(iq3_minus,:,:), ph%Index_i(:), &
                         ph%Index_j(:), ph%Index_k(:), ph%ifc3(:,:,:,:), phases_q2q3)
+
+!!$                   if(iq1_ibz == 5 .and. iq2 == 8 .and. s1 == 3 .and. s2 == 3 .and. s3 == 3) then
+!!$                      print*, 'iq1_ibz, iq2, s1, s2, s3 = ', iq1_ibz, iq2, s1, s2, s3
+!!$                      print*,  'Vm2 = ', Vm2(index_minus)
+!!$                      print*, 'ev1:'
+!!$                      print*, ph%evecs(iq1,:,:)
+!!$                      print*, 'ev2:'
+!!$                      print*, ph%evecs(iq2,:,:)
+!!$                      print*, 'ev3:'
+!!$                      print*, ph%evecs(iq3_minus,:,:)
+!!$                      call exit
+!!$                   end if
                 end if
 
                 if(key == 'W') then
-                   !Calculate W-:
+                   !Energy of phonon 3
+                   en3 = ph%ens(iq3_minus, s3)
 
+                   !Bose factor for phonon 3
+                   bose3 = Bose(en3, crys%T)
+
+                   !Calculate W-:
+                   
                    !Evaluate delta function
                    delta = delta_fn_tetra(en1 - en3, iq2, s2, ph%qmesh, ph%tetramap, &
                         ph%tetracount, ph%tetra_evals)
-
+                   
                    !Temperature dependent occupation factor
-                   !occup_fac = (bose1 + 1.0_dp)*bose2*bose3
+                   !(bose1 + 1)*bose2*bose3/(bose1*(bose1 + 1))
+                   ! = (bose2 + bose3 + 1)
                    occup_fac = (bose2 + bose3 + 1.0_dp)
 
                    !Save W-
-                   !Note that here we divided through by bose1(bose1 + 1) and
-                   !used the fact that bose2*bose3/bose1 = bose2 + bose3 + 1.
                    if(en1*en2*en3 /= 0.0_dp) then
                       Wm(index_minus) = Vm2(index_minus)*occup_fac*delta/en1/en2/en3
+                      !dbg
+                      !Wm(index_minus) = occup_fac*delta/en1/en2/en3
                    end if
 
                    !Calculate W+:
 
                    !Grab corresponding plus process using
                    !V-(s1q1|s2q2,s3q3) = V+(s1q1|s2-q2,s3q3)
-                   neg_q2_indvec = modulo(-q2_indvec, ph%qmesh)
-                   neg_iq2 = mux_vector(neg_q2_indvec, ph%qmesh, 0_k4)
-                   index_plus = ((neg_iq2 - 1)*ph%numbranches + (s2 - 1))*ph%numbranches + s3
                    Vp2_index_plus = Vm2(index_minus)
+                   index_plus = ((neg_iq2 - 1)*ph%numbranches + (s2 - 1))*ph%numbranches + s3
                    
                    !Evaluate delta function
-                   delta = delta_fn_tetra(en3 - en1, iq2, s2, ph%qmesh, ph%tetramap, &
+                   delta = delta_fn_tetra(en3 - en1, neg_iq2, s2, ph%qmesh, ph%tetramap, &
                         ph%tetracount, ph%tetra_evals)
 
                    !Temperature dependent occupation factor
-                   !occup_fac = (bose1 + 1.0_dp)*(bose2 + 1.0_dp)*bose3
+                   !(bose1 + 1)*(bose2 + 1)*bose3/(bose1*(bose1 + 1))
+                   ! = bose2 - bose3.
                    occup_fac = (bose2 - bose3)
                    
                    !Save W+
-                   !Note that here we divided through by bose1(bose1 + 1) and
-                   !used the fact that (bose2 + 1)*bose3/bose1 = bose2 - bose3.
                    if(en1*en2*en3 /= 0.0_dp) then
                       Wp(index_plus) = Vp2_index_plus*occup_fac*delta/en1/en2/en3
+                      !dbg
+                      !Wp(index_plus) = occup_fac*delta/en1/en2/en3
                    end if
                    
                    !Save 2nd and 3rd phonon states
@@ -390,7 +408,7 @@ contains
        call read_transition_probabilities(trim(adjustl(filepath_Wm)), W)
 
        do iproc = 1, nprocs
-          rta_rates_psum(iq, s) = rta_rates_psum(iq, s) + 0.5_dp*W(iproc) 
+          rta_rates_psum(iq, s) = rta_rates_psum(iq, s) + 0.5_dp*W(iproc)
        end do
     end do
 
