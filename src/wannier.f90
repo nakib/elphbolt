@@ -492,8 +492,6 @@ contains
   !!For testing purposes
   ! Adapted from the code of Quantum Espresso and ShengBTE
   subroutine phonon_espresso(crys,scell,kpoints,omegas,velocities,eigenvect)
-    implicit none
-
     type(crystal), intent(in) :: crys
     integer(k4),intent(in) :: scell(3)
     real(kind=8),intent(in) :: kpoints(:,:)
@@ -839,38 +837,18 @@ contains
           end do
           velocities(ik,i,:)=velocities(ik,i,:)/(2.*omegas(ik,i))
        end do
-    end do
 
-    omegas(1,1:3) = 0.0
+       !Take care of gamma point.
+       if(all(k(ik,1:3) == 0)) then
+          omegas(ik, 1:3) = 0.0_dp
+          velocities(ik, :, :) = 0.0_dp
+       end if
+    end do
     
     ! Return the result to the units used in the rest of ShengBTE.
     !omegas=omegas*toTHz !THz
     omegas=omegas*Ryd2eV !eV
     velocities=velocities*toTHz*bohr2nm
-    
-    deallocate(k)
-    deallocate(label)
-    deallocate(mass)
-    deallocate(tipo)
-    deallocate(r)
-    deallocate(eps)
-    deallocate(zeff)
-    deallocate(fc_s)
-    deallocate(mm)
-    deallocate(rr)
-    deallocate(dyn)
-    deallocate(dyn_s)
-    deallocate(dyn_g)
-    deallocate(ddyn)
-    deallocate(ddyn_s)
-    deallocate(ddyn_g)
-    deallocate(eival)
-    deallocate(vels)
-    deallocate(eigenvectors)
-    deallocate(cauxiliar)
-    deallocate(work)
-    deallocate(rwork)
-    deallocate(omega2)
   end subroutine phonon_espresso
 
   function g2_epw(wann, crys, qvec, el_evec_k, el_evec_kp, ph_evec_q, ph_en, gmixed_ik)

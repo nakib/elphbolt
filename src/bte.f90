@@ -161,7 +161,7 @@ contains
 
        !Reduce field term coarrays
        do im = 1, num_images()
-          field_term(:,:,:) = field_term(:,:,:) + field_term_reduce(:,:,:)[im]
+          field_term(:,:,:) = field_term(:,:,:) + field_term_reduce(:,:,:)[im] !nm.eV/K
        end do
        sync all
     end if

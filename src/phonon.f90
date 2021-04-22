@@ -42,6 +42,8 @@ module phonon_module
      !! The third axis contains the pair (symmetry index, image).
      integer(k4), allocatable :: fbz2ibz_map(:)
      !! Map from an FBZ phonon point to its IBZ wedge image.
+     real(dp), allocatable :: symmetrizers(:,:,:)
+     !! Symmetrizers of wave vector dependent vectors.
      integer(k4), allocatable :: tetra(:,:)
      !! List of all the wave vector mesh tetrahedra vertices.
      !! First axis list tetraheda and the second axis list the vertices.
@@ -116,7 +118,7 @@ contains
     type(numerics), intent(in) :: num
     
     !Local variables
-    integer(k4) :: iq
+    integer(k4) :: i, iq, ii, jj, kk, l, il, s, ib
     !Switch for mesh utilites with or without energy restriction
     logical :: blocks
     character(len = 1024) :: numcols
@@ -141,25 +143,68 @@ contains
     call phonon_espresso(crys, wann%coarse_qmesh, ph%wavevecs, &
          ph%ens, ph%vels, ph%evecs)
 
-    !TODO symmetrize phonon energies and velocities
-    
     !Calculate IBZ mesh
     call print_message("Calculating IBZ and IBZ -> FBZ mappings...")
     call find_irred_wedge(ph%qmesh, ph%nq_irred, ph%wavevecs_irred, &
          ph%indexlist_irred, ph%nequiv, sym%nsymm_rot, sym%qrotations, ph%ibz2fbz_map, blocks)
 
+    !Create symmetrizers of wave vector dependent vectors ShengBTE style
+    allocate(ph%symmetrizers(3, 3, ph%nq))
+    ph%symmetrizers = 0.0_dp
+    do iq = 1, ph%nq
+       kk = 0
+       do jj = 1, sym%nsymm
+          if(sym%equiv_map(jj, iq) == iq) then
+             ph%symmetrizers(:, :, iq) = ph%symmetrizers(:, :, iq) + &
+                  sym%crotations_orig(:, :, jj)
+             kk = kk + 1
+          end if
+       end do
+       if(kk > 1) then
+          ph%symmetrizers(:, :, iq) = ph%symmetrizers(:, :, iq)/kk
+       end if
+    end do
+    
+    !Symmetrize phonon energies and velocities.
+    do i = 1, ph%nq_irred !an irreducible point
+       ii = ph%indexlist_irred(i)
+       do l = 1, ph%nequiv(i) !number of equivalent points of i
+          il = ph%ibz2fbz_map(l, i, 2) ! (i, l) -> il
+          s = ph%ibz2fbz_map(l, i, 1) ! mapping rotation
+
+          !energy
+          ph%ens(il,:) = ph%ens(ii,:)
+
+          !velocity
+          ph%vels(ii,:,:)=transpose(&
+               matmul(ph%symmetrizers(:,:,ii),transpose(ph%vels(ii,:,:))))
+          do ib = 1, ph%numbranches
+             !here use real space (Cartesian) rotations
+             ph%vels(il, ib, :) = matmul(sym%crotations(:, :, s), ph%vels(ii, ib, :))
+          end do
+       end do
+    end do
+    
     !Create FBZ to IBZ map
     call print_message("Calculating FBZ -> IBZ mappings...")
     call create_fbz2ibz_map(ph%fbz2ibz_map, ph%nq, ph%nq_irred, ph%indexlist, &
          ph%nequiv, ph%ibz2fbz_map)
 
-    !Print out irreducible phonon energies
-    write(numcols, "(I0)") ph%numbranches
+    !Print out irreducible phonon energies and velocities
     if(this_image() == 1) then
+       write(numcols, "(I0)") ph%numbranches
        open(1, file = "ph.ens", status = "replace")
        do iq = 1, ph%nq_irred
           write(1, "(" // trim(adjustl(numcols)) // "E20.10)") &
                ph%ens(ph%indexlist_irred(iq), :)
+       end do
+       close(1)
+
+       write(numcols, "(I0)") 3*ph%numbranches
+       open(1, file = "ph.velocity", status = "replace")
+       do iq = 1, ph%nq_irred
+          write(1, "(" // trim(adjustl(numcols)) // "E20.10)") &
+               ph%vels(ph%indexlist_irred(iq), :, :)
        end do
        close(1)
     end if

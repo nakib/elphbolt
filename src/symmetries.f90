@@ -63,7 +63,7 @@ contains
     !Internal variables:
     integer(k4) :: i, j, k, ii, jj, kk, ll, info, nq
     integer(k4) :: P(3)
-    integer(k4), allocatable :: rtmp(:,:,:), local_equiv_map(:,:)
+    integer(k4), allocatable :: rtmp(:,:,:) !, local_equiv_map(:,:)
     logical, allocatable :: valid(:)
     real(dp), allocatable :: crtmp(:,:,:), qrtmp(:,:,:)
     real(dp), allocatable :: translations(:,:), ctranslations(:,:)
@@ -116,13 +116,13 @@ contains
     sym%crotations(:,:,sym%nsymm+1:2*sym%nsymm) = -sym%crotations_orig(:,:,1:sym%nsymm)
 
     !Find rotations that are either duplicated or incompatible with mesh.
-    allocate(local_equiv_map(sym%nsymm_rot,nq))
-    call find_equiv_map(sym%nsymm_rot,local_equiv_map,mesh,sym%qrotations)
+    allocate(sym%equiv_map(sym%nsymm_rot,nq))
+    call find_equiv_map(sym%nsymm_rot,sym%equiv_map,mesh,sym%qrotations)
     allocate(valid(sym%nsymm_rot))
     valid = .true.
     jj = 0
     do ii = 1,sym%nsymm_rot
-       if(valid(ii) .and. any(local_equiv_map(ii,:) == -1)) then
+       if(valid(ii) .and. any(sym%equiv_map(ii,:) == -1)) then
           valid(ii) = .false.
           jj = jj + 1
        end if

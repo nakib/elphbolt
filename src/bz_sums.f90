@@ -193,13 +193,6 @@ contains
     !Local variables
     integer(k4) :: ik, ib, icart, jcart, nk, nbands
     real(dp) :: dist_factor, e, v, A, trans_coeff(3,3)
-
-    if(this_image() == 1) then
-       print*, vels(1,1,:)
-       print*, vels(1,6,:)
-       print*, vels(10,1,:)
-       print*, vels(10,6,:)
-    end if
     
     nk = size(ens(:,1))
     nbands = size(ens(1,:))
@@ -207,15 +200,15 @@ contains
     !TODO Do checks related to particle and field type
     
     !For phonon thermal conductivity
-    A = 1.0_dp/kB/T/(volume*1.0e-27)/product(mesh)
-    A = qe*10.0e6*1.0e-12*A !Units conversion
+    A = 1.0_dp/kB/T/(volume)/product(mesh)
+    A = qe*1.0e21*A !Units conversion
     
     trans_coeff(:,:) = 0.0_dp
     do ik = 1, nk
        do ib = 1, nbands
           e = ens(ik, ib)
           !For phonons
-          if(e == 0.0_dp) cycle !Ignore zero phonons
+          if(e == 0.0_dp) cycle !Ignore zero energies phonons
           dist_factor = Bose(e, T)
           dist_factor = dist_factor*(1.0_dp + dist_factor)
           do icart = 1, 3
