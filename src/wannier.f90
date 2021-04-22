@@ -255,7 +255,8 @@ contains
     end do !ik
   end subroutine el_wann_epw
 
-  subroutine ph_wann_epw(wann, crys, nq, qvecs, energies, velocities, evecs)
+!!$  subroutine ph_wann_epw(wann, crys, nq, qvecs, energies, velocities, evecs)
+  subroutine ph_wann_epw(wann, crys, nq, qvecs, energies, evecs)  
     !! Wannier interpolate phonons on list of arb. q-vec
 
     class(epw_wannier), intent(in) :: wann
@@ -265,21 +266,17 @@ contains
     integer(k4), intent(in) :: nq
     real(dp), intent(in) :: qvecs(nq, 3) !Crystal coordinates
     real(dp), intent(out) :: energies(nq, wann%numbranches)
-    real(dp), intent(out), optional :: velocities(nq, wann%numbranches, 3)
     complex(dp), intent(out), optional :: evecs(nq, wann%numbranches, wann%numbranches)
-
+!!$    real(dp), intent(out), optional :: velocities(nq, wann%numbranches, 3)
+    
     integer(k4) :: iuc, ib, jb, ipol, iq, na, nb, nwork, aux
     complex(dp) :: caux
     real(dp), allocatable :: rwork(:)
     complex(dp), allocatable :: work(:)
     real(dp) :: omega2(wann%numbranches), rcart(3), massnorm
-    complex(dp) :: dynmat(wann%numbranches, wann%numbranches), &
-         ddynmat(3, wann%numbranches, wann%numbranches)
+    complex(dp) :: dynmat(wann%numbranches, wann%numbranches) !, &
+!!$         ddynmat(3, wann%numbranches, wann%numbranches)
 
-    !Catch error for optional velocity calculation
-    if(present(velocities) .and. .not. present(evecs)) &
-         call exit_with_message("In Wannier, velocity is present but not eigenvecs.")
-    
     nwork = 1
     allocate(work(nwork))
     allocate(rwork(max(1, 9*crys%numatoms-2)))
@@ -287,25 +284,26 @@ contains
     do iq = 1, nq
        !Form dynamical matrix (dynmat) and q-derivative of dynmat (ddynmat) 
        !from Dphwann, rcells_q, and phwsdeg
-       dynmat = 0
-       ddynmat = 0
+       dynmat = (0.0_dp, 0.0_dp)
+!!$       ddynmat = (0.0_dp, 0.0_dp)
        do iuc = 1, wann%nwsq
           caux = expi(twopi*dot_product(qvecs(iq, :), wann%rcells_q(iuc, :)))&
                /wann%phwsdeg(iuc)
           dynmat = dynmat + caux*wann%Dphwann(iuc, :, :)
 
-          if(present(velocities)) then
-             rcart = matmul(crys%lattvecs, wann%rcells_q(iuc, :))
-             do ipol=1, 3
-                ddynmat(ipol, :, :) = ddynmat(ipol, :, :) + &
-                     oneI*rcart(ipol)*caux*wann%Dphwann(iuc, :, :)
-             end do
-          end if
+!!$          if(present(velocities)) then
+!!$             rcart = matmul(crys%lattvecs, wann%rcells_q(iuc, :))
+!!$             do ipol=1, 3
+!!$                ddynmat(ipol, :, :) = ddynmat(ipol, :, :) + &
+!!$                     oneI*rcart(ipol)*caux*wann%Dphwann(iuc, :, :)
+!!$             end do
+!!$          end if
        end do
-
+       
        !Non-analytic correction
        if(crys%polar) then
-          call dyn_nonanalytic(wann, crys, matmul(crys%reclattvecs,qvecs(iq,:))*bohr2nm, dynmat, ddynmat)
+!!$          call dyn_nonanalytic(wann, crys, matmul(crys%reclattvecs,qvecs(iq,:))*bohr2nm, dynmat, ddynmat)
+          call dyn_nonanalytic(wann, crys, matmul(crys%reclattvecs,qvecs(iq,:))*bohr2nm, dynmat)
        end if
 
        !Force Hermiticity
@@ -315,7 +313,7 @@ contains
              dynmat(jb, ib) = dynmat(ib, jb)
           end do
        end do
-
+       
        !Mass normalize
        do na = 1, crys%numatoms
           do nb = 1, crys%numatoms
@@ -323,15 +321,15 @@ contains
                   crys%masses(crys%atomtypes(nb)))*Ryd2amu
              dynmat(3*(na-1)+1:3*na, 3*(nb-1)+1:3*nb) = &
                   dynmat(3*(na-1)+1:3*na, 3*(nb-1)+1:3*nb)*massnorm
-             if(present(velocities)) then
-                do ipol=1, 3
-                   ddynmat(ipol, 3*(na-1)+1:3*na, 3*(nb-1)+1:3*nb) = &
-                        ddynmat(ipol, 3*(na-1)+1:3*na, 3*(nb-1)+1:3*nb)*massnorm
-                end do
-             end if
+!!$             if(present(velocities)) then
+!!$                do ipol=1, 3
+!!$                   ddynmat(ipol, 3*(na-1)+1:3*na, 3*(nb-1)+1:3*nb) = &
+!!$                        ddynmat(ipol, 3*(na-1)+1:3*na, 3*(nb-1)+1:3*nb)*massnorm
+!!$                end do
+!!$             end if
           end do
        end do
-
+       
        !Diagonalize dynmat
        call zheev("V", "U", wann%numbranches, dynmat(:, :), wann%numbranches, omega2, work, -1, rwork, aux)
        if(real(work(1)) > nwork) then
@@ -346,30 +344,30 @@ contains
           evecs(iq, :, :) = transpose(dynmat(:, :))
        end if
 
-       if(present(velocities)) then
-          !Calculate velocities using Feynman-Hellmann thm
-          do ib = 1, wann%numbranches
-             do ipol = 1, 3
-                velocities(iq, ib, ipol) = real(dot_product(dynmat(:, ib), &
-                     matmul(ddynmat(ipol, :, :), dynmat(:, ib))))
-             end do
-             velocities(iq, ib, :) = velocities(iq, ib, :)/(2.0_dp*energies(iq, ib))
-          end do
-       end if
+!!$       if(present(velocities)) then
+!!$          !Calculate velocities using Feynman-Hellmann thm
+!!$          do ib = 1, wann%numbranches
+!!$             do ipol = 1, 3
+!!$                velocities(iq, ib, ipol) = real(dot_product(dynmat(:, ib), &
+!!$                     matmul(ddynmat(ipol, :, :), dynmat(:, ib))))
+!!$             end do
+!!$             velocities(iq, ib, :) = velocities(iq, ib, :)/(2.0_dp*energies(iq, ib))
+!!$          end do
+!!$       end if
 
        !energies(iq, :) = energies(iq, :)*Rydberg2radTHz !2piTHz
        !energies(iq, :) = energies(iq, :)*Rydberg2eV*1.0e3_dp !meV
        energies(iq, :) = energies(iq, :)*Ryd2eV !eV
-       if(present(velocities)) then
-          velocities(iq, :, :) = velocities(iq, :, :)*Ryd2radTHz !nmTHz = Km/s
-       end if
+!!$       if(present(velocities)) then
+!!$          velocities(iq, :, :) = velocities(iq, :, :)*Ryd2radTHz !nmTHz = Km/s
+!!$       end if
        
        !Take care of gamma point.
        if(all(qvecs(iq,:) == 0)) then
           energies(iq, 1:3) = 0
-          if(present(velocities)) then
-             velocities(iq, :, :) = 0
-          end if
+!!$          if(present(velocities)) then
+!!$             velocities(iq, :, :) = 0
+!!$          end if
        end if
 
        !Handle negative energy phonons
@@ -386,7 +384,8 @@ contains
     end do !iq
   end subroutine ph_wann_epw
 
-  subroutine dyn_nonanalytic(wann, crys, q, dyn, ddyn)
+!!$  subroutine dyn_nonanalytic(wann, crys, q, dyn, ddyn)
+  subroutine dyn_nonanalytic(wann, crys, q, dyn)
     !! Calculate the long-range correction to the
     !! dynamical matrix and its derivative for a given phonon mode.
     !!
@@ -399,16 +398,16 @@ contains
     !Local variables
     real(dp), intent(in) :: q(3) !Cartesian
     complex(dp), intent(inout) :: dyn(wann%numbranches,wann%numbranches)
-    complex(dp), intent(inout) :: ddyn(3,wann%numbranches,wann%numbranches)
+!!$    complex(dp), intent(inout) :: ddyn(3,wann%numbranches,wann%numbranches)
 
     complex(dp) :: dyn_l(wann%numbranches,wann%numbranches)
-    complex(dp) :: ddyn_l(3,wann%numbranches,wann%numbranches)
+!!$    complex(dp) :: ddyn_l(3,wann%numbranches,wann%numbranches)
     real(dp) :: qeq,     &! <q+g| epsilon |q+g>
-         arg, zag(3), zbg(3), g(3), gmax, alph, geg,&
+         arg, zig(3), zjg(3), g(3), gmax, alph, geg, &
          tpiba, dgeg(3), fnat(3), rr(crys%numatoms,crys%numatoms,3)
-    integer(k4) :: na,nb,i,idim,jdim,ipol,jpol,m1,m2,m3,nq1,nq2,nq3
+    integer(k4) :: iat,jat,i,idim,jdim,ipol,jpol,m1,m2,m3,nq1,nq2,nq3
     complex(dp) :: fac, facqd, facq
-
+    
     tpiba = twopi/twonorm(crys%lattvecs(:,1))*bohr2nm
 
     !Recall that the phonon supercell in elphbolt is the
@@ -419,12 +418,12 @@ contains
 
     gmax= 14.0_dp !dimensionless
     alph= tpiba**2 !bohr^-2
-    geg = gmax*alph*4.0d0
+    geg = gmax*alph*4.0_dp
     !In Ry units, qe = sqrt(2.0)
     fac = 8.0_dp*pi/(crys%volume/bohr2nm**3)
 
-    dyn_l = 0.0_dp
-    ddyn_l = 0.0_dp
+    dyn_l = (0.0_dp, 0.0_dp)
+!!$    ddyn_l = (0.0_dp, 0.0_dp)
     do m1 = -nq1,nq1
        do m2 = -nq2,nq2
           do m3 = -nq3,nq3
@@ -434,21 +433,21 @@ contains
              if (qeq > 0.0_dp .and. qeq/alph/4.0_dp < gmax ) then
                 facqd = exp(-qeq/alph/4.0_dp)/qeq
 
-                do na = 1,crys%numatoms
-                   zag(:)=matmul(g,crys%born(:,:,na))
+                do iat = 1,crys%numatoms
+                   zig(:)=matmul(g,crys%born(:,:,iat))
                    fnat(:)=0.0_dp
-                   do nb = 1,crys%numatoms
-                      rr(na,nb,:) = (crys%basis_cart(:,na)-crys%basis_cart(:,nb))/bohr2nm
-                      arg = dot_product(g,rr(na,nb,:))
-                      zbg(:) = matmul(g,crys%born(:,:,nb))
-                      fnat(:) = fnat(:) + zbg(:)*expi(arg)
+                   do jat = 1,crys%numatoms
+                      rr(iat,jat,:) = (crys%basis_cart(:,iat)-crys%basis_cart(:,jat))/bohr2nm
+                      arg = dot_product(g,rr(iat,jat,:))
+                      zjg(:) = matmul(g,crys%born(:,:,jat))
+                      fnat(:) = fnat(:) + zjg(:)*expi(arg)
                    end do
-                   do jpol=1,3
-                      jdim=(na-1)*3+jpol
-                      do ipol=1,3
-                         idim=(na-1)*3+ipol
-                         dyn_l(idim,jdim) = dyn_l(idim,jdim) - facqd * &
-                              zag(ipol) * fnat(jpol)
+                   do ipol=1,3
+                      idim=(iat-1)*3+ipol
+                      do jpol=1,3
+                         jdim=(iat-1)*3+jpol
+                         dyn_l(idim,jdim) = dyn_l(idim,jdim) - &
+                              facqd*zig(ipol)*fnat(jpol)
                       end do
                    end do
                 end do
@@ -457,27 +456,27 @@ contains
              g = g + q
              qeq = dot_product(g,matmul(crys%epsilon,g))
              if (qeq > 0.0_dp .and. qeq/alph/4.0_dp < gmax ) then
-                facqd = exp(-qeq/alph/4.0d0)/qeq
+                facqd = exp(-qeq/alph/4.0_dp)/qeq
                 dgeg=matmul(crys%epsilon+transpose(crys%epsilon),g)
-                do nb = 1,crys%numatoms
-                   zbg(:)=matmul(g,crys%born(:,:,nb))
-                   do na = 1,crys%numatoms
-                      rr(na,nb,:) = (crys%basis_cart(:,na)-crys%basis_cart(:,nb))/bohr2nm
-                      zag(:)=matmul(g,crys%born(:,:,na))
-                      arg = dot_product(g,rr(na,nb,:))
+                do iat = 1,crys%numatoms
+                   zig(:)=matmul(g,crys%born(:,:,iat))                   
+                   do jat = 1,crys%numatoms
+                      rr(iat,jat,:) = (crys%basis_cart(:,iat)-crys%basis_cart(:,jat))/bohr2nm
+                      zjg(:)=matmul(g,crys%born(:,:,jat))
+                      arg = dot_product(g,rr(iat,jat,:))
                       facq = facqd*expi(arg)
-                      do jpol=1,3
-                         jdim=(nb-1)*3+jpol
-                         do ipol=1,3
-                            idim=(na-1)*3+ipol
+                      do ipol=1,3
+                         idim=(iat-1)*3+ipol
+                         do jpol=1,3
+                            jdim=(jat-1)*3+jpol
                             dyn_l(idim,jdim) = dyn_l(idim,jdim) + facq * &
-                                 zag(ipol)*zbg(jpol)
-                            !Correction to derivative of dynmat
-                            ddyn_l(:,idim,jdim)=ddyn_l(:,idim,jdim)+&
-                                 facq*&
-                                 ( zbg(jpol)*crys%born(:,ipol,na)+zag(ipol)*crys%born(:,jpol,nb)+&
-                                 zag(ipol)*zbg(jpol)*(oneI*rr(na,nb,:)-&
-                                 dgeg(:)/alph/4.0_dp-dgeg(:)/qeq) )
+                                 zig(ipol)*zjg(jpol)
+!!$                            !Correction to derivative of dynmat
+!!$                            ddyn_l(:,idim,jdim)=ddyn_l(:,idim,jdim)+&
+!!$                                 facq*&
+!!$                                 ( zjg(jpol)*crys%born(ipol,:,iat)+zig(ipol)*crys%born(jpol,:,jat) + &
+!!$                                 zig(ipol)*zjg(jpol)*(oneI*rr(iat,jat,:) - &
+!!$                                 dgeg(:)/alph/4.0_dp - dgeg(:)/qeq) )
                          end do
                       end do
                    end do
@@ -487,7 +486,7 @@ contains
        end do
     end do
     dyn = dyn + dyn_l*fac
-    ddyn = ddyn + ddyn_l*fac
+!!$    ddyn = ddyn + ddyn_l*fac
   end subroutine dyn_nonanalytic
 
   !!For testing purposes
@@ -803,8 +802,9 @@ contains
     ! group velocities are extracted exactly like in the previous
     ! subroutine.
     do ik=1,nk
-       dyn(:,:)=dyn_s(ik,:,:)+dyn_g(ik,:,:)
-       ddyn(:,:,:)=ddyn_s(ik,:,:,:)+ddyn_g(ik,:,:,:)
+       dyn(:,:) = dyn_s(ik,:,:) + dyn_g(ik,:,:)
+       ddyn(:,:,:) = ddyn_s(ik,:,:,:) + ddyn_g(ik,:,:,:)
+       
        do ipol=1,3
           do jpol=1,3
              do iat=1,nat
@@ -847,6 +847,7 @@ contains
     !omegas=omegas*toTHz !THz
     omegas=omegas*Ryd2eV !eV
     velocities=velocities*toTHz*bohr2nm
+    
     deallocate(k)
     deallocate(label)
     deallocate(mass)
@@ -1125,8 +1126,9 @@ contains
     !Calculate phonon dispersions
     allocate(ph_ens_path(nqpath,wann%numbranches), ph_vels_path(nqpath,wann%numbranches,3),&
          ph_evecs_path(nqpath,wann%numbranches,wann%numbranches))
-    call ph_wann_epw(wann, crys, nqpath, qpathvecs, ph_ens_path, ph_vels_path, ph_evecs_path)
-
+!!$    call ph_wann_epw(wann, crys, nqpath, qpathvecs, ph_ens_path, ph_vels_path, ph_evecs_path)
+    call ph_wann_epw(wann, crys, nqpath, qpathvecs, ph_ens_path, ph_evecs_path)
+        
     !Output phonon dispersions
     write(saux,"(I0)") wann%numbranches
     open(1,file="ph_ens_path",status="replace")

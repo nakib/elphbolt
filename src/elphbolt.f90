@@ -75,9 +75,6 @@ program elphBolt
   
   !Calculate transition probabilities
   call calculate_3ph_interaction(ph, crys, num, 'W')
-
-  !Calculate RTA scattering rates
-  !call calculate_ph_rta_rates(ph, num, crys, bt%ph_rta_rates)
   
   !RTA solution
   call bt%solve_rta_ph(num, crys, ph)

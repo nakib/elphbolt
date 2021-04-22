@@ -219,18 +219,6 @@ contains
                    Vm2(index_minus) = Vm2_3ph(s1, s2, s3, ph%evecs(iq1,:,:), &
                         ph%evecs(iq2,:,:), ph%evecs(iq3_minus,:,:), ph%Index_i(:), &
                         ph%Index_j(:), ph%Index_k(:), ph%ifc3(:,:,:,:), phases_q2q3)
-
-!!$                   if(iq1_ibz == 5 .and. iq2 == 8 .and. s1 == 3 .and. s2 == 3 .and. s3 == 3) then
-!!$                      print*, 'iq1_ibz, iq2, s1, s2, s3 = ', iq1_ibz, iq2, s1, s2, s3
-!!$                      print*,  'Vm2 = ', Vm2(index_minus)
-!!$                      print*, 'ev1:'
-!!$                      print*, ph%evecs(iq1,:,:)
-!!$                      print*, 'ev2:'
-!!$                      print*, ph%evecs(iq2,:,:)
-!!$                      print*, 'ev3:'
-!!$                      print*, ph%evecs(iq3_minus,:,:)
-!!$                      call exit
-!!$                   end if
                 end if
 
                 if(key == 'W') then
@@ -254,8 +242,6 @@ contains
                    !Save W-
                    if(en1*en2*en3 /= 0.0_dp) then
                       Wm(index_minus) = Vm2(index_minus)*occup_fac*delta/en1/en2/en3
-                      !dbg
-                      !Wm(index_minus) = occup_fac*delta/en1/en2/en3
                    end if
 
                    !Calculate W+:
@@ -277,8 +263,6 @@ contains
                    !Save W+
                    if(en1*en2*en3 /= 0.0_dp) then
                       Wp(index_plus) = Vp2_index_plus*occup_fac*delta/en1/en2/en3
-                      !dbg
-                      !Wp(index_plus) = occup_fac*delta/en1/en2/en3
                    end if
                    
                    !Save 2nd and 3rd phonon states

@@ -1,15 +1,16 @@
 module bz_sums
   !! Module containing the procedures to do Brillouin zone sums.
 
-  use params, only: dp, k4
-  use misc, only: exit_with_message, print_message, write2file_rank2_real, distribute_points
+  use params, only: dp, k4, kB, qe
+  use misc, only: exit_with_message, print_message, write2file_rank2_real, &
+       distribute_points, Bose
   use phonon_module, only: phonon
   use electron_module, only: electron
   use delta, only: delta_fn_tetra
 
   implicit none
 
-  public 
+  public calculate_transport_coeff
   private calculate_el_dos, calculate_ph_dos_iso
 
   interface calculate_dos
@@ -171,4 +172,64 @@ contains
 
     sync all
   end subroutine calculate_ph_dos_iso
+
+  subroutine calculate_transport_coeff(species, field, T, chempot, ens, vels, &
+       volume, mesh, response)
+    !! Subroutine to calculate transport coefficients.
+    !!
+    !! species Type of particle
+    !! field Type of field
+    !! ens FBZ energies
+    !! vels FBZ velocities
+    !! volume Primitive cell volume
+    !! mesh Wave vector grid
+    !! response FBZ response function
+
+    character(len = 2), intent(in) :: species
+    character(len = 1), intent(in) :: field
+    integer(k4), intent(in) :: mesh(3)
+    real(dp), intent(in) :: T, chempot, ens(:,:), vels(:,:,:), volume, response(:,:,:)
+
+    !Local variables
+    integer(k4) :: ik, ib, icart, jcart, nk, nbands
+    real(dp) :: dist_factor, e, v, A, trans_coeff(3,3)
+
+    if(this_image() == 1) then
+       print*, vels(1,1,:)
+       print*, vels(1,6,:)
+       print*, vels(10,1,:)
+       print*, vels(10,6,:)
+    end if
+    
+    nk = size(ens(:,1))
+    nbands = size(ens(1,:))
+
+    !TODO Do checks related to particle and field type
+    
+    !For phonon thermal conductivity
+    A = 1.0_dp/kB/T/(volume*1.0e-27)/product(mesh)
+    A = qe*10.0e6*1.0e-12*A !Units conversion
+    
+    trans_coeff(:,:) = 0.0_dp
+    do ik = 1, nk
+       do ib = 1, nbands
+          e = ens(ik, ib)
+          !For phonons
+          if(e == 0.0_dp) cycle !Ignore zero phonons
+          dist_factor = Bose(e, T)
+          dist_factor = dist_factor*(1.0_dp + dist_factor)
+          do icart = 1, 3
+             v = vels(ik, ib, icart)
+             do jcart = 1, 3
+                trans_coeff(icart, jcart) = trans_coeff(icart, jcart) + &
+                     e*dist_factor*v*response(ik, ib, jcart)
+             end do
+          end do
+       end do
+    end do
+    trans_coeff = A*trans_coeff !W/m/K
+    sync all
+
+    if(this_image() == 1) print*, trans_coeff
+  end subroutine calculate_transport_coeff
 end module bz_sums

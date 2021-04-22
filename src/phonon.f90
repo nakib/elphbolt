@@ -137,11 +137,11 @@ contains
     allocate(ph%ens(ph%nq, ph%numbranches))
     allocate(ph%vels(ph%nq, ph%numbranches, 3))
     allocate(ph%evecs(ph%nq, ph%numbranches, ph%numbranches))    
-    call wann%ph_wann_epw(crys, ph%nq, ph%wavevecs, ph%ens, ph%vels, ph%evecs)
-!!$    !!test
-!!$    !call phonon_espresso(crys, wann%coarse_qmesh, ph%wavevecs, &
-!!$    !     ph%ens, ph%vels, ph%evecs)
-!!$    !!test
+!!$    call wann%ph_wann_epw(crys, ph%nq, ph%wavevecs, ph%ens)
+    call phonon_espresso(crys, wann%coarse_qmesh, ph%wavevecs, &
+         ph%ens, ph%vels, ph%evecs)
+
+    !TODO symmetrize phonon energies and velocities
     
     !Calculate IBZ mesh
     call print_message("Calculating IBZ and IBZ -> FBZ mappings...")
