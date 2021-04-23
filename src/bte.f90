@@ -46,7 +46,7 @@ contains
 
     !Local variables
     character(len = 1024) :: tag, Tdir
-    integer(k4) :: it
+    integer(k4) :: iq, it
 
     call print_message("Solving ph BTE in the RTA...")
     
@@ -65,6 +65,12 @@ contains
     call calculate_field_term('ph', 'T', ph%nequiv, ph%ibz2fbz_map, &
          crys%T, 0.0_dp, ph%ens, ph%vels, bt%ph_rta_rates_ibz, bt%ph_field_term)
 
+    !Symmetrize field term
+    do iq = 1, ph%nq
+       bt%ph_field_term(iq,:,:)=transpose(&
+            matmul(ph%symmetrizers(:,:,iq),transpose(bt%ph_field_term(iq,:,:))))
+    end do
+    
     !RTA solution of BTE
     allocate(bt%ph_response(ph%nq, ph%numbranches, 3))
     bt%ph_response = bt%ph_field_term
@@ -91,6 +97,12 @@ contains
        call iterate_bte_ph(crys%T, num%datadumpdir, .False., ph%nequiv, sym%equiv_map, &
             ph%ibz2fbz_map, bt%ph_rta_rates_ibz, bt%ph_field_term, bt%ph_response)
 
+       !Symmetrize response function
+       do iq = 1, ph%nq
+          bt%ph_response(iq,:,:)=transpose(&
+               matmul(ph%symmetrizers(:,:,iq),transpose(bt%ph_response(iq,:,:))))
+       end do
+       
        !Calculate transport coefficient
        call calculate_transport_coeff('ph', 'T', crys%T, 0.0_dp, ph%ens, ph%vels, &
             crys%volume, ph%qmesh, bt%ph_response)
