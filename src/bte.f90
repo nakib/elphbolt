@@ -4,11 +4,12 @@ module bte_module
 
   use params, only: dp, k4, qe
   use misc, only: print_message, exit_with_message, write2file_rank2_real, &
-       distribute_points
+       distribute_points, demux_state
   use numerics_module, only: numerics
   use crystal_module, only: crystal
+  use symmetry_module, only: symmetry
   use phonon_module, only: phonon
-  use interactions, only: calculate_ph_rta_rates
+  use interactions, only: calculate_ph_rta_rates, read_transition_probabilities
   use bz_sums, only: calculate_transport_coeff
 
   implicit none
@@ -23,7 +24,9 @@ module bte_module
      !! Phonon RTA scattering rates on the IBZ.
      real(dp), allocatable :: ph_field_term(:,:,:)
      !! Phonon field coupling term on the FBZ.
-
+     real(dp), allocatable :: ph_response(:,:,:)
+     !! Phonon response function on the FBZ.
+     
    contains
 
      procedure :: solve_rta_ph
@@ -32,16 +35,18 @@ module bte_module
 
 contains
 
-  subroutine solve_rta_ph(bt, num, crys, ph)
+  subroutine solve_rta_ph(bt, num, crys, sym, ph)
     !! Subroutine to calculate the RTA solution of the phonon BTE.
 
     class(bte), intent(out) :: bt
     type(numerics), intent(in) :: num
     type(crystal), intent(in) :: crys
+    type(symmetry), intent(in) :: sym
     type(phonon), intent(in) :: ph
 
     !Local variables
     character(len = 1024) :: tag, Tdir
+    integer(k4) :: it
 
     call print_message("Solving ph BTE in the RTA...")
     
@@ -60,15 +65,38 @@ contains
     call calculate_field_term('ph', 'T', ph%nequiv, ph%ibz2fbz_map, &
          crys%T, 0.0_dp, ph%ens, ph%vels, bt%ph_rta_rates_ibz, bt%ph_field_term)
 
+    !RTA solution of BTE
+    allocate(bt%ph_response(ph%nq, ph%numbranches, 3))
+    bt%ph_response = bt%ph_field_term
+    
     !Calculate transport coefficient
     call calculate_transport_coeff('ph', 'T', crys%T, 0.0_dp, ph%ens, ph%vels, &
-         crys%volume, ph%qmesh, bt%ph_field_term)
+         crys%volume, ph%qmesh, bt%ph_response)
 
     !Change to data output directory
     call chdir(trim(adjustl(Tdir)))
 
     !Write RTA scattering rates to file
     call write2file_rank2_real('ph.W_rta', bt%ph_rta_rates_ibz)
+
+    !Change back to cwd
+    call chdir(trim(adjustl(num%cwd)))
+
+    !!!!
+    !TODO Need a more elegant solution to jumping between directories...
+    !!!!
+    
+    !Start iterator
+    do it = 1, 5
+       call iterate_bte_ph(crys%T, num%datadumpdir, .False., ph%nequiv, sym%equiv_map, &
+            ph%ibz2fbz_map, bt%ph_rta_rates_ibz, bt%ph_field_term, bt%ph_response)
+
+       !Calculate transport coefficient
+       call calculate_transport_coeff('ph', 'T', crys%T, 0.0_dp, ph%ens, ph%vels, &
+            crys%volume, ph%qmesh, bt%ph_response)
+
+!!$       if(is_converged(coeff_new, coeff_old)) exit
+    end do
   end subroutine solve_rta_ph
 
   subroutine calculate_field_term(species, field, nequiv, ibz2fbz_map, &
@@ -163,7 +191,128 @@ contains
        do im = 1, num_images()
           field_term(:,:,:) = field_term(:,:,:) + field_term_reduce(:,:,:)[im] !nm.eV/K
        end do
-       sync all
     end if
+    sync all
   end subroutine calculate_field_term
+
+  subroutine iterate_bte_ph(T, datadumpdir, drag, nequiv, equiv_map, ibz2fbz_map, rta_rates_ibz, &
+       field_term, response_ph)
+    !! Subroutine to iterate the BTE one step.
+    !! 
+    !! 
+
+    logical, intent(in) :: drag
+    integer(k4), intent(in) :: nequiv(:), equiv_map(:,:), ibz2fbz_map(:,:,:)
+    real(dp), intent(in) :: T, rta_rates_ibz(:,:), field_term(:,:,:)
+    real(dp), intent(inout) :: response_ph(:,:,:)
+    character(len = *), intent(in) :: datadumpdir
+
+    !Local variables
+    integer(k4) :: nstates_irred, nprocs, chunk, istate1, numbranches, s1, &
+         iq1_ibz, ieq, iq1_sym, iq1_fbz, iproc, iq2, s2, iq3, s3, im, nq
+    integer(k4), allocatable :: istate2_plus(:), istate3_plus(:), &
+         istate2_minus(:), istate3_minus(:), start[:], end[:]
+    real(dp) :: tau_ibz
+    real(dp), allocatable :: Wp(:), Wm(:), response_ph_reduce(:,:,:)[:]
+    character(len = 1024) :: filepath_Wm, filepath_Wp, Wdir, tag
+
+    !Set output directory of transition probilities
+    write(tag, "(E9.3)") T
+    Wdir = trim(adjustl(datadumpdir))//'W_T'//trim(adjustl(tag))
+    
+    !Number of phonon branches
+    numbranches = size(rta_rates_ibz(1,:))
+
+    !Number of FBZ wave vectors
+    nq = size(field_term(:,1,1))
+    
+    !Total number of IBZ blocks states
+    nstates_irred = size(rta_rates_ibz(:,1))*numbranches
+
+    !Total number of 3-phonon processes for a given initial phonon state
+    nprocs = nq*numbranches**2
+
+    !Allocate arrays
+    allocate(Wp(nprocs), Wm(nprocs))
+    allocate(istate2_plus(nprocs), istate3_plus(nprocs), &
+         istate2_minus(nprocs), istate3_minus(nprocs))
+    
+    !Allocate coarrays
+    allocate(start[*], end[*])
+    allocate(response_ph_reduce(nq, numbranches, 3)[*])
+
+    !Initialize coarray
+    response_ph_reduce(:,:,:) = 0.0_dp
+    
+    !Divide phonon states among images
+    call distribute_points(nstates_irred, chunk, start, end)
+
+    !Run over first phonon IBZ states
+    do istate1 = start, end
+       !Demux state index into branch (s) and wave vector (iq) indices
+       call demux_state(istate1, numbranches, s1, iq1_ibz)
+
+       !RTA lifetime
+       tau_ibz = 0.0_dp
+       if(rta_rates_ibz(iq1_ibz, s1) /= 0.0_dp) then
+          tau_ibz = 1.0_dp/rta_rates_ibz(iq1_ibz, s1)
+       end if
+
+       !Set W+ filename
+       write(tag, '(I9)') istate1
+       filepath_Wp = trim(adjustl(Wdir))//'/Wp.istate'//trim(adjustl(tag))
+
+       !Read W+ from file
+       call read_transition_probabilities(trim(adjustl(filepath_Wp)), Wp, &
+            istate2_plus, istate3_plus)
+
+       !Set W- filename
+       filepath_Wm = trim(adjustl(Wdir))//'/Wm.istate'//trim(adjustl(tag))
+
+       !Read W- from file
+       call read_transition_probabilities(trim(adjustl(filepath_Wm)), Wm, &
+            istate2_minus, istate3_minus)
+
+       !Sum over the number of equivalent q-points of the IBZ point
+       do ieq = 1, nequiv(iq1_ibz)
+          iq1_sym = ibz2fbz_map(ieq, iq1_ibz, 1) !symmetry
+          iq1_fbz = ibz2fbz_map(ieq, iq1_ibz, 2) !image due to symmetry
+
+          do iproc = 1, nprocs
+             !Self contribution from plus processes:
+             
+             !Grab 2nd and 3rd phonons
+             call demux_state(istate2_plus(iproc), numbranches, s2, iq2)
+             call demux_state(istate3_plus(iproc), numbranches, s3, iq3)
+
+             response_ph_reduce(iq1_fbz, s1, :) = response_ph_reduce(iq1_fbz, s1, :) + &
+                  Wp(iproc)*(response_ph(equiv_map(iq1_sym, iq3), s3, :) - &
+                  response_ph(equiv_map(iq1_sym, iq2), s2, :))
+
+             !Self contribution from minus processes:
+             
+             !Grab 2nd and 3rd phonons
+             call demux_state(istate2_minus(iproc), numbranches, s2, iq2)
+             call demux_state(istate3_minus(iproc), numbranches, s3, iq3)
+
+             response_ph_reduce(iq1_fbz, s1, :) = response_ph_reduce(iq1_fbz, s1, :) + &
+                  0.5_dp*Wm(iproc)*(response_ph(equiv_map(iq1_sym, iq3), s3, :) + &
+                  response_ph(equiv_map(iq1_sym, iq2), s2, :))
+          end do
+
+          !Iterate BTE
+          response_ph_reduce(iq1_fbz, s1, :) = field_term(iq1_fbz, s1, :) + &
+               response_ph_reduce(iq1_fbz, s1, :)*tau_ibz          
+       end do
+    end do
+
+    sync all
+
+    !Update the response function
+    response_ph(:,:,:) = 0.0_dp
+    do im = 1, num_images()
+       response_ph(:,:,:) = response_ph(:,:,:) + response_ph_reduce(:,:,:)[im]
+    end do
+    sync all
+  end subroutine iterate_bte_ph
 end module bte_module

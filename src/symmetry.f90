@@ -36,10 +36,10 @@ module symmetry_module
      !! Map of equivalent points under rotations.
      !! Axis 1 runs over rotations.
      !! Axis 2 runs over wave vectors (full Brillouin zone).
-     integer(k4), allocatable :: equiv_map_blocks(:,:)
-     !! Map of equivalent points under rotations.
-     !! Axis 1 runs over rotations.
-     !! Axis 2 runs over wave vectors (energy windowed blocks of full Brillouin zone).
+!!$     integer(k4), allocatable :: equiv_map_blocks(:,:)
+!!$     !! Map of equivalent points under rotations.
+!!$     !! Axis 1 runs over rotations.
+!!$     !! Axis 2 runs over wave vectors (energy windowed blocks of full Brillouin zone).
      character(len=10) :: international
      !! Spacegroup in Hermann–Mauguin (or international) notation.
 

@@ -15,7 +15,7 @@ module interactions
 
   private
   public calculate_g_mixed, calculate_g2_bloch, calculate_3ph_interaction, &
-       calculate_ph_rta_rates
+       calculate_ph_rta_rates, read_transition_probabilities
 
 contains
   
