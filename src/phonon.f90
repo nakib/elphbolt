@@ -42,6 +42,10 @@ module phonon_module
      !! The third axis contains the pair (symmetry index, image).
      integer(k4), allocatable :: fbz2ibz_map(:)
      !! Map from an FBZ phonon point to its IBZ wedge image.
+     integer(k4), allocatable :: equiv_map(:,:)
+     !! Map of equivalent points under rotations.
+     !! Axis 1 runs over rotations.
+     !! Axis 2 runs over wave vectors (full Brillouin zone).
      real(dp), allocatable :: symmetrizers(:,:,:)
      !! Symmetrizers of wave vector dependent vectors.
      integer(k4), allocatable :: tetra(:,:)
@@ -55,16 +59,10 @@ module phonon_module
      !! Tetrahedra vertices filled with eigenvalues.
      real(dp), allocatable :: ens(:,:)
      !! List of phonon energies on FBZ.
-!!$     real(dp), allocatable :: ens_irred(:,:)
-!!$     !! List of phonon energies on IBZ.
      real(dp), allocatable :: vels(:,:,:)
      !! List of phonon velocities on FBZ.
-!!$     real(dp), allocatable :: vels_irred(:,:,:)
-!!$     !! List of phonon velocites on IBZ.
      complex(dp), allocatable :: evecs(:,:,:)
      !! List of all phonon eigenvectors.
-!!$     complex(dp), allocatable :: evecs_irred(:,:,:)
-!!$     !! List of IBZ wedge phonon eigenvectors.
      real(dp), allocatable :: ifc3(:,:,:,:)
      !! Third order force constants (ifc3) tensor.
      integer(k4) :: numtriplets
@@ -146,7 +144,8 @@ contains
     !Calculate IBZ mesh
     call print_message("Calculating IBZ and IBZ -> FBZ mappings...")
     call find_irred_wedge(ph%qmesh, ph%nq_irred, ph%wavevecs_irred, &
-         ph%indexlist_irred, ph%nequiv, sym%nsymm_rot, sym%qrotations, ph%ibz2fbz_map, blocks)
+         ph%indexlist_irred, ph%nequiv, sym%nsymm_rot, sym%qrotations, &
+         ph%ibz2fbz_map, ph%equiv_map, blocks)
 
     !Create symmetrizers of wave vector dependent vectors ShengBTE style
     allocate(ph%symmetrizers(3, 3, ph%nq))
@@ -154,7 +153,7 @@ contains
     do iq = 1, ph%nq
        kk = 0
        do jj = 1, sym%nsymm
-          if(sym%equiv_map(jj, iq) == iq) then
+          if(ph%equiv_map(jj, iq) == iq) then
              ph%symmetrizers(:, :, iq) = ph%symmetrizers(:, :, iq) + &
                   sym%crotations_orig(:, :, jj)
              kk = kk + 1
@@ -258,6 +257,5 @@ contains
     tmp = crys%lattvecs
     call dgesv(3, ph%numtriplets, tmp, 3, P, ph%R_k, 3, info)
     ph%R_k = matmul(crys%lattvecs, anint(ph%R_k/10.0_dp)) !nm
-  end subroutine read_ifc3
-      
+  end subroutine read_ifc3      
 end module phonon_module

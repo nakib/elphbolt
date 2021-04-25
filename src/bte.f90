@@ -94,7 +94,7 @@ contains
     
     !Start iterator
     do it = 1, 5
-       call iterate_bte_ph(crys%T, num%datadumpdir, .False., ph%nequiv, sym%equiv_map, &
+       call iterate_bte_ph(crys%T, num%datadumpdir, .False., ph%nequiv, ph%equiv_map, &
             ph%ibz2fbz_map, bt%ph_rta_rates_ibz, bt%ph_field_term, bt%ph_response)
 
        !Symmetrize response function

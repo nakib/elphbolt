@@ -67,6 +67,10 @@ module electron_module
      !! The third axis contains the pair (symmetry index, image).
      integer(k4), allocatable :: fbz2ibz_map(:)
      !! Map from an FBZ electron point to its IBZ wedge image.
+     integer(k4), allocatable :: equiv_map(:,:)
+     !! Map of equivalent points under rotations.
+     !! Axis 1 runs over rotations.
+     !! Axis 2 runs over wave vectors.
      integer(k4), allocatable :: tetra(:,:)
      !! List of all the wave vector mesh tetrahedra vertices.
      !! First axis list tetraheda and the second axis list the vertices.
@@ -215,8 +219,9 @@ contains
     ! 2. Calculate the IBZ
     call print_message("Calculating IBZ and IBZ -> FBZ mappings...")
     call find_irred_wedge(el%kmesh, el%nk_irred, el%wavevecs_irred, &
-         el%indexlist_irred, el%nequiv, sym%nsymm_rot, sym%qrotations, el%ibz2fbz_map, blocks)
-
+         el%indexlist_irred, el%nequiv, sym%nsymm_rot, sym%qrotations, &
+         el%ibz2fbz_map, el%equiv_map, blocks)
+    
     ! 3. Calculate IBZ quantities
     call print_message("Calculating IBZ energies...")
     allocate(el%ens_irred(el%nk_irred, wann%numwannbands), &
@@ -241,6 +246,8 @@ contains
           el%ens(il,:) = el%ens_irred(i,:)
           
           !velocity
+          !TODO Apply symmetrizer here to make sure that all the velocities components
+          !agree with the symmetry of the wave vector.
           do ib = 1,wann%numwannbands
              !here use real space (Cartesian) rotations
              el%vels(il, ib, :) = matmul(sym%crotations(:, :, s), el%vels_irred(i, ib, :))
@@ -262,8 +269,10 @@ contains
     !    After this step, el%wavevecs, el%ens, el%vels, and el%evecs
     !    will refer to the energy restricted mesh
     call print_message("Calcutating FBZ blocks quantities...")
+    
     !wave vectors
     deallocate(el%wavevecs)
+    
     blocks = .true.
     call calculate_wavevectors_full(el%kmesh, el%wavevecs, blocks, el%indexlist) !wave vectors
 
@@ -282,11 +291,12 @@ contains
     !    el%wavevecs_irred, el%nequiv, and el%ibz2fbz_map
     !    will refer to the energy restricted mesh 
     call print_message("Calculating IBZ blocks...")
-    deallocate(el%wavevecs_irred, el%indexlist_irred, el%nequiv, el%ibz2fbz_map)
+    deallocate(el%wavevecs_irred, el%indexlist_irred, el%nequiv, &
+         el%ibz2fbz_map, el%equiv_map)
     blocks = .true.
     call find_irred_wedge(el%kmesh, el%nk_irred, el%wavevecs_irred, &
          el%indexlist_irred, el%nequiv, sym%nsymm_rot, sym%qrotations, &
-         el%ibz2fbz_map, blocks, el%indexlist)
+         el%ibz2fbz_map, el%equiv_map, blocks, el%indexlist)
 
     ! 9. Get IBZ blocks energies, velocities, and eigen vectors
     !    energies and velocities

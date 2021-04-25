@@ -32,14 +32,6 @@ module symmetry_module
      !! Rotations with time-reversal, real space, Cartesian coordinates.
      real(dp), allocatable :: qrotations(:,:,:)
      !! Rotations with time-reversal, reciprocal space, crystal coordinates.
-     integer(k4), allocatable :: equiv_map(:,:)
-     !! Map of equivalent points under rotations.
-     !! Axis 1 runs over rotations.
-     !! Axis 2 runs over wave vectors (full Brillouin zone).
-!!$     integer(k4), allocatable :: equiv_map_blocks(:,:)
-!!$     !! Map of equivalent points under rotations.
-!!$     !! Axis 1 runs over rotations.
-!!$     !! Axis 2 runs over wave vectors (energy windowed blocks of full Brillouin zone).
      character(len=10) :: international
      !! Spacegroup in Hermann–Mauguin (or international) notation.
 
@@ -63,7 +55,7 @@ contains
     !Internal variables:
     integer(k4) :: i, j, k, ii, jj, kk, ll, info, nq
     integer(k4) :: P(3)
-    integer(k4), allocatable :: rtmp(:,:,:) !, local_equiv_map(:,:)
+    integer(k4), allocatable :: rtmp(:,:,:), local_equiv_map(:,:)
     logical, allocatable :: valid(:)
     real(dp), allocatable :: crtmp(:,:,:), qrtmp(:,:,:)
     real(dp), allocatable :: translations(:,:), ctranslations(:,:)
@@ -116,13 +108,13 @@ contains
     sym%crotations(:,:,sym%nsymm+1:2*sym%nsymm) = -sym%crotations_orig(:,:,1:sym%nsymm)
 
     !Find rotations that are either duplicated or incompatible with mesh.
-    allocate(sym%equiv_map(sym%nsymm_rot,nq))
-    call find_equiv_map(sym%nsymm_rot,sym%equiv_map,mesh,sym%qrotations)
+    allocate(local_equiv_map(sym%nsymm_rot,nq))
+    call find_equiv_map(sym%nsymm_rot,local_equiv_map,mesh,sym%qrotations)
     allocate(valid(sym%nsymm_rot))
     valid = .true.
     jj = 0
     do ii = 1,sym%nsymm_rot
-       if(valid(ii) .and. any(sym%equiv_map(ii,:) == -1)) then
+       if(valid(ii) .and. any(local_equiv_map(ii,:) == -1)) then
           valid(ii) = .false.
           jj = jj + 1
        end if
@@ -230,7 +222,7 @@ contains
   end subroutine find_equiv_map
 
   subroutine find_irred_wedge(mesh,nwavevecs_irred,wavevecs_irred, &
-       indexlist_irred,nequivalent,nsymm_rot,qrotations,ibz2fbz_map,blocks,indexlist)
+       indexlist_irred,nequivalent,nsymm_rot,qrotations,ibz2fbz_map,equivalence_map,blocks,indexlist)
     !! Find the irreducible wedge of the FBZ and other quantities.
     !! Wedge finding algorithm is inspired by ShengBTE.
     !!
@@ -252,13 +244,13 @@ contains
     integer(k4), optional, intent(in) :: indexlist(:)
     integer(k4), intent(out) :: nwavevecs_irred
     integer(k4), allocatable, intent(out) :: indexlist_irred(:), &
-         nequivalent(:), ibz2fbz_map(:,:,:)
+         nequivalent(:), ibz2fbz_map(:,:,:), equivalence_map(:,:)
     real(dp), allocatable, intent(out) :: wavevecs_irred(:,:)
 
     !Local variables
     integer(k4) :: nwavevecs, i, imux, s, image, imagelist(nsymm_rot), &
          nrunninglist, counter, ijk(3)
-    integer(k4), allocatable :: equivalence_map(:,:), runninglist(:), &
+    integer(k4), allocatable :: runninglist(:), &
          indexlist_irred_tmp(:), nequivalent_tmp(:), ibz2fbz_map_tmp(:,:,:)
     logical :: proceed
 
@@ -333,7 +325,7 @@ contains
     if(this_image() == 1) write(*, *) "Number IBZ wave vectors = ", nwavevecs_irred
 
     !Deallocate some internal data
-    deallocate(runninglist, equivalence_map)
+    deallocate(runninglist)
 
     !Copy the tmp data into (much) smaller sized global data holders
     allocate(indexlist_irred(nwavevecs_irred), nequivalent(nwavevecs_irred), &
