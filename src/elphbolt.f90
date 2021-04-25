@@ -16,7 +16,8 @@ program elphBolt
   use wannier_module, only: epw_wannier
   use bte_module, only: bte
   use bz_sums, only: calculate_dos
-  use interactions, only:  calculate_g_mixed, calculate_g2_bloch, calculate_3ph_interaction
+  use interactions, only: calculate_gReq, calculate_gkRp, calculate_g2_bloch, &
+       calculate_3ph_interaction
   
   implicit none
   
@@ -61,8 +62,11 @@ program elphBolt
   !Calculate phonon density of states
   call calculate_dos(ph, num%tetrahedra)
   
-!!$  !Calculate mixed Bloch-Wannier space e-ph vertex
-!!$  call calculate_g_mixed(wann, el, num)
+  !Calculate mixed Bloch-Wannier space e-ph vertex g(Re,q)
+  call calculate_gReq(wann, ph, num)
+  
+  !Calculate mixed Bloch-Wannier space e-ph vertex g(k,Rp)
+  call calculate_gkRp(wann, el, num)
 !!$
 !!$  !Calculate Bloch space e-ph vertex
 !!$  !TODO call calculate_g2_bloch(wann, crys, el, ph, num)

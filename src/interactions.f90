@@ -14,7 +14,7 @@ module interactions
   implicit none
 
   private
-  public calculate_g_mixed, calculate_g2_bloch, calculate_3ph_interaction, &
+  public calculate_gReq, calculate_gkRp, calculate_g2_bloch, calculate_3ph_interaction, &
        calculate_ph_rta_rates, read_transition_probabilities
 
 contains
@@ -421,9 +421,35 @@ contains
     end if
     close(1)
   end subroutine read_transition_probabilities
+
+  subroutine calculate_gReq(wann, ph, num)
+    !! Parallel driver of gReq_epw over IBZ phonon wave vectors.
+
+    type(epw_wannier), intent(in) :: wann
+    type(phonon), intent(in) :: ph
+    type(numerics), intent(in) :: num
+
+    !Local variables
+    integer(k4) :: iq, iqstart, iqend, chunk
+
+    call print_message("Doing g(Re,Rp) -> g(Re,q) for all IBZ q...")
+
+    call distribute_points(ph%nq_irred, chunk, iqstart, iqend)
+
+    if(this_image() == 1) then
+       print*, "   #q = ", ph%nq_irred
+       print*, "   #q/image = ", chunk
+    end if
+
+    do iq = iqstart, iqend
+       call wann%gReq_epw(num, iq, ph%wavevecs_irred(iq, :))
+    end do
+
+    sync all
+  end subroutine calculate_gReq
   
-  subroutine calculate_g_mixed(wann, el, num)
-    !! Parallel driver of gmixed_epw over IBZ electron wave vectors.
+  subroutine calculate_gkRp(wann, el, num)
+    !! Parallel driver of gkRp_epw over IBZ electron wave vectors.
 
     type(epw_wannier), intent(in) :: wann
     type(electron), intent(in) :: el
@@ -442,14 +468,15 @@ contains
     end if
 
     do ik = ikstart, ikend
-       call wann%gmixed_epw(num, ik, el%wavevecs_irred(ik, :))
+       call wann%gkRp_epw(num, ik, el%wavevecs_irred(ik, :))
     end do
 
     sync all
-  end subroutine calculate_g_mixed
+  end subroutine calculate_gkRp
 
   subroutine calculate_g2_bloch(wann, crys, el, ph, num)
     !! Parallel driver of g2_epw over IBZ electron states within the Fermi window.
+    !!
     !! This subroutine will calculate the full Bloch rep. matrix elements for
     !! all the energy window restricted electron-phonon processes for a given
     !! irreducible initial electron state = (band, wave vector). 
@@ -471,7 +498,7 @@ contains
          q_indvec(3), count, g2size
     real(dp) :: k(3), kp(3), q(3)
     real(dp), allocatable :: g2_istate(:)
-    complex(dp) :: gmixed_ik(wann%numwannbands,wann%numwannbands,wann%numbranches,wann%nwsq)
+    complex(dp) :: gkRp_ik(wann%numwannbands,wann%numwannbands,wann%numbranches,wann%nwsq)
     character(len = 1024) :: filename
 
     call print_message("Doing g(k,Rp) -> |g(k,q)|^2 for all IBZ states...")
@@ -503,12 +530,12 @@ contains
        !Apply energy window to initial (IBZ blocks) electron
        if(abs(el%ens_irred(ik, m) - el%enref) > el%fsthick) cycle
 
-       !Load gmixed(ik) here for use inside the loops below
+       !Load gkRp(ik) here for use inside the loops below
        call chdir(trim(adjustl(num%g2dir)))
        write (filename, '(I6)') ik
-       filename = 'gmixed.ik'//trim(adjustl(filename))
+       filename = 'gkRp.ik'//trim(adjustl(filename))
        open(1,file=filename,status="old",access='stream')
-       read(1) gmixed_ik
+       read(1) gkRp_ik
        close(1)
        call chdir(num%cwd)
 
@@ -547,9 +574,9 @@ contains
                 count = count + 1
                 
                 !TODO Calculate |g_mns(<k>,q)|^2
-!!$                g2_istate(count) = wann%g2_epw(crys, q, el%evecs_irred(ik, m, :), &
-!!$                     el%evecs(ikp, n, :), ph%evecs(iq, s, :), &
-!!$                     ph%ens(iq, s), gmixed_ik)
+                !g2_istate(count) = wann%g2_epw(crys, q, el%evecs_irred(ik, m, :), &
+                !     el%evecs(ikp, n, :), ph%evecs(iq, s, :), &
+                !     ph%ens(iq, s), gkRp_ik)
                 !NOTE: The above will crash for unequal k and q meshes.
              end do !s
           end do !n
@@ -571,10 +598,10 @@ contains
     end do
     sync all
     
-    !Delete the gmixed disk data
+    !Delete the gkRp disk data
     if(this_image() == 1) then
        call chdir(trim(adjustl(num%g2dir)))
-       call system('rm gmixed.*')
+       call system('rm gkRp.*')
        call chdir(num%cwd)
     endif
     sync all

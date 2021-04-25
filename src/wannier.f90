@@ -63,7 +63,7 @@ module wannier_module
    contains
 
      procedure :: read=>read_EPW_Wannier, el_wann_epw, ph_wann_epw, &
-          gmixed_epw, g2_epw
+          gkRp_epw, gReq_epw, g2_epw
      procedure :: test_wannier
 
   end type epw_wannier
@@ -989,9 +989,9 @@ contains
     glprefac = glprefac*fac
   end subroutine long_range_prefac
 
-  subroutine gmixed_epw(wann, num, ik, kvec)
+  subroutine gkRp_epw(wann, num, ik, kvec)
     !! Calculate the Bloch-Wannier mixed rep. e-ph matrix elements g(k,Rp),
-    !! where kvec is an IBZ electron wave vector and Rp is a phonon unit cell.
+    !! where k is an IBZ electron wave vector and Rp is a phonon unit cell.
     !! Note: this step *DOES NOT* perform the rotation over the Wannier bands space.
     !!
     !! The result will be saved to disk tagged with k-index.
@@ -1023,14 +1023,59 @@ contains
     !Write data in binary format
     !Note: this will overwrite existing data!
     write (filename, '(I9)') ik
-    filename = 'gmixed.ik'//trim(adjustl(filename))
+    filename = 'gkRp.ik'//trim(adjustl(filename))
     open(1, file = trim(filename), status = 'replace', access = 'stream')
     write(1) gmixed
     close(1)
 
     !Change back to working directory
     call chdir(num%cwd)
-  end subroutine gmixed_epw
+  end subroutine gkRp_epw
+
+  subroutine gReq_epw(wann, num, iq, qvec)
+    !! Calculate the Bloch-Wannier mixed rep. e-ph matrix elements g(Re,q),
+    !! where q is an IBZ phonon wave vector and Re is a phonon unit cell.
+    !! Note: this step *DOES NOT* perform the rotation over the Wannier bands space.
+    !!
+    !! The result will be saved to disk tagged with k-index.
+
+    class(epw_wannier), intent(in) :: wann
+    type(numerics), intent(in) :: num
+    integer(k4), intent(in) :: iq
+    real(dp), intent(in) :: qvec(3)
+
+    !Local variables
+    integer(k4) :: iuc, s
+    complex(dp) :: caux
+    complex(dp), allocatable:: gmixed(:,:,:,:)
+
+    character(len = 1024) :: filename
+
+    allocate(gmixed(wann%numwannbands, wann%numwannbands, wann%numbranches, wann%nwsk))
+
+    !Fourier transform to q-space
+    gmixed = 0
+    do iuc = 1,wann%nwsg
+       caux = expi(twopi*dot_product(qvec, wann%rcells_g(iuc,:)))/wann%gwsdeg(iuc)
+       do s = 1, wann%numbranches
+          gmixed(:,:,s,:) = gmixed(:,:,s,:) + caux*wann%gwann(:,:,:,s,iuc)
+       end do
+    end do
+
+    !Change to data output directory
+    call chdir(trim(adjustl(num%g2dir)))
+
+    !Write data in binary format
+    !Note: this will overwrite existing data!
+    write (filename, '(I9)') iq
+    filename = 'gReq.iq'//trim(adjustl(filename))
+    open(1, file = trim(filename), status = 'replace', access = 'stream')
+    write(1) gmixed
+    close(1)
+
+    !Change back to working directory
+    call chdir(num%cwd)
+  end subroutine gReq_epw
 
   !For testing and debugging:
   subroutine gmixed_epw_gamma(wann, num)
