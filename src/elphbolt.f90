@@ -17,7 +17,7 @@ program elphBolt
   use bte_module, only: bte
   use bz_sums, only: calculate_dos
   use interactions, only: calculate_gReq, calculate_gkRp, calculate_g2_bloch, &
-       calculate_3ph_interaction
+       calculate_3ph_interaction, calculate_gq2_bloch
   
   implicit none
   
@@ -64,6 +64,9 @@ program elphBolt
   
   !Calculate mixed Bloch-Wannier space e-ph vertex g(Re,q)
   call calculate_gReq(wann, ph, num)
+  
+  !Calculate Bloch space e-ph vertex for IBZ q
+  call calculate_gq2_bloch(wann, crys, el, ph, num)
   
   !Calculate mixed Bloch-Wannier space e-ph vertex g(k,Rp)
   call calculate_gkRp(wann, el, num)
