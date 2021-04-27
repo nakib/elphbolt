@@ -36,6 +36,8 @@ module numerics_module
      !! Choose if earlier ph-ph vertices are to be used.
      logical :: tetrahedra
      !! Choose is the tetrahedron method for delta function evaluation will be used.
+     logical :: phe
+     !! Choose if ph-e interaction will be included.
    
    contains
 
@@ -54,10 +56,10 @@ contains
     integer(k4) :: mesh_ref, qmesh(3)
     real(dp) :: fsthick
     character(len = 1024) :: datadumpdir
-    logical :: read_g2, read_V, tetrahedra
+    logical :: read_g2, read_V, tetrahedra, phe
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_g2, read_V, &
-         tetrahedra
+         tetrahedra, phe
 
     !Open input file
     open(1, file = 'input.nml', status = 'old')
@@ -70,6 +72,7 @@ contains
     n%read_g2 = .false.
     n%read_V = .false.
     n%tetrahedra = .false.
+    n%phe = .false.
     read(1, nml = numerics)
     if(any(qmesh <= 0) .or. mesh_ref < 1 .or. fsthick < 0) then
        call exit_with_message('Bad input(s) in numerics.')
@@ -81,6 +84,7 @@ contains
     n%read_g2 = read_g2
     n%read_V = read_V
     n%tetrahedra = tetrahedra
+    n%phe = phe
     
     !Create data dump directory
     if(this_image() == 1) call system('mkdir ' // trim(adjustl(n%datadumpdir)))

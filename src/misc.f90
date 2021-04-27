@@ -282,4 +282,14 @@ contains
     
     Bose = 1.0_dp/(exp(e/kB/T) - 1.0_dp)
   end function Bose
+
+  pure real(dp) function Fermi(e, chempot, T)
+    !! e Energy in eV
+    !! chempot Chemical potential in eV
+    !! T temperature in K
+
+    real(dp), intent(in) :: e, chempot, T
+
+    Fermi = 1.0_dp/(exp((e - chempot)/kB/T) + 1.0_dp)
+  end function Fermi
 end module misc

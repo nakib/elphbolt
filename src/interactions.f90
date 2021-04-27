@@ -1,9 +1,9 @@
 module interactions
   !! Module containing the procedures related to the computation of interactions.
 
-  use params, only: k4, dp, pi, amu, qe, hbar_eVps
+  use params, only: k4, dp, pi, twopi, amu, qe, hbar_eVps
   use misc, only: exit_with_message, print_message, distribute_points, &
-       demux_state, mux_vector, mux_state, expi, Bose, binsearch
+       demux_state, mux_vector, mux_state, expi, Bose, binsearch, Fermi
   use wannier_module, only: epw_wannier
   use crystal_module, only: crystal
   use electron_module, only: electron
@@ -15,7 +15,7 @@ module interactions
 
   private
   public calculate_gReq, calculate_gkRp, calculate_g2_bloch, calculate_3ph_interaction, &
-       calculate_ph_rta_rates, read_transition_probabilities, calculate_gq2_bloch
+       calculate_ph_rta_rates, read_transition_probabilities, calculate_eph_interaction_ibzq
 
 contains
   
@@ -58,7 +58,7 @@ contains
     !! This subroutine calculates |V-(s1<q1>|s2q2,s3q3)|^2, W-(s1<q1>|s2q2,s3q3),
     !! and W+(s1<q1>|s2q2,s3q3) for each irreducible phonon and saves the results to disk.
     !!
-    !! key = 'V', 'W' for vertex, scattering rate calculation, respectively.
+    !! key = 'V', 'W' for vertex, transition probabilitiy calculation, respectively.
 
     type(phonon), intent(in) :: ph
     type(crystal), intent(in) :: crys
@@ -82,9 +82,9 @@ contains
     end if
 
     if(key == 'V') then
-       call print_message("Calculating 3-ph vertices for all IBZ q...")
+       call print_message("Calculating 3-ph vertices for all IBZ phonons...")
     else
-       call print_message("Calculating 3-ph scattering rates for all IBZ q...")
+       call print_message("Calculating 3-ph transition probabilities for all IBZ phonons...")
     end if
 
     !Set output directory of transition probilities
@@ -286,9 +286,6 @@ contains
           open(1, file = trim(filename), status = 'replace', access = 'stream')
           write(1) Vm2
           close(1)
-
-          !Change back to working directory
-          call chdir(num%cwd)
        end if
 
        if(key == 'W') then
@@ -317,10 +314,10 @@ contains
           write(1) istate2_plus
           write(1) istate3_plus
           close(1)
-
-          !Change back to working directory
-          call chdir(num%cwd)
        end if
+
+       !Change back to working directory
+       call chdir(num%cwd)
     end do !istate1
     sync all
   end subroutine calculate_3ph_interaction
@@ -474,13 +471,15 @@ contains
     sync all
   end subroutine calculate_gkRp
 
-  subroutine calculate_gq2_bloch(wann, crys, el, ph, num)
+  subroutine calculate_eph_interaction_ibzq(wann, crys, el, ph, num, key)
     !! Parallel driver of g2(q,k) over IBZ phonon states.
     !!
     !! This subroutine will calculate the full Bloch rep. matrix elements for
     !! all the energy window restricted electron-phonon processes for a given
     !! irreducible initial phonon state = (branch, wave vector). 
     !! This list will be written to disk in files tagged with the muxed state index.
+    !!
+    !! key = 'g', 'Y' for vertex, transition probability calculation, respectively.
     !
     !In the FBZ and IBZ blocks a wave vector was retained when at least one
     !band belonged within the energy window. Here the bands outside the energy
@@ -491,21 +490,51 @@ contains
     type(electron), intent(in) :: el
     type(phonon), intent(in) :: ph
     type(numerics), intent(in) :: num
+    character(len = 1), intent(in) :: key
     
     !Local variables
     integer(k4) :: nstates_irred, istate, m, iq, iq_fbz, n, ik, ikp, s, &
          ikp_window, start, end, chunk, k_indvec(3), kp_indvec(3), &
          q_indvec(3), count, g2size
-    real(dp) :: k(3), kp(3), q(3)
-    real(dp), allocatable :: g2_istate(:)
+    integer(k4), allocatable :: istate1(:), istate2(:)
+    real(dp) :: k(3), kp(3), q(3), en_ph, en_el, en_elp, const, delta, &
+         invboseplus1, fermi1, fermi2, occup_fac
+    real(dp), allocatable :: g2_istate(:), Y(:)
     complex(dp) :: gReq_iq(wann%numwannbands, wann%numwannbands, wann%numbranches, wann%nwsk)
-    character(len = 1024) :: filename
+    character(len = 1024) :: filename, filename_Y, Ydir, tag
 
-    call print_message("Doing g(Re,q) -> |g(k,q)|^2 for all IBZ phonons...")
+    if(key /= 'g' .and. key /= 'Y') then
+       call exit_with_message(&
+            "Invalid value of key in call to calculate_eph_interaction_ibzq. Exiting.")
+    end if
 
+    if(key == 'g') then
+       call print_message("Doing g(Re,q) -> |g(k,q)|^2 for all IBZ phonons...")
+    else
+       call print_message("Doing e-ph transition probabilities all IBZ phonons...")
+    end if
+    
+    !Set output directory of transition probilities
+    write(tag, "(E9.3)") crys%T
+    Ydir = trim(adjustl(num%datadumpdir))//'Y_T'//trim(adjustl(tag))
+    if(this_image() == 1 .and. key == 'Y') then
+       !Create directory
+       call system('mkdir '//trim(adjustl(Ydir)))
+    end if
+    sync all
+
+    !Conversion factor in transition probability expression
+    const = twopi/hbar_eVps
+    
     !Length of g2_istate
     g2size = el%nstates_inwindow*ph%numbranches
+
+    !Allocate g2_istate and, if needed, Y
     allocate(g2_istate(g2size))
+    if(key == 'Y') then
+       allocate(Y(g2size))
+       allocate(istate1(g2size), istate2(g2size))
+    end if
 
     !Total number of IBZ blocks states
     nstates_irred = ph%nq_irred*ph%numbranches
@@ -524,26 +553,53 @@ contains
        !Demux state index into branch (s) and wave vector (iq) indices
        call demux_state(istate, ph%numbranches, s, iq)
 
+       if(key == 'g') then
+          !Load gReq(iq) here for use inside the loops below
+          call chdir(trim(adjustl(num%g2dir)))
+          write (filename, '(I6)') iq
+          filename = 'gReq.iq'//trim(adjustl(filename))
+          open(1,file=filename,status="old",access='stream')
+          read(1) gReq_iq
+          close(1)
+          call chdir(num%cwd)
+       end if
+
        !Get the muxed index of FBZ wave vector from the IBZ blocks index list
        iq_fbz = ph%indexlist_irred(iq)
 
-!!$       !Apply energy window to initial (IBZ blocks) electron
-!!$       if(abs(el%ens_irred(ik, m) - el%enref) > el%fsthick) cycle
+       !Energy of phonon
+       en_ph = ph%ens(iq_fbz, s)
 
-       !Load gReq(iq) here for use inside the loops below
-       call chdir(trim(adjustl(num%g2dir)))
-       write (filename, '(I6)') iq
-       filename = 'gReq.iq'//trim(adjustl(filename))
-       open(1,file=filename,status="old",access='stream')
-       read(1) gReq_iq
-       close(1)
-       call chdir(num%cwd)
-
+       !1/(1 + Bose factor) for phonon
+       if(key == 'Y') then
+          if(en_ph /= 0.0_dp) then
+             invboseplus1 = 1.0_dp/(1.0_dp + Bose(en_ph, crys%T))
+          else
+             invboseplus1 = 0.0_dp
+          end if
+       end if
+       
        !Initial (IBZ blocks) wave vector (crystal coords.)
        q = ph%wavevecs(iq_fbz, :)
 
        !Convert from crystal to 0-based index vector
        q_indvec = nint(q*ph%qmesh)
+
+       !Load g2_istate from disk for scattering rates calculation
+       if(key == 'Y') then
+          !Change to data output directory
+          call chdir(trim(adjustl(num%g2dir)))
+
+          !Read data in binary format
+          write (filename, '(I9)') istate
+          filename = 'gq2.istate'//trim(adjustl(filename))
+          open(1, file = trim(filename), status = 'old', access = 'stream')
+          read(1) g2_istate
+          close(1)
+
+          !Change back to working directory
+          call chdir(num%cwd)
+       end if
 
        !Run over initial (in-window, FBZ blocks) electron wave vectors
        do ik = 1, el%nk
@@ -566,49 +622,103 @@ contains
           
           !Run over initial electron bands
           do m = 1, wann%numwannbands
+             !Energy of initial electron
+             en_el = el%ens(ik, m)
+             
              !Apply energy window to initial electron
-             if(abs(el%ens(ik, m) - el%enref) > el%fsthick) cycle
+             if(abs(en_el - el%enref) > el%fsthick) cycle
 
+             !Fermi factor for initial electron
+             if(key == 'Y') fermi1 = Fermi(en_el, el%enref, crys%T)
+             
              !Run over final electron bands
              do n = 1, wann%numwannbands
+                !Energy of final electron
+                en_elp = el%ens(ikp_window, n)
+                
                 !Apply energy window to final electron
-                if(abs(el%ens(ikp_window, n) - el%enref) > el%fsthick) cycle
-
+                if(abs(en_elp - el%enref) > el%fsthick) cycle
+                
                 !Increment g2 processes counter
                 count = count + 1
 
-                !Calculate |g_mns(k,<q>)|^2
-                g2_istate(count) = wann%g2_epw(crys, q, el%evecs(ik, m, :), &
-                     el%evecs(ikp_window, n, :), ph%evecs(iq_fbz, s, :), &
-                     ph%ens(iq_fbz, s), gReq_iq)
+                if(key == 'g') then
+                   !Calculate |g_mns(k,<q>)|^2
+                   g2_istate(count) = wann%g2_epw(crys, q, el%evecs(ik, m, :), &
+                        el%evecs(ikp_window, n, :), ph%evecs(iq_fbz, s, :), &
+                        ph%ens(iq_fbz, s), gReq_iq)
+                end if
+
+                if(key == 'Y') then
+                   !Fermi factor for initial electron
+                   fermi2 = Fermi(en_elp, el%enref, crys%T)
+
+                   !Calculate Y:
+
+                   !Evaulate delta function
+                   delta = delta_fn_tetra(en_elp - en_ph, ik, m, el%kmesh, el%tetramap, &
+                        el%tetracount, el%tetra_evals)
+                   
+                   !Temperature dependent occupation factor
+                   occup_fac = fermi1*(1.0_dp - fermi2)*invboseplus1
+
+                   !Save Y
+                   Y(count) = g2_istate(count)*occup_fac*delta
+
+                   !Save initial and final electron states
+                   istate1(count) = mux_state(el%numbands, m, ik)
+                   istate2(count) = mux_state(el%numbands, n, ikp)
+                end if
              end do
           end do !n
        end do !ikp
-       
-       !Change to data output directory
-       call chdir(trim(adjustl(num%g2dir)))
 
-       !Write data in binary format
-       !Note: this will overwrite existing data!
-       write (filename, '(I9)') istate
-       filename = 'gq2.istate'//trim(adjustl(filename))
-       open(1, file = trim(filename), status = 'replace', access = 'stream')
-       write(1) g2_istate
-       close(1)
-       
+       if(key == 'g') then
+          !Change to data output directory
+          call chdir(trim(adjustl(num%g2dir)))
+
+          !Write data in binary format
+          !Note: this will overwrite existing data!
+          write (filename, '(I9)') istate
+          filename = 'gq2.istate'//trim(adjustl(filename))
+          open(1, file = trim(filename), status = 'replace', access = 'stream')
+          write(1) g2_istate
+          close(1)
+       end if
+
+       if(key == 'Y') then
+          !Multiply constant factor, unit factor, etc.
+          Y(:) = const*Y(:) !THz
+          
+          !Change to data output directory
+          call chdir(trim(adjustl(Ydir)))
+
+          !Write data in binary format
+          !Note: this will overwrite existing data!
+          write (filename, '(I9)') istate
+          filename = 'Y.istate'//trim(adjustl(filename))
+          open(1, file = trim(filename), status = 'replace', access = 'stream')
+          write(1) Y
+          write(1) istate1
+          write(1) istate2
+          close(1)
+       end if
+
        !Change back to working directory
        call chdir(num%cwd)
     end do
     sync all
-    
-    !Delete the gReq disk data
-    if(this_image() == 1) then
-       call chdir(trim(adjustl(num%g2dir)))
-       call system('rm gReq.*')
-       call chdir(num%cwd)
-    endif
+
+    if(key == 'g') then
+       !Delete the gReq disk data
+       if(this_image() == 1) then
+          call chdir(trim(adjustl(num%g2dir)))
+          call system('rm gReq.*')
+          call chdir(num%cwd)
+       end if
+    end if
     sync all
-  end subroutine calculate_gq2_bloch
+  end subroutine calculate_eph_interaction_ibzq
   
   subroutine calculate_g2_bloch(wann, crys, el, ph, num)
     !! Parallel driver of g2_epw over IBZ electron states within the Fermi window.

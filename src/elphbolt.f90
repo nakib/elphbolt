@@ -17,7 +17,7 @@ program elphBolt
   use bte_module, only: bte
   use bz_sums, only: calculate_dos
   use interactions, only: calculate_gReq, calculate_gkRp, calculate_g2_bloch, &
-       calculate_3ph_interaction, calculate_gq2_bloch
+       calculate_3ph_interaction, calculate_eph_interaction_ibzq
   
   implicit none
   
@@ -61,12 +61,17 @@ program elphBolt
 
   !Calculate phonon density of states
   call calculate_dos(ph, num%tetrahedra)
-  
-  !Calculate mixed Bloch-Wannier space e-ph vertex g(Re,q)
-  call calculate_gReq(wann, ph, num)
-  
-  !Calculate Bloch space e-ph vertex for IBZ q
-  call calculate_gq2_bloch(wann, crys, el, ph, num)
+
+  if(num%phe) then     
+     !Calculate mixed Bloch-Wannier space e-ph vertex g(Re,q)
+     call calculate_gReq(wann, ph, num)
+
+     !Calculate Bloch space e-ph vertex g(k,q) for IBZ q
+     call calculate_eph_interaction_ibzq(wann, crys, el, ph, num, 'g')
+
+     !Calculate ph-e transition probabilities
+     call calculate_eph_interaction_ibzq(wann, crys, el, ph, num, 'Y')
+  end if
   
   !Calculate mixed Bloch-Wannier space e-ph vertex g(k,Rp)
   call calculate_gkRp(wann, el, num)
@@ -80,7 +85,7 @@ program elphBolt
      call calculate_3ph_interaction(ph, crys, num, 'V')
   end if
   
-  !Calculate transition probabilities
+  !Calculate ph-ph transition probabilities
   call calculate_3ph_interaction(ph, crys, num, 'W')
   
   !RTA solution
