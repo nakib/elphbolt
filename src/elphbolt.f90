@@ -89,5 +89,9 @@ program elphBolt
   call calculate_3ph_interaction(ph, crys, num, 'W')
   
   !RTA solution
-  call bt%solve_rta_ph(num, crys, sym, ph)
+  if(num%phe) then
+     call bt%solve_rta_ph(num, crys, sym, ph, el)
+  else
+     call bt%solve_rta_ph(num, crys, sym, ph)
+  end if
 end program elphBolt

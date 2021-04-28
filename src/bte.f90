@@ -9,7 +9,9 @@ module bte_module
   use crystal_module, only: crystal
   use symmetry_module, only: symmetry
   use phonon_module, only: phonon
-  use interactions, only: calculate_ph_rta_rates, read_transition_probabilities
+  use electron_module, only: electron
+  use interactions, only: calculate_ph_rta_rates, read_transition_probs_3ph, &
+       read_transition_probs_eph
   use bz_sums, only: calculate_transport_coeff
 
   implicit none
@@ -35,7 +37,7 @@ module bte_module
 
 contains
 
-  subroutine solve_rta_ph(bt, num, crys, sym, ph)
+  subroutine solve_rta_ph(bt, num, crys, sym, ph, el)
     !! Subroutine to calculate the RTA solution of the phonon BTE.
 
     class(bte), intent(out) :: bt
@@ -43,10 +45,12 @@ contains
     type(crystal), intent(in) :: crys
     type(symmetry), intent(in) :: sym
     type(phonon), intent(in) :: ph
+    type(electron), intent(in), optional :: el
 
     !Local variables
     character(len = 1024) :: tag, Tdir
     integer(k4) :: iq, it
+    real(dp), allocatable :: rates_3ph(:,:), rates_phe(:,:)
 
     call print_message("Solving ph BTE in the RTA...")
     
@@ -59,7 +63,13 @@ contains
     sync all
     
     !Calculate RTA scattering rates
-    call calculate_ph_rta_rates(ph, num, crys, bt%ph_rta_rates_ibz)
+    if(present(el)) then
+       call calculate_ph_rta_rates(rates_3ph, rates_phe, num, crys, ph, el)
+    else
+       call calculate_ph_rta_rates(rates_3ph, rates_phe, num, crys, ph)
+    end if
+    !Matthiessen's rule
+    bt%ph_rta_rates_ibz = rates_3ph + rates_phe
     
     !Calculate RTA term F0
     call calculate_field_term('ph', 'T', ph%nequiv, ph%ibz2fbz_map, &
@@ -83,6 +93,8 @@ contains
     call chdir(trim(adjustl(Tdir)))
 
     !Write RTA scattering rates to file
+    call write2file_rank2_real('ph.W_rta_3ph', rates_3ph)
+    call write2file_rank2_real('ph.W_rta_phe', rates_phe)
     call write2file_rank2_real('ph.W_rta', bt%ph_rta_rates_ibz)
 
     !Change back to cwd
@@ -241,7 +253,7 @@ contains
     !Total number of IBZ blocks states
     nstates_irred = size(rta_rates_ibz(:,1))*numbranches
 
-    !Total number of 3-phonon processes for a given initial phonon state
+    !Total number of 3-phonon processes for a given initial phonon state.
     nprocs = nq*numbranches**2
 
     !Allocate arrays
@@ -275,14 +287,14 @@ contains
        filepath_Wp = trim(adjustl(Wdir))//'/Wp.istate'//trim(adjustl(tag))
 
        !Read W+ from file
-       call read_transition_probabilities(trim(adjustl(filepath_Wp)), Wp, &
+       call read_transition_probs_3ph(trim(adjustl(filepath_Wp)), Wp, &
             istate2_plus, istate3_plus)
 
        !Set W- filename
        filepath_Wm = trim(adjustl(Wdir))//'/Wm.istate'//trim(adjustl(tag))
 
        !Read W- from file
-       call read_transition_probabilities(trim(adjustl(filepath_Wm)), Wm, &
+       call read_transition_probs_3ph(trim(adjustl(filepath_Wm)), Wm, &
             istate2_minus, istate3_minus)
 
        !Sum over the number of equivalent q-points of the IBZ point

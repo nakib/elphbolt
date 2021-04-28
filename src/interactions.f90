@@ -15,7 +15,8 @@ module interactions
 
   private
   public calculate_gReq, calculate_gkRp, calculate_g2_bloch, calculate_3ph_interaction, &
-       calculate_ph_rta_rates, read_transition_probabilities, calculate_eph_interaction_ibzq
+       calculate_ph_rta_rates, read_transition_probs_3ph, read_transition_probs_eph, &
+       calculate_eph_interaction_ibzq
 
 contains
   
@@ -322,103 +323,6 @@ contains
     sync all
   end subroutine calculate_3ph_interaction
 
-  subroutine calculate_ph_rta_rates(ph, num, crys, rta_rates)
-    !! Subroutine for parallel reading of the 3-ph transition probabilities
-    !! from disk and calculating the relaxation time approximation (RTA)
-    !! scattering rates for phonons.
-
-    type(phonon), intent(in) :: ph
-    type(numerics), intent(in) :: num
-    type(crystal), intent(in) :: crys
-    real(dp), allocatable, intent(out) :: rta_rates(:,:)
-
-    !Local variables
-    integer(k4) :: nstates_irred, procs, istate, nprocs, iproc, chunk, s, &
-         iq, im
-    integer(k4), allocatable :: start[:], end[:]
-    real(dp), allocatable :: rta_rates_psum(:,:)[:], W(:)
-    character(len = 1024) :: filepath_Wm, filepath_Wp, Wdir, tag
-    
-    !Set output directory of transition probilities
-    write(tag, "(E9.3)") crys%T
-    Wdir = trim(adjustl(num%datadumpdir))//'W_T'//trim(adjustl(tag))
-    
-    !Total number of IBZ blocks states
-    nstates_irred = ph%nq_irred*ph%numbranches
-
-    !Total number of 3-phonon processes for a given phonon state
-    nprocs = ph%nq*ph%numbranches**2
-
-    !Allocate start and end coarrays
-    allocate(start[*], end[*])
-    
-    !Divide phonon states among images
-    call distribute_points(nstates_irred, chunk, start, end)
-
-    !Allocate and initialize scattering rates coarrays
-    allocate(rta_rates_psum(ph%nq_irred, ph%numbranches)[*])
-    rta_rates_psum(:, :) = 0.0_dp
-    
-    !Allocate and initialize scattering rates
-    allocate(rta_rates(ph%nq_irred, ph%numbranches))
-    rta_rates(:, :) = 0.0_dp
-    
-    !Allocate transition probabilities variable
-    allocate(W(nprocs))
-    
-    !Run over first phonon IBZ states
-    do istate = start, end
-       !Demux state index into branch (s) and wave vector (iq) indices
-       call demux_state(istate, ph%numbranches, s, iq)
-
-       !Set W+ filename
-       write(tag, '(I9)') istate
-       filepath_Wp = trim(adjustl(Wdir))//'/Wp.istate'//trim(adjustl(tag))
-       
-       !Read W+ from file
-       call read_transition_probabilities(trim(adjustl(filepath_Wp)), W)
-
-       do iproc = 1, nprocs
-          rta_rates_psum(iq, s) = rta_rates_psum(iq, s) + W(iproc) 
-       end do
-
-       !Set W- filename
-       filepath_Wm = trim(adjustl(Wdir))//'/Wm.istate'//trim(adjustl(tag))
-       
-       !Read W- from file
-       call read_transition_probabilities(trim(adjustl(filepath_Wm)), W)
-
-       do iproc = 1, nprocs
-          rta_rates_psum(iq, s) = rta_rates_psum(iq, s) + 0.5_dp*W(iproc)
-       end do
-    end do
-
-    sync all
-
-    !Reduce coarray partial sums
-    do im = 1, num_images()
-       rta_rates(:,:) = rta_rates(:,:) + rta_rates_psum(:,:)[im]
-    end do
-    sync all
-  end subroutine calculate_ph_rta_rates
-
-  subroutine read_transition_probabilities(filepath, W, istate2, istate3)
-    !! Subroutine to read the phonon transition probabilities from disk.
-
-    character(len = *), intent(in) :: filepath
-    real(dp), intent(out) :: W(:)
-    integer(k4), optional, intent(out) :: istate2(:), istate3(:)
-
-    !Read data
-    open(1, file = trim(adjustl(filepath)), status = 'old', access = 'stream')
-    read(1) W
-    if(present(istate2) .and. present(istate3)) then
-       read(1) istate2
-       read(1) istate3
-    end if
-    close(1)
-  end subroutine read_transition_probabilities
-
   subroutine calculate_gReq(wann, ph, num)
     !! Parallel driver of gReq_epw over IBZ phonon wave vectors.
 
@@ -495,11 +399,11 @@ contains
     !Local variables
     integer(k4) :: nstates_irred, istate, m, iq, iq_fbz, n, ik, ikp, s, &
          ikp_window, start, end, chunk, k_indvec(3), kp_indvec(3), &
-         q_indvec(3), count, g2size
+         q_indvec(3), nprocs, count
     integer(k4), allocatable :: istate1(:), istate2(:)
     real(dp) :: k(3), kp(3), q(3), en_ph, en_el, en_elp, const, delta, &
          invboseplus1, fermi1, fermi2, occup_fac
-    real(dp), allocatable :: g2_istate(:), Y(:)
+    real(dp), allocatable :: g2_istate(:), Y_istate(:)
     complex(dp) :: gReq_iq(wann%numwannbands, wann%numwannbands, wann%numbranches, wann%nwsk)
     character(len = 1024) :: filename, filename_Y, Ydir, tag
 
@@ -511,7 +415,7 @@ contains
     if(key == 'g') then
        call print_message("Doing g(Re,q) -> |g(k,q)|^2 for all IBZ phonons...")
     else
-       call print_message("Doing e-ph transition probabilities all IBZ phonons...")
+       call print_message("Doing ph-e transition probabilities all IBZ phonons...")
     end if
     
     !Set output directory of transition probilities
@@ -526,14 +430,12 @@ contains
     !Conversion factor in transition probability expression
     const = twopi/hbar_eVps
     
-    !Length of g2_istate
-    g2size = el%nstates_inwindow*ph%numbranches
-
-    !Allocate g2_istate and, if needed, Y
-    allocate(g2_istate(g2size))
-    if(key == 'Y') then
-       allocate(Y(g2size))
-       allocate(istate1(g2size), istate2(g2size))
+    !Allocate and initialize g2_istate and, if needed, Y
+    if(key == 'g') then
+       !Maximum length of g2_istate
+       nprocs = el%nstates_inwindow*ph%numbranches
+       allocate(g2_istate(nprocs))
+       g2_istate(:) = 0.0_dp
     end if
 
     !Total number of IBZ blocks states
@@ -547,9 +449,6 @@ contains
     end if
 
     do istate = start, end !over IBZ blocks states
-       !Initialize eligible process counter for this state
-       count = 0
-
        !Demux state index into branch (s) and wave vector (iq) indices
        call demux_state(istate, ph%numbranches, s, iq)
 
@@ -594,15 +493,33 @@ contains
           write (filename, '(I9)') istate
           filename = 'gq2.istate'//trim(adjustl(filename))
           open(1, file = trim(filename), status = 'old', access = 'stream')
+          read(1) nprocs
+          if(allocated(g2_istate)) deallocate(g2_istate, Y_istate, istate1, istate2)
+          allocate(g2_istate(nprocs))
           read(1) g2_istate
           close(1)
 
           !Change back to working directory
           call chdir(num%cwd)
+
+          !Allocate quantities related to transition probabilities
+          allocate(Y_istate(nprocs))
+          allocate(istate1(nprocs), istate2(nprocs))
+          
+          if(nprocs > 0) then
+             istate1(:) = -1_k4
+             istate2(:) = -1_k4
+             Y_istate(:) = 0.0_dp
+          else
+             cycle
+          end if
        end if
 
        !Run over initial (in-window, FBZ blocks) electron wave vectors
        do ik = 1, el%nk
+          !Initialize process counter
+          count = 0
+          
           !Initial wave vector (crystal coords.)
           k = el%wavevecs(ik, :)
 
@@ -621,7 +538,7 @@ contains
           if(ikp_window < 0) cycle
           
           !Run over initial electron bands
-          do m = 1, wann%numwannbands
+          do m = 1, el%numbands
              !Energy of initial electron
              en_el = el%ens(ik, m)
              
@@ -632,14 +549,14 @@ contains
              if(key == 'Y') fermi1 = Fermi(en_el, el%enref, crys%T)
              
              !Run over final electron bands
-             do n = 1, wann%numwannbands
+             do n = 1, el%numbands
                 !Energy of final electron
                 en_elp = el%ens(ikp_window, n)
                 
                 !Apply energy window to final electron
                 if(abs(en_elp - el%enref) > el%fsthick) cycle
                 
-                !Increment g2 processes counter
+                !Increment g2 process counter
                 count = count + 1
 
                 if(key == 'g') then
@@ -648,7 +565,7 @@ contains
                         el%evecs(ikp_window, n, :), ph%evecs(iq_fbz, s, :), &
                         ph%ens(iq_fbz, s), gReq_iq)
                 end if
-
+                
                 if(key == 'Y') then
                    !Fermi factor for initial electron
                    fermi2 = Fermi(en_elp, el%enref, crys%T)
@@ -658,12 +575,12 @@ contains
                    !Evaulate delta function
                    delta = delta_fn_tetra(en_elp - en_ph, ik, m, el%kmesh, el%tetramap, &
                         el%tetracount, el%tetra_evals)
-                   
+
                    !Temperature dependent occupation factor
                    occup_fac = fermi1*(1.0_dp - fermi2)*invboseplus1
 
                    !Save Y
-                   Y(count) = g2_istate(count)*occup_fac*delta
+                   Y_istate(count) = g2_istate(count)*occup_fac*delta
 
                    !Save initial and final electron states
                    istate1(count) = mux_state(el%numbands, m, ik)
@@ -682,13 +599,14 @@ contains
           write (filename, '(I9)') istate
           filename = 'gq2.istate'//trim(adjustl(filename))
           open(1, file = trim(filename), status = 'replace', access = 'stream')
-          write(1) g2_istate
+          write(1) count
+          write(1) g2_istate(1:count)
           close(1)
        end if
 
        if(key == 'Y') then
           !Multiply constant factor, unit factor, etc.
-          Y(:) = const*Y(:) !THz
+          Y_istate(1:count) = const*Y_istate(1:count) !THz
           
           !Change to data output directory
           call chdir(trim(adjustl(Ydir)))
@@ -698,14 +616,17 @@ contains
           write (filename, '(I9)') istate
           filename = 'Y.istate'//trim(adjustl(filename))
           open(1, file = trim(filename), status = 'replace', access = 'stream')
-          write(1) Y
-          write(1) istate1
-          write(1) istate2
+          write(1) count
+          write(1) Y_istate(1:count)
+          write(1) istate1(1:count)
+          write(1) istate2(1:count)
           close(1)
        end if
 
        !Change back to working directory
        call chdir(num%cwd)
+
+       if(key == 'Y') deallocate(g2_istate, Y_istate, istate1, istate2)
     end do
     sync all
 
@@ -852,4 +773,154 @@ contains
     endif
     sync all
   end subroutine calculate_g2_bloch
+
+  subroutine calculate_ph_rta_rates(rta_rates_3ph, rta_rates_phe, num, crys, ph, el)
+    !! Subroutine for parallel reading of the 3-ph and ph-e transition probabilities
+    !! from disk and calculating the relaxation time approximation (RTA)
+    !! scattering rates for the 3-ph and ph-e channels.
+
+    real(dp), allocatable, intent(out) :: rta_rates_3ph(:,:)
+    real(dp), allocatable, intent(out) :: rta_rates_phe(:,:)
+    type(numerics), intent(in) :: num
+    type(crystal), intent(in) :: crys
+    type(phonon), intent(in) :: ph
+    type(electron), intent(in), optional :: el
+
+    !Local variables
+    integer(k4) :: nstates_irred, procs, istate, nprocs_3ph, nprocs_phe, &
+         iproc, chunk, s, iq, im
+    integer(k4), allocatable :: start[:], end[:]
+    real(dp), allocatable :: rta_rates_3ph_psum(:,:)[:], rta_rates_phe_psum(:,:)[:], &
+         W(:), Y(:)
+    character(len = 1024) :: filepath_Wm, filepath_Wp, filepath_Y, Wdir, Ydir, tag
+    
+    !Set output directory of transition probilities
+    write(tag, "(E9.3)") crys%T
+    Wdir = trim(adjustl(num%datadumpdir))//'W_T'//trim(adjustl(tag))
+    if(present(el)) then
+       Ydir = trim(adjustl(num%datadumpdir))//'Y_T'//trim(adjustl(tag))
+    end if
+    
+    !Total number of IBZ blocks states
+    nstates_irred = ph%nq_irred*ph%numbranches
+
+    !Total number of 3-phonon processes for a given phonon state
+    nprocs_3ph = ph%nq*ph%numbranches**2
+
+    if(present(el)) then
+       !Total number of phonon-electron processes for a given phonon state
+       nprocs_phe = el%nstates_inwindow*ph%numbranches
+    end if
+
+    !Allocate start and end coarrays
+    allocate(start[*], end[*])
+    
+    !Divide phonon states among images
+    call distribute_points(nstates_irred, chunk, start, end)
+
+    !Allocate and initialize scattering rates coarrays
+    allocate(rta_rates_3ph_psum(ph%nq_irred, ph%numbranches)[*])
+    rta_rates_3ph_psum(:, :) = 0.0_dp
+    if(present(el)) then
+       allocate(rta_rates_phe_psum(ph%nq_irred, ph%numbranches)[*])
+       rta_rates_phe_psum(:, :) = 0.0_dp
+    end if
+    
+    !Allocate and initialize scattering rates
+    allocate(rta_rates_3ph(ph%nq_irred, ph%numbranches), rta_rates_phe(ph%nq_irred, ph%numbranches))
+    rta_rates_3ph(:, :) = 0.0_dp
+    rta_rates_phe(:, :) = 0.0_dp
+    
+    !Allocate transition probabilities variable
+    allocate(W(nprocs_3ph))
+    
+    !Run over first phonon IBZ states
+    do istate = start, end
+       !Demux state index into branch (s) and wave vector (iq) indices
+       call demux_state(istate, ph%numbranches, s, iq)
+
+       !Set W+ filename
+       write(tag, '(I9)') istate
+       filepath_Wp = trim(adjustl(Wdir))//'/Wp.istate'//trim(adjustl(tag))
+       
+       !Read W+ from file
+       call read_transition_probs_3ph(trim(adjustl(filepath_Wp)), W)
+
+       do iproc = 1, nprocs_3ph
+          rta_rates_3ph_psum(iq, s) = rta_rates_3ph_psum(iq, s) + W(iproc) 
+       end do
+
+       !Set W- filename
+       filepath_Wm = trim(adjustl(Wdir))//'/Wm.istate'//trim(adjustl(tag))
+       
+       !Read W- from file
+       call read_transition_probs_3ph(trim(adjustl(filepath_Wm)), W)
+
+       do iproc = 1, nprocs_3ph
+          rta_rates_3ph_psum(iq, s) = rta_rates_3ph_psum(iq, s) + 0.5_dp*W(iproc)
+       end do
+
+       if(present(el)) then
+          !Set Y filename
+          filepath_Y = trim(adjustl(Ydir))//'/Y.istate'//trim(adjustl(tag))
+
+          !Read Y from file
+          call read_transition_probs_eph(trim(adjustl(filepath_Y)), nprocs_phe, Y)
+
+          do iproc = 1, nprocs_phe
+             rta_rates_phe_psum(iq, s) = rta_rates_phe_psum(iq, s) + Y(iproc)
+          end do
+       end if
+    end do
+
+    sync all
+
+    !Reduce coarray partial sums
+    do im = 1, num_images()
+       rta_rates_3ph(:,:) = rta_rates_3ph(:,:) + rta_rates_3ph_psum(:,:)[im]
+       rta_rates_phe(:,:) = rta_rates_phe(:,:) + rta_rates_phe_psum(:,:)[im]
+    end do
+    sync all
+  end subroutine calculate_ph_rta_rates
+  
+  subroutine read_transition_probs_3ph(filepath, T, istate2, istate3)
+    !! Subroutine to read the phonon transition probabilities from disk.
+
+    character(len = *), intent(in) :: filepath
+    real(dp), intent(out) :: T(:)
+    integer(k4), intent(out), optional :: istate2(:), istate3(:)
+
+    !Read data
+    open(1, file = trim(adjustl(filepath)), status = 'old', access = 'stream')
+    read(1) T
+    if(present(istate2) .and. present(istate3)) then
+       read(1) istate2
+       read(1) istate3
+    end if
+    close(1)
+  end subroutine read_transition_probs_3ph
+
+  subroutine read_transition_probs_eph(filepath, N, T, istate1, istate2)
+    !! Subroutine to read transition probabilities from disk for e-ph/ph-e processes.
+    !! This is different from the read_transition_probs_3ph subroutine in that this
+    !! returns the number interaction processes and also allocates the return arrays
+    !! accordingly.
+
+    character(len = *), intent(in) :: filepath
+    integer(k4), intent(out) :: N
+    real(dp), allocatable, intent(out) :: T(:)
+    integer(k4), allocatable, intent(out), optional :: istate1(:), istate2(:)
+
+    !Read data
+    open(1, file = trim(adjustl(filepath)), status = 'old', access = 'stream')
+    read(1) N
+    allocate(T(N))
+    read(1) T
+    if(present(istate1) .and. present(istate2)) then
+       allocate(istate1(N), istate2(N))
+       read(1) istate1
+       read(1) istate2
+    end if
+    close(1)
+  end subroutine read_transition_probs_eph
 end module interactions
