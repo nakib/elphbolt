@@ -499,27 +499,24 @@ contains
           read(1) g2_istate
           close(1)
 
+          !print*, 'istate, nprocs = ', istate, nprocs
+
           !Change back to working directory
           call chdir(num%cwd)
-
-          !Allocate quantities related to transition probabilities
+          
+          !Allocate and initialize quantities related to transition probabilities
           allocate(Y_istate(nprocs))
           allocate(istate1(nprocs), istate2(nprocs))
-          
-          if(nprocs > 0) then
-             istate1(:) = -1_k4
-             istate2(:) = -1_k4
-             Y_istate(:) = 0.0_dp
-          else
-             cycle
-          end if
+          istate1(:) = -1_k4
+          istate2(:) = -1_k4
+          Y_istate(:) = 0.0_dp
        end if
 
+       !Initialize process counter
+       count = 0
+       
        !Run over initial (in-window, FBZ blocks) electron wave vectors
        do ik = 1, el%nk
-          !Initialize process counter
-          count = 0
-          
           !Initial wave vector (crystal coords.)
           k = el%wavevecs(ik, :)
 
@@ -578,7 +575,7 @@ contains
 
                    !Temperature dependent occupation factor
                    occup_fac = fermi1*(1.0_dp - fermi2)*invboseplus1
-
+                   
                    !Save Y
                    Y_istate(count) = g2_istate(count)*occup_fac*delta
 
@@ -586,9 +583,9 @@ contains
                    istate1(count) = mux_state(el%numbands, m, ik)
                    istate2(count) = mux_state(el%numbands, n, ikp)
                 end if
-             end do
-          end do !n
-       end do !ikp
+             end do !n
+          end do !m
+       end do !ik
 
        if(key == 'g') then
           !Change to data output directory
@@ -607,7 +604,7 @@ contains
        if(key == 'Y') then
           !Multiply constant factor, unit factor, etc.
           Y_istate(1:count) = const*Y_istate(1:count) !THz
-          
+
           !Change to data output directory
           call chdir(trim(adjustl(Ydir)))
 
@@ -625,7 +622,7 @@ contains
 
        !Change back to working directory
        call chdir(num%cwd)
-
+       
        if(key == 'Y') deallocate(g2_istate, Y_istate, istate1, istate2)
     end do
     sync all
