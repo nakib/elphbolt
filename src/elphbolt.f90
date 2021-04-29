@@ -76,8 +76,8 @@ program elphBolt
      call calculate_eph_interaction_ibzq(wann, crys, el, ph, num, 'Y')
   end if
   
-  !Calculate mixed Bloch-Wannier space e-ph vertex g(k,Rp)
-  call calculate_gkRp(wann, el, num)
+!!$  !Calculate mixed Bloch-Wannier space e-ph vertex g(k,Rp)
+!!$  call calculate_gkRp(wann, el, num)
 !!$
 !!$  !Calculate Bloch space e-ph vertex
 !!$  !TODO call calculate_g2_bloch(wann, crys, el, ph, num)

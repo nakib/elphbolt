@@ -18,83 +18,6 @@ module bz_sums
   end interface calculate_dos
   
 contains
-  
-  subroutine calculate_el_dos(el, usetetra)
-    !! Calculate the density of states (DOS) in units of 1/energy. 
-    !! The DOS will be evaluates on the IBZ mesh energies.
-    !!
-    !! el Electron data type
-    !! usetetra Use the tetrahedron method for delta functions?
-
-    type(electron), intent(inout) :: el
-    logical, intent(in) :: usetetra
-    
-    !Local variables
-    integer(k4) :: ik, ib, ikp, ibp, im, chunk, counter
-    integer(k4), allocatable :: start[:], end[:]
-    real(dp) :: e, delta
-    real(dp), allocatable :: dos_chunk(:,:)[:]
-
-    call print_message("Calculating electron density of states...")
-    
-    !Allocate start and end coarrays
-    allocate(start[*], end[*])
-    
-    !Divide wave vectors among images
-    call distribute_points(el%nk_irred, chunk, start, end)
-    
-    !Allocate small work variable chunk for each image
-    allocate(dos_chunk(end - start + 1, el%numbands)[*])
-    
-    !Allocate dos
-    allocate(el%dos(el%nk_irred, el%numbands))
-
-    !Initialize dos arrays
-    el%dos(:,:) = 0.0_dp
-    dos_chunk(:,:) = 0.0_dp
-
-    counter = 0
-    do ik = start, end !Run over IBZ wave vectors
-       !Increase counter
-       counter = counter + 1
-       do ib = 1, el%numbands !Run over wave vectors   
-          !Grab sample energy from the IBZ
-          e = el%ens_irred(ik, ib) 
-          
-          do ikp = 1, el%nk !Sum over FBZ wave vectors
-             do ibp = 1, el%numbands !Sum over wave vectors
-                if(usetetra) then
-                   !Evaluate delta[E(iq,ib) - E(iq',ib')]
-                   delta = delta_fn_tetra(e, ikp, ibp, el%kmesh, el%tetramap, &
-                        el%tetracount, el%tetra_evals)
-
-                   !Sum over delta function
-                   dos_chunk(counter, ib) = dos_chunk(counter, ib) + delta
-                   
-                   !
-                   !TODO need to implement Gaussian broadening
-                   !
-                end if
-             end do
-          end do
-       end do
-    end do
-    !Multiply with spin degeneracy factor
-    dos_chunk(:,:) = el%spindeg*dos_chunk(:,:)
-
-    sync all
-    
-    !Collect dos_chunks into dos
-    do im = 1, num_images()
-       el%dos(start[im]:end[im], :) = dos_chunk(:,:)[im]
-    end do
-    sync all
-
-    !Write dos to file
-    call write2file_rank2_real(el%prefix // '.dos', el%dos)
-
-    sync all
-  end subroutine calculate_el_dos
 
   subroutine calculate_chempot(el, T, vol)
     !! Subroutine to calculate the chemical potential for a
@@ -108,7 +31,7 @@ contains
     integer(k4) :: ib, ik, it, ngrid, maxiter
 
     call print_message("Calculating chemical potential...")
-    
+
     !Total number of points in full mesh
     ngrid = product(el%kmesh)
 
@@ -145,17 +68,97 @@ contains
        end if
     end do
     el%chempot = mu
-    
+
     if(abs(aux - absconc)/absconc > thresh) then
        call exit_with_message(&
             "Could not converge to correct chemical potential. Exiting.")
     end if
-    
+
     if(this_image() == 1) then
        print*, 'Carrier concentration =', signconc*aux, ' cm^-3'
        print*, 'Chemical potential = ', el%chempot, ' eV'
     end if
   end subroutine calculate_chempot
+  
+  subroutine calculate_el_dos(el, usetetra)
+    !! Calculate the density of states (DOS) in units of 1/energy. 
+    !! The DOS will be evaluates on the IBZ mesh energies.
+    !!
+    !! el Electron data type
+    !! usetetra Use the tetrahedron method for delta functions?
+
+    type(electron), intent(inout) :: el
+    logical, intent(in) :: usetetra
+    
+    !Local variables
+    integer(k4) :: ik, ib, ikp, ibp, im, chunk, counter, num_active_images
+    integer(k4), allocatable :: start[:], end[:]
+    real(dp) :: e, delta
+    real(dp), allocatable :: dos_chunk(:,:)[:]
+
+    call print_message("Calculating electron density of states...")
+    
+    !Allocate start and end coarrays
+    allocate(start[*], end[*])
+    
+    !Divide wave vectors among images
+    call distribute_points(el%nk_irred, chunk, start, end)
+
+    !Number of active images
+    num_active_images = min(el%nk_irred, num_images())
+    
+    !Allocate small work variable chunk for each image
+    allocate(dos_chunk(chunk, el%numbands)[*])
+    
+    !Allocate dos
+    allocate(el%dos(el%nk_irred, el%numbands))
+
+    !Initialize dos arrays
+    el%dos(:,:) = 0.0_dp
+    dos_chunk(:,:) = 0.0_dp
+
+    counter = 0
+    !Work the active images only:
+    do ik = min(start, num_active_images), end !Run over IBZ wave vectors
+       !Increase counter
+       counter = counter + 1
+       do ib = 1, el%numbands !Run over wave vectors   
+          !Grab sample energy from the IBZ
+          e = el%ens_irred(ik, ib) 
+
+          do ikp = 1, el%nk !Sum over FBZ wave vectors
+             do ibp = 1, el%numbands !Sum over wave vectors
+                if(usetetra) then
+                   !Evaluate delta[E(iq,ib) - E(iq',ib')]
+                   delta = delta_fn_tetra(e, ikp, ibp, el%kmesh, el%tetramap, &
+                        el%tetracount, el%tetra_evals)
+
+                   !Sum over delta function
+                   dos_chunk(counter, ib) = dos_chunk(counter, ib) + delta
+
+                   !
+                   !TODO need to implement Gaussian broadening
+                   !
+                end if
+             end do
+          end do
+       end do
+    end do
+    !Multiply with spin degeneracy factor
+    dos_chunk(:,:) = el%spindeg*dos_chunk(:,:)
+    sync all
+    
+    !Collect dos_chunks into dos
+    do im = 1, num_active_images
+       el%dos(start[im]:end[im], :) = dos_chunk(:,:)[im]
+    end do
+    sync all
+
+    !Write dos to file
+    call write2file_rank2_real(el%prefix // '.dos', el%dos)
+
+    sync all
+  end subroutine calculate_el_dos
 
   subroutine calculate_ph_dos_iso(ph, usetetra)
     !! Calculate the phonon density of states (DOS) in units of 1/energy and,
@@ -170,7 +173,7 @@ contains
     logical, intent(in) :: usetetra
     
     !Local variables
-    integer(k4) :: iq, ib, iqp, ibp, im, chunk, counter
+    integer(k4) :: iq, ib, iqp, ibp, im, chunk, counter, num_active_images
     integer(k4), allocatable :: start[:], end[:]
     real(dp) :: e, delta
     real(dp), allocatable :: dos_chunk(:,:)[:]
@@ -182,9 +185,12 @@ contains
     
     !Divide wave vectors among images
     call distribute_points(ph%nq_irred, chunk, start, end)
+
+    !Number of active images
+    num_active_images = min(ph%nq_irred, num_images())
     
     !Allocate small work variable chunk for each image
-    allocate(dos_chunk(end - start + 1, ph%numbranches)[*])
+    allocate(dos_chunk(chunk, ph%numbranches)[*])
     
     !Allocate dos
     allocate(ph%dos(ph%nq_irred, ph%numbranches))
@@ -194,7 +200,8 @@ contains
     dos_chunk(:,:) = 0.0_dp
 
     counter = 0
-    do iq = start, end !Run over IBZ wave vectors
+    !Work the active images only:
+    do iq = min(start, num_active_images), end !Run over IBZ wave vectors
        !Increase counter
        counter = counter + 1
        do ib = 1, ph%numbranches !Run over wave vectors   
@@ -223,7 +230,7 @@ contains
     sync all
     
     !Collect dos_chunks into dos
-    do im = 1, num_images()
+    do im = 1, num_active_images
        ph%dos(start[im]:end[im], :) = dos_chunk(:,:)[im]
     end do
     sync all
