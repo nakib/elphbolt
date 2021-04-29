@@ -546,7 +546,7 @@ contains
              if(abs(en_el - el%enref) > el%fsthick) cycle
 
              !Fermi factor for initial electron
-             if(key == 'Y') fermi1 = Fermi(en_el, el%enref, crys%T)
+             if(key == 'Y') fermi1 = Fermi(en_el, el%chempot, crys%T)
              
              !Run over final electron bands
              do n = 1, el%numbands
@@ -568,7 +568,7 @@ contains
                 
                 if(key == 'Y') then
                    !Fermi factor for initial electron
-                   fermi2 = Fermi(en_elp, el%enref, crys%T)
+                   fermi2 = Fermi(en_elp, el%chempot, crys%T)
 
                    !Calculate Y:
 

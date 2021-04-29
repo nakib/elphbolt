@@ -4,3 +4,4 @@ export FC=caf
 export LIBS=-lblas -llapack
 
 #module load gcc/7.2.0   3) opencoarrays/2.6.3   4) lapack/3.8.0   5) openblas/0.3.6
+#spglib-1.6.0 built with gcc and path to ~/spglib-1.6.0/build/lib/ added to environment

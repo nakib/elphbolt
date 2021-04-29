@@ -15,7 +15,7 @@ program elphBolt
   use phonon_module, only: phonon
   use wannier_module, only: epw_wannier
   use bte_module, only: bte
-  use bz_sums, only: calculate_dos
+  use bz_sums, only: calculate_dos, calculate_chempot
   use interactions, only: calculate_gReq, calculate_gkRp, calculate_g2_bloch, &
        calculate_3ph_interaction, calculate_eph_interaction_ibzq
   
@@ -55,6 +55,9 @@ program elphBolt
 
   !Calculate electron density of states
   call calculate_dos(el, num%tetrahedra)
+
+  !Calculate chemical potential
+  call calculate_chempot(el, crys%T, crys%volume)
   
   !Calculate phonons
   call ph%initialize(wann, crys, sym, num)

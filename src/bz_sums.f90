@@ -3,14 +3,14 @@ module bz_sums
 
   use params, only: dp, k4, kB, qe
   use misc, only: exit_with_message, print_message, write2file_rank2_real, &
-       distribute_points, Bose
+       distribute_points, Bose, Fermi
   use phonon_module, only: phonon
   use electron_module, only: electron
   use delta, only: delta_fn_tetra
 
   implicit none
 
-  public calculate_transport_coeff
+  public calculate_dos, calculate_transport_coeff, calculate_chempot
   private calculate_el_dos, calculate_ph_dos_iso
 
   interface calculate_dos
@@ -95,6 +95,67 @@ contains
 
     sync all
   end subroutine calculate_el_dos
+
+  subroutine calculate_chempot(el, T, vol)
+    !! Subroutine to calculate the chemical potential for a
+    !! given carrier concentration.
+
+    type(electron), intent(inout) :: el
+    real(dp), intent(in) :: T, vol
+
+    !Local variables
+    real(dp) :: a, b, aux, const, absconc, signconc, mu, thresh
+    integer(k4) :: ib, ik, it, ngrid, maxiter
+
+    call print_message("Calculating chemical potential...")
+    
+    !Total number of points in full mesh
+    ngrid = product(el%kmesh)
+
+    !Normalization and units factor
+    const = el%spindeg/dble(ngrid)/vol/(1.0e-21_dp)
+
+    !Maximum number of iterations
+    maxiter = 1000
+
+    !Convergence threshold
+    thresh = 1.0e-12_dp
+
+    !Absolute value and sign of concentration
+    absconc = abs(el%conc)
+    signconc = sign(1.0_dp, el%conc)
+
+    a = el%enref - 20.0_dp !guess lower bound
+    b = el%enref + 20.0_dp !guess upper bound
+    do it = 1, maxiter
+       mu = 0.5_dp*(a + b)
+       aux = 0.0_dp
+       do ib = 1, el%numbands
+          do ik = 1, el%nk
+             aux = aux + Fermi(el%ens(ik, ib), mu, T)
+          end do
+       end do
+       aux = aux*const !cm^-3
+       if(abs(aux - absconc)/absconc < thresh) then
+          exit
+       else if(aux < absconc) then
+          a = mu
+       else
+          b = mu
+       end if
+    end do
+    el%chempot = mu
+    
+    if(abs(aux - absconc)/absconc > thresh) then
+       call exit_with_message(&
+            "Could not converge to correct chemical potential. Exiting.")
+    end if
+    
+    if(this_image() == 1) then
+       print*, 'Carrier concentration =', signconc*aux, ' cm^-3'
+       print*, 'Chemical potential = ', el%chempot, ' eV'
+    end if
+  end subroutine calculate_chempot
 
   subroutine calculate_ph_dos_iso(ph, usetetra)
     !! Calculate the phonon density of states (DOS) in units of 1/energy and,

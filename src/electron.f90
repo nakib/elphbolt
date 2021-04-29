@@ -52,6 +52,10 @@ module electron_module
      !! This is the center of the transport enery window.
      real(dp) :: fsthick
      !! Fermi surface thickness in (eV).
+     real(dp) :: chempot
+     !! Chemical potential
+     real(dp) :: conc
+     !! Electron(-)/hole(+) carrier concentration.
      real(dp), allocatable :: wavevecs(:,:)
      !! List of all electron wave vectors (crystal coordinates).
      real(dp), allocatable :: wavevecs_irred(:,:)
@@ -115,13 +119,14 @@ contains
     type(numerics), intent(in) :: num
 
     !Local variables
-    real(dp) :: enref
+    real(dp) :: enref, conc
     integer(k4) :: spindeg, numbands, numtransbands, indlowband, indhighband, &
          indhighvalence, indlowconduction
     logical :: metallic
 
     namelist /electrons/ enref, spindeg, numbands, numtransbands, &
-         indlowband, indhighband, metallic, indhighvalence, indlowconduction
+         indlowband, indhighband, metallic, indhighvalence, indlowconduction, &
+         conc
     
     !Open input file
     open(1, file = 'input.nml', status = 'old')
@@ -135,6 +140,7 @@ contains
     el%indhighvalence = -1
     el%indlowconduction = -1
     el%metallic = .false.
+    el%conc = 0.0_dp
     read(1, nml = electrons)
     if(spindeg < 1 .or. spindeg > 2) then
        call exit_with_message('spindeg can be 1 or 2.')
@@ -175,6 +181,7 @@ contains
     el%indlowconduction = indlowconduction
     el%metallic = metallic
     el%enref = enref
+    el%conc = conc
     
     !Close input file
     close(1)
@@ -184,6 +191,7 @@ contains
     el%kmesh = el%mesh_ref*num%qmesh
     el%fsthick = num%fsthick
 
+    !Calculate electrons
     call calculate_electrons(el, wann, crys, sym, num)
   end subroutine read_input_and_setup
   
