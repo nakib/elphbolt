@@ -65,18 +65,26 @@ contains
     r = mod(num, denom)
   end subroutine int_div
 
-  subroutine distribute_points(npts, chunk, istart, iend)
+  subroutine distribute_points(npts, chunk, istart, iend, num_active_images)
     !! Distribute points among processes
 
     integer(k4), intent(in) :: npts
-    integer(k4), intent(out) :: chunk, istart, iend
-    
+    integer(k4), intent(out) :: chunk, istart, iend, num_active_images
+
+    !Number of active images
+    num_active_images = min(npts, num_images())
     !Number of points per process
     chunk = ceiling(dble(npts)/num_images())
     !Start index
     istart = (this_image()-1)*chunk + 1
     !End index
-    iend = min(chunk*this_image(),npts)
+    iend = min(chunk*this_image(), npts)
+    !Update chunk
+    if(istart < iend) then
+       chunk = iend - istart + 1
+    else
+       chunk = 1
+    end if
   end subroutine distribute_points
   
   function cross_product(A, B)

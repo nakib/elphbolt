@@ -145,7 +145,7 @@ contains
     real(dp), allocatable, intent(out) :: field_term(:,:,:)
 
     !Local variables
-    integer(k4) :: ik_ibz, ik_fbz, ieq, ib, nk_ibz, nk, nbands, im, chunk
+    integer(k4) :: ik_ibz, ik_fbz, ieq, ib, nk_ibz, nk, nbands, im, chunk, num_active_images
     integer(k4), allocatable :: start[:], end[:]
     real(dp), allocatable :: field_term_reduce(:,:,:)[:]
     real(dp) :: A
@@ -191,12 +191,13 @@ contains
        allocate(start[*], end[*])
 
        !Divide IBZ states among images
-       call distribute_points(nk_ibz, chunk, start, end)
-
+       call distribute_points(nk_ibz, chunk, start, end, num_active_images)
+       
        !Allocate and initialize field term coarrays
        allocate(field_term_reduce(nk, nbands, 3)[*])
        field_term_reduce(:,:,:) = 0.0_dp
-       
+
+       !Work the active images only:
        do ik_ibz = start, end
           do ieq = 1, nequiv(ik_ibz)
              ik_fbz = ibz2fbz_map(ieq, ik_ibz, 2)
@@ -212,7 +213,7 @@ contains
        sync all
 
        !Reduce field term coarrays
-       do im = 1, num_images()
+       do im = 1, num_active_images
           field_term(:,:,:) = field_term(:,:,:) + field_term_reduce(:,:,:)[im] !nm.eV/K
        end do
     end if
@@ -233,7 +234,7 @@ contains
 
     !Local variables
     integer(k4) :: nstates_irred, nprocs, chunk, istate1, numbranches, s1, &
-         iq1_ibz, ieq, iq1_sym, iq1_fbz, iproc, iq2, s2, iq3, s3, im, nq
+         iq1_ibz, ieq, iq1_sym, iq1_fbz, iproc, iq2, s2, iq3, s3, im, nq, num_active_images
     integer(k4), allocatable :: istate2_plus(:), istate3_plus(:), &
          istate2_minus(:), istate3_minus(:), start[:], end[:]
     real(dp) :: tau_ibz
@@ -269,8 +270,8 @@ contains
     response_ph_reduce(:,:,:) = 0.0_dp
     
     !Divide phonon states among images
-    call distribute_points(nstates_irred, chunk, start, end)
-
+    call distribute_points(nstates_irred, chunk, start, end, num_active_images)
+    
     !Run over first phonon IBZ states
     do istate1 = start, end
        !Demux state index into branch (s) and wave vector (iq) indices
@@ -334,7 +335,7 @@ contains
 
     !Update the response function
     response_ph(:,:,:) = 0.0_dp
-    do im = 1, num_images()
+    do im = 1, num_active_images
        response_ph(:,:,:) = response_ph(:,:,:) + response_ph_reduce(:,:,:)[im]
     end do
     sync all

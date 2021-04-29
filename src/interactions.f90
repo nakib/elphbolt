@@ -70,7 +70,7 @@ contains
     integer(k4) :: start, end, chunk, istate1, nstates_irred, &
          nprocs, s1, s2, s3, iq1_ibz, iq1, iq2, iq3_minus, it, &
          q1_indvec(3), q2_indvec(3), q3_minus_indvec(3), index_minus, index_plus, &
-         neg_iq2, neg_q2_indvec(3)
+         neg_iq2, neg_q2_indvec(3), num_active_images
     real(dp) :: en1, en2, en3, massfac, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
          delta, occup_fac, Vp2_index_plus, const, bose2, bose3
     real(dp), allocatable :: Vm2(:), Wm(:), Wp(:)
@@ -115,7 +115,7 @@ contains
     end if
 
     !Divide phonon states among images
-    call distribute_points(nstates_irred, chunk, start, end)
+    call distribute_points(nstates_irred, chunk, start, end, num_active_images)
 
     if(this_image() == 1) then
        print*, "   #states = ", nstates_irred
@@ -331,11 +331,11 @@ contains
     type(numerics), intent(in) :: num
 
     !Local variables
-    integer(k4) :: iq, iqstart, iqend, chunk
+    integer(k4) :: iq, iqstart, iqend, chunk, num_active_images
 
     call print_message("Doing g(Re,Rp) -> g(Re,q) for all IBZ q...")
 
-    call distribute_points(ph%nq_irred, chunk, iqstart, iqend)
+    call distribute_points(ph%nq_irred, chunk, iqstart, iqend, num_active_images)
 
     if(this_image() == 1) then
        print*, "   #q = ", ph%nq_irred
@@ -357,11 +357,11 @@ contains
     type(numerics), intent(in) :: num
 
     !Local variables
-    integer(k4) :: ik, ikstart, ikend, chunk
+    integer(k4) :: ik, ikstart, ikend, chunk, num_active_images
 
     call print_message("Doing g(Re,Rp) -> g(k,Rp) for all IBZ k...")
 
-    call distribute_points(el%nk_irred, chunk, ikstart, ikend)
+    call distribute_points(el%nk_irred, chunk, ikstart, ikend, num_active_images)
 
     if(this_image() == 1) then
        print*, "   #k = ", el%nk_irred
@@ -399,7 +399,7 @@ contains
     !Local variables
     integer(k4) :: nstates_irred, istate, m, iq, iq_fbz, n, ik, ikp, s, &
          ikp_window, start, end, chunk, k_indvec(3), kp_indvec(3), &
-         q_indvec(3), nprocs, count
+         q_indvec(3), nprocs, count, num_active_images
     integer(k4), allocatable :: istate1(:), istate2(:)
     real(dp) :: k(3), kp(3), q(3), en_ph, en_el, en_elp, const, delta, &
          invboseplus1, fermi1, fermi2, occup_fac
@@ -441,7 +441,7 @@ contains
     !Total number of IBZ blocks states
     nstates_irred = ph%nq_irred*ph%numbranches
 
-    call distribute_points(nstates_irred, chunk, start, end)
+    call distribute_points(nstates_irred, chunk, start, end, num_active_images)
     
     if(this_image() == 1) then
        print*, "   #states = ", nstates_irred
@@ -662,7 +662,7 @@ contains
     !Local variables
     integer(k4) :: nstates_irred, istate, m, ik, ik_muxed, n, ikp, s, &
          iq, start, end, chunk, k_indvec(3), kp_indvec(3), &
-         q_indvec(3), count, g2size
+         q_indvec(3), count, g2size, num_active_images
     real(dp) :: k(3), kp(3), q(3)
     real(dp), allocatable :: g2_istate(:)
     complex(dp) :: gkRp_ik(wann%numwannbands,wann%numwannbands,wann%numbranches,wann%nwsq)
@@ -677,7 +677,7 @@ contains
     !Total number of IBZ blocks states
     nstates_irred = el%nk_irred*wann%numwannbands
 
-    call distribute_points(nstates_irred, chunk, start, end)
+    call distribute_points(nstates_irred, chunk, start, end, num_active_images)
     
     if(this_image() == 1) then
        print*, "   #states = ", nstates_irred
@@ -788,7 +788,7 @@ contains
 
     !Local variables
     integer(k4) :: nstates_irred, procs, istate, nprocs_3ph, nprocs_phe, &
-         iproc, chunk, s, iq, im
+         iproc, chunk, s, iq, im, num_active_images
     integer(k4), allocatable :: start[:], end[:]
     real(dp), allocatable :: rta_rates_3ph_psum(:,:)[:], rta_rates_phe_psum(:,:)[:], &
          W(:), Y(:)
@@ -816,7 +816,7 @@ contains
     allocate(start[*], end[*])
     
     !Divide phonon states among images
-    call distribute_points(nstates_irred, chunk, start, end)
+    call distribute_points(nstates_irred, chunk, start, end, num_active_images)
 
     !Allocate and initialize scattering rates coarrays
     allocate(rta_rates_3ph_psum(ph%nq_irred, ph%numbranches)[*])
@@ -876,9 +876,11 @@ contains
     sync all
 
     !Reduce coarray partial sums
-    do im = 1, num_images()
+    do im = 1, num_active_images
        rta_rates_3ph(:,:) = rta_rates_3ph(:,:) + rta_rates_3ph_psum(:,:)[im]
-       rta_rates_phe(:,:) = rta_rates_phe(:,:) + rta_rates_phe_psum(:,:)[im]
+       if(present(el)) then
+          rta_rates_phe(:,:) = rta_rates_phe(:,:) + rta_rates_phe_psum(:,:)[im]
+       end if
     end do
     sync all
   end subroutine calculate_ph_rta_rates

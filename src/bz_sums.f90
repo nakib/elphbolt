@@ -102,11 +102,8 @@ contains
     allocate(start[*], end[*])
     
     !Divide wave vectors among images
-    call distribute_points(el%nk_irred, chunk, start, end)
+    call distribute_points(el%nk_irred, chunk, start, end, num_active_images)
 
-    !Number of active images
-    num_active_images = min(el%nk_irred, num_images())
-    
     !Allocate small work variable chunk for each image
     allocate(dos_chunk(chunk, el%numbands)[*])
     
@@ -118,8 +115,7 @@ contains
     dos_chunk(:,:) = 0.0_dp
 
     counter = 0
-    !Work the active images only:
-    do ik = min(start, num_active_images), end !Run over IBZ wave vectors
+    do ik = start, end !Run over IBZ wave vectors
        !Increase counter
        counter = counter + 1
        do ib = 1, el%numbands !Run over wave vectors   
@@ -184,10 +180,7 @@ contains
     allocate(start[*], end[*])
     
     !Divide wave vectors among images
-    call distribute_points(ph%nq_irred, chunk, start, end)
-
-    !Number of active images
-    num_active_images = min(ph%nq_irred, num_images())
+    call distribute_points(ph%nq_irred, chunk, start, end, num_active_images)
     
     !Allocate small work variable chunk for each image
     allocate(dos_chunk(chunk, ph%numbranches)[*])
@@ -200,8 +193,7 @@ contains
     dos_chunk(:,:) = 0.0_dp
 
     counter = 0
-    !Work the active images only:
-    do iq = min(start, num_active_images), end !Run over IBZ wave vectors
+    do iq = start, end !Run over IBZ wave vectors
        !Increase counter
        counter = counter + 1
        do ib = 1, ph%numbranches !Run over wave vectors   
