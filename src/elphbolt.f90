@@ -77,14 +77,18 @@ program elphBolt
      !Calculate ph-e transition probabilities
      call calculate_eph_interaction_ibzq(wann, crys, el, ph, num, 'Y')
   end if
-  
-!!$  !Calculate mixed Bloch-Wannier space e-ph vertex g(k,Rp)
-!!$  call calculate_gkRp(wann, el, num)
-!!$
-!!$  !Calculate Bloch space e-ph vertex
-!!$  !TODO call calculate_g2_bloch(wann, crys, el, ph, num)
-!!$  !TODO need to fix this for unequal k and q meshes
 
+  if(.not. num%read_gk2) then
+     !Calculate mixed Bloch-Wannier space e-ph vertex g(k,Rp)
+     call calculate_gkRp(wann, el, num)
+
+!!$     !Calculate Bloch space e-ph vertex g(k,q) for IBZ k
+!!$     call calculate_eph_interaction_ibzk(wann, crys, el, ph, num, 'g')
+  end if
+
+!!$  !Calculate ph-e transition probabilities
+!!$  call calculate_eph_interaction_ibzk(wann, crys, el, ph, num, 'X')
+     
   if(.not. num%read_V) then
      !Calculate ph-ph vertex
      call calculate_3ph_interaction(ph, crys, num, 'V')
