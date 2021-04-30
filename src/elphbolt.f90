@@ -65,13 +65,15 @@ program elphBolt
   !Calculate phonon density of states
   call calculate_dos(ph, num%tetrahedra)
 
-  if(num%phe) then     
-     !Calculate mixed Bloch-Wannier space e-ph vertex g(Re,q)
-     call calculate_gReq(wann, ph, num)
+  if(num%phe) then
+     if(.not. num%read_gq2) then
+        !Calculate mixed Bloch-Wannier space e-ph vertex g(Re,q)
+        call calculate_gReq(wann, ph, num)
 
-     !Calculate Bloch space e-ph vertex g(k,q) for IBZ q
-     call calculate_eph_interaction_ibzq(wann, crys, el, ph, num, 'g')
-
+        !Calculate Bloch space e-ph vertex g(k,q) for IBZ q
+        call calculate_eph_interaction_ibzq(wann, crys, el, ph, num, 'g')
+     end if
+     
      !Calculate ph-e transition probabilities
      call calculate_eph_interaction_ibzq(wann, crys, el, ph, num, 'Y')
   end if

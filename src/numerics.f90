@@ -30,7 +30,7 @@ module numerics_module
      character(len = 1024) :: Vdir
      !character, allocatable :: Vdir(:)
      !! Directory for ph-ph vertex.
-     logical :: read_g2
+     logical :: read_gq2
      !! Choose if earlier e-ph vertices are to be used.
      logical :: read_V
      !! Choose if earlier ph-ph vertices are to be used.
@@ -56,9 +56,9 @@ contains
     integer(k4) :: mesh_ref, qmesh(3)
     real(dp) :: fsthick
     character(len = 1024) :: datadumpdir
-    logical :: read_g2, read_V, tetrahedra, phe
+    logical :: read_gq2, read_V, tetrahedra, phe
 
-    namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_g2, read_V, &
+    namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_V, &
          tetrahedra, phe
 
     !Open input file
@@ -69,7 +69,7 @@ contains
     n%mesh_ref = 1
     n%fsthick = 0.0_dp
     n%datadumpdir = './'
-    n%read_g2 = .false.
+    n%read_gq2 = .false.
     n%read_V = .false.
     n%tetrahedra = .false.
     n%phe = .false.
@@ -81,7 +81,7 @@ contains
     n%mesh_ref = mesh_ref
     n%fsthick = fsthick
     n%datadumpdir = trim(datadumpdir)
-    n%read_g2 = read_g2
+    n%read_gq2 = read_gq2
     n%read_V = read_V
     n%tetrahedra = tetrahedra
     n%phe = phe

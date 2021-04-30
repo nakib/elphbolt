@@ -499,8 +499,6 @@ contains
           read(1) g2_istate
           close(1)
 
-          !print*, 'istate, nprocs = ', istate, nprocs
-
           !Change back to working directory
           call chdir(num%cwd)
           
