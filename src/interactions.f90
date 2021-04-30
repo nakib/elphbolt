@@ -877,6 +877,7 @@ contains
           rta_rates_phe(:,:) = rta_rates_phe(:,:) + rta_rates_phe_psum(:,:)[im]
        end if
     end do
+    rta_rates_3ph(:,:) = el%spindeg*rta_rates_3ph(:,:)
     sync all
   end subroutine calculate_ph_rta_rates
   
