@@ -863,7 +863,7 @@ contains
           call read_transition_probs_eph(trim(adjustl(filepath_Y)), nprocs_phe, Y)
 
           do iproc = 1, nprocs_phe
-             rta_rates_phe_psum(iq, s) = rta_rates_phe_psum(iq, s) + Y(iproc)
+             rta_rates_phe_psum(iq, s) = rta_rates_phe_psum(iq, s) + el%spindeg*Y(iproc)
           end do
        end if
     end do
@@ -877,7 +877,6 @@ contains
           rta_rates_phe(:,:) = rta_rates_phe(:,:) + rta_rates_phe_psum(:,:)[im]
        end if
     end do
-    rta_rates_3ph(:,:) = el%spindeg*rta_rates_3ph(:,:)
     sync all
   end subroutine calculate_ph_rta_rates
   
