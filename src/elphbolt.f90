@@ -16,8 +16,8 @@ program elphBolt
   use wannier_module, only: epw_wannier
   use bte_module, only: bte
   use bz_sums, only: calculate_dos, calculate_chempot
-  use interactions, only: calculate_gReq, calculate_gkRp, calculate_g2_bloch, &
-       calculate_3ph_interaction, calculate_eph_interaction_ibzq
+  use interactions, only: calculate_gReq, calculate_gkRp, calculate_3ph_interaction, &
+       calculate_eph_interaction_ibzq, calculate_eph_interaction_ibzk
   
   implicit none
   
@@ -82,8 +82,8 @@ program elphBolt
      !Calculate mixed Bloch-Wannier space e-ph vertex g(k,Rp)
      call calculate_gkRp(wann, el, num)
 
-!!$     !Calculate Bloch space e-ph vertex g(k,q) for IBZ k
-!!$     call calculate_eph_interaction_ibzk(wann, crys, el, ph, num, 'g')
+     !Calculate Bloch space e-ph vertex g(k,q) for IBZ k
+     call calculate_eph_interaction_ibzk(wann, crys, el, ph, num, 'g')
   end if
 
 !!$  !Calculate ph-e transition probabilities
