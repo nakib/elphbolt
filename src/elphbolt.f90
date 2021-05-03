@@ -86,8 +86,8 @@ program elphBolt
      call calculate_eph_interaction_ibzk(wann, crys, el, ph, num, 'g')
   end if
 
-!!$  !Calculate ph-e transition probabilities
-!!$  call calculate_eph_interaction_ibzk(wann, crys, el, ph, num, 'X')
+  !Calculate ph-e transition probabilities
+  call calculate_eph_interaction_ibzk(wann, crys, el, ph, num, 'X')
      
   if(.not. num%read_V) then
      !Calculate ph-ph vertex
