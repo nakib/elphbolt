@@ -11,7 +11,7 @@ module bte_module
   use phonon_module, only: phonon
   use electron_module, only: electron
   use interactions, only: calculate_ph_rta_rates, read_transition_probs_3ph, &
-       read_transition_probs_eph
+       read_transition_probs_eph, calculate_el_rta_rates
   use bz_sums, only: calculate_transport_coeff
 
   implicit none
@@ -29,16 +29,18 @@ module bte_module
      real(dp), allocatable :: ph_response(:,:,:)
      !! Phonon response function on the FBZ.
      
+     real(dp), allocatable :: el_rta_rates_ibz(:,:)
+     !! Phonon RTA scattering rates on the IBZ.
    contains
 
-     procedure :: solve_rta_ph
+     procedure :: solve_bte
      
   end type bte
 
 contains
 
-  subroutine solve_rta_ph(bt, num, crys, sym, ph, el)
-    !! Subroutine to calculate the RTA solution of the phonon BTE.
+  subroutine solve_bte(bt, num, crys, sym, ph, el)
+    !! Subroutine to solve the BTE
 
     class(bte), intent(out) :: bt
     type(numerics), intent(in) :: num
@@ -50,9 +52,9 @@ contains
     !Local variables
     character(len = 1024) :: tag, Tdir
     integer(k4) :: iq, it
-    real(dp), allocatable :: rates_3ph(:,:), rates_phe(:,:)
+    real(dp), allocatable :: rates_3ph(:,:), rates_phe(:,:), rates_eph(:,:)
 
-    call print_message("Solving ph BTE in the RTA...")
+    call print_message("Solving BTE in the RTA...")
     
     !Create output folder tagged by temperature and change into it
     write(tag, "(E9.3)") crys%T
@@ -61,67 +63,89 @@ contains
        call system('mkdir '//trim(adjustl(Tdir)))
     end if
     sync all
-    
-    !Calculate RTA scattering rates
-    if(present(el)) then
-       call calculate_ph_rta_rates(rates_3ph, rates_phe, num, crys, ph, el)
-    else
-       call calculate_ph_rta_rates(rates_3ph, rates_phe, num, crys, ph)
-    end if
-    !Matthiessen's rule
-    bt%ph_rta_rates_ibz = rates_3ph + rates_phe
-    
-    !Calculate RTA term F0
-    call calculate_field_term('ph', 'T', ph%nequiv, ph%ibz2fbz_map, &
-         crys%T, 0.0_dp, ph%ens, ph%vels, bt%ph_rta_rates_ibz, bt%ph_field_term)
 
-    !Symmetrize field term
-    do iq = 1, ph%nq
-       bt%ph_field_term(iq,:,:)=transpose(&
-            matmul(ph%symmetrizers(:,:,iq),transpose(bt%ph_field_term(iq,:,:))))
-    end do
-    
-    !RTA solution of BTE
-    allocate(bt%ph_response(ph%nq, ph%numbranches, 3))
-    bt%ph_response = bt%ph_field_term
-    
-    !Calculate transport coefficient
-    call calculate_transport_coeff('ph', 'T', crys%T, 0.0_dp, ph%ens, ph%vels, &
-         crys%volume, ph%qmesh, bt%ph_response)
+    if(num%phbte) then
+       !Calculate RTA scattering rates
+       if(present(el)) then
+          call calculate_ph_rta_rates(rates_3ph, rates_phe, num, crys, ph, el)
+       else
+          call calculate_ph_rta_rates(rates_3ph, rates_phe, num, crys, ph)
+       end if
+       !Matthiessen's rule
+       bt%ph_rta_rates_ibz = rates_3ph + rates_phe
 
-    !Change to data output directory
-    call chdir(trim(adjustl(Tdir)))
+       !Calculate field term (F0 or G0)
+       call calculate_field_term('ph', 'T', ph%nequiv, ph%ibz2fbz_map, &
+            crys%T, 0.0_dp, ph%ens, ph%vels, bt%ph_rta_rates_ibz, bt%ph_field_term)
 
-    !Write RTA scattering rates to file
-    call write2file_rank2_real('ph.W_rta_3ph', rates_3ph)
-    call write2file_rank2_real('ph.W_rta_phe', rates_phe)
-    call write2file_rank2_real('ph.W_rta', bt%ph_rta_rates_ibz)
-
-    !Change back to cwd
-    call chdir(trim(adjustl(num%cwd)))
-
-    !!!!
-    !TODO Need a more elegant solution to jumping between directories...
-    !!!!
-    
-    !Start iterator
-    do it = 1, 5
-       call iterate_bte_ph(crys%T, num%datadumpdir, .False., ph%nequiv, ph%equiv_map, &
-            ph%ibz2fbz_map, bt%ph_rta_rates_ibz, bt%ph_field_term, bt%ph_response)
-
-       !Symmetrize response function
+       !Symmetrize field term
        do iq = 1, ph%nq
-          bt%ph_response(iq,:,:)=transpose(&
-               matmul(ph%symmetrizers(:,:,iq),transpose(bt%ph_response(iq,:,:))))
+          bt%ph_field_term(iq,:,:)=transpose(&
+               matmul(ph%symmetrizers(:,:,iq),transpose(bt%ph_field_term(iq,:,:))))
        end do
-       
+
+       !RTA solution of BTE
+       allocate(bt%ph_response(ph%nq, ph%numbranches, 3))
+       bt%ph_response = bt%ph_field_term
+
        !Calculate transport coefficient
        call calculate_transport_coeff('ph', 'T', crys%T, 0.0_dp, ph%ens, ph%vels, &
             crys%volume, ph%qmesh, bt%ph_response)
 
-!!$       if(is_converged(coeff_new, coeff_old)) exit
-    end do
-  end subroutine solve_rta_ph
+       !Change to data output directory
+       call chdir(trim(adjustl(Tdir)))
+
+       !Write RTA scattering rates to file
+       call write2file_rank2_real('ph.W_rta_3ph', rates_3ph)
+       call write2file_rank2_real('ph.W_rta_phe', rates_phe)
+       call write2file_rank2_real('ph.W_rta', bt%ph_rta_rates_ibz)
+    end if
+
+    if(num%ebte) then
+       !Calculate RTA scattering rates
+       call calculate_el_rta_rates(rates_eph, num, crys, el)
+       bt%el_rta_rates_ibz = rates_eph ! + other channels
+       
+       !TODO Calculate field term (I0 or J0)
+
+       !TODO Symmetrize field term
+
+       !...
+       !...
+       !...
+
+       !Change to data output directory
+       call chdir(trim(adjustl(Tdir)))
+
+       !Write RTA scattering rates to file
+       call write2file_rank2_real('el.W_rta_eph', rates_eph)
+    end if
+    
+    !Change back to cwd
+    call chdir(trim(adjustl(num%cwd)))
+
+!!$    !!!!
+!!$    !TODO Need a more elegant solution to jumping between directories...
+!!$    !!!!
+!!$    
+!!$    !Start iterator
+!!$    do it = 1, 5
+!!$       call iterate_bte_ph(crys%T, num%datadumpdir, .False., ph%nequiv, ph%equiv_map, &
+!!$            ph%ibz2fbz_map, bt%ph_rta_rates_ibz, bt%ph_field_term, bt%ph_response)
+!!$
+!!$       !Symmetrize response function
+!!$       do iq = 1, ph%nq
+!!$          bt%ph_response(iq,:,:)=transpose(&
+!!$               matmul(ph%symmetrizers(:,:,iq),transpose(bt%ph_response(iq,:,:))))
+!!$       end do
+!!$       
+!!$       !Calculate transport coefficient
+!!$       call calculate_transport_coeff('ph', 'T', crys%T, 0.0_dp, ph%ens, ph%vels, &
+!!$            crys%volume, ph%qmesh, bt%ph_response)
+!!$
+!!$       !if(is_converged(coeff_new, coeff_old)) exit
+!!$    end do
+  end subroutine solve_bte
 
   subroutine calculate_field_term(species, field, nequiv, ibz2fbz_map, &
        T, chempot, ens, vels, rta_rates_ibz, field_term)

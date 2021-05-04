@@ -40,7 +40,10 @@ module numerics_module
      !! Choose is the tetrahedron method for delta function evaluation will be used.
      logical :: phe
      !! Choose if ph-e interaction will be included.
-   
+     logical :: phbte
+     !! Choose if phonon BTE will be solved.
+     logical :: ebte
+     !! Choose if electron BTE will be solved.
    contains
 
      procedure :: initialize=>read_input_and_setup
@@ -58,10 +61,10 @@ contains
     integer(k4) :: mesh_ref, qmesh(3)
     real(dp) :: fsthick
     character(len = 1024) :: datadumpdir
-    logical :: read_gq2, read_gk2, read_V, tetrahedra, phe
+    logical :: read_gq2, read_gk2, read_V, tetrahedra, phe, phbte, ebte
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
-         read_V, tetrahedra, phe
+         read_V, tetrahedra, phe, phbte, ebte
 
     !Open input file
     open(1, file = 'input.nml', status = 'old')
@@ -76,8 +79,10 @@ contains
     n%read_V = .false.
     n%tetrahedra = .false.
     n%phe = .false.
+    n%phbte = .false.
+    n%ebte = .false.
     read(1, nml = numerics)
-    if(any(qmesh <= 0) .or. mesh_ref < 1 .or. fsthick < 0) then
+    if(any(qmesh <= 0) .or. mesh_ref < 1 .or. fsthick < 0 .or. .not.(phbte .or. ebte)) then
        call exit_with_message('Bad input(s) in numerics.')
     end if
     n%qmesh = qmesh
@@ -89,6 +94,8 @@ contains
     n%read_V = read_V
     n%tetrahedra = tetrahedra
     n%phe = phe
+    n%phbte = phbte
+    n%ebte = ebte
     
     !Create data dump directory
     if(this_image() == 1) call system('mkdir ' // trim(adjustl(n%datadumpdir)))

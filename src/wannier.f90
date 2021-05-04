@@ -277,7 +277,7 @@ contains
     nwork = 1
     allocate(work(nwork))
     allocate(rwork(max(1, 9*crys%numatoms-2)))
-
+    
     do iq = 1, nq
        !Form dynamical matrix (dynmat) and q-derivative of dynmat (ddynmat) 
        !from Dphwann, rcells_q, and phwsdeg
@@ -333,7 +333,7 @@ contains
        if(all(qvecs(iq,:) == 0)) then
           energies(iq, 1:3) = 0
        end if
-
+       
        !Handle negative energy phonons
        do ib = 1, wann%numbranches
           if(energies(iq,ib) < -0.005_dp) then
@@ -834,7 +834,7 @@ contains
        u(ip) = ph_evec_q(ip)/sqrt(crys%masses(crys%atomtypes(mtype)))
     end do
 
-    if(ph_en == 0) then !zero out matrix elements at Gamma
+    if(ph_en == 0) then !zero out matrix elements for energy phonons
        g2_epw = 0
     else
        UkpgkUk = 0 !g(k,Rp) rotated by the electron U(k), U(k') matrices
