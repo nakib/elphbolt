@@ -49,7 +49,7 @@ module electron_module
      !! List of irreducible wedge states within transport window.
      real(dp) :: enref
      !! Electron reference energy (eV).
-     !! This is the center of the transport enery window.
+     !! This is the center of the transport energy window.
      real(dp) :: fsthick
      !! Fermi surface thickness in (eV).
      real(dp) :: chempot

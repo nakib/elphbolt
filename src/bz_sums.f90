@@ -233,12 +233,15 @@ contains
     sync all
   end subroutine calculate_ph_dos_iso
 
-  subroutine calculate_transport_coeff(species, field, T, chempot, ens, vels, &
+  subroutine calculate_transport_coeff(species, field, T, deg, chempot, ens, vels, &
        volume, mesh, response)
     !! Subroutine to calculate transport coefficients.
     !!
     !! species Type of particle
     !! field Type of field
+    !! T Temperature in K
+    !! deg Degeneracy
+    !! chempot Chemical potential in eV
     !! ens FBZ energies
     !! vels FBZ velocities
     !! volume Primitive cell volume
@@ -247,40 +250,69 @@ contains
 
     character(len = 2), intent(in) :: species
     character(len = 1), intent(in) :: field
-    integer(k8), intent(in) :: mesh(3)
+    integer(k8), intent(in) :: mesh(3), deg
     real(dp), intent(in) :: T, chempot, ens(:,:), vels(:,:,:), volume, response(:,:,:)
 
     !Local variables
-    integer(k8) :: ik, ib, icart, jcart, nk, nbands
+    integer(k8) :: ik, ib, icart, nk, nbands, pow
     real(dp) :: dist_factor, e, v, A, trans_coeff(3,3)
     
     nk = size(ens(:,1))
     nbands = size(ens(1,:))
-
-    !TODO Do checks related to particle and field type
     
-    !For phonon thermal conductivity
-    A = 1.0_dp/kB/T/(volume)/product(mesh)
-    A = qe*1.0e21*A !Units conversion
+    !Do checks related to particle and field type
+    if(species == 'ph') then
+       if(chempot /= 0.0_dp) then
+          call exit_with_message(&
+               "Phonon chemical potential non-zero in calculate_transport_coefficient. Exiting.")
+       end if
+       if(field == 'T') then !thermal conductivity
+          A = qe*1.0e21/kB/T/volume/product(mesh)
+          pow = 1
+       else if(field == 'E') then
+          !A = 
+          !pow = 
+       else
+          call exit_with_message("Unknown field type in calculate_transport_coefficient. Exiting.")
+       end if
+    else if(species == 'el') then
+       if(field == 'T') then
+          !A = 
+          !pow = 
+       else if(field == 'E') then
+          A = deg*1.0e21/kB/T/volume/product(mesh)
+          pow = 0
+       else
+          call exit_with_message("Unknown field type in calculate_transport_coefficient. Exiting.")
+       end if
+    else
+       call exit_with_message("Unknown particle species in calculate_transport_coefficient. Exiting.")
+    end if
     
     trans_coeff(:,:) = 0.0_dp
     do ik = 1, nk
        do ib = 1, nbands
           e = ens(ik, ib)
-          !For phonons
-          if(e == 0.0_dp) cycle !Ignore zero energies phonons
-          dist_factor = Bose(e, T)
-          dist_factor = dist_factor*(1.0_dp + dist_factor)
+          if(species == 'ph') then
+             if(e == 0.0_dp) cycle !Ignore zero energies phonons
+             dist_factor = Bose(e, T)
+             dist_factor = dist_factor*(1.0_dp + dist_factor)
+          else
+             dist_factor = Fermi(e, chempot, T)
+             dist_factor = dist_factor*(1.0_dp - dist_factor)
+          end if
           do icart = 1, 3
              v = vels(ik, ib, icart)
-             do jcart = 1, 3
-                trans_coeff(icart, jcart) = trans_coeff(icart, jcart) + &
-                     e*dist_factor*v*response(ik, ib, jcart)
-             end do
+             trans_coeff(icart, :) = trans_coeff(icart, :) + &
+                  (e - chempot)**pow*dist_factor*v*response(ik, ib, :)
           end do
        end do
     end do
-    trans_coeff = A*trans_coeff !W/m/K
+    !Units:
+    ! W/m/K for thermal conductivity
+    ! 1/Omega/m for charge conductivity
+    ! V/K for thermopower
+    trans_coeff = A*trans_coeff
     sync all
 
     if(this_image() == 1) print*, trans_coeff

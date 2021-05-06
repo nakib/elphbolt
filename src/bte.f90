@@ -4,7 +4,7 @@ module bte_module
 
   use params, only: dp, k8, qe
   use misc, only: print_message, exit_with_message, write2file_rank2_real, &
-       distribute_points, demux_state
+       distribute_points, demux_state, binsearch
   use numerics_module, only: numerics
   use crystal_module, only: crystal
   use symmetry_module, only: symmetry
@@ -75,6 +75,10 @@ contains
        else
           call calculate_ph_rta_rates(rates_3ph, rates_phe, num, crys, ph)
        end if
+
+       !Allocate total RTA scattering rates
+       allocate(bt%ph_rta_rates_ibz(ph%nq_irred, ph%numbranches))
+       
        !Matthiessen's rule
        bt%ph_rta_rates_ibz = rates_3ph + rates_phe
 
@@ -93,7 +97,7 @@ contains
        bt%ph_response = bt%ph_field_term
 
        !Calculate transport coefficient
-       call calculate_transport_coeff('ph', 'T', crys%T, 0.0_dp, ph%ens, ph%vels, &
+       call calculate_transport_coeff('ph', 'T', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
             crys%volume, ph%qmesh, bt%ph_response)
 
        !Change to data output directory
@@ -108,14 +112,28 @@ contains
     if(num%ebte) then
        !Calculate RTA scattering rates
        call calculate_el_rta_rates(rates_eph, num, crys, el)
+
+       !Allocate total RTA scattering rates
+       allocate(bt%el_rta_rates_ibz(el%nk_irred, el%numbands))
        bt%el_rta_rates_ibz = rates_eph ! + other channels
        
        !Calculate field term (I0 or J0)
-       call calculate_field_term('el', 'E', ph%nequiv, el%ibz2fbz_map, &
-            crys%T, el%chempot, el%ens, el%vels, bt%el_rta_rates_ibz, bt%el_field_term)
+       call calculate_field_term('el', 'E', el%nequiv, el%ibz2fbz_map, &
+            crys%T, el%chempot, el%ens, el%vels, bt%el_rta_rates_ibz, bt%el_field_term, el%indexlist)
 
-       !TODO Symmetrize field term
-
+!!$       !TODO Symmetrize field term
+!!$       do ik = 1, el%nk
+!!$          bt%el_field_term(ik,:,:)=transpose(&
+!!$               matmul(el%symmetrizers(:,:,ik),transpose(bt%el_field_term(ik,:,:))))
+!!$       end do
+       
+       !RTA solution of BTE
+       allocate(bt%el_response(el%nk, el%numbands, 3))
+       bt%el_response = bt%el_field_term
+       
+       !Calculate transport coefficient
+       call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, el%ens, el%vels, &
+            crys%volume, el%kmesh, bt%el_response)
        !...
        !...
        !...
@@ -154,7 +172,7 @@ contains
   end subroutine solve_bte
 
   subroutine calculate_field_term(species, field, nequiv, ibz2fbz_map, &
-       T, chempot, ens, vels, rta_rates_ibz, field_term)
+       T, chempot, ens, vels, rta_rates_ibz, field_term, el_indexlist)
     !! Subroutine to calculate the field coupling term of the BTE.
     !!
     !! species Type of particle
@@ -167,13 +185,15 @@ contains
     !! chempot Chemical potential (should be 0 for phonons)
     !! rta_rates_ibz IBZ RTA scattering rates
     !! field_term FBZ field-coupling term of the BTE
+    !! el_indexlist [Optional] 
 
     character(len = 2), intent(in) :: species
     character(len = 1), intent(in) :: field
     integer(k8), intent(in) :: nequiv(:), ibz2fbz_map(:,:,:)
     real(dp), intent(in) :: T, chempot, ens(:,:), vels(:,:,:), rta_rates_ibz(:,:)
     real(dp), allocatable, intent(out) :: field_term(:,:,:)
-
+    integer(k8), intent(in), optional :: el_indexlist(:)
+    
     !Local variables
     integer(k8) :: ik_ibz, ik_fbz, ieq, ib, nk_ibz, nk, nbands, pow, &
          im, chunk, num_active_images
@@ -233,7 +253,12 @@ contains
        !Work the active images only:
        do ik_ibz = start, end
           do ieq = 1, nequiv(ik_ibz)
-             ik_fbz = ibz2fbz_map(ieq, ik_ibz, 2)
+             if(species == 'ph') then
+                ik_fbz = ibz2fbz_map(ieq, ik_ibz, 2)
+             else
+                !Find index of electron in indexlist
+                call binsearch(el_indexlist, ibz2fbz_map(ieq, ik_ibz, 2), ik_fbz)
+             end if
              do ib = 1, nbands
                 if(rta_rates_ibz(ik_ibz, ib) /= 0.0_dp) then
                    field_term_reduce(ik_fbz, ib, :) = A*vels(ik_fbz, ib, :)*&
