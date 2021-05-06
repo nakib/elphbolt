@@ -55,7 +55,7 @@ contains
 
     !Local variables
     character(len = 1024) :: tag, Tdir
-    integer(k8) :: iq, it
+    integer(k8) :: iq, ik, it
     real(dp), allocatable :: rates_3ph(:,:), rates_phe(:,:), rates_eph(:,:)
 
     call print_message("Solving BTE in the RTA...")
@@ -121,11 +121,11 @@ contains
        call calculate_field_term('el', 'E', el%nequiv, el%ibz2fbz_map, &
             crys%T, el%chempot, el%ens, el%vels, bt%el_rta_rates_ibz, bt%el_field_term, el%indexlist)
 
-!!$       !TODO Symmetrize field term
-!!$       do ik = 1, el%nk
-!!$          bt%el_field_term(ik,:,:)=transpose(&
-!!$               matmul(el%symmetrizers(:,:,ik),transpose(bt%el_field_term(ik,:,:))))
-!!$       end do
+       !Symmetrize field term
+       do ik = 1, el%nk
+          bt%el_field_term(ik,:,:)=transpose(&
+               matmul(el%symmetrizers(:,:,ik),transpose(bt%el_field_term(ik,:,:))))
+       end do
        
        !RTA solution of BTE
        allocate(bt%el_response(el%nk, el%numbands, 3))

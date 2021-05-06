@@ -85,7 +85,7 @@ contains
     !Open input file
     open(1, file = 'input.nml', status = 'old')
 
-    wann%coarse_qmesh = (/1, 1, 1/)
+    coarse_qmesh = (/1, 1, 1/)
     read(1, nml = wannier)
     if(any(coarse_qmesh <= 0)) then
        call exit_with_message('Bad input(s) in wannier.')

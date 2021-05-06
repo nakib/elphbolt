@@ -134,15 +134,15 @@ contains
     open(1, file = 'input.nml', status = 'old')
 
     !Read electrons information
-    el%spindeg = 2 !Default calculation is non-spin polarized
-    el%numbands = -1
-    el%numtransbands = -1
-    el%indlowband = -1
-    el%indhighband = -1
-    el%indhighvalence = -1
-    el%indlowconduction = -1
-    el%metallic = .false.
-    el%conc = 0.0_dp
+    spindeg = 2 !Default calculation is non-spin polarized
+    numbands = -1
+    numtransbands = -1
+    indlowband = -1
+    indhighband = -1
+    indhighvalence = -1
+    indlowconduction = -1
+    metallic = .false.
+    conc = 0.0_dp
     read(1, nml = electrons)
     if(spindeg < 1 .or. spindeg > 2) then
        call exit_with_message('spindeg can be 1 or 2.')

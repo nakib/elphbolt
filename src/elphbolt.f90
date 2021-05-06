@@ -88,14 +88,16 @@ program elphBolt
 
   !Calculate ph-e transition probabilities
   call calculate_eph_interaction_ibzk(wann, crys, el, ph, num, 'X')
-     
-  if(.not. num%read_V) then
-     !Calculate ph-ph vertex
-     call calculate_3ph_interaction(ph, crys, num, 'V')
+
+  if(num%phbte) then
+     if(.not. num%read_V) then
+        !Calculate ph-ph vertex
+        call calculate_3ph_interaction(ph, crys, num, 'V')
+     end if
+
+     !Calculate ph-ph transition probabilities
+     call calculate_3ph_interaction(ph, crys, num, 'W')
   end if
-  
-  !Calculate ph-ph transition probabilities
-  call calculate_3ph_interaction(ph, crys, num, 'W')
   
   !RTA solution
   if(num%phbte) then

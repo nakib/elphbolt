@@ -70,17 +70,17 @@ contains
     open(1, file = 'input.nml', status = 'old')
 
     !Read numerics information
-    n%qmesh = (/1, 1, 1/)
-    n%mesh_ref = 1
-    n%fsthick = 0.0_dp
-    n%datadumpdir = './'
-    n%read_gq2 = .false.
-    n%read_gk2 = .false.
-    n%read_V = .false.
-    n%tetrahedra = .false.
-    n%phe = .false.
-    n%phbte = .false.
-    n%ebte = .false.
+    qmesh = (/1, 1, 1/)
+    mesh_ref = 1
+    fsthick = 0.0_dp
+    datadumpdir = './'
+    read_gq2 = .false.
+    read_gk2 = .false.
+    read_V = .false.
+    tetrahedra = .false.
+    phe = .false.
+    phbte = .false.
+    ebte = .false.
     read(1, nml = numerics)
     if(any(qmesh <= 0) .or. mesh_ref < 1 .or. fsthick < 0 .or. .not.(phbte .or. ebte)) then
        call exit_with_message('Bad input(s) in numerics.')

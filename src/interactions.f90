@@ -526,7 +526,7 @@ contains
           kp = kp/dble(el%kmesh) !crystal coords.
 
           !Muxed index of kp
-          ikp = mux_vector(kp_indvec, el%kmesh, 0_dp)
+          ikp = mux_vector(kp_indvec, el%kmesh, 0_k8)
 
           !Check if final electron wave vector is within energy window
           call binsearch(el%indexlist, ikp, ikp_window)
@@ -791,7 +791,7 @@ contains
              q_indvec = modulo(q_indvec, el%kmesh) !0-based index vector
              q = q_indvec/dble(el%kmesh) !crystal coords.
              !Muxed index of q
-             iq = mux_vector(q_indvec, el%kmesh, 0_dp)
+             iq = mux_vector(q_indvec, el%kmesh, 0_k8)
 
              !Calculate the fine mesh phonon.
              call wann%ph_wann_epw(crys, 1_k8, q, ph_ens_iq, ph_evecs_iq)
@@ -800,7 +800,7 @@ contains
              q_indvec = modulo(q_indvec/el%mesh_ref, ph%qmesh) !0-based index vector
              q = q_indvec/dble(ph%qmesh) !crystal coords.
              !Muxed index of q
-             iq = mux_vector(q_indvec, ph%qmesh, 0_dp)
+             iq = mux_vector(q_indvec, ph%qmesh, 0_k8)
           end if
           
           !Run over final electron bands
@@ -864,7 +864,7 @@ contains
                         el%tetracount, el%tetra_evals)
 
                    !Temperature dependent occupation factor
-                   occup_fac = 1.0_dp + bosefac + fermi_minus_fac
+                   occup_fac = 1.0_dp + bosefac - fermi_minus_fac
                    
                    !Save X-
                    if(en_ph >= 0.5e-3) then !Use a small phonon energy cut-off
@@ -979,11 +979,6 @@ contains
 
     !Total number of 3-phonon processes for a given phonon state
     nprocs_3ph = ph%nq*ph%numbranches**2
-
-!!$    if(present(el)) then
-!!$       !Total number of phonon-electron processes for a given phonon state
-!!$       nprocs_phe = el%nstates_inwindow*ph%numbranches
-!!$    end if
 
     !Allocate start and end coarrays
     allocate(start[*], end[*])
