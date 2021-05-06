@@ -1,7 +1,7 @@
 module bz_sums
   !! Module containing the procedures to do Brillouin zone sums.
 
-  use params, only: dp, k4, kB, qe
+  use params, only: dp, k8, kB, qe
   use misc, only: exit_with_message, print_message, write2file_rank2_real, &
        distribute_points, Bose, Fermi
   use phonon_module, only: phonon
@@ -28,7 +28,7 @@ contains
 
     !Local variables
     real(dp) :: a, b, aux, const, absconc, signconc, mu, thresh
-    integer(k4) :: ib, ik, it, ngrid, maxiter
+    integer(k8) :: ib, ik, it, ngrid, maxiter
 
     call print_message("Calculating chemical potential...")
 
@@ -91,8 +91,8 @@ contains
     logical, intent(in) :: usetetra
     
     !Local variables
-    integer(k4) :: ik, ib, ikp, ibp, im, chunk, counter, num_active_images
-    integer(k4), allocatable :: start[:], end[:]
+    integer(k8) :: ik, ib, ikp, ibp, im, chunk, counter, num_active_images
+    integer(k8), allocatable :: start[:], end[:]
     real(dp) :: e, delta
     real(dp), allocatable :: dos_chunk(:,:)[:]
 
@@ -169,8 +169,8 @@ contains
     logical, intent(in) :: usetetra
     
     !Local variables
-    integer(k4) :: iq, ib, iqp, ibp, im, chunk, counter, num_active_images
-    integer(k4), allocatable :: start[:], end[:]
+    integer(k8) :: iq, ib, iqp, ibp, im, chunk, counter, num_active_images
+    integer(k8), allocatable :: start[:], end[:]
     real(dp) :: e, delta
     real(dp), allocatable :: dos_chunk(:,:)[:]
 
@@ -247,11 +247,11 @@ contains
 
     character(len = 2), intent(in) :: species
     character(len = 1), intent(in) :: field
-    integer(k4), intent(in) :: mesh(3)
+    integer(k8), intent(in) :: mesh(3)
     real(dp), intent(in) :: T, chempot, ens(:,:), vels(:,:,:), volume, response(:,:,:)
 
     !Local variables
-    integer(k4) :: ik, ib, icart, jcart, nk, nbands
+    integer(k8) :: ik, ib, icart, jcart, nk, nbands
     real(dp) :: dist_factor, e, v, A, trans_coeff(3,3)
     
     nk = size(ens(:,1))

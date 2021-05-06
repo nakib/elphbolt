@@ -1,7 +1,7 @@
 module numerics_module
   !! Module containing type and procedures related to the numerics.
 
-  use params, only: dp, k4, twopi
+  use params, only: dp, k8, twopi
   use misc, only: exit_with_message
 
   implicit none
@@ -12,9 +12,9 @@ module numerics_module
   type numerics
      !! Data and procedures related to the numerics.
 
-     integer(k4) :: qmesh(3)
+     integer(k8) :: qmesh(3)
      !! Phonon wave vector mesh.
-     integer(k4) :: mesh_ref
+     integer(k8) :: mesh_ref
      !! Electron mesh refinement factor compared to the phonon mesh.
      real(dp) :: fsthick
      !! Fermi surface thickness in (eV).
@@ -58,7 +58,7 @@ contains
     class(numerics), intent(out) :: n
 
     !Local variables
-    integer(k4) :: mesh_ref, qmesh(3)
+    integer(k8) :: mesh_ref, qmesh(3)
     real(dp) :: fsthick
     character(len = 1024) :: datadumpdir
     logical :: read_gq2, read_gk2, read_V, tetrahedra, phe, phbte, ebte

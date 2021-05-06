@@ -7,7 +7,7 @@ program elphBolt
   !! and Phys. Rev. B 102, 245202 (2020) with both the electron-phonon and phonon-phonon
   !! interactions computed ab initio.
 
-  use params, only: k4, dp
+  use params, only: k8, dp
   use numerics_module, only: numerics
   use crystal_module, only: crystal
   use symmetry_module, only: symmetry

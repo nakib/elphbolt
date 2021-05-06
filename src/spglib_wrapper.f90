@@ -26,7 +26,7 @@
 module spglib_wrapper
   !! Wrapper for spglib from ShengBTE.
   
-  use params, only: dp, k4
+  use params, only: dp, k8
   use iso_c_binding
 
   implicit none
@@ -86,11 +86,11 @@ contains
     !! memory for get_operations().
 
     real(dp),dimension(3,3),intent(in) :: lattice
-    integer(k4),intent(in) :: natoms
-    integer(k4),dimension(natoms),intent(in) :: types
+    integer(k8),intent(in) :: natoms
+    integer(k8),dimension(natoms),intent(in) :: types
     real(dp),dimension(3,natoms),intent(in) :: positions
 
-    integer(k4) :: get_num_operations
+    integer(k8) :: get_num_operations
 
     ! Notice the explicit C-compatible types used through this module.
     real(kind=C_DOUBLE),dimension(3,3) :: clattice
@@ -117,11 +117,11 @@ contains
     !! operations of the system.
 
     real(dp),dimension(3,3),intent(in) :: lattice
-    integer(k4),intent(in) :: natoms
-    integer(k4),dimension(natoms),intent(in) :: types
+    integer(k8),intent(in) :: natoms
+    integer(k8),dimension(natoms),intent(in) :: types
     real(dp),dimension(3,natoms),intent(in) :: positions
-    integer(k4),intent(inout) :: nops
-    integer(k4),dimension(3,3,nops),intent(out) :: rotations
+    integer(k8),intent(inout) :: nops
+    integer(k8),dimension(3,3,nops),intent(out) :: rotations
     real(dp),dimension(3,nops),intent(out) :: translations
     character(len=10),intent(out) :: international
 
@@ -164,14 +164,14 @@ contains
     !! returned by get_operations().
     
     real(dp),dimension(3,3),intent(in) :: lattice
-    integer(k4),intent(in) :: nops
-    integer(k4),dimension(3,3,nops),intent(in) :: rotations
+    integer(k8),intent(in) :: nops
+    integer(k8),dimension(3,3,nops),intent(in) :: rotations
     real(dp),dimension(3,nops),intent(in) :: translations
     real(dp),dimension(3,3,nops),intent(out) :: crotations
     real(dp),dimension(3,nops),intent(out) :: ctranslations
 
-    integer(k4) :: i,info
-    integer(k4),dimension(3) :: P
+    integer(k8) :: i,info
+    integer(k8),dimension(3) :: P
     real(dp),dimension(3,3) :: tmp1,tmp2
 
     ctranslations=matmul(lattice,translations)

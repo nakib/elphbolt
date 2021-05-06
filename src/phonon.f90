@@ -1,7 +1,7 @@
 module phonon_module
   !! Module containing type and procedures related to the phononic properties.
 
-  use params, only: dp, k4
+  use params, only: dp, k8
   use misc, only: print_message
   use numerics_module, only: numerics
   use wannier_module, only: epw_wannier, phonon_espresso
@@ -19,43 +19,43 @@ module phonon_module
 
      character(len = 2) :: prefix = 'ph'
      !! Prefix idenitfying particle type.
-     integer(k4) :: numbranches
+     integer(k8) :: numbranches
      !! Total number of phonon branches.
-     integer(k4) :: nq
+     integer(k8) :: nq
      !! Number of phonon wave vectors in the full Brillouin zone (FBZ).
-     integer(k4) :: nq_irred
+     integer(k8) :: nq_irred
      !! Number of phonon wave vectors in the irreducible wedge of Brillouin zone (IBZ).
-     integer(k4) :: qmesh(3) 
+     integer(k8) :: qmesh(3) 
      !! Phonon wave vector mesh.
      real(dp), allocatable :: wavevecs(:,:)
      !! List of all phonon wave vectors (crystal coordinates).
      real(dp), allocatable :: wavevecs_irred(:,:)
      !! List of irreducible phonon wave vectors (crystal coordinates).
-     integer(k4), allocatable :: indexlist(:)
+     integer(k8), allocatable :: indexlist(:)
      !! List of muxed indices of the FBZ wave vectors.
-     integer(k4), allocatable :: indexlist_irred(:)
+     integer(k8), allocatable :: indexlist_irred(:)
      !! List of muxed indices of the IBZ wedge.
-     integer(k4), allocatable :: nequiv(:)
+     integer(k8), allocatable :: nequiv(:)
      !! List of the number of equivalent points for each IBZ point.
-     integer(k4), allocatable :: ibz2fbz_map(:,:,:)
+     integer(k8), allocatable :: ibz2fbz_map(:,:,:)
      !! Map from an IBZ phonon point to its images.
      !! The third axis contains the pair (symmetry index, image).
-     integer(k4), allocatable :: fbz2ibz_map(:)
+     integer(k8), allocatable :: fbz2ibz_map(:)
      !! Map from an FBZ phonon point to its IBZ wedge image.
-     integer(k4), allocatable :: equiv_map(:,:)
+     integer(k8), allocatable :: equiv_map(:,:)
      !! Map of equivalent points under rotations.
      !! Axis 1 runs over rotations.
      !! Axis 2 runs over wave vectors (full Brillouin zone).
      real(dp), allocatable :: symmetrizers(:,:,:)
      !! Symmetrizers of wave vector dependent vectors.
-     integer(k4), allocatable :: tetra(:,:)
+     integer(k8), allocatable :: tetra(:,:)
      !! List of all the wave vector mesh tetrahedra vertices.
      !! First axis list tetraheda and the second axis list the vertices.
-     integer(k4), allocatable :: tetracount(:)
+     integer(k8), allocatable :: tetracount(:)
      !! The number of tetrahedra in which a wave vector belongs.
-     integer(k4), allocatable :: tetramap(:,:,:)
+     integer(k8), allocatable :: tetramap(:,:,:)
      !! Mapping from a wave vector to the (tetrahedron, vertex) where it belongs.
-     real(k4), allocatable :: tetra_evals(:,:,:)
+     real(dp), allocatable :: tetra_evals(:,:,:)
      !! Tetrahedra vertices filled with eigenvalues.
      real(dp), allocatable :: ens(:,:)
      !! List of phonon energies on FBZ.
@@ -65,11 +65,11 @@ module phonon_module
      !! List of all phonon eigenvectors.
      real(dp), allocatable :: ifc3(:,:,:,:)
      !! Third order force constants (ifc3) tensor.
-     integer(k4) :: numtriplets
+     integer(k8) :: numtriplets
      !! Number of triplets in the ifc3 file.
      real(dp), allocatable :: R_j(:,:), R_k(:,:)
      !! Position of the 2nd and 3rd atoms in supercell for an ifc3 triplet.
-     integer(k4), allocatable :: Index_i(:), Index_j(:), Index_k(:)
+     integer(k8), allocatable :: Index_i(:), Index_j(:), Index_k(:)
      !! Label of primitive cell atoms in the ifc3 triplet.
      real(dp), allocatable :: dos(:,:)
      !! Branch resolved density of states.
@@ -116,7 +116,7 @@ contains
     type(numerics), intent(in) :: num
     
     !Local variables
-    integer(k4) :: i, iq, ii, jj, kk, l, il, s, ib
+    integer(k8) :: i, iq, ii, jj, kk, l, il, s, ib
     !Switch for mesh utilites with or without energy restriction
     logical :: blocks
     character(len = 1024) :: numcols
@@ -226,7 +226,7 @@ contains
     
     !Local variables
     real(dp) :: tmp(3,3)
-    integer(k4) :: ii, jj, ll, mm, nn, ltem, mtem, ntem, info, P(3)
+    integer(k8) :: ii, jj, ll, mm, nn, ltem, mtem, ntem, info, P(3)
 
     !The file is in a simple sparse format, described in detail in
     !the user documentation. See Doc/ShengBTE.pdf.

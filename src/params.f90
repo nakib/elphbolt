@@ -5,7 +5,7 @@ module params
 
   integer, parameter :: dp = selected_real_kind(14,200)
   !! Custom real precision.
-  integer, parameter :: k4 = selected_real_kind(8)
+  integer, parameter :: k8 = selected_real_kind(8)
   !! Custom integer precision.
 
   !Physical constants:

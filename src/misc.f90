@@ -1,7 +1,7 @@
 module misc
   !! Module containing miscellaneous math and numerics related functions and subroutines.
 
-  use params, only: dp, k4, kB
+  use params, only: dp, k8, kB
 
   implicit none
 
@@ -39,7 +39,7 @@ contains
     character(len = *), intent(in) :: filename
     real(dp), intent(in) :: data(:,:)
 
-    integer(k4) :: ik, nk
+    integer(k8) :: ik, nk
     character(len = 1024) :: numcols
 
     nk = size(data(:, 1))
@@ -58,8 +58,8 @@ contains
   subroutine int_div(num, denom, q, r)
     !! Quotient(q) and remainder(r) of the integer division num/denom.
 
-    integer(k4), intent(in) :: num, denom
-    integer(k4), intent(out) :: q, r
+    integer(k8), intent(in) :: num, denom
+    integer(k8), intent(out) :: q, r
 
     q = num/denom
     r = mod(num, denom)
@@ -68,8 +68,8 @@ contains
   subroutine distribute_points(npts, chunk, istart, iend, num_active_images)
     !! Distribute points among processes
 
-    integer(k4), intent(in) :: npts
-    integer(k4), intent(out) :: chunk, istart, iend, num_active_images
+    integer(k8), intent(in) :: npts
+    integer(k8), intent(out) :: chunk, istart, iend, num_active_images
 
     !Number of active images
     num_active_images = min(npts, num_images())
@@ -110,7 +110,7 @@ contains
     !! 2-norm of a vector
 
     real(dp), intent(in) :: v(:)
-    integer(k4) :: i, s
+    integer(k8) :: i, s
 
     s = size(v)
     twonorm = 0.0_dp
@@ -123,9 +123,9 @@ contains
   subroutine sort_int(list)
     !! Swap sort list of integers
 
-    integer(k4), intent(inout) :: list(:)
-    integer(k4) :: i, j, n
-    integer(k4) :: aux, tmp
+    integer(k8), intent(inout) :: list(:)
+    integer(k8) :: i, j, n
+    integer(k8) :: aux, tmp
     
     n = size(list)
 
@@ -147,7 +147,7 @@ contains
     
     real(dp), intent(inout) :: list(:)
     real(kind=8) :: aux, tmp
-    integer(k4) :: i, j, n
+    integer(k8) :: i, j, n
 
     n = size(list)
 
@@ -167,9 +167,9 @@ contains
   subroutine binsearch(array, e, m)
     !! Binary search in a list of integers and return index.
     
-    integer(k4), intent(in) :: array(:), e
-    integer(k4), intent(out) :: m
-    integer(k4) :: a, b, mid
+    integer(k8), intent(in) :: array(:), e
+    integer(k8), intent(out) :: m
+    integer(k8) :: a, b, mid
 
     a = 1
     b = size(array)
@@ -198,8 +198,8 @@ contains
     !! mesh is the number of wave vectors along the three reciprocal lattice vectors.
     !! base states whether v has 0- or 1-based indexing.
 
-    integer(k4), intent(in) :: v(3), mesh(3), base
-    integer(k4) :: mux_vector
+    integer(k8), intent(in) :: v(3), mesh(3), base
+    integer(k8) :: mux_vector
 
     if(base < 0 .or. base > 1) then
        call exit_with_message("Base has to be either 0 or 1 in misc.f90:mux_vector")
@@ -219,9 +219,9 @@ contains
     !! mesh is the number of wave vectors along the three reciprocal lattice vectors.
     !! base chooses whether v has 0- or 1-based indexing.
     
-    integer(k4), intent(in) :: i, mesh(3), base
-    integer(k4), intent(out) :: v(3)
-    integer(k4) :: aux
+    integer(k8), intent(in) :: i, mesh(3), base
+    integer(k8), intent(out) :: v(3)
+    integer(k8) :: aux
 
     if(base < 0 .or. base > 1) then
        call exit_with_message("Base has to be either 0 or 1 in misc.f90:demux_vector")
@@ -241,10 +241,10 @@ contains
     !! (optionally, from a list of indices).
     !! Internally uses demux_vector.
 
-    integer(k4), intent(in) :: nmesh, mesh(3), base
-    integer(k4), optional, intent(in) :: indexlist(nmesh)
-    integer(k4), intent(out) :: index_mesh(3, nmesh)
-    integer(k4) :: i
+    integer(k8), intent(in) :: nmesh, mesh(3), base
+    integer(k8), optional, intent(in) :: indexlist(nmesh)
+    integer(k8), intent(out) :: index_mesh(3, nmesh)
+    integer(k8) :: i
 
     do i = 1, nmesh !over total number of wave vectors
        if(present(indexlist)) then
@@ -255,14 +255,14 @@ contains
     end do
   end subroutine demux_mesh
 
-  pure integer(k4) function mux_state(nbands, iband, ik)
+  pure integer(k8) function mux_state(nbands, iband, ik)
     !! Multiplex a (band index, wave vector index) pair into a state index 
     !!
     !! nbands is the number of bands
     !! iband is the band index
     !! ik is the wave vector index
     
-    integer(k4), intent(in) :: nbands, ik, iband 
+    integer(k8), intent(in) :: nbands, ik, iband 
 
     mux_state = (ik - 1)*nbands + iband
   end function mux_state
@@ -275,8 +275,8 @@ contains
     !! iband is the band index
     !! ik is the wave vector index
     
-    integer(k4), intent(in) :: m, nbands
-    integer(k4), intent(out) :: ik, iband 
+    integer(k8), intent(in) :: m, nbands
+    integer(k8), intent(out) :: ik, iband 
 
     iband = modulo(m - 1, nbands) + 1
     ik = int((m - 1)/nbands) + 1

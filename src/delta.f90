@@ -1,7 +1,7 @@
 module delta
   !! Module containing the procedures related to delta function evaulation.
 
-  use params, only: dp, k4
+  use params, only: dp, k8
   use misc, only: exit_with_message, print_message, demux_vector, mux_vector, &
        binsearch, sort
   
@@ -24,12 +24,12 @@ contains
     !! tetra_evals Tetrahedra populated with the eigenvalues
 
     real(dp), intent(in) :: e
-    integer(k4), intent(in) :: ik, ib
-    integer(k4), intent(in) :: mesh(3), tetramap(:,:,:), tetracount(:)
+    integer(k8), intent(in) :: ik, ib
+    integer(k8), intent(in) :: mesh(3), tetramap(:,:,:), tetracount(:)
     real(dp), intent(in) :: tetra_evals(:,:,:)
 
     !Local variables
-    integer(k4) :: iv, it, itk, num, numtetra
+    integer(k8) :: iv, it, itk, num, numtetra
     logical :: c1, c2, c3
     real(dp) :: e1, e2, e3, e4, e1e, e2e, e3e, e4e, &
          e21, e31, e41, e32, e42, e43, tmp ! eji \equiv ej - ei
@@ -186,16 +186,16 @@ contains
     !! blocks Is the FBZ wave vector list full or energy restricted?
     !! indexlist List of muxed indices of the FBZ wave vectors
 
-    integer(k4), intent(in) :: nk, mesh(3)
-    integer(k4), intent(out), allocatable :: tetra(:,:), tetracount(:), tetramap(:,:,:)
+    integer(k8), intent(in) :: nk, mesh(3)
+    integer(k8), intent(out), allocatable :: tetra(:,:), tetracount(:), tetramap(:,:,:)
     logical, intent(in) :: blocks
-    integer(k4), optional, intent(in) :: indexlist(:)
+    integer(k8), optional, intent(in) :: indexlist(:)
 
     !Local variables
-    integer(k4) :: ik, i, j, k, ijk(3), ii, jj, kk, tk, tl, aux, count
-    integer(k4) :: ip1, jp1, kp1, n1, n2, n3, tmp
-    integer(k4), dimension(6,4) :: tetra_vertices_labels
-    integer(k4), dimension(8,3) :: scvol_vertices ! subcell volume vertices
+    integer(k8) :: ik, i, j, k, ijk(3), ii, jj, kk, tk, tl, aux, count
+    integer(k8) :: ip1, jp1, kp1, n1, n2, n3, tmp
+    integer(k8), dimension(6,4) :: tetra_vertices_labels
+    integer(k8), dimension(8,3) :: scvol_vertices ! subcell volume vertices
 
     n1 = mesh(1)
     n2 = mesh(2)
@@ -221,9 +221,9 @@ contains
     
     do ik = 1, nk !Run over all wave vectors in FBZ
        if(blocks) then !For energy window restricted FBZ
-          call demux_vector(indexlist(ik) - 1, ijk, mesh, 1_k4)
+          call demux_vector(indexlist(ik) - 1, ijk, mesh, 1_k8)
        else !For unrestristed FBZ
-          call demux_vector(ik, ijk, mesh, 1_k4)
+          call demux_vector(ik, ijk, mesh, 1_k8)
        end if
        i = ijk(1)
        j = ijk(2)
@@ -267,7 +267,7 @@ contains
              ii = scvol_vertices(aux,1)
              jj = scvol_vertices(aux,2)
              kk = scvol_vertices(aux,3)
-             aux = mux_vector((/ii, jj, kk/), mesh, 1_k4)
+             aux = mux_vector((/ii, jj, kk/), mesh, 1_k8)
              tmp = aux !Guaranteed to be > 0
              if(blocks) then
                 !Which point in indexlist does aux correspond to?
@@ -294,7 +294,7 @@ contains
     !! evals List of eigenvalues 
     !! tetra_evals Tetrahedra populated with the eigenvalues
 
-    integer(k4), intent(in) :: tetra(:,:)
+    integer(k8), intent(in) :: tetra(:,:)
     real(dp), intent(in) :: evals(:,:)
     real(dp), allocatable, intent(out) :: tetra_evals(:,:,:)
 

@@ -1,7 +1,7 @@
 module wannier_module
   !! Module containing type and procedures related to Wannierization.
 
-  use params, only: dp, k4, Ryd2eV, Ryd2radTHz, oneI, pi, twopi, twopiI, &
+  use params, only: dp, k8, Ryd2eV, Ryd2radTHz, oneI, pi, twopi, twopiI, &
        Ryd2amu, bohr2nm
   use misc, only: exit_with_message, print_message, expi, twonorm, &
        distribute_points, demux_state, mux_vector
@@ -29,29 +29,29 @@ module wannier_module
   type epw_wannier
      !! Data and procedures related to Wannierization.
 
-     integer(k4) :: numwannbands
+     integer(k8) :: numwannbands
      !! Number of Wannier bands.
-     integer(k4) :: numbranches
+     integer(k8) :: numbranches
      !! Number of phonon branches.
-     integer(k4) :: nwsk
+     integer(k8) :: nwsk
      !! Number of real space cells for electrons.
-     integer(k4) :: coarse_qmesh(3)
+     integer(k8) :: coarse_qmesh(3)
      !! Coarse phonon wave vector mesh in Wannier calculation.
-     integer(k4) :: nwsq
+     integer(k8) :: nwsq
      !! Number of real space cells for phonons.
-     integer(k4) :: nwsg
+     integer(k8) :: nwsg
      !! Number of real space cells for electron-phonon vertex.
-     integer(k4), allocatable :: rcells_k(:, :)
+     integer(k8), allocatable :: rcells_k(:, :)
      !! Real space cell locations for electrons.
-     integer(k4), allocatable :: rcells_q(:, :)
+     integer(k8), allocatable :: rcells_q(:, :)
      !! Real space cell locations for phonons.
-     integer(k4), allocatable :: rcells_g(:, :)
+     integer(k8), allocatable :: rcells_g(:, :)
      !! Real space cell locations for electron-phonon vertex.     
-     integer(k4), allocatable :: elwsdeg(:)
+     integer(k8), allocatable :: elwsdeg(:)
      !! Real space cell multiplicity for electrons.
-     integer(k4), allocatable :: phwsdeg(:)
+     integer(k8), allocatable :: phwsdeg(:)
      !! Real space cell multiplicity for phonons.
-     integer(k4), allocatable :: gwsdeg(:)
+     integer(k8), allocatable :: gwsdeg(:)
      !! Real space cell multiplicity for electron-phonon vertex.
      complex(dp), allocatable :: Hwann(:, :, :)
      !! Hamiltonian in Wannier representation.
@@ -77,8 +77,8 @@ contains
     class(epw_wannier), intent(out) :: wann
 
     !Local variables
-    integer(k4) :: iuc, ib, jb
-    integer(k4) :: coarse_qmesh(3)
+    integer(k8) :: iuc, ib, jb
+    integer(k8) :: coarse_qmesh(3)
 
     namelist /wannier/ coarse_qmesh
 
@@ -172,14 +172,14 @@ contains
 
     class(epw_wannier), intent(in) :: wann
     type(crystal), intent(in) :: crys
-    integer(k4), intent(in) :: nk
+    integer(k8), intent(in) :: nk
     real(dp), intent(in) :: kvecs(nk,3) !Crystal coordinates
     real(dp), intent(out) :: energies(nk,wann%numwannbands)
     real(dp), optional, intent(out) :: velocities(nk,wann%numwannbands,3)
     complex(dp), optional, intent(out) :: evecs(nk,wann%numwannbands,wann%numwannbands)
 
     !Local variables
-    integer(k4) :: iuc, ib, jb, ipol, ik, nwork, tmp
+    integer(k8) :: iuc, ib, jb, ipol, ik, nwork, tmp
     real(dp) :: rcart(3)
     real(dp),  allocatable :: rwork(:)
     complex(dp), allocatable :: work(:)
@@ -262,12 +262,12 @@ contains
     type(crystal), intent(in) :: crys
 
     !Local variables
-    integer(k4), intent(in) :: nq
+    integer(k8), intent(in) :: nq
     real(dp), intent(in) :: qvecs(nq, 3) !Crystal coordinates
     real(dp), intent(out) :: energies(nq, wann%numbranches)
     complex(dp), intent(out), optional :: evecs(nq, wann%numbranches, wann%numbranches)
     
-    integer(k4) :: iuc, ib, jb, ipol, iq, na, nb, nwork, aux
+    integer(k8) :: iuc, ib, jb, ipol, iq, na, nb, nwork, aux
     complex(dp) :: caux
     real(dp), allocatable :: rwork(:)
     complex(dp), allocatable :: work(:)
@@ -366,7 +366,7 @@ contains
     real(dp) :: qeq,     &! <q+g| epsilon |q+g>
          arg, zig(3), zjg(3), g(3), gmax, alph, geg, &
          tpiba, dgeg(3), fnat(3), rr(crys%numatoms,crys%numatoms,3)
-    integer(k4) :: iat,jat,i,idim,jdim,ipol,jpol,m1,m2,m3,nq1,nq2,nq3
+    integer(k8) :: iat,jat,i,idim,jdim,ipol,jpol,m1,m2,m3,nq1,nq2,nq3
     complex(dp) :: fac, facqd, facq
     
     tpiba = twopi/twonorm(crys%lattvecs(:,1))*bohr2nm
@@ -447,7 +447,7 @@ contains
     !! This is adapted from Quantum Espresso and ShengBTE.
     
     type(crystal), intent(in) :: crys
-    integer(k4),intent(in) :: scell(3)
+    integer(k8),intent(in) :: scell(3)
     real(kind=8),intent(in) :: kpoints(:,:)
     real(kind=8),intent(out) :: omegas(:,:),velocities(:,:,:)
     complex(kind=8),optional,intent(out) :: eigenvect(:,:,:)
@@ -456,9 +456,9 @@ contains
     real(kind=8),parameter :: toTHz=20670.687,&
          massfactor=1.8218779*6.022e-4
 
-    integer(k4) :: ir,nreq,ntype,nat,ibrav,qscell(3),nbranches
-    integer(k4) :: i,j,ipol,jpol,iat,jat,idim,jdim,t1,t2,t3,m1,m2,m3,ik
-    integer(k4) :: ndim,nk,nwork,ncell_g(3)
+    integer(k8) :: ir,nreq,ntype,nat,ibrav,qscell(3),nbranches
+    integer(k8) :: i,j,ipol,jpol,iat,jat,idim,jdim,t1,t2,t3,m1,m2,m3,ik
+    integer(k8) :: ndim,nk,nwork,ncell_g(3)
     integer(kind=8),allocatable :: tipo(:)
     character(len=1) :: polar_key
     character(len=5),allocatable :: label(:)
@@ -901,7 +901,7 @@ contains
 
     real(dp) :: qeq,     &! <q+g| epsilon |q+g>
          arg, zaq, g(3), gmax, alph, geg,tpiba
-    integer(k4) :: na,ipol, m1,m2,m3,nq1,nq2,nq3
+    integer(k8) :: na,ipol, m1,m2,m3,nq1,nq2,nq3
     complex(dp) :: fac, facqd, facq
 
     tpiba = twopi/twonorm(crys%lattvecs(:,1))*bohr2nm
@@ -952,11 +952,11 @@ contains
 
     class(epw_wannier), intent(in) :: wann
     type(numerics), intent(in) :: num
-    integer(k4), intent(in) :: ik
+    integer(k8), intent(in) :: ik
     real(dp), intent(in) :: kvec(3)
 
     !Local variables
-    integer(k4) :: iuc
+    integer(k8) :: iuc
     complex(dp) :: caux
     complex(dp), allocatable:: gmixed(:,:,:,:)
 
@@ -995,11 +995,11 @@ contains
 
     class(epw_wannier), intent(in) :: wann
     type(numerics), intent(in) :: num
-    integer(k4), intent(in) :: iq
+    integer(k8), intent(in) :: iq
     real(dp), intent(in) :: qvec(3)
 
     !Local variables
-    integer(k4) :: iuc, s
+    integer(k8) :: iuc, s
     complex(dp) :: caux
     complex(dp), allocatable:: gmixed(:,:,:,:)
 
@@ -1040,7 +1040,7 @@ contains
     class(epw_wannier), intent(in) :: wann
     type(numerics), intent(in) :: num
     
-    integer(k4) :: iuc
+    integer(k8) :: iuc
     complex(dp) :: caux
     complex(dp), allocatable:: gmixed(:, :, :, :)
     character(len = 1024) :: filename
@@ -1077,7 +1077,7 @@ contains
     type(crystal), intent(in) :: crys
 
     !Local variables
-    integer(k4) :: i, nqpath, m, n, s
+    integer(k8) :: i, nqpath, m, n, s
     real(dp) :: k(3), kp(3)
     real(dp), allocatable :: qpathvecs(:,:), ph_ens_path(:,:), &
          el_ens_path(:,:), ph_vels_path(:,:,:), el_ens_kp(:), &
@@ -1136,7 +1136,7 @@ contains
     k = (/0.0_dp, 0.0_dp, 0.0_dp/)
     allocate(el_ens_k(wann%numwannbands), el_vels_k(wann%numwannbands,3),&
          el_evecs_k(wann%numwannbands,wann%numwannbands))
-    call el_wann_epw(wann, crys, 1_k4, k, el_ens_k, el_vels_k, el_evecs_k)
+    call el_wann_epw(wann, crys, 1_k8, k, el_ens_k, el_vels_k, el_evecs_k)
 
     !Calculate g(k, Rp)
     call gmixed_epw_gamma(wann, num)
@@ -1169,7 +1169,7 @@ contains
        kp = qpathvecs(i, :) !for k = Gamma 
 
        !Calculate electrons at path point
-       call el_wann_epw(wann, crys, 1_k4, kp, el_ens_kp, el_vels_kp, el_evecs_kp)
+       call el_wann_epw(wann, crys, 1_k8, kp, el_ens_kp, el_vels_kp, el_evecs_kp)
 
        !Calculate |g(k,k')|^2
        !(q is the same as k')

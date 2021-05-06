@@ -1,7 +1,7 @@
 module electron_module
   !! Module containing types and procedures related to the electronic properties.
 
-  use params, only: dp, k4
+  use params, only: dp, k8
   use misc, only: exit_with_message, print_message, demux_state, sort
   use numerics_module, only: numerics
   use wannier_module, only: epw_wannier
@@ -19,33 +19,33 @@ module electron_module
 
      character(len = 2) :: prefix = 'el'
      !! Prefix idenitfying particle type.
-     integer(k4) :: spindeg
+     integer(k8) :: spindeg
      !! Spin degeneracy.
-     integer(k4) :: numbands
+     integer(k8) :: numbands
      !! Total number of electronic bands (from DFT/Wannier).
-     integer(k4) :: numtransbands
+     integer(k8) :: numtransbands
      !! Total number of transport active bands.
-     integer(k4) :: indlowband
+     integer(k8) :: indlowband
      !! Lowest transport band index.
-     integer(k4) :: indhighband
+     integer(k8) :: indhighband
      !! Highest transport band index.
-     integer(k4) :: indhighvalence
+     integer(k8) :: indhighvalence
      !! Highest valence band index.
-     integer(k4) :: indlowconduction
+     integer(k8) :: indlowconduction
      !! Lowest conduction band index.
-     integer(k4) :: mesh_ref
+     integer(k8) :: mesh_ref
      !! Electron mesh refinement factor compared to the phonon mesh.
-     integer(k4) :: kmesh(3)
+     integer(k8) :: kmesh(3)
      !! Electron wave vector mesh.
-     integer(k4) :: nk
+     integer(k8) :: nk
      !! Number of fine electron wave vectors in the full Brillouin zone (FBZ).
-     integer(k4) :: nk_irred
+     integer(k8) :: nk_irred
      !! Number of fine electron wave vectors in the irreducible wedge of Brillouin zone (IBZ).
-     integer(k4) :: nstates_inwindow
+     integer(k8) :: nstates_inwindow
      !! Number of electron wave vectors within transport window.
-     integer(k4) :: nstates_irred_inwindow
+     integer(k8) :: nstates_irred_inwindow
      !! Number of IBZ wedge electron wave vectors within transport window.
-     integer(k4), allocatable :: IBZ_inwindow_states(:,:)
+     integer(k8), allocatable :: IBZ_inwindow_states(:,:)
      !! List of irreducible wedge states within transport window.
      real(dp) :: enref
      !! Electron reference energy (eV).
@@ -60,29 +60,29 @@ module electron_module
      !! List of all electron wave vectors (crystal coordinates).
      real(dp), allocatable :: wavevecs_irred(:,:)
      !! List of irreducible electron wave vectors (crystal coordinates).
-     integer(k4), allocatable :: indexlist(:)
+     integer(k8), allocatable :: indexlist(:)
      !! List of muxed indices of the FBZ wave vectors.
-     integer(k4), allocatable :: indexlist_irred(:)
+     integer(k8), allocatable :: indexlist_irred(:)
      !! List of muxed indices of the IBZ wedge.
-     integer(k4), allocatable :: nequiv(:)
+     integer(k8), allocatable :: nequiv(:)
      !! List of the number of equivalent points for each IBZ point.
-     integer(k4), allocatable :: ibz2fbz_map(:,:,:)
+     integer(k8), allocatable :: ibz2fbz_map(:,:,:)
      !! Map from an IBZ electron point to its images.
      !! The third axis contains the pair (symmetry index, image).
-     integer(k4), allocatable :: fbz2ibz_map(:)
+     integer(k8), allocatable :: fbz2ibz_map(:)
      !! Map from an FBZ electron point to its IBZ wedge image.
-     integer(k4), allocatable :: equiv_map(:,:)
+     integer(k8), allocatable :: equiv_map(:,:)
      !! Map of equivalent points under rotations.
      !! Axis 1 runs over rotations.
      !! Axis 2 runs over wave vectors.
-     integer(k4), allocatable :: tetra(:,:)
+     integer(k8), allocatable :: tetra(:,:)
      !! List of all the wave vector mesh tetrahedra vertices.
      !! First axis list tetraheda and the second axis list the vertices.
-     integer(k4), allocatable :: tetracount(:)
+     integer(k8), allocatable :: tetracount(:)
      !! The number of tetrahedra in which a wave vector belongs.
-     integer(k4), allocatable :: tetramap(:,:,:)
+     integer(k8), allocatable :: tetramap(:,:,:)
      !! Mapping from a wave vector to the (tetrahedron, vertex) where it belongs.
-     real(k4), allocatable :: tetra_evals(:,:,:)
+     real(dp), allocatable :: tetra_evals(:,:,:)
      !! Tetrahedra vertices filled with eigenvalues.
      real(dp), allocatable :: ens(:,:)
      !! List of electron energies on FBZ.
@@ -120,7 +120,7 @@ contains
 
     !Local variables
     real(dp) :: enref, conc
-    integer(k4) :: spindeg, numbands, numtransbands, indlowband, indhighband, &
+    integer(k8) :: spindeg, numbands, numtransbands, indlowband, indhighband, &
          indhighvalence, indlowconduction
     logical :: metallic
 
@@ -206,7 +206,7 @@ contains
     type(numerics), intent(in) :: num
     
     !Some utitlity variables
-    integer(k4) :: i, l, s, il, ib, count, istate
+    integer(k8) :: i, l, s, il, ib, count, istate
     real(dp), allocatable :: el_ens_tmp(:, :), el_vels_tmp(:, :, :)
 
     !Switch for mesh utilites with or without energy restriction
@@ -399,11 +399,11 @@ contains
     !! indexlist is the list of wave vector indices - will be updated
     !! to the list of indices in the blocks
 
-    integer(k4), intent(inout) :: nk
-    integer(k4), allocatable, intent(inout) :: indexlist(:)
+    integer(k8), intent(inout) :: nk
+    integer(k8), allocatable, intent(inout) :: indexlist(:)
     real(dp), intent(in) :: energies(:,:), enref, fsthick
 
-    integer(k4) :: ik, count, numbands, inwindow(nk)
+    integer(k8) :: ik, count, numbands, inwindow(nk)
     real(dp), allocatable :: aux(:)
     
     numbands = size(energies(1,:))    
@@ -434,9 +434,9 @@ contains
     !! Subroutine to find FBZ blocks quanties by eliminating points that
     !! lie outside the energy window.
 
-    integer(k4), intent(in) :: indexlist(:)
+    integer(k8), intent(in) :: indexlist(:)
     real(dp), allocatable, intent(inout) :: energies(:,:), velocities(:,:,:)
-    integer(k4) :: i, nk, numbands
+    integer(k8) :: i, nk, numbands
     real(dp), allocatable :: energies_tmp(:,:), velocities_tmp(:,:,:)
 
     nk = size(indexlist)

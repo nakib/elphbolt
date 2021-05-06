@@ -2,7 +2,7 @@ module symmetry_module
   !! Module containing type and procedures related crystal and
   !! Brillouin zone symmetries.
 
-  use params, only: dp, k4
+  use params, only: dp, k8
   use misc, only: mux_vector, demux_mesh, demux_vector, exit_with_message
   use crystal_module !, only :: crystal
   use spglib_wrapper, only: get_operations, get_cartesian_operations, get_num_operations
@@ -15,18 +15,18 @@ module symmetry_module
   type symmetry
      !! Data and procedure related to symmetries.
      
-     integer(k4) :: nsymm
+     integer(k8) :: nsymm
      !! Number of spacegroup symmetries.
-     integer(k4) :: nsymm_rot
+     integer(k8) :: nsymm_rot
      !! Number of rotations.
-     integer(k4), allocatable :: rotations_orig(:,:,:)
+     integer(k8), allocatable :: rotations_orig(:,:,:)
      !! Rotations without time-reversal, real space, crystal coordinates.
      real(dp), allocatable :: crotations_orig(:,:,:)
      !! Rotations without time-reversal, real space, Cartesian coordinates.
      real(dp), allocatable :: qrotations_orig(:,:,:)
      !! Rotations without time-reversal, reciprocal space, crystal coordinates.
      !And with time-reversal (time reversed sector is the 2nd half of last axis):
-     integer(k4), allocatable :: rotations(:,:,:) 
+     integer(k8), allocatable :: rotations(:,:,:) 
      !! Rotations with time-reversal, real space, crystal coordinates.
      real(dp), allocatable :: crotations(:,:,:)
      !! Rotations with time-reversal, real space, Cartesian coordinates.
@@ -50,12 +50,12 @@ contains
 
     class(symmetry), intent(out) :: sym
     type(crystal), intent(in) :: crys
-    integer(k4), intent(in) :: mesh(3)
+    integer(k8), intent(in) :: mesh(3)
 
     !Internal variables:
-    integer(k4) :: i, j, k, ii, jj, kk, ll, info, nq
-    integer(k4) :: P(3)
-    integer(k4), allocatable :: rtmp(:,:,:), local_equiv_map(:,:)
+    integer(k8) :: i, j, k, ii, jj, kk, ll, info, nq
+    integer(k8) :: P(3)
+    integer(k8), allocatable :: rtmp(:,:,:), local_equiv_map(:,:)
     logical, allocatable :: valid(:)
     real(dp), allocatable :: crtmp(:,:,:), qrtmp(:,:,:)
     real(dp), allocatable :: translations(:,:), ctranslations(:,:)
@@ -164,11 +164,11 @@ contains
     !! Compute all images of a wave vector (crystal coords.) under the
     !! rotational symmetry operations.
 
-    integer(k4), intent(in) :: q_in(3), mesh(3)
+    integer(k8), intent(in) :: q_in(3), mesh(3)
     real(dp), intent(in) :: qrotations(:,:,:)
     real(dp), intent(out) :: q_out(:,:)
 
-    integer(k4) :: ii, nsymm_rot
+    integer(k8) :: ii, nsymm_rot
 
     nsymm_rot = size(qrotations(1,1,:))
 
@@ -180,14 +180,14 @@ contains
   subroutine find_equiv_map(nsymm_rot,equiv_map,mesh,qrotations,indexlist)
     !! Subroutine to create the map of equivalent wave vectors.
 
-    integer(k4), intent(in) :: nsymm_rot, mesh(3)
+    integer(k8), intent(in) :: nsymm_rot, mesh(3)
     real(dp), intent(in) :: qrotations(:,:,:)
-    integer(k4), optional, intent(in) :: indexlist(:)
-    integer(k4), intent(out) :: equiv_map(:,:)
+    integer(k8), optional, intent(in) :: indexlist(:)
+    integer(k8), intent(out) :: equiv_map(:,:)
 
-    integer(k4) :: nmesh
-    integer(k4), allocatable :: index_mesh(:,:)
-    integer(k4) :: i, isym, ivec(3), base
+    integer(k8) :: nmesh
+    integer(k8), allocatable :: index_mesh(:,:)
+    integer(k8) :: i, isym, ivec(3), base
     real(dp) :: vec(3), vec_star(3, nsymm_rot), dnrm2
 
     if(present(indexlist)) then
@@ -237,20 +237,20 @@ contains
     !! indexlist is the sorted list of indices of the wavevectors
     !!   in the energy restricted FBZ which must be present if blocks is true
 
-    integer(k4), intent(in) :: mesh(3)
+    integer(k8), intent(in) :: mesh(3)
     logical, intent(in) :: blocks
-    integer(k4), intent(in) :: nsymm_rot
+    integer(k8), intent(in) :: nsymm_rot
     real(dp), intent(in) :: qrotations(:,:,:)
-    integer(k4), optional, intent(in) :: indexlist(:)
-    integer(k4), intent(out) :: nwavevecs_irred
-    integer(k4), allocatable, intent(out) :: indexlist_irred(:), &
+    integer(k8), optional, intent(in) :: indexlist(:)
+    integer(k8), intent(out) :: nwavevecs_irred
+    integer(k8), allocatable, intent(out) :: indexlist_irred(:), &
          nequivalent(:), ibz2fbz_map(:,:,:), equivalence_map(:,:)
     real(dp), allocatable, intent(out) :: wavevecs_irred(:,:)
 
     !Local variables
-    integer(k4) :: nwavevecs, i, imux, s, image, imagelist(nsymm_rot), &
+    integer(k8) :: nwavevecs, i, imux, s, image, imagelist(nsymm_rot), &
          nrunninglist, counter, ijk(3)
-    integer(k4), allocatable :: runninglist(:), &
+    integer(k8), allocatable :: runninglist(:), &
          indexlist_irred_tmp(:), nequivalent_tmp(:), ibz2fbz_map_tmp(:,:,:)
     logical :: proceed
 
@@ -341,7 +341,7 @@ contains
     allocate(wavevecs_irred(nwavevecs_irred,3))
     do i = 1,nwavevecs_irred !run over total number of vectors
        imux = indexlist_irred(i)
-       call demux_vector(imux, ijk, mesh, 0_k4) !get 0-based (i,j,k) indices
+       call demux_vector(imux, ijk, mesh, 0_k8) !get 0-based (i,j,k) indices
 
        wavevecs_irred(i,:) = dble(ijk)/mesh !wave vectors in crystal coordinates
     end do
@@ -350,8 +350,8 @@ contains
   function fbz2ibz(iwvmux,nwv_irred,nequiv,ibz2fbz_map)
     !! Find index in IBZ blocks list for a given FBZ blocks muxed vector index
 
-    integer(k4), intent(in) :: iwvmux, nwv_irred, nequiv(nwv_irred), ibz2fbz_map(:,:,:)
-    integer(k4) :: i, l, il, fbz2ibz
+    integer(k8), intent(in) :: iwvmux, nwv_irred, nequiv(nwv_irred), ibz2fbz_map(:,:,:)
+    integer(k8) :: i, l, il, fbz2ibz
 
     fbz2ibz = -1
 
@@ -377,11 +377,11 @@ contains
   subroutine create_fbz2ibz_map(fbz2ibz_map, nwv, nwv_irred, indexlist, nequiv, ibz2fbz_map)
     !! Subroutine to create map of FBZ blocks to IBZ blocks
 
-    integer(k4), intent(in) :: nwv, nwv_irred, indexlist(nwv), &
+    integer(k8), intent(in) :: nwv, nwv_irred, indexlist(nwv), &
          nequiv(nwv_irred),ibz2fbz_map(:,:,:)
-    integer(k4), intent(out), allocatable :: fbz2ibz_map(:)
+    integer(k8), intent(out), allocatable :: fbz2ibz_map(:)
 
-    integer(k4) :: iwv
+    integer(k8) :: iwv
 
     allocate(fbz2ibz_map(nwv))
 

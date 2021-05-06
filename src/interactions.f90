@@ -1,7 +1,7 @@
 module interactions
   !! Module containing the procedures related to the computation of interactions.
 
-  use params, only: k4, dp, pi, twopi, amu, qe, hbar_eVps
+  use params, only: k8, dp, pi, twopi, amu, qe, hbar_eVps
   use misc, only: exit_with_message, print_message, distribute_points, &
        demux_state, mux_vector, mux_state, expi, Bose, binsearch, Fermi
   use wannier_module, only: epw_wannier
@@ -24,12 +24,12 @@ contains
        Index_i, Index_j, Index_k, ifc3, phases_q2q3)
     !! Function to calculate the 3-ph interaction vertex |V-|^2.
     
-    integer(k4), intent(in) :: s1, s2, s3, Index_i(:), Index_j(:), Index_k(:)
+    integer(k8), intent(in) :: s1, s2, s3, Index_i(:), Index_j(:), Index_k(:)
     complex(dp), intent(in) :: phases_q2q3(:), ev1(:,:), ev2(:,:), ev3(:,:)
     real(dp), intent(in) :: ifc3(:,:,:,:)
 
     !Local variables
-    integer(k4) :: it, a, b, c, aind, bind, cind, ntrip
+    integer(k8) :: it, a, b, c, aind, bind, cind, ntrip
     complex(dp) :: aux1, aux2, V0
 
     ntrip = size(Index_k(:))
@@ -67,14 +67,14 @@ contains
     character(len = 1), intent(in) :: key
     
     !Local variables
-    integer(k4) :: start, end, chunk, istate1, nstates_irred, &
+    integer(k8) :: start, end, chunk, istate1, nstates_irred, &
          nprocs, s1, s2, s3, iq1_ibz, iq1, iq2, iq3_minus, it, &
          q1_indvec(3), q2_indvec(3), q3_minus_indvec(3), index_minus, index_plus, &
          neg_iq2, neg_q2_indvec(3), num_active_images
     real(dp) :: en1, en2, en3, massfac, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
          delta, occup_fac, Vp2_index_plus, const, bose2, bose3
     real(dp), allocatable :: Vm2(:), Wm(:), Wp(:)
-    integer(k4), allocatable :: istate2_plus(:), istate3_plus(:), istate2_minus(:), istate3_minus(:)
+    integer(k8), allocatable :: istate2_plus(:), istate3_plus(:), istate2_minus(:), istate3_minus(:)
     complex(dp) :: phases_q2q3(ph%numtriplets)
     character(len = 1024) :: filename, filename_Wm, filename_Wp, Wdir, tag
 
@@ -128,10 +128,10 @@ contains
        if(key == 'W') then
           Wp(:) = 0.0_dp
           Wm(:) = 0.0_dp
-          istate2_plus(:) = 0_k4
-          istate3_plus(:) = 0_k4
-          istate2_minus(:) = 0_k4
-          istate3_minus(:) = 0_k4
+          istate2_plus(:) = 0_k8
+          istate3_plus(:) = 0_k8
+          istate2_minus(:) = 0_k8
+          istate3_minus(:) = 0_k8
        end if
 
        !Demux state index into branch (s) and wave vector (iq) indices
@@ -179,7 +179,7 @@ contains
           q3_minus = q3_minus_indvec/dble(ph%qmesh) !crystal coords.
 
           !Muxed index of q3_minus
-          iq3_minus = mux_vector(q3_minus_indvec, ph%qmesh, 0_k4)
+          iq3_minus = mux_vector(q3_minus_indvec, ph%qmesh, 0_k8)
           
           if(key == 'V') then
              !Calculate the numtriplet number of mass-normalized phases for this (q2,q3) pair
@@ -207,7 +207,7 @@ contains
 
                 !Get index of -q2
                 neg_q2_indvec = modulo(-q2_indvec, ph%qmesh)
-                neg_iq2 = mux_vector(neg_q2_indvec, ph%qmesh, 0_k4)
+                neg_iq2 = mux_vector(neg_q2_indvec, ph%qmesh, 0_k8)
              end if
              
              !Run over branches of third phonon
@@ -331,7 +331,7 @@ contains
     type(numerics), intent(in) :: num
 
     !Local variables
-    integer(k4) :: iq, iqstart, iqend, chunk, num_active_images
+    integer(k8) :: iq, iqstart, iqend, chunk, num_active_images
 
     call print_message("Doing g(Re,Rp) -> g(Re,q) for all IBZ q...")
 
@@ -357,7 +357,7 @@ contains
     type(numerics), intent(in) :: num
 
     !Local variables
-    integer(k4) :: ik, ikstart, ikend, chunk, num_active_images
+    integer(k8) :: ik, ikstart, ikend, chunk, num_active_images
 
     call print_message("Doing g(Re,Rp) -> g(k,Rp) for all IBZ k...")
 
@@ -397,10 +397,10 @@ contains
     character(len = 1), intent(in) :: key
     
     !Local variables
-    integer(k4) :: nstates_irred, istate, m, iq, iq_fbz, n, ik, ikp, s, &
+    integer(k8) :: nstates_irred, istate, m, iq, iq_fbz, n, ik, ikp, s, &
          ikp_window, start, end, chunk, k_indvec(3), kp_indvec(3), &
          q_indvec(3), nprocs, count, num_active_images
-    integer(k4), allocatable :: istate1(:), istate2(:)
+    integer(k8), allocatable :: istate1(:), istate2(:)
     real(dp) :: k(3), kp(3), q(3), en_ph, en_el, en_elp, const, delta, &
          invboseplus1, fermi1, fermi2, occup_fac
     real(dp), allocatable :: g2_istate(:), Y_istate(:)
@@ -505,8 +505,8 @@ contains
           !Allocate and initialize quantities related to transition probabilities
           allocate(Y_istate(nprocs))
           allocate(istate1(nprocs), istate2(nprocs))
-          istate1(:) = -1_k4
-          istate2(:) = -1_k4
+          istate1(:) = -1_k8
+          istate2(:) = -1_k8
           Y_istate(:) = 0.0_dp
        end if
 
@@ -575,7 +575,9 @@ contains
                    occup_fac = fermi1*(1.0_dp - fermi2)*invboseplus1
                    
                    !Save Y
-                   Y_istate(count) = g2_istate(count)*occup_fac*delta
+                   if(en_ph >= 0.5e-3) then !Use a small phonon energy cut-off
+                      Y_istate(count) = g2_istate(count)*occup_fac*delta
+                   end if
 
                    !Save initial and final electron states
                    istate1(count) = mux_state(el%numbands, m, ik)
@@ -658,13 +660,13 @@ contains
     character(len = 1), intent(in) :: key
     
     !Local variables
-    integer(k4) :: nstates_irred, istate, m, ik, ik_fbz, n, ikp, s, &
+    integer(k8) :: nstates_irred, istate, m, ik, ik_fbz, n, ikp, s, &
          iq, start, end, chunk, k_indvec(3), kp_indvec(3), &
          q_indvec(3), count, nprocs, num_active_images
     real(dp) :: k(3), kp(3), q(3), ph_ens_iq(1, ph%numbranches), const, bosefac, &
          fermi_minus_fac, fermi_plus_fac, en_ph, en_el, delta, occup_fac
     real(dp), allocatable :: g2_istate(:), Xplus_istate(:), Xminus_istate(:)
-    integer(k4), allocatable :: istate_el(:), istate_ph(:)
+    integer(k8), allocatable :: istate_el(:), istate_ph(:)
     complex(dp) :: gkRp_ik(wann%numwannbands,wann%numwannbands,wann%numbranches,wann%nwsq), &
          ph_evecs_iq(1, ph%numbranches,ph%numbranches)
     character(len = 1024) :: filename, filename_X, Xdir, tag
@@ -763,8 +765,8 @@ contains
           !Allocate and initialize quantities related to transition probabilities
           allocate(Xplus_istate(nprocs), Xminus_istate(nprocs))
           allocate(istate_el(nprocs), istate_ph(nprocs))
-          istate_el(:) = 0_k4
-          istate_ph(:) = 0_k4
+          istate_el(:) = 0_k8
+          istate_ph(:) = 0_k8
           Xplus_istate(:) = 0.0_dp
           Xminus_istate(:) = 0.0_dp
        end if
@@ -784,7 +786,7 @@ contains
           !Note that q, k, and k' are all on the same mesh
           q_indvec = kp_indvec - k_indvec
           needfinephon = .false.
-          if(any(mod(q_indvec(:), el%mesh_ref) /= 0_k4)) then
+          if(any(mod(q_indvec(:), el%mesh_ref) /= 0_k8)) then
              needfinephon = .true.
              q_indvec = modulo(q_indvec, el%kmesh) !0-based index vector
              q = q_indvec/dble(el%kmesh) !crystal coords.
@@ -792,7 +794,7 @@ contains
              iq = mux_vector(q_indvec, el%kmesh, 0_dp)
 
              !Calculate the fine mesh phonon.
-             call wann%ph_wann_epw(crys, 1_k4, q, ph_ens_iq, ph_evecs_iq)
+             call wann%ph_wann_epw(crys, 1_k8, q, ph_ens_iq, ph_evecs_iq)
              !TODO: for consistency, above we should also use ifcs
           else !Original (coarser) mesh phonon
              q_indvec = modulo(q_indvec/el%mesh_ref, ph%qmesh) !0-based index vector
@@ -851,7 +853,9 @@ contains
                    occup_fac = bosefac + fermi_plus_fac
                    
                    !Save X+
-                   Xplus_istate(count) = g2_istate(count)*occup_fac*delta
+                   if(en_ph >= 0.5e-3) then !Use a small phonon energy cut-off
+                      Xplus_istate(count) = g2_istate(count)*occup_fac*delta
+                   end if
                    
                    !Calculate X-:
 
@@ -863,7 +867,9 @@ contains
                    occup_fac = 1.0_dp + bosefac + fermi_minus_fac
                    
                    !Save X-
-                   Xminus_istate(count) = g2_istate(count)*occup_fac*delta
+                   if(en_ph >= 0.5e-3) then !Use a small phonon energy cut-off
+                      Xminus_istate(count) = g2_istate(count)*occup_fac*delta
+                   end if
 
                    !Save final electron and interacting phonon states (same for + and -)
                    istate_el(count) = mux_state(el%numbands, m, ik)
@@ -954,9 +960,9 @@ contains
     type(electron), intent(in), optional :: el
 
     !Local variables
-    integer(k4) :: nstates_irred, procs, istate, nprocs_3ph, nprocs_phe, &
+    integer(k8) :: nstates_irred, procs, istate, nprocs_3ph, nprocs_phe, &
          iproc, chunk, s, iq, im, num_active_images
-    integer(k4), allocatable :: start[:], end[:]
+    integer(k8), allocatable :: start[:], end[:]
     real(dp), allocatable :: rta_rates_3ph_psum(:,:)[:], rta_rates_phe_psum(:,:)[:], &
          W(:), Y(:)
     character(len = 1024) :: filepath_Wm, filepath_Wp, filepath_Y, Wdir, Ydir, tag
@@ -1064,9 +1070,9 @@ contains
     type(electron), intent(in) :: el
     
     !Local variables
-    integer(k4) :: nstates_irred, procs, istate, nprocs_eph, &
+    integer(k8) :: nstates_irred, procs, istate, nprocs_eph, &
          iproc, chunk, m, ik, im, num_active_images
-    integer(k4), allocatable :: start[:], end[:]
+    integer(k8), allocatable :: start[:], end[:]
     real(dp), allocatable :: rta_rates_eph_psum(:,:)[:], X(:)
     character(len = 1024) :: filepath_Xp, filepath_Xm, Xdir, tag
 
@@ -1137,7 +1143,7 @@ contains
 
     character(len = *), intent(in) :: filepath
     real(dp), intent(out) :: T(:)
-    integer(k4), intent(out), optional :: istate2(:), istate3(:)
+    integer(k8), intent(out), optional :: istate2(:), istate3(:)
 
     !Read data
     open(1, file = trim(adjustl(filepath)), status = 'old', access = 'stream')
@@ -1156,9 +1162,9 @@ contains
     !! accordingly.
 
     character(len = *), intent(in) :: filepath
-    integer(k4), intent(out) :: N
+    integer(k8), intent(out) :: N
     real(dp), allocatable, intent(out) :: T(:)
-    integer(k4), allocatable, intent(out), optional :: istate1(:), istate2(:)
+    integer(k8), allocatable, intent(out), optional :: istate1(:), istate2(:)
 
     !Read data
     open(1, file = trim(adjustl(filepath)), status = 'old', access = 'stream')

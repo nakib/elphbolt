@@ -2,7 +2,7 @@ module bte_module
   !! Module containing type and procedures related to the solution of the
   !! Boltzmann transport equation (BTE).
 
-  use params, only: dp, k4, qe
+  use params, only: dp, k8, qe
   use misc, only: print_message, exit_with_message, write2file_rank2_real, &
        distribute_points, demux_state
   use numerics_module, only: numerics
@@ -30,7 +30,11 @@ module bte_module
      !! Phonon response function on the FBZ.
      
      real(dp), allocatable :: el_rta_rates_ibz(:,:)
-     !! Phonon RTA scattering rates on the IBZ.
+     !! Electron RTA scattering rates on the IBZ.
+     real(dp), allocatable :: el_field_term(:,:,:)
+     !! Electron field coupling term on the FBZ.
+     real(dp), allocatable :: el_response(:,:,:)
+     !! electron response function on the FBZ.
    contains
 
      procedure :: solve_bte
@@ -51,7 +55,7 @@ contains
 
     !Local variables
     character(len = 1024) :: tag, Tdir
-    integer(k4) :: iq, it
+    integer(k8) :: iq, it
     real(dp), allocatable :: rates_3ph(:,:), rates_phe(:,:), rates_eph(:,:)
 
     call print_message("Solving BTE in the RTA...")
@@ -106,7 +110,9 @@ contains
        call calculate_el_rta_rates(rates_eph, num, crys, el)
        bt%el_rta_rates_ibz = rates_eph ! + other channels
        
-       !TODO Calculate field term (I0 or J0)
+       !Calculate field term (I0 or J0)
+       call calculate_field_term('el', 'E', ph%nequiv, el%ibz2fbz_map, &
+            crys%T, el%chempot, el%ens, el%vels, bt%el_rta_rates_ibz, bt%el_field_term)
 
        !TODO Symmetrize field term
 
@@ -164,29 +170,32 @@ contains
 
     character(len = 2), intent(in) :: species
     character(len = 1), intent(in) :: field
-    integer(k4), intent(in) :: nequiv(:), ibz2fbz_map(:,:,:)
+    integer(k8), intent(in) :: nequiv(:), ibz2fbz_map(:,:,:)
     real(dp), intent(in) :: T, chempot, ens(:,:), vels(:,:,:), rta_rates_ibz(:,:)
     real(dp), allocatable, intent(out) :: field_term(:,:,:)
 
     !Local variables
-    integer(k4) :: ik_ibz, ik_fbz, ieq, ib, nk_ibz, nk, nbands, im, chunk, num_active_images
-    integer(k4), allocatable :: start[:], end[:]
+    integer(k8) :: ik_ibz, ik_fbz, ieq, ib, nk_ibz, nk, nbands, pow, &
+         im, chunk, num_active_images
+    integer(k8), allocatable :: start[:], end[:]
     real(dp), allocatable :: field_term_reduce(:,:,:)[:]
     real(dp) :: A
     logical :: trivial_case
 
-    !Set constant depending on species and field type
+    !Set constant and power of energy depending on species and field type
     if(species == 'ph') then
        A = 1.0_dp/T
-
+       pow = 1
        if(chempot /= 0.0_dp) then
           call exit_with_message("Phonon chemical potential non-zero in calculate_field_term. Exiting.")
        end if
     else if(species == 'el') then
        if(field == 'T') then
           A = 1.0_dp/T
+          pow = 1
        else if(field == 'E') then
           A = qe
+          pow = 0
        else
           call exit_with_message("Unknown field type in calculate_field_term. Exiting.")
        end if
@@ -228,7 +237,7 @@ contains
              do ib = 1, nbands
                 if(rta_rates_ibz(ik_ibz, ib) /= 0.0_dp) then
                    field_term_reduce(ik_fbz, ib, :) = A*vels(ik_fbz, ib, :)*&
-                        (ens(ik_fbz, ib) - chempot)/rta_rates_ibz(ik_ibz, ib)
+                        (ens(ik_fbz, ib) - chempot)**pow/rta_rates_ibz(ik_ibz, ib)
                 end if
              end do
           end do
@@ -251,15 +260,15 @@ contains
     !! 
 
     logical, intent(in) :: drag
-    integer(k4), intent(in) :: nequiv(:), equiv_map(:,:), ibz2fbz_map(:,:,:)
+    integer(k8), intent(in) :: nequiv(:), equiv_map(:,:), ibz2fbz_map(:,:,:)
     real(dp), intent(in) :: T, rta_rates_ibz(:,:), field_term(:,:,:)
     real(dp), intent(inout) :: response_ph(:,:,:)
     character(len = *), intent(in) :: datadumpdir
 
     !Local variables
-    integer(k4) :: nstates_irred, nprocs, chunk, istate1, numbranches, s1, &
+    integer(k8) :: nstates_irred, nprocs, chunk, istate1, numbranches, s1, &
          iq1_ibz, ieq, iq1_sym, iq1_fbz, iproc, iq2, s2, iq3, s3, im, nq, num_active_images
-    integer(k4), allocatable :: istate2_plus(:), istate3_plus(:), &
+    integer(k8), allocatable :: istate2_plus(:), istate3_plus(:), &
          istate2_minus(:), istate3_minus(:), start[:], end[:]
     real(dp) :: tau_ibz
     real(dp), allocatable :: Wp(:), Wm(:), response_ph_reduce(:,:,:)[:]

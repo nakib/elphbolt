@@ -1,7 +1,7 @@
 module crystal_module
   !! Module containing type and procedures related to the crystal structure.
 
-  use params, only: dp, k4, twopi
+  use params, only: dp, k8, twopi
   use misc, only: exit_with_message, print_message, cross_product, demux_vector
 
   implicit none
@@ -12,15 +12,15 @@ module crystal_module
   type crystal
      !! Data and procedures related to the crystal structure.
 
-     integer(k4) :: numelements
+     integer(k8) :: numelements
      !! Number of types of basis atoms.
-     integer(k4) :: numatoms
+     integer(k8) :: numatoms
      !! Number of basis atoms.
      character(len=100) :: name
      !! Elements in the in the basis.
      character(len=3), allocatable :: elements(:)
      !! Elements in the in the basis.
-     integer(k4), allocatable :: atomtypes(:)
+     integer(k8), allocatable :: atomtypes(:)
      !! Integer tagging unique elements in the basis.
      real(dp), allocatable :: masses(:)
      !! Masses of the basis atoms.
@@ -58,8 +58,8 @@ contains
     class(crystal), intent(out) :: c
 
     !Local variables
-    integer(k4) :: i, j, k, numelements, numatoms
-    integer(k4), allocatable :: atomtypes(:)
+    integer(k8) :: i, j, k, numelements, numatoms
+    integer(k8), allocatable :: atomtypes(:)
     real(dp), allocatable :: masses(:), born(:,:,:), basis(:,:), basis_cart(:,:)
     real(dp) :: epsilon(3,3), lattvecs(3,3), volume, reclattvecs(3,3), volume_bz, T
     character(len=3), allocatable :: elements(:)
@@ -161,11 +161,11 @@ contains
     !! mesh is the array of number of points along the reciprocal lattice vectors
     !! wavevecs is the list of all the wave vectors
 
-    integer(k4), intent(in) :: mesh(3)
+    integer(k8), intent(in) :: mesh(3)
     logical, intent(in) :: blocks
-    integer(k4), optional, intent(in) :: indexlist(:)
+    integer(k8), optional, intent(in) :: indexlist(:)
     real(dp), allocatable, intent(out) :: wavevecs(:,:)
-    integer(k4) :: nwavevecs, ijk(3), i, imux
+    integer(k8) :: nwavevecs, ijk(3), i, imux
 
     if(blocks .and. .not. present(indexlist)) &
          call exit_with_message("If blocks is true then indexlist must be present")
@@ -183,7 +183,7 @@ contains
        else
           imux = i
        end if
-       call demux_vector(imux, ijk, mesh, 0_k4) !get 0-based (i,j,k) indices
+       call demux_vector(imux, ijk, mesh, 0_k8) !get 0-based (i,j,k) indices
        wavevecs(i,:) = dble(ijk)/mesh !wave vectors in crystal coordinates
     end do
   end subroutine calculate_wavevectors_full
