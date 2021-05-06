@@ -2,7 +2,7 @@ module electron_module
   !! Module containing types and procedures related to the electronic properties.
 
   use params, only: dp, k8
-  use misc, only: exit_with_message, print_message, demux_state, sort
+  use misc, only: exit_with_message, print_message, demux_state, sort, binsearch
   use numerics_module, only: numerics
   use wannier_module, only: epw_wannier
   use crystal_module, only: crystal, calculate_wavevectors_full
@@ -75,6 +75,8 @@ module electron_module
      !! Map of equivalent points under rotations.
      !! Axis 1 runs over rotations.
      !! Axis 2 runs over wave vectors.
+     real(dp), allocatable :: symmetrizers(:,:,:)
+     !! Symmetrizers of wave vector dependent vectors.
      integer(k8), allocatable :: tetra(:,:)
      !! List of all the wave vector mesh tetrahedra vertices.
      !! First axis list tetraheda and the second axis list the vertices.
@@ -206,7 +208,7 @@ contains
     type(numerics), intent(in) :: num
     
     !Some utitlity variables
-    integer(k8) :: i, l, s, il, ib, count, istate
+    integer(k8) :: i, l, s, il, ii, jj, kk, ib, count, istate, aux
     real(dp), allocatable :: el_ens_tmp(:, :), el_vels_tmp(:, :, :)
 
     !Switch for mesh utilites with or without energy restriction
@@ -254,8 +256,6 @@ contains
           el%ens(il,:) = el%ens_irred(i,:)
           
           !velocity
-          !TODO Apply symmetrizer here to make sure that all the velocities components
-          !agree with the symmetry of the wave vector.
           do ib = 1,wann%numwannbands
              !here use real space (Cartesian) rotations
              el%vels(il, ib, :) = matmul(sym%crotations(:, :, s), el%vels_irred(i, ib, :))
@@ -263,9 +263,9 @@ contains
        end do
     end do
     
-    ! 5. Find energy window restricted FBZ blocks
+    ! 5. Find energy window restricted FBZ blocks.
     !    After this step, el%nk, el%indexlist will refer
-    !    to the energy restricted mesh
+    !    to the energy restricted mesh.
     call print_message("Calculating Fermi window restricted FBZ blocks...")
     call apply_energy_window(el%nk, el%indexlist, el%ens, el%enref, el%fsthick)
     
@@ -273,9 +273,9 @@ contains
     call print_message("Sorting FBZ blocks index list...")
     call sort(el%indexlist)
 
-    ! 7. Get FBZ blocks wave vectors, energies, velocities and eigenvectors
+    ! 7. Get FBZ blocks wave vectors, energies, velocities and eigenvectors.
     !    After this step, el%wavevecs, el%ens, el%vels, and el%evecs
-    !    will refer to the energy restricted mesh
+    !    will refer to the energy restricted mesh.
     call print_message("Calcutating FBZ blocks quantities...")
     
     !wave vectors
@@ -283,7 +283,7 @@ contains
     
     blocks = .true.
     call calculate_wavevectors_full(el%kmesh, el%wavevecs, blocks, el%indexlist) !wave vectors
-
+    
     !energies and velocities
     call fbz_blocks_quantities(el%indexlist, el%ens, el%vels)
 
@@ -306,8 +306,25 @@ contains
          el%indexlist_irred, el%nequiv, sym%nsymm_rot, sym%qrotations, &
          el%ibz2fbz_map, el%equiv_map, blocks, el%indexlist)
 
-    ! 9. Get IBZ blocks energies, velocities, and eigen vectors
-    !    energies and velocities
+    !Create symmetrizers of wave vector dependent vectors ShengBTE style
+    allocate(el%symmetrizers(3, 3, el%nk))
+    el%symmetrizers = 0.0_dp
+    do i = 1, el%nk
+       ii = el%indexlist(i)
+       kk = 0
+       do jj = 1, sym%nsymm
+          if(el%equiv_map(jj, i) == ii) then
+             el%symmetrizers(:, :, i) = el%symmetrizers(:, :, i) + &
+                  sym%crotations_orig(:, :, jj)
+             kk = kk + 1
+          end if
+       end do
+       if(kk > 1) then
+          el%symmetrizers(:, :, i) = el%symmetrizers(:, :, i)/kk
+       end if
+    end do
+    
+    ! 9. Get IBZ blocks energies, velocities, and eigen vectors.
     call print_message("Calcutating IBZ blocks quantities...")
     deallocate(el%ens_irred, el%vels_irred, el%evecs_irred)
     allocate(el%ens_irred(el%nk_irred, wann%numwannbands), &
@@ -315,7 +332,7 @@ contains
          el%evecs_irred(el%nk_irred, wann%numwannbands, wann%numwannbands))
     call wann%el_wann_epw(crys, el%nk_irred, el%wavevecs_irred, el%ens_irred, &
          el%vels_irred, el%evecs_irred)
-
+    
     ! 10. Calculate the number of FBZ blocks electronic states
     !     available for scattering
     el%nstates_inwindow = 0
@@ -331,7 +348,22 @@ contains
     call print_message("Calculating FBZ -> IBZ mappings...")
     !call create_fbz2ibz_map
     call create_fbz2ibz_map(el%fbz2ibz_map,el%nk,el%nk_irred,el%indexlist,el%nequiv,el%ibz2fbz_map)
+    
+    do i = 1, el%nk_irred !IBZ
+       do l = 1, el%nequiv(i) !number of equivalent points of i
+          il = el%ibz2fbz_map(l, i, 2) ! (i, l) -> il
+          s = el%ibz2fbz_map(l, i, 1) ! symmetry
+          call binsearch(el%indexlist, il, aux)
 
+          !energy
+          el%ens(aux,:) = el%ens_irred(i,:)
+
+          !velocity
+          el%vels(aux,:,:) = transpose(&
+               matmul(el%symmetrizers(:,:,aux),transpose(el%vels(aux,:,:))))
+       end do
+    end do
+        
     ! 12. Calculate the number of IBZ electronic states available for scattering
     el%nstates_irred_inwindow = 0
     do istate = 1,el%nk_irred*wann%numwannbands
@@ -343,7 +375,7 @@ contains
     end do
     if(this_image() == 1) write(*, *) "Number of energy restricted IBZ blocks states = ", &
          el%nstates_irred_inwindow
-
+    
     !Calculate list of IBZ in-window states = (wave vector index, band index)
     allocate(el%IBZ_inwindow_states(el%nstates_irred_inwindow,2))
     count = 0
@@ -431,8 +463,7 @@ contains
   end subroutine apply_energy_window
 
   subroutine fbz_blocks_quantities(indexlist, energies, velocities)
-    !! Subroutine to find FBZ blocks quanties by eliminating points that
-    !! lie outside the energy window.
+    !! Subroutine to find FBZ quanties the lie within the Fermi window.
 
     integer(k8), intent(in) :: indexlist(:)
     real(dp), allocatable, intent(inout) :: energies(:,:), velocities(:,:,:)
@@ -443,10 +474,10 @@ contains
     numbands = size(energies(1,:))
 
     allocate(energies_tmp(nk, numbands), velocities_tmp(nk, numbands, 3))
-
+    
     do i = 1, nk
-       energies_tmp(i, :) = energies(indexlist(i), :)
-       velocities_tmp(i, :, :) = velocities(indexlist(i), :, :)
+       energies_tmp(i,:) = energies(indexlist(i),:)
+       velocities_tmp(i,:,:) = velocities(indexlist(i),:,:)
     end do
 
     deallocate(energies, velocities)

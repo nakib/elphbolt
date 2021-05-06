@@ -167,6 +167,8 @@ contains
     !Symmetrize phonon energies and velocities.
     do i = 1, ph%nq_irred !an irreducible point
        ii = ph%indexlist_irred(i)
+       ph%vels(ii,:,:)=transpose(&
+            matmul(ph%symmetrizers(:,:,ii),transpose(ph%vels(ii,:,:))))
        do l = 1, ph%nequiv(i) !number of equivalent points of i
           il = ph%ibz2fbz_map(l, i, 2) ! (i, l) -> il
           s = ph%ibz2fbz_map(l, i, 1) ! mapping rotation
@@ -175,8 +177,6 @@ contains
           ph%ens(il,:) = ph%ens(ii,:)
 
           !velocity
-          ph%vels(ii,:,:)=transpose(&
-               matmul(ph%symmetrizers(:,:,ii),transpose(ph%vels(ii,:,:))))
           do ib = 1, ph%numbranches
              !here use real space (Cartesian) rotations
              ph%vels(il, ib, :) = matmul(sym%crotations(:, :, s), ph%vels(ii, ib, :))

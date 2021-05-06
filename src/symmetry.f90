@@ -233,6 +233,7 @@ contains
     !! nequivalent lists the number of equivalent points of each irreducible point
     !! ibz2fbz_map contains the map from an irreducible BZ (IBZ) vector to its FBZ images
     !!   The third axis contains the pair (symmetry index, image)
+    !! equivalence_map is a map of the equivalent points under rotations
     !! blocks chooses whether the FBZ is energy restricted or not
     !! indexlist is the sorted list of indices of the wavevectors
     !!   in the energy restricted FBZ which must be present if blocks is true
