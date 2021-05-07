@@ -153,7 +153,7 @@ contains
 !!$    !!!!
 !!$    
     !Start iterator
-    do it = 1, 20
+    do it = 1, 5
        if(num%phbte) then
           call iterate_bte_ph(crys%T, num%datadumpdir, .False., ph%nequiv, ph%equiv_map, &
                ph%ibz2fbz_map, bt%ph_rta_rates_ibz, bt%ph_field_term, bt%ph_response)
@@ -170,10 +170,6 @@ contains
        end if
 
        if(num%ebte) then
-          !call iterate_bte_el(crys%T, num%datadumpdir, .False., el%indexlist, &
-          !     el%nequiv, el%equiv_map, el%ibz2fbz_map, bt%el_rta_rates_ibz, &
-          !     bt%el_field_term, bt%el_response)
-
           call iterate_bte_el(crys%T, num%datadumpdir, .False., el, bt%el_rta_rates_ibz, &
                bt%el_field_term, bt%el_response)
 
@@ -293,7 +289,11 @@ contains
 
        !Reduce field term coarrays
        do im = 1, num_active_images
-          field_term(:,:,:) = field_term(:,:,:) + field_term_reduce(:,:,:)[im] !nm.eV/K
+          !Units:
+          ! nm.eV/K for phonons, gradT-field
+          ! ... for electrons, gradT-field
+          ! ... for electrons, E-field
+          field_term(:,:,:) = field_term(:,:,:) + field_term_reduce(:,:,:)[im]
        end do
     end if
     sync all
@@ -442,7 +442,7 @@ contains
     integer(k8), allocatable :: istate_el(:), istate_ph(:), start[:], end[:]
     real(dp) :: tau_ibz
     real(dp), allocatable :: Xplus(:), Xminus(:), response_el_reduce(:,:,:)[:]
-    character(len = 1024) :: filepath_Xminus, filepath_Xplus, Xdir, tag
+    character(1024) :: filepath_Xminus, filepath_Xplus, Xdir, tag
 
     !Set output directory of transition probilities
     write(tag, "(E9.3)") T
@@ -496,15 +496,14 @@ contains
        !Read X- from file
        call read_transition_probs_eph(trim(adjustl(filepath_Xminus)), nprocs, Xminus)
 
-       !Sum over the number of equivalent q-points of the IBZ point
+       !Sum over the number of equivalent k-points of the IBZ point
        do ieq = 1, el%nequiv(ik_ibz)
           ik_sym = el%ibz2fbz_map(ieq, ik_ibz, 1) !symmetry
-          !ik_fbz = el%ibz2fbz_map(ieq, ik_ibz, 2) !image due to symmetry
           call binsearch(el%indexlist, el%ibz2fbz_map(ieq, ik_ibz, 2), ik_fbz)
-
+          
           !Sum over scattering processes
           do iproc = 1, nprocs
-             !Self contribution from X+ processes:
+             !Self contribution from X+ and X- processes:
              
              !Grab electron and phonon
              call demux_state(istate_el(iproc), numbands, n, ikp)

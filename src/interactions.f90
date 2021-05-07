@@ -872,7 +872,7 @@ contains
                    end if
 
                    !Save final electron and interacting phonon states (same for + and -)
-                   istate_el(count) = mux_state(el%numbands, m, ik)
+                   istate_el(count) = mux_state(el%numbands, n, ikp)
                    if(needfinephon) then
                       !Write fine phonon index as negative so that the iterator
                       !knows to interpolate phonon quantities at this wave vector.
