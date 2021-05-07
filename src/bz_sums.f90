@@ -234,7 +234,7 @@ contains
   end subroutine calculate_ph_dos_iso
 
   subroutine calculate_transport_coeff(species, field, T, deg, chempot, ens, vels, &
-       volume, mesh, response)
+       volume, mesh, response, conc)
     !! Subroutine to calculate transport coefficients.
     !!
     !! species Type of particle
@@ -242,20 +242,23 @@ contains
     !! T Temperature in K
     !! deg Degeneracy
     !! chempot Chemical potential in eV
-    !! ens FBZ energies
-    !! vels FBZ velocities
-    !! volume Primitive cell volume
+    !! ens FBZ energies in eV
+    !! vels FBZ velocities in Km/s
+    !! volume Primitive cell volume in nm^3
     !! mesh Wave vector grid
     !! response FBZ response function
+    !! conc [Optional] Carrier concentration in cm^-3
 
     character(len = 2), intent(in) :: species
     character(len = 1), intent(in) :: field
     integer(k8), intent(in) :: mesh(3), deg
     real(dp), intent(in) :: T, chempot, ens(:,:), vels(:,:,:), volume, response(:,:,:)
-
+    real(dp), intent(in), optional :: conc
+    
     !Local variables
-    integer(k8) :: ik, ib, icart, nk, nbands, pow
-    real(dp) :: dist_factor, e, v, A, trans_coeff(3,3)
+    integer(k8) :: ik, ib, icart, nk, nbands, pow_hc, pow_cc
+    real(dp) :: dist_factor, e, v, A_hc, A_cc, &
+         trans_coeff_hc(3,3), trans_coeff_cc(3,3) !h(c)c = heat(charge) current
     
     nk = size(ens(:,1))
     nbands = size(ens(1,:))
@@ -267,21 +270,29 @@ contains
                "Phonon chemical potential non-zero in calculate_transport_coefficient. Exiting.")
        end if
        if(field == 'T') then !thermal conductivity
-          A = qe*1.0e21/kB/T/volume/product(mesh)
-          pow = 1
+          A_hc = qe*1.0e21/kB/T/volume/product(mesh)
+          pow_hc = 1
+          A_cc = 0.0_dp
+          pow_hc = 0
        else if(field == 'E') then
-          !A = 
-          !pow = 
+          !TODO
+          !A_hc = 
+          !pow_hc =
+          A_cc = 0.0_dp
+          pow_hc = 0
        else
           call exit_with_message("Unknown field type in calculate_transport_coefficient. Exiting.")
        end if
     else if(species == 'el') then
        if(field == 'T') then
+          !TODO
           !A = 
           !pow = 
        else if(field == 'E') then
-          A = deg*1.0e21/kB/T/volume/product(mesh)
-          pow = 0
+          A_cc = deg*1.0e21/kB/T/volume/product(mesh)
+          pow_cc = 0
+          A_hc = sign(1.0_dp, conc)*A_cc
+          pow_hc = 1
        else
           call exit_with_message("Unknown field type in calculate_transport_coefficient. Exiting.")
        end if
@@ -289,7 +300,8 @@ contains
        call exit_with_message("Unknown particle species in calculate_transport_coefficient. Exiting.")
     end if
     
-    trans_coeff(:,:) = 0.0_dp
+    trans_coeff_hc(:,:) = 0.0_dp
+    trans_coeff_cc(:,:) = 0.0_dp
     do ik = 1, nk
        do ib = 1, nbands
           e = ens(ik, ib)
@@ -303,8 +315,10 @@ contains
           end if
           do icart = 1, 3
              v = vels(ik, ib, icart)
-             trans_coeff(icart, :) = trans_coeff(icart, :) + &
-                  (e - chempot)**pow*dist_factor*v*response(ik, ib, :)
+             trans_coeff_hc(icart, :) = trans_coeff_hc(icart, :) + &
+                  (e - chempot)**pow_hc*dist_factor*v*response(ik, ib, :)
+             trans_coeff_cc(icart, :) = trans_coeff_cc(icart, :) + &
+                  (e - chempot)**pow_cc*dist_factor*v*response(ik, ib, :)
           end do
        end do
     end do
@@ -312,9 +326,17 @@ contains
     ! W/m/K for thermal conductivity
     ! 1/Omega/m for charge conductivity
     ! V/K for thermopower
-    trans_coeff = A*trans_coeff
+    ! A/m for alpha
+    trans_coeff_hc = A_hc*trans_coeff_hc
+    trans_coeff_cc = A_cc*trans_coeff_cc
     sync all
 
-    if(this_image() == 1) print*, trans_coeff
+    if(this_image() == 1) then
+       if(species == 'el' .and. field == 'E') then
+          print*, 'sigma [1/Omega/m] = ', trans_coeff_cc
+          print*, 'alpha/T [A/m/K] = ', trans_coeff_hc/T
+       end if
+       print*, '...'
+    end if
   end subroutine calculate_transport_coeff
 end module bz_sums

@@ -133,10 +133,7 @@ contains
        
        !Calculate transport coefficient
        call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, el%ens, el%vels, &
-            crys%volume, el%kmesh, bt%el_response)
-       !...
-       !...
-       !...
+            crys%volume, el%kmesh, bt%el_response, el%conc)
 
        !Change to data output directory
        call chdir(trim(adjustl(Tdir)))
@@ -153,10 +150,10 @@ contains
 !!$    !!!!
 !!$    
     !Start iterator
-    do it = 1, 5
+    do it = 1, 10
        if(num%phbte) then
-          call iterate_bte_ph(crys%T, num%datadumpdir, .False., ph%nequiv, ph%equiv_map, &
-               ph%ibz2fbz_map, bt%ph_rta_rates_ibz, bt%ph_field_term, bt%ph_response)
+          call iterate_bte_ph(crys%T, num%datadumpdir, .False., ph, bt%ph_rta_rates_ibz, &
+               bt%ph_field_term, bt%ph_response)
 
           !Symmetrize response function
           do iq = 1, ph%nq
@@ -181,7 +178,7 @@ contains
 
           !Calculate transport coefficient
           call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, el%ens, el%vels, &
-               crys%volume, el%kmesh, bt%el_response)
+               crys%volume, el%kmesh, bt%el_response, el%conc)
        end if
        
        !if(is_converged(coeff_new, coeff_old)) exit
@@ -292,21 +289,27 @@ contains
           !Units:
           ! nm.eV/K for phonons, gradT-field
           ! ... for electrons, gradT-field
-          ! ... for electrons, E-field
+          ! nm.C for electrons, E-field
           field_term(:,:,:) = field_term(:,:,:) + field_term_reduce(:,:,:)[im]
        end do
     end if
     sync all
   end subroutine calculate_field_term
 
-  subroutine iterate_bte_ph(T, datadumpdir, drag, nequiv, equiv_map, ibz2fbz_map, rta_rates_ibz, &
+  subroutine iterate_bte_ph(T, datadumpdir, drag, ph, rta_rates_ibz, &
        field_term, response_ph)
     !! Subroutine to iterate the phonon BTE one step.
     !! 
-    !! 
+    !! T Temperature in K
+    !! datadumpdir Output directory
+    !! drag Is drag included?
+    !! ph Phonon object
+    !! rta_rates_ibz Phonon RTA scattering rates
+    !! field_term Phonon field coupling term
+    !! response_el Phonon response function
 
+    type(phonon), intent(in) :: ph
     logical, intent(in) :: drag
-    integer(k8), intent(in) :: nequiv(:), equiv_map(:,:), ibz2fbz_map(:,:,:)
     real(dp), intent(in) :: T, rta_rates_ibz(:,:), field_term(:,:,:)
     real(dp), intent(inout) :: response_ph(:,:,:)
     character(len = *), intent(in) :: datadumpdir
@@ -378,9 +381,9 @@ contains
             istate2_minus, istate3_minus)
 
        !Sum over the number of equivalent q-points of the IBZ point
-       do ieq = 1, nequiv(iq1_ibz)
-          iq1_sym = ibz2fbz_map(ieq, iq1_ibz, 1) !symmetry
-          iq1_fbz = ibz2fbz_map(ieq, iq1_ibz, 2) !image due to symmetry
+       do ieq = 1, ph%nequiv(iq1_ibz)
+          iq1_sym = ph%ibz2fbz_map(ieq, iq1_ibz, 1) !symmetry
+          iq1_fbz = ph%ibz2fbz_map(ieq, iq1_ibz, 2) !image due to symmetry
 
           !Sum over scattering processes
           do iproc = 1, nprocs
@@ -391,8 +394,8 @@ contains
              call demux_state(istate3_plus(iproc), numbranches, s3, iq3)
 
              response_ph_reduce(iq1_fbz, s1, :) = response_ph_reduce(iq1_fbz, s1, :) + &
-                  Wp(iproc)*(response_ph(equiv_map(iq1_sym, iq3), s3, :) - &
-                  response_ph(equiv_map(iq1_sym, iq2), s2, :))
+                  Wp(iproc)*(response_ph(ph%equiv_map(iq1_sym, iq3), s3, :) - &
+                  response_ph(ph%equiv_map(iq1_sym, iq2), s2, :))
 
              !Self contribution from minus processes:
              
@@ -401,8 +404,8 @@ contains
              call demux_state(istate3_minus(iproc), numbranches, s3, iq3)
 
              response_ph_reduce(iq1_fbz, s1, :) = response_ph_reduce(iq1_fbz, s1, :) + &
-                  0.5_dp*Wm(iproc)*(response_ph(equiv_map(iq1_sym, iq3), s3, :) + &
-                  response_ph(equiv_map(iq1_sym, iq2), s2, :))
+                  0.5_dp*Wm(iproc)*(response_ph(ph%equiv_map(iq1_sym, iq3), s3, :) + &
+                  response_ph(ph%equiv_map(iq1_sym, iq2), s2, :))
           end do
 
           !Iterate BTE
@@ -421,16 +424,19 @@ contains
     sync all
   end subroutine iterate_bte_ph
 
-  !subroutine iterate_bte_el(T, datadumpdir, drag, indexlist, nequiv, equiv_map, &
-  !     ibz2fbz_map, rta_rates_ibz, field_term, response_el)
   subroutine iterate_bte_el(T, datadumpdir, drag, el, rta_rates_ibz, field_term, response_el)
     !! Subroutine to iterate the electron BTE one step.
     !! 
-    !!
+    !! T Temperature in K
+    !! datadumpdir Output directory
+    !! drag Is drag included?
+    !! el Electron object
+    !! rta_rates_ibz Electron RTA scattering rates
+    !! field_term Electron field coupling term
+    !! response_el Electron response function
     
     type(electron), intent(in) :: el
     logical, intent(in) :: drag
-    !integer(k8), intent(in) :: indexlist(:), nequiv(:), equiv_map(:,:), ibz2fbz_map(:,:,:)
     real(dp), intent(in) :: T, rta_rates_ibz(:,:), field_term(:,:,:)
     real(dp), intent(inout) :: response_el(:,:,:)
     character(len = *), intent(in) :: datadumpdir
