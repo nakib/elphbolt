@@ -1150,7 +1150,7 @@ contains
     close(1)
   end subroutine read_transition_probs_3ph
 
-  subroutine read_transition_probs_eph(filepath, N, T, istate1, istate2)
+  subroutine read_transition_probs_eph(filepath, N, TP, istate1, istate2)
     !! Subroutine to read transition probabilities from disk for e-ph/ph-e processes.
     !! This is different from the read_transition_probs_3ph subroutine in that this
     !! returns the number interaction processes and also allocates the return arrays
@@ -1158,14 +1158,14 @@ contains
 
     character(len = *), intent(in) :: filepath
     integer(k8), intent(out) :: N
-    real(dp), allocatable, intent(out) :: T(:)
+    real(dp), allocatable, intent(out) :: TP(:)
     integer(k8), allocatable, intent(out), optional :: istate1(:), istate2(:)
 
     !Read data
     open(1, file = trim(adjustl(filepath)), status = 'old', access = 'stream')
     read(1) N
-    allocate(T(N))
-    read(1) T
+    allocate(TP(N))
+    read(1) TP
     if(present(istate1) .and. present(istate2)) then
        allocate(istate1(N), istate2(N))
        read(1) istate1

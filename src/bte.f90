@@ -152,23 +152,44 @@ contains
 !!$    !TODO Need a more elegant solution to jumping between directories...
 !!$    !!!!
 !!$    
-!!$    !Start iterator
-!!$    do it = 1, 5
-!!$       call iterate_bte_ph(crys%T, num%datadumpdir, .False., ph%nequiv, ph%equiv_map, &
-!!$            ph%ibz2fbz_map, bt%ph_rta_rates_ibz, bt%ph_field_term, bt%ph_response)
-!!$
-!!$       !Symmetrize response function
-!!$       do iq = 1, ph%nq
-!!$          bt%ph_response(iq,:,:)=transpose(&
-!!$               matmul(ph%symmetrizers(:,:,iq),transpose(bt%ph_response(iq,:,:))))
-!!$       end do
-!!$       
-!!$       !Calculate transport coefficient
-!!$       call calculate_transport_coeff('ph', 'T', crys%T, 0.0_dp, ph%ens, ph%vels, &
-!!$            crys%volume, ph%qmesh, bt%ph_response)
-!!$
-!!$       !if(is_converged(coeff_new, coeff_old)) exit
-!!$    end do
+    !Start iterator
+    do it = 1, 20
+       if(num%phbte) then
+          call iterate_bte_ph(crys%T, num%datadumpdir, .False., ph%nequiv, ph%equiv_map, &
+               ph%ibz2fbz_map, bt%ph_rta_rates_ibz, bt%ph_field_term, bt%ph_response)
+
+          !Symmetrize response function
+          do iq = 1, ph%nq
+             bt%ph_response(iq,:,:)=transpose(&
+                  matmul(ph%symmetrizers(:,:,iq),transpose(bt%ph_response(iq,:,:))))
+          end do
+
+          !Calculate transport coefficient
+          call calculate_transport_coeff('ph', 'T', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
+               crys%volume, ph%qmesh, bt%ph_response)
+       end if
+
+       if(num%ebte) then
+          !call iterate_bte_el(crys%T, num%datadumpdir, .False., el%indexlist, &
+          !     el%nequiv, el%equiv_map, el%ibz2fbz_map, bt%el_rta_rates_ibz, &
+          !     bt%el_field_term, bt%el_response)
+
+          call iterate_bte_el(crys%T, num%datadumpdir, .False., el, bt%el_rta_rates_ibz, &
+               bt%el_field_term, bt%el_response)
+
+          !Symmetrize response function
+          do ik = 1, el%nk
+             bt%el_response(ik,:,:)=transpose(&
+                  matmul(el%symmetrizers(:,:,ik),transpose(bt%el_response(ik,:,:))))
+          end do
+
+          !Calculate transport coefficient
+          call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, el%ens, el%vels, &
+               crys%volume, el%kmesh, bt%el_response)
+       end if
+       
+       !if(is_converged(coeff_new, coeff_old)) exit
+    end do
   end subroutine solve_bte
 
   subroutine calculate_field_term(species, field, nequiv, ibz2fbz_map, &
@@ -280,7 +301,7 @@ contains
 
   subroutine iterate_bte_ph(T, datadumpdir, drag, nequiv, equiv_map, ibz2fbz_map, rta_rates_ibz, &
        field_term, response_ph)
-    !! Subroutine to iterate the BTE one step.
+    !! Subroutine to iterate the phonon BTE one step.
     !! 
     !! 
 
@@ -309,7 +330,7 @@ contains
     !Number of FBZ wave vectors
     nq = size(field_term(:,1,1))
     
-    !Total number of IBZ blocks states
+    !Total number of IBZ states
     nstates_irred = size(rta_rates_ibz(:,1))*numbranches
 
     !Total number of 3-phonon processes for a given initial phonon state.
@@ -332,7 +353,7 @@ contains
     
     !Run over first phonon IBZ states
     do istate1 = start, end
-       !Demux state index into branch (s) and wave vector (iq) indices
+       !Demux state index into branch (s) and wave vector (iq1_ibz) indices
        call demux_state(istate1, numbranches, s1, iq1_ibz)
 
        !RTA lifetime
@@ -361,6 +382,7 @@ contains
           iq1_sym = ibz2fbz_map(ieq, iq1_ibz, 1) !symmetry
           iq1_fbz = ibz2fbz_map(ieq, iq1_ibz, 2) !image due to symmetry
 
+          !Sum over scattering processes
           do iproc = 1, nprocs
              !Self contribution from plus processes:
              
@@ -398,4 +420,114 @@ contains
     end do
     sync all
   end subroutine iterate_bte_ph
+
+  !subroutine iterate_bte_el(T, datadumpdir, drag, indexlist, nequiv, equiv_map, &
+  !     ibz2fbz_map, rta_rates_ibz, field_term, response_el)
+  subroutine iterate_bte_el(T, datadumpdir, drag, el, rta_rates_ibz, field_term, response_el)
+    !! Subroutine to iterate the electron BTE one step.
+    !! 
+    !!
+    
+    type(electron), intent(in) :: el
+    logical, intent(in) :: drag
+    !integer(k8), intent(in) :: indexlist(:), nequiv(:), equiv_map(:,:), ibz2fbz_map(:,:,:)
+    real(dp), intent(in) :: T, rta_rates_ibz(:,:), field_term(:,:,:)
+    real(dp), intent(inout) :: response_el(:,:,:)
+    character(len = *), intent(in) :: datadumpdir
+
+    !Local variables
+    integer(k8) :: nstates_irred, nprocs, chunk, istate, numbands, numbranches, &
+         ik_ibz, m, ieq, ik_sym, ik_fbz, iproc, ikp, n, iq, s, im, nk, &
+         num_active_images, aux
+    integer(k8), allocatable :: istate_el(:), istate_ph(:), start[:], end[:]
+    real(dp) :: tau_ibz
+    real(dp), allocatable :: Xplus(:), Xminus(:), response_el_reduce(:,:,:)[:]
+    character(len = 1024) :: filepath_Xminus, filepath_Xplus, Xdir, tag
+
+    !Set output directory of transition probilities
+    write(tag, "(E9.3)") T
+    Xdir = trim(adjustl(datadumpdir))//'X_T'//trim(adjustl(tag))
+
+    !Number of electron bands
+    numbands = size(rta_rates_ibz(1,:))
+
+    !Number of in-window FBZ wave vectors
+    nk = size(field_term(:,1,1))
+
+    !Total number of IBZ states
+    nstates_irred = size(rta_rates_ibz(:,1))*numbands
+
+    !Allocate coarrays
+    allocate(start[*], end[*])
+    allocate(response_el_reduce(nk, numbands, 3)[*])
+
+    !Initialize coarray
+    response_el_reduce(:,:,:) = 0.0_dp
+    
+    !Divide electron states among images
+    call distribute_points(nstates_irred, chunk, start, end, num_active_images)
+
+    !Run over electron IBZ states
+    do istate = start, end
+       !Demux state index into band (m) and wave vector (ik_ibz) indices
+       call demux_state(istate, numbands, m, ik_ibz)
+
+       !Apply energy window to initial (IBZ blocks) electron
+       if(abs(el%ens_irred(ik_ibz, m) - el%enref) > el%fsthick) cycle
+
+       !RTA lifetime
+       tau_ibz = 0.0_dp
+       if(rta_rates_ibz(ik_ibz, m) /= 0.0_dp) then
+          tau_ibz = 1.0_dp/rta_rates_ibz(ik_ibz, m)
+       end if
+
+       !Set X+ filename
+       write(tag, '(I9)') istate
+       filepath_Xplus = trim(adjustl(Xdir))//'/Xplus.istate'//trim(adjustl(tag))
+
+       !Read X+ from file
+       call read_transition_probs_eph(trim(adjustl(filepath_Xplus)), nprocs, Xplus, &
+            istate_el, istate_ph)
+
+       !Set X- filename
+       write(tag, '(I9)') istate
+       filepath_Xminus = trim(adjustl(Xdir))//'/Xminus.istate'//trim(adjustl(tag))
+
+       !Read X- from file
+       call read_transition_probs_eph(trim(adjustl(filepath_Xminus)), nprocs, Xminus)
+
+       !Sum over the number of equivalent q-points of the IBZ point
+       do ieq = 1, el%nequiv(ik_ibz)
+          ik_sym = el%ibz2fbz_map(ieq, ik_ibz, 1) !symmetry
+          !ik_fbz = el%ibz2fbz_map(ieq, ik_ibz, 2) !image due to symmetry
+          call binsearch(el%indexlist, el%ibz2fbz_map(ieq, ik_ibz, 2), ik_fbz)
+
+          !Sum over scattering processes
+          do iproc = 1, nprocs
+             !Self contribution from X+ processes:
+             
+             !Grab electron and phonon
+             call demux_state(istate_el(iproc), numbands, n, ikp)
+!!$             !call demux_state(istate_ph(iproc), numbranches, s, iq)
+
+             call binsearch(el%indexlist, el%equiv_map(ik_sym, ikp), aux)
+             response_el_reduce(ik_fbz, m, :) = response_el_reduce(ik_fbz, m, :) + &
+                  response_el(aux, n, :)*(Xplus(iproc) + Xminus(iproc))
+          end do
+
+          !Iterate BTE
+          response_el_reduce(ik_fbz, m, :) = field_term(ik_fbz, m, :) + &
+               response_el_reduce(ik_fbz, m, :)*tau_ibz
+       end do
+    end do
+
+    sync all
+
+    !Update the response function
+    response_el(:,:,:) = 0.0_dp
+    do im = 1, num_active_images
+       response_el(:,:,:) = response_el(:,:,:) + response_el_reduce(:,:,:)[im]
+    end do
+    sync all
+  end subroutine iterate_bte_el
 end module bte_module
