@@ -20,31 +20,30 @@ module interactions
 
 contains
   
-  pure real(dp) function Vm2_3ph(s1, s2, s3, ev1, ev2, ev3, &
-       Index_i, Index_j, Index_k, ifc3, phases_q2q3)
+  pure real(dp) function Vm2_3ph(ev1_s1, conjg_ev2_s2, conjg_ev3_s3, &
+       Index_i, Index_j, Index_k, ifc3, phases_q2q3, ntrip, nb)
     !! Function to calculate the 3-ph interaction vertex |V-|^2.
     
-    integer(k8), intent(in) :: s1, s2, s3, Index_i(:), Index_j(:), Index_k(:)
-    complex(dp), intent(in) :: phases_q2q3(:), ev1(:,:), ev2(:,:), ev3(:,:)
-    real(dp), intent(in) :: ifc3(:,:,:,:)
+    integer(k8), intent(in) :: Index_i(ntrip), Index_j(ntrip), Index_k(ntrip), ntrip, nb
+    complex(dp), intent(in) :: phases_q2q3(ntrip), ev1_s1(nb), conjg_ev2_s2(nb), conjg_ev3_s3(nb)
+    real(dp), intent(in) :: ifc3(3, 3, 3, ntrip)
 
     !Local variables
-    integer(k8) :: it, a, b, c, aind, bind, cind, ntrip
-    complex(dp) :: aux1, aux2, V0
-
-    ntrip = size(Index_k(:))
+    integer(k8) :: it, a, b, c, aind, bind, cind
+    complex(dp) :: aux1, aux2, aux3, V0
     
     aux1 = (0.0_dp, 0.0_dp)
     do it = 1, ntrip
+       aind = 3*(Index_k(it) - 1)
+       bind = 3*(Index_j(it) - 1)
+       cind = 3*(Index_i(it) - 1)
        V0 = (0.0_dp, 0.0_dp)
        do a = 1, 3
-          aind = a + 3*(Index_k(it) - 1)
+          aux2 = conjg_ev3_s3(a + aind)
           do b = 1, 3
-             bind = b + 3*(Index_j(it) - 1)
-             aux2 = conjg(ev2(s2, bind)*ev3(s3, aind))
+             aux3 = aux2*conjg_ev2_s2(b + bind)
              do c = 1, 3
-                cind = c + 3*(Index_i(it) - 1)
-                V0 = V0 + ifc3(c, b, a, it)*ev1(s1, cind)*aux2
+                V0 = V0 + ifc3(c, b, a, it)*ev1_s1(c + cind)*aux3
              end do
           end do
        end do
@@ -72,7 +71,7 @@ contains
          q1_indvec(3), q2_indvec(3), q3_minus_indvec(3), index_minus, index_plus, &
          neg_iq2, neg_q2_indvec(3), num_active_images
     real(dp) :: en1, en2, en3, massfac, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
-         delta, occup_fac, Vp2_index_plus, const, bose2, bose3
+         occup_fac, Vp2_index_plus, const, bose2, bose3, delta_minus, delta_plus
     real(dp), allocatable :: Vm2(:), Wm(:), Wp(:)
     integer(k8), allocatable :: istate2_plus(:), istate3_plus(:), istate2_minus(:), istate3_minus(:)
     complex(dp) :: phases_q2q3(ph%numtriplets)
@@ -182,32 +181,34 @@ contains
           iq3_minus = mux_vector(q3_minus_indvec, ph%qmesh, 0_k8)
           
           if(key == 'V') then
-             !Calculate the numtriplet number of mass-normalized phases for this (q2,q3) pair
-             do it = 1, ph%numtriplets
-                massfac = 1.0_dp/sqrt(&
-                     crys%masses(crys%atomtypes(ph%Index_i(it)))*&
-                     crys%masses(crys%atomtypes(ph%Index_j(it)))*&
-                     crys%masses(crys%atomtypes(ph%Index_k(it))))
-                q2_cart = matmul(crys%reclattvecs, q2)
-                q3_minus_cart = matmul(crys%reclattvecs, q3_minus)
-                phases_q2q3(it) = massfac*&
-                     expi(-dot_product(q2_cart, ph%R_j(:,it)) -&
-                     dot_product(q3_minus_cart, ph%R_k(:,it)))
-             end do
+             if(en1 /= 0.0_dp) then
+                !Calculate the numtriplet number of mass-normalized phases for this (q2,q3) pair
+                do it = 1, ph%numtriplets
+                   massfac = 1.0_dp/sqrt(&
+                        crys%masses(crys%atomtypes(ph%Index_i(it)))*&
+                        crys%masses(crys%atomtypes(ph%Index_j(it)))*&
+                        crys%masses(crys%atomtypes(ph%Index_k(it))))
+                   q2_cart = matmul(crys%reclattvecs, q2)
+                   q3_minus_cart = matmul(crys%reclattvecs, q3_minus)
+                   phases_q2q3(it) = massfac*&
+                        expi(-dot_product(q2_cart, ph%R_j(:,it)) -&
+                        dot_product(q3_minus_cart, ph%R_k(:,it)))
+                end do
+             end if
           end if
           
           !Run over branches of second phonon
           do s2 = 1, ph%numbranches
-             if(key == 'W') then
-                !Energy of phonon 2
-                en2 = ph%ens(iq2, s2)
+             !Energy of phonon 2
+             en2 = ph%ens(iq2, s2)
 
+             !Get index of -q2
+             neg_q2_indvec = modulo(-q2_indvec, ph%qmesh)
+             neg_iq2 = mux_vector(neg_q2_indvec, ph%qmesh, 0_k8)
+
+             if(key == 'W') then
                 !Bose factor for phonon 2
                 bose2 = Bose(en2, crys%T)
-
-                !Get index of -q2
-                neg_q2_indvec = modulo(-q2_indvec, ph%qmesh)
-                neg_iq2 = mux_vector(neg_q2_indvec, ph%qmesh, 0_k8)
              end if
              
              !Run over branches of third phonon
@@ -215,25 +216,34 @@ contains
                 !Minus process index
                 index_minus = ((iq2 - 1)*ph%numbranches + (s2 - 1))*ph%numbranches + s3
 
+                !Energy of phonon 3
+                en3 = ph%ens(iq3_minus, s3)
+
+                !Evaluate delta functions
+                delta_minus = delta_fn_tetra(en1 - en3, iq2, s2, ph%qmesh, ph%tetramap, &
+                     ph%tetracount, ph%tetra_evals)
+
+                delta_plus = delta_fn_tetra(en3 - en1, neg_iq2, s2, ph%qmesh, ph%tetramap, &
+                     ph%tetracount, ph%tetra_evals)
+                
                 if(key == 'V') then
-                   !Calculate the minus process vertex
-                   Vm2(index_minus) = Vm2_3ph(s1, s2, s3, ph%evecs(iq1,:,:), &
-                        ph%evecs(iq2,:,:), ph%evecs(iq3_minus,:,:), ph%Index_i(:), &
-                        ph%Index_j(:), ph%Index_k(:), ph%ifc3(:,:,:,:), phases_q2q3)
+                   if(en1*en2*en3 == 0.0_dp .or. &
+                        (delta_minus == 0.0_dp .and. delta_plus == 0.0_dp)) then
+                      Vm2(index_minus) = 0.0_dp
+                   else
+                      !Calculate the minus process vertex
+                      Vm2(index_minus) = Vm2_3ph(ph%evecs(iq1, s1, :), &
+                           conjg(ph%evecs(iq2, s2, :)), conjg(ph%evecs(iq3_minus, s3, :)), &
+                           ph%Index_i(:), ph%Index_j(:), ph%Index_k(:), ph%ifc3(:,:,:,:), &
+                           phases_q2q3, ph%numtriplets, ph%numbranches)
+                   end if
                 end if
 
                 if(key == 'W') then
-                   !Energy of phonon 3
-                   en3 = ph%ens(iq3_minus, s3)
-
                    !Bose factor for phonon 3
                    bose3 = Bose(en3, crys%T)
 
                    !Calculate W-:
-                   
-                   !Evaluate delta function
-                   delta = delta_fn_tetra(en1 - en3, iq2, s2, ph%qmesh, ph%tetramap, &
-                        ph%tetracount, ph%tetra_evals)
                    
                    !Temperature dependent occupation factor
                    !(bose1 + 1)*bose2*bose3/(bose1*(bose1 + 1))
@@ -242,7 +252,7 @@ contains
 
                    !Save W-
                    if(en1*en2*en3 /= 0.0_dp) then
-                      Wm(index_minus) = Vm2(index_minus)*occup_fac*delta/en1/en2/en3
+                      Wm(index_minus) = Vm2(index_minus)*occup_fac*delta_minus/en1/en2/en3
                    end if
 
                    !Calculate W+:
@@ -251,10 +261,6 @@ contains
                    !V-(s1q1|s2q2,s3q3) = V+(s1q1|s2-q2,s3q3)
                    Vp2_index_plus = Vm2(index_minus)
                    index_plus = ((neg_iq2 - 1)*ph%numbranches + (s2 - 1))*ph%numbranches + s3
-                   
-                   !Evaluate delta function
-                   delta = delta_fn_tetra(en3 - en1, neg_iq2, s2, ph%qmesh, ph%tetramap, &
-                        ph%tetracount, ph%tetra_evals)
 
                    !Temperature dependent occupation factor
                    !(bose1 + 1)*(bose2 + 1)*bose3/(bose1*(bose1 + 1))
@@ -263,7 +269,7 @@ contains
                    
                    !Save W+
                    if(en1*en2*en3 /= 0.0_dp) then
-                      Wp(index_plus) = Vp2_index_plus*occup_fac*delta/en1/en2/en3
+                      Wp(index_plus) = Vp2_index_plus*occup_fac*delta_plus/en1/en2/en3
                    end if
                    
                    !Save 2nd and 3rd phonon states
