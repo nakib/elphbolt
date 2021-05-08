@@ -273,7 +273,7 @@ contains
           A_hc = qe*1.0e21/kB/T/volume/product(mesh)
           pow_hc = 1
           A_cc = 0.0_dp
-          pow_hc = 0
+          pow_cc = 0
        else if(field == 'E') then
           !TODO
           !A_hc = 
@@ -334,7 +334,10 @@ contains
     if(this_image() == 1) then
        if(species == 'el' .and. field == 'E') then
           print*, 'sigma [1/Omega/m] = ', trans_coeff_cc
-          print*, 'alpha/T [A/m/K] = ', trans_coeff_hc/T
+          print*, 'alpha_el/T [A/m/K] = ', trans_coeff_hc/T
+       end if
+       if(species == 'ph' .and. field == 'T') then
+          print*, 'kappa_ph [W/m/K] = ', trans_coeff_hc
        end if
        print*, '...'
     end if
