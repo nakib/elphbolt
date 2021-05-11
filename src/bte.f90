@@ -4,7 +4,7 @@ module bte_module
 
   use params, only: dp, k8, qe
   use misc, only: print_message, exit_with_message, write2file_rank2_real, &
-       distribute_points, demux_state, binsearch
+       distribute_points, demux_state, binsearch, interpolate, demux_vector
   use numerics_module, only: numerics
   use crystal_module, only: crystal
   use symmetry_module, only: symmetry
@@ -167,8 +167,11 @@ contains
        end if
 
        if(num%ebte) then
-          call iterate_bte_el(crys%T, num%datadumpdir, .False., el, bt%el_rta_rates_ibz, &
-               bt%el_field_term, bt%el_response)
+!!$          call iterate_bte_el(crys%T, num%datadumpdir, .False., el, ph, sym,&
+!!$               bt%el_rta_rates_ibz, bt%el_field_term, bt%el_response)
+
+          call iterate_bte_el(crys%T, num%datadumpdir, .True., el, ph, sym,&
+               bt%el_rta_rates_ibz, bt%el_field_term, bt%el_response, bt%ph_response)
 
           !Symmetrize response function
           do ik = 1, el%nk
@@ -424,29 +427,34 @@ contains
     sync all
   end subroutine iterate_bte_ph
 
-  subroutine iterate_bte_el(T, datadumpdir, drag, el, rta_rates_ibz, field_term, response_el)
+  subroutine iterate_bte_el(T, datadumpdir, drag, el, ph, sym, rta_rates_ibz, field_term, &
+       response_el, response_ph)
     !! Subroutine to iterate the electron BTE one step.
     !! 
     !! T Temperature in K
     !! datadumpdir Output directory
     !! drag Is drag included?
     !! el Electron object
+    !! ph Phonons object
+    !! sym Symmetry
     !! rta_rates_ibz Electron RTA scattering rates
     !! field_term Electron field coupling term
     !! response_el Electron response function
     
     type(electron), intent(in) :: el
+    type(phonon), intent(in) :: ph
+    type(symmetry), intent(in) :: sym
     logical, intent(in) :: drag
-    real(dp), intent(in) :: T, rta_rates_ibz(:,:), field_term(:,:,:)
+    real(dp), intent(in) :: T, rta_rates_ibz(:,:), field_term(:,:,:), response_ph(:,:,:)
     real(dp), intent(inout) :: response_el(:,:,:)
     character(len = *), intent(in) :: datadumpdir
 
     !Local variables
     integer(k8) :: nstates_irred, nprocs, chunk, istate, numbands, numbranches, &
          ik_ibz, m, ieq, ik_sym, ik_fbz, iproc, ikp, n, iq, s, im, nk, &
-         num_active_images, aux
+         num_active_images, aux, ipol, fineq_indvec(3)
     integer(k8), allocatable :: istate_el(:), istate_ph(:), start[:], end[:]
-    real(dp) :: tau_ibz
+    real(dp) :: tau_ibz, ForG(3)
     real(dp), allocatable :: Xplus(:), Xminus(:), response_el_reduce(:,:,:)[:]
     character(1024) :: filepath_Xminus, filepath_Xplus, Xdir, tag
 
@@ -509,15 +517,50 @@ contains
           
           !Sum over scattering processes
           do iproc = 1, nprocs
-             !Self contribution from X+ and X- processes:
-             
-             !Grab electron and phonon
+             !Grab the final electron and, if needed, the interacting phonon
              call demux_state(istate_el(iproc), numbands, n, ikp)
-!!$             !call demux_state(istate_ph(iproc), numbranches, s, iq)
+             if(drag) then
+                if(istate_ph(iproc) < 0) then !This phonon is on the (fine) electron mesh
+                   call demux_state(-istate_ph(iproc), numbranches, s, iq)
+                   iq = -iq !Keep the negative tag
+                else !This phonon is on the phonon mesh
+                   call demux_state(istate_ph(iproc), numbranches, s, iq)
+                   
+                end if
+             end if
 
+             !Self contribution:
+             
+             !Find image of final electron wave vector due to the current symmetry
              call binsearch(el%indexlist, el%equiv_map(ik_sym, ikp), aux)
+
              response_el_reduce(ik_fbz, m, :) = response_el_reduce(ik_fbz, m, :) + &
                   response_el(aux, n, :)*(Xplus(iproc) + Xminus(iproc))
+
+             !Drag contribution:
+             
+             if(drag) then
+                if(iq < 0) then !Need to interpolate on this point
+                   !Calculate the fine mesh wave vector, 0-based index vector
+                   call demux_vector(-iq, fineq_indvec, el%kmesh, 0_k8)
+                   
+                   !Find image of phonon wave vector due to the current symmetry
+                   fineq_indvec = modulo( &
+                        nint(matmul(sym%qrotations(:, :, ik_sym), fineq_indvec)), el%kmesh)
+
+                   !Interpolate response function on this wave vector
+                   do ipol = 1, 3
+                      call interpolate(ph%qmesh, el%mesh_ref, response_ph(:, s, ipol), &
+                           fineq_indvec, ForG(ipol))
+                   end do
+                else
+                   !F(q) or G(q)
+                   ForG(:) = response_ph(ph%equiv_map(ik_sym, iq), s, :)
+                end if
+                !Here we use the fact that F(-q) = -F(q) and G(-q) = -G(q)
+                response_el_reduce(ik_fbz, m, :) = response_el_reduce(ik_fbz, m, :) - &
+                     response_ph(ph%equiv_map(ik_sym, iq), s, :)*(Xplus(iproc) + Xminus(iproc))
+             end if
           end do
 
           !Iterate BTE

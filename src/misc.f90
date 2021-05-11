@@ -301,8 +301,8 @@ contains
     Fermi = 1.0_dp/(exp((e - chempot)/kB/T) + 1.0_dp)
   end function Fermi
 
-  subroutine interp(coarsemesh, refinement, f, q, interpolation)
-    !!Function to perform BZ interpolation.
+  subroutine interpolate(coarsemesh, refinement, f, q, interpolation)
+    !! Subroutine to perform BZ interpolation.
     !!
     !! coarsemesh The coarse mesh.
     !! refinement The mesh refinement factor.
@@ -336,7 +336,7 @@ contains
     !mode = 0: 3d interpolation
     !mode = 1: 2d interpolation
     !mode = 2: 1d interpolation
-    if(mode .eq. 0) then !3d
+    if(mode == 0) then !3d
        allocate(pivot(8), T(8, 8), c(8))
 
        !Fine mesh point
@@ -383,7 +383,7 @@ contains
        !Approximate f(x,y,z) in terms of a.
        aux = c(1) + c(2)*x + c(3)*y + c(4)*z +&
             c(5)*x*y + c(6)*x*z + c(7)*y*z + c(8)*x*y*z
-    else if(mode .eq. 1) then !2d
+    else if(mode == 1) then !2d
        allocate(pivot(4), T(4, 4), c(4))
        
        count = 1
@@ -444,5 +444,5 @@ contains
     end if
     
     interpolation = aux
-  end subroutine interp
+  end subroutine interpolate
 end module misc
