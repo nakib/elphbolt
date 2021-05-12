@@ -587,7 +587,7 @@ contains
 
                    !Save initial and final electron states
                    istate1(count) = mux_state(el%numbands, m, ik)
-                   istate2(count) = mux_state(el%numbands, n, ikp)
+                   istate2(count) = mux_state(el%numbands, n, ikp_window)
                 end if
              end do !n
           end do !m

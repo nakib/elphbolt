@@ -155,8 +155,8 @@ contains
     !Start iterator
     do it = 1, 3
        if(num%phbte) then
-          call iterate_bte_ph(crys%T, num%datadumpdir, .False., ph, bt%ph_rta_rates_ibz, &
-               bt%ph_field_term, bt%ph_response)
+          call iterate_bte_ph(crys%T, num%datadumpdir, .True., ph, el, bt%ph_rta_rates_ibz, &
+               bt%ph_field_term, bt%ph_response, bt%el_response)
 
           !Symmetrize response function
           do iq = 1, ph%nq
@@ -299,8 +299,8 @@ contains
     sync all
   end subroutine calculate_field_term
 
-  subroutine iterate_bte_ph(T, datadumpdir, drag, ph, rta_rates_ibz, &
-       field_term, response_ph)
+  subroutine iterate_bte_ph(T, datadumpdir, drag, ph, el, rta_rates_ibz, &
+       field_term, response_ph, response_el)
     !! Subroutine to iterate the phonon BTE one step.
     !! 
     !! T Temperature in K
@@ -309,26 +309,35 @@ contains
     !! ph Phonon object
     !! rta_rates_ibz Phonon RTA scattering rates
     !! field_term Phonon field coupling term
-    !! response_el Phonon response function
+    !! response_ph Phonon response function
+    !! response_el Electron response function
 
     type(phonon), intent(in) :: ph
+    type(electron), intent(in) :: el
     logical, intent(in) :: drag
-    real(dp), intent(in) :: T, rta_rates_ibz(:,:), field_term(:,:,:)
+    real(dp), intent(in) :: T, rta_rates_ibz(:,:), field_term(:,:,:), response_el(:,:,:)
     real(dp), intent(inout) :: response_ph(:,:,:)
     character(len = *), intent(in) :: datadumpdir
 
     !Local variables
-    integer(k8) :: nstates_irred, nprocs, chunk, istate1, numbranches, s1, &
-         iq1_ibz, ieq, iq1_sym, iq1_fbz, iproc, iq2, s2, iq3, s3, im, nq, num_active_images
+    integer(k8) :: nstates_irred, nprocs_3ph, chunk, istate1, numbranches, s1, &
+         iq1_ibz, ieq, iq1_sym, iq1_fbz, iproc, iq2, s2, iq3, s3, im, nq, &
+         num_active_images, numbands, ik, ikp, m, n, nprocs_phe, aux1, aux2
     integer(k8), allocatable :: istate2_plus(:), istate3_plus(:), &
-         istate2_minus(:), istate3_minus(:), start[:], end[:]
+         istate2_minus(:), istate3_minus(:), istate_el1(:), istate_el2(:), &
+         start[:], end[:]
     real(dp) :: tau_ibz
-    real(dp), allocatable :: Wp(:), Wm(:), response_ph_reduce(:,:,:)[:]
-    character(len = 1024) :: filepath_Wm, filepath_Wp, Wdir, tag
+    real(dp), allocatable :: Wp(:), Wm(:), Y(:), response_ph_reduce(:,:,:)[:]
+    character(len = 1024) :: filepath_Wm, filepath_Wp, filepath_Y, &
+         Wdir, Ydir, tag
 
     !Set output directory of transition probilities
     write(tag, "(E9.3)") T
     Wdir = trim(adjustl(datadumpdir))//'W_T'//trim(adjustl(tag))
+    Ydir = trim(adjustl(datadumpdir))//'Y_T'//trim(adjustl(tag))
+
+    !Number of electron bands
+    numbands = size(response_el(1,:,1))
     
     !Number of phonon branches
     numbranches = size(rta_rates_ibz(1,:))
@@ -340,12 +349,12 @@ contains
     nstates_irred = size(rta_rates_ibz(:,1))*numbranches
 
     !Total number of 3-phonon processes for a given initial phonon state.
-    nprocs = nq*numbranches**2
+    nprocs_3ph = nq*numbranches**2
 
     !Allocate arrays
-    allocate(Wp(nprocs), Wm(nprocs))
-    allocate(istate2_plus(nprocs), istate3_plus(nprocs), &
-         istate2_minus(nprocs), istate3_minus(nprocs))
+    allocate(Wp(nprocs_3ph), Wm(nprocs_3ph))
+    allocate(istate2_plus(nprocs_3ph), istate3_plus(nprocs_3ph), &
+         istate2_minus(nprocs_3ph), istate3_minus(nprocs_3ph))
     
     !Allocate coarrays
     allocate(start[*], end[*])
@@ -383,13 +392,24 @@ contains
        call read_transition_probs_3ph(trim(adjustl(filepath_Wm)), Wm, &
             istate2_minus, istate3_minus)
 
+       if(drag) then
+          !Set Y filename
+          filepath_Y = trim(adjustl(Ydir))//'/Y.istate'//trim(adjustl(tag))
+
+          !Read Y from file
+          if(allocated(Y)) deallocate(Y)
+          if(allocated(istate_el1)) deallocate(istate_el2)
+          call read_transition_probs_eph(trim(adjustl(filepath_Y)), nprocs_phe, Y, &
+               istate_el1, istate_el2)
+       end if
+
        !Sum over the number of equivalent q-points of the IBZ point
        do ieq = 1, ph%nequiv(iq1_ibz)
           iq1_sym = ph%ibz2fbz_map(ieq, iq1_ibz, 1) !symmetry
           iq1_fbz = ph%ibz2fbz_map(ieq, iq1_ibz, 2) !image due to symmetry
 
           !Sum over scattering processes
-          do iproc = 1, nprocs
+          do iproc = 1, nprocs_3ph
              !Self contribution from plus processes:
              
              !Grab 2nd and 3rd phonons
@@ -407,9 +427,26 @@ contains
              call demux_state(istate3_minus(iproc), numbranches, s3, iq3)
 
              response_ph_reduce(iq1_fbz, s1, :) = response_ph_reduce(iq1_fbz, s1, :) + &
-                  0.5_dp*Wm(iproc)*(response_ph(ph%equiv_map(iq1_sym, iq3), s3, :) + &
-                  response_ph(ph%equiv_map(iq1_sym, iq2), s2, :))
+                     0.5_dp*Wm(iproc)*(response_ph(ph%equiv_map(iq1_sym, iq3), s3, :) + &
+                     response_ph(ph%equiv_map(iq1_sym, iq2), s2, :))
           end do
+
+          !Drag contribution:
+          
+          if(drag) then
+             do iproc = 1, nprocs_phe
+                !Grab initial and final electron states
+                call demux_state(istate_el1(iproc), numbands, m, ik)
+                call demux_state(istate_el2(iproc), numbands, n, ikp)
+                
+                !Find image of electron wave vector due to the current symmetry
+                call binsearch(el%indexlist, el%equiv_map(iq1_sym, ik), aux1)
+                call binsearch(el%indexlist, el%equiv_map(iq1_sym, ikp), aux2)
+
+                response_ph_reduce(iq1_fbz, s1, :) = response_ph_reduce(iq1_fbz, s1, :) + &
+                     el%spindeg*Y(iproc)*(response_el(aux2, n, :) - response_el(aux1, m, :))
+             end do
+          end if
 
           !Iterate BTE
           response_ph_reduce(iq1_fbz, s1, :) = field_term(iq1_fbz, s1, :) + &
@@ -440,6 +477,7 @@ contains
     !! rta_rates_ibz Electron RTA scattering rates
     !! field_term Electron field coupling term
     !! response_el Electron response function
+    !! response_ph Phonon response function
     
     type(electron), intent(in) :: el
     type(phonon), intent(in) :: ph
