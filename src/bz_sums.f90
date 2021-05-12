@@ -269,25 +269,25 @@ contains
           call exit_with_message(&
                "Phonon chemical potential non-zero in calculate_transport_coefficient. Exiting.")
        end if
-       if(field == 'T') then !thermal conductivity
+       if(field == 'T') then
           A_hc = qe*1.0e21/kB/T/volume/product(mesh)
           pow_hc = 1
           A_cc = 0.0_dp
           pow_cc = 0
        else if(field == 'E') then
-          !TODO
-          !A_hc = 
-          !pow_hc =
+          A_hc = sign(1.0_dp, conc)*qe*1.0e21/kB/T/volume/product(mesh)
+          pow_hc = 1
           A_cc = 0.0_dp
-          pow_hc = 0
+          pow_cc = 0
        else
           call exit_with_message("Unknown field type in calculate_transport_coefficient. Exiting.")
        end if
     else if(species == 'el') then
        if(field == 'T') then
-          !TODO
-          !A = 
-          !pow = 
+          A_cc = deg*1.0e21/kB/T/volume/product(mesh)
+          pow_cc = 1
+          A_hc = sign(1.0_dp, conc)*qe*A_cc
+          pow_hc = 0 
        else if(field == 'E') then
           A_cc = deg*1.0e21/kB/T/volume/product(mesh)
           pow_cc = 0
@@ -336,10 +336,20 @@ contains
           print*, 'sigma [1/Omega/m] = ', trans_coeff_cc
           print*, 'alpha_el/T [A/m/K] = ', trans_coeff_hc/T
        end if
+
+       if(species == 'el' .and. field == 'T') then
+          print*, 'sigmaS [A/m/K] = ', trans_coeff_cc
+          print*, 'kappa0_el/T [W/m/K] = ', trans_coeff_hc
+       end if
+
+       if(species == 'ph' .and. field == 'E') then
+          print*, 'alpha_ph/T [A/m/K] = ', trans_coeff_hc/T
+       end if
+       
        if(species == 'ph' .and. field == 'T') then
           print*, 'kappa_ph [W/m/K] = ', trans_coeff_hc
        end if
-       print*, '...'
+       print*, '______________'
     end if
   end subroutine calculate_transport_coeff
 end module bz_sums

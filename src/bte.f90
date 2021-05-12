@@ -98,7 +98,7 @@ contains
 
        !Calculate transport coefficient
        call calculate_transport_coeff('ph', 'E', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
-            crys%volume, ph%qmesh, bt%ph_response)
+            crys%volume, ph%qmesh, bt%ph_response, el%conc)
 
        !Change to data output directory
        call chdir(trim(adjustl(Tdir)))
@@ -166,7 +166,7 @@ contains
 
           !Calculate transport coefficient
           call calculate_transport_coeff('ph', 'E', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
-               crys%volume, ph%qmesh, bt%ph_response)
+               crys%volume, ph%qmesh, bt%ph_response, el%conc)
        end if
 
        if(num%ebte) then
@@ -291,7 +291,7 @@ contains
        do im = 1, num_active_images
           !Units:
           ! nm.eV/K for phonons, gradT-field
-          ! ... for electrons, gradT-field
+          ! nm.eV/K for electrons, gradT-field
           ! nm.C for electrons, E-field
           field_term(:,:,:) = field_term(:,:,:) + field_term_reduce(:,:,:)[im]
        end do
