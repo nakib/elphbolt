@@ -108,7 +108,7 @@ program elphbolt
      end if
   end if
 
-  if(num%ebte) then
-     call bt%solve_bte(num, crys, sym, ph, el)
-  end if
+!!$  if(num%ebte) then
+!!$     call bt%solve_bte(num, crys, sym, ph, el)
+!!$  end if
 end program elphbolt

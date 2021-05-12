@@ -308,6 +308,7 @@ contains
     !! refinement The mesh refinement factor.
     !! f The coarse mesh function to be interpolated.
     !! q The 0-based index vector where to evaluate f.
+    !! interpolation The result
     
     integer(k8), intent(in) :: coarsemesh(3), q(3), refinement
     real(dp), intent(in) :: f(:)
@@ -317,7 +318,7 @@ contains
     integer(k8), allocatable :: pivot(:)
     integer(k8) :: i000, i100, i010, i110, i001, i101, i011, i111, equalpol
     real(dp) :: x0, x1, y0, y1, z0, z1, x, y, z, v(2), v0(2), v1(2)
-    real(dp),allocatable :: T(:, :), c(:)
+    real(dp), allocatable :: T(:, :), c(:)
     real(dp) :: aux
 
     aux = 0.0_dp
@@ -328,7 +329,7 @@ contains
 
     mode = 0
     do ipol = 1, 3
-       if(r1(ipol) .eq. r0(ipol)) then
+       if(r1(ipol) == r0(ipol)) then
           mode = mode + 1
        end if
     end do

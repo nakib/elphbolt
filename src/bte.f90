@@ -83,7 +83,7 @@ contains
        bt%ph_rta_rates_ibz = rates_3ph + rates_phe
 
        !Calculate field term (F0 or G0)
-       call calculate_field_term('ph', 'T', ph%nequiv, ph%ibz2fbz_map, &
+       call calculate_field_term('ph', 'E', ph%nequiv, ph%ibz2fbz_map, &
             crys%T, 0.0_dp, ph%ens, ph%vels, bt%ph_rta_rates_ibz, bt%ph_field_term)
 
        !Symmetrize field term
@@ -97,7 +97,7 @@ contains
        bt%ph_response = bt%ph_field_term
 
        !Calculate transport coefficient
-       call calculate_transport_coeff('ph', 'T', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
+       call calculate_transport_coeff('ph', 'E', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
             crys%volume, ph%qmesh, bt%ph_response)
 
        !Change to data output directory
@@ -108,6 +108,9 @@ contains
        call write2file_rank2_real('ph.W_rta_phe', rates_phe)
        call write2file_rank2_real('ph.W_rta', bt%ph_rta_rates_ibz)
     end if
+
+    !Change back to cwd
+    call chdir(trim(adjustl(num%cwd)))
 
     if(num%ebte) then
        !Calculate RTA scattering rates
@@ -150,7 +153,7 @@ contains
 !!$    !!!!
 !!$    
     !Start iterator
-    do it = 1, 10
+    do it = 1, 3
        if(num%phbte) then
           call iterate_bte_ph(crys%T, num%datadumpdir, .False., ph, bt%ph_rta_rates_ibz, &
                bt%ph_field_term, bt%ph_response)
@@ -162,14 +165,11 @@ contains
           end do
 
           !Calculate transport coefficient
-          call calculate_transport_coeff('ph', 'T', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
+          call calculate_transport_coeff('ph', 'E', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
                crys%volume, ph%qmesh, bt%ph_response)
        end if
 
        if(num%ebte) then
-!!$          call iterate_bte_el(crys%T, num%datadumpdir, .False., el, ph, sym,&
-!!$               bt%el_rta_rates_ibz, bt%el_field_term, bt%el_response)
-
           call iterate_bte_el(crys%T, num%datadumpdir, .True., el, ph, sym,&
                bt%el_rta_rates_ibz, bt%el_field_term, bt%el_response, bt%ph_response)
 
@@ -471,6 +471,9 @@ contains
     !Total number of IBZ states
     nstates_irred = size(rta_rates_ibz(:,1))*numbands
 
+    !Number of phonon branches
+    numbranches = size(response_ph(1,:,1))
+
     !Allocate coarrays
     allocate(start[*], end[*])
     allocate(response_el_reduce(nk, numbands, 3)[*])
@@ -525,7 +528,6 @@ contains
                    iq = -iq !Keep the negative tag
                 else !This phonon is on the phonon mesh
                    call demux_state(istate_ph(iproc), numbranches, s, iq)
-                   
                 end if
              end if
 
@@ -559,7 +561,7 @@ contains
                 end if
                 !Here we use the fact that F(-q) = -F(q) and G(-q) = -G(q)
                 response_el_reduce(ik_fbz, m, :) = response_el_reduce(ik_fbz, m, :) - &
-                     response_ph(ph%equiv_map(ik_sym, iq), s, :)*(Xplus(iproc) + Xminus(iproc))
+                     ForG(:)*(Xplus(iproc) + Xminus(iproc))
              end if
           end do
 
