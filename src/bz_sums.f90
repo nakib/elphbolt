@@ -275,7 +275,7 @@ contains
           A_cc = 0.0_dp
           pow_cc = 0
        else if(field == 'E') then
-          A_hc = sign(1.0_dp, conc)*qe*1.0e21/kB/T/volume/product(mesh)
+          A_hc = sign(1.0_dp, conc)*1.0e21/kB/T/volume/product(mesh)
           pow_hc = 1
           A_cc = 0.0_dp
           pow_cc = 0
