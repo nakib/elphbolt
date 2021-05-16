@@ -257,11 +257,14 @@ contains
     
     !Local variables
     integer(k8) :: ik, ib, icart, nk, nbands, pow_hc, pow_cc
-    real(dp) :: dist_factor, e, v, A_hc, A_cc, &
+    real(dp) :: dist_factor, e, v, fac, A_hc, A_cc, &
          trans_coeff_hc(3,3), trans_coeff_cc(3,3) !h(c)c = heat(charge) current
     
     nk = size(ens(:,1))
     nbands = size(ens(1,:))
+
+    !Common multiplicative factor
+    fac = 1.0e21/kB/T/volume/product(mesh) 
     
     !Do checks related to particle and field type
     if(species == 'ph') then
@@ -270,12 +273,12 @@ contains
                "Phonon chemical potential non-zero in calculate_transport_coefficient. Exiting.")
        end if
        if(field == 'T') then
-          A_hc = qe*1.0e21/kB/T/volume/product(mesh)
+          A_hc = qe*fac
           pow_hc = 1
           A_cc = 0.0_dp
           pow_cc = 0
        else if(field == 'E') then
-          A_hc = sign(1.0_dp, conc)*1.0e21/kB/T/volume/product(mesh)
+          A_hc = sign(1.0_dp, conc)*fac
           pow_hc = 1
           A_cc = 0.0_dp
           pow_cc = 0
@@ -284,12 +287,12 @@ contains
        end if
     else if(species == 'el') then
        if(field == 'T') then
-          A_cc = deg*1.0e21/kB/T/volume/product(mesh)
+          A_cc = deg*fac
           pow_cc = 1
           A_hc = sign(1.0_dp, conc)*qe*A_cc
           pow_hc = 0 
        else if(field == 'E') then
-          A_cc = deg*1.0e21/kB/T/volume/product(mesh)
+          A_cc = deg*fac
           pow_cc = 0
           A_hc = sign(1.0_dp, conc)*A_cc
           pow_hc = 1
@@ -326,7 +329,7 @@ contains
     ! W/m/K for thermal conductivity
     ! 1/Omega/m for charge conductivity
     ! V/K for thermopower
-    ! A/m for alpha
+    ! A/m/K for alpha/T
     trans_coeff_hc = A_hc*trans_coeff_hc
     trans_coeff_cc = A_cc*trans_coeff_cc
     sync all

@@ -421,7 +421,7 @@ contains
     if(key == 'g') then
        call print_message("Doing g(Re,q) -> |g(k,q)|^2 for all IBZ phonons...")
     else
-       call print_message("Doing ph-e transition probabilities all IBZ phonons...")
+       call print_message("Doing ph-e transition probabilities for all IBZ phonons...")
     end if
     
     !Set output directory of transition probilities
@@ -529,7 +529,6 @@ contains
           
           !Find final electron wave vector
           kp_indvec = modulo(k_indvec + el%mesh_ref*q_indvec, el%kmesh) !0-based index vector
-          kp = kp/dble(el%kmesh) !crystal coords.
 
           !Muxed index of kp
           ikp = mux_vector(kp_indvec, el%kmesh, 0_k8)
@@ -546,8 +545,11 @@ contains
              !Apply energy window to initial electron
              if(abs(en_el - el%enref) > el%fsthick) cycle
 
-             !Fermi factor for initial electron
-             if(key == 'Y') fermi1 = Fermi(en_el, el%chempot, crys%T)
+             !Fermi factor for initial and final electrons
+             if(key == 'Y') then
+                fermi1 = Fermi(en_el, el%chempot, crys%T)
+                fermi2 = Fermi(en_el + en_ph, el%chempot, crys%T)
+             end if
              
              !Run over final electron bands
              do n = 1, el%numbands
@@ -562,18 +564,15 @@ contains
 
                 if(key == 'g') then
                    !Calculate |g_mns(k,<q>)|^2
-                   g2_istate(count) = wann%g2_epw(crys, q, el%evecs(ik, m, :), &
+                   g2_istate(count) = wann%g2_epw(crys, k, q, el%evecs(ik, m, :), &
                         el%evecs(ikp_window, n, :), ph%evecs(iq_fbz, s, :), &
-                        ph%ens(iq_fbz, s), gReq_iq)
+                        ph%ens(iq_fbz, s), gReq_iq, 'el')
                 end if
                 
-                if(key == 'Y') then
-                   !Fermi factor for initial electron
-                   fermi2 = Fermi(en_elp, el%chempot, crys%T)
-
+                if(key == 'Y') then                   
                    !Calculate Y:
 
-                   !Evaulate delta function
+                   !Evaluate delta function
                    delta = delta_fn_tetra(en_elp - en_ph, ik, m, el%kmesh, el%tetramap, &
                         el%tetracount, el%tetra_evals)
 
@@ -666,7 +665,7 @@ contains
     character(len = 1), intent(in) :: key
     
     !Local variables
-    integer(k8) :: nstates_irred, istate, m, ik, ik_fbz, n, ikp, s, &
+    integer(k8) :: nstates_irred, istate, m, ik, n, ikp, s, &
          iq, start, end, chunk, k_indvec(3), kp_indvec(3), &
          q_indvec(3), count, nprocs, num_active_images
     real(dp) :: k(3), kp(3), q(3), ph_ens_iq(1, ph%numbranches), const, bosefac, &
@@ -686,7 +685,7 @@ contains
     if(key == 'g') then
        call print_message("Doing g(k,Rp) -> |g(k,q)|^2 for all IBZ electrons...")
     else
-       call print_message("Doing e-ph transition probabilities all IBZ electrons...")
+       call print_message("Doing e-ph transition probabilities for all IBZ electrons...")
     end if
 
     !Set output directory of transition probilities
@@ -735,7 +734,7 @@ contains
        end if
 
        !Get the muxed index of FBZ wave vector from the IBZ blocks index list
-       ik_fbz = el%indexlist_irred(ik)
+       !ik_fbz = el%indexlist_irred(ik)
 
        !Electron energy
        en_el = el%ens_irred(ik, m)
@@ -822,13 +821,13 @@ contains
                 if(key == 'g') then
                    !Calculate |g_mns(<k>,q)|^2
                    if(needfinephon) then
-                      g2_istate(count) = wann%g2_epw(crys, q, el%evecs_irred(ik, m, :), &
+                      g2_istate(count) = wann%g2_epw(crys, k, q, el%evecs_irred(ik, m, :), &
                            el%evecs(ikp, n, :), ph_evecs_iq(1, s, :), &
-                           ph_ens_iq(1, s), gkRp_ik)
+                           ph_ens_iq(1, s), gkRp_ik, 'ph')
                    else
-                      g2_istate(count) = wann%g2_epw(crys, q, el%evecs_irred(ik, m, :), &
+                      g2_istate(count) = wann%g2_epw(crys, k, q, el%evecs_irred(ik, m, :), &
                            el%evecs(ikp, n, :), ph%evecs(iq, s, :), &
-                           ph%ens(iq, s), gkRp_ik)
+                           ph%ens(iq, s), gkRp_ik, 'ph')
                    end if
                 end if
 

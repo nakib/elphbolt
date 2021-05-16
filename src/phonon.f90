@@ -60,9 +60,9 @@ module phonon_module
      real(dp), allocatable :: ens(:,:)
      !! List of phonon energies on FBZ.
      real(dp), allocatable :: vels(:,:,:)
-     !! List of phonon velocities on FBZ.
+     !! List of phonon velocities on IBZ.
      complex(dp), allocatable :: evecs(:,:,:)
-     !! List of all phonon eigenvectors.
+     !! List of all phonon eigenvectors on IBZ.
      real(dp), allocatable :: ifc3(:,:,:,:)
      !! Third order force constants (ifc3) tensor.
      integer(k8) :: numtriplets

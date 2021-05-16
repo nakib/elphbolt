@@ -357,8 +357,12 @@ contains
 
           !energy
           el%ens(aux,:) = el%ens_irred(i,:)
-
+          
           !velocity
+          do ib = 1,wann%numwannbands
+             !here use real space (Cartesian) rotations
+             el%vels(aux, ib, :) = matmul(sym%crotations(:, :, s), el%vels_irred(i, ib, :))
+          end do
           el%vels(aux,:,:) = transpose(&
                matmul(el%symmetrizers(:,:,aux),transpose(el%vels(aux,:,:))))
        end do

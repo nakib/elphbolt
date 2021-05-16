@@ -137,7 +137,7 @@ contains
        !Calculate transport coefficient
        call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, el%ens, el%vels, &
             crys%volume, el%kmesh, bt%el_response, el%conc)
-
+       
        !Change to data output directory
        call chdir(trim(adjustl(Tdir)))
 
@@ -153,7 +153,7 @@ contains
 !!$    !!!!
 !!$    
     !Start iterator
-    do it = 1, 3
+    do it = 1, 10
        if(num%phbte) then
           call iterate_bte_ph(crys%T, num%datadumpdir, .True., ph, el, bt%ph_rta_rates_ibz, &
                bt%ph_field_term, bt%ph_response, bt%el_response)
@@ -398,7 +398,8 @@ contains
 
           !Read Y from file
           if(allocated(Y)) deallocate(Y)
-          if(allocated(istate_el1)) deallocate(istate_el2)
+          if(allocated(istate_el1)) deallocate(istate_el1)
+          if(allocated(istate_el2)) deallocate(istate_el2)
           call read_transition_probs_eph(trim(adjustl(filepath_Y)), nprocs_phe, Y, &
                istate_el1, istate_el2)
        end if
@@ -573,7 +574,7 @@ contains
              
              !Find image of final electron wave vector due to the current symmetry
              call binsearch(el%indexlist, el%equiv_map(ik_sym, ikp), aux)
-
+             
              response_el_reduce(ik_fbz, m, :) = response_el_reduce(ik_fbz, m, :) + &
                   response_el(aux, n, :)*(Xplus(iproc) + Xminus(iproc))
 

@@ -805,27 +805,39 @@ contains
     velocities=velocities*toTHz*bohr2nm
   end subroutine phonon_espresso
 
-  function g2_epw(wann, crys, qvec, el_evec_k, el_evec_kp, ph_evec_q, ph_en, gmixed_ik)
+  function g2_epw(wann, crys, kvec, qvec, el_evec_k, el_evec_kp, ph_evec_q, ph_en, &
+       gmixed, wannspace)
     !! Function to calculate |g|^2.
     !! This works with EPW real space data
+    !! kvec: electron wave vector in crystal coords
     !! qvec: phonon wave vector in crystal coords
     !! el_evec_k(kp): initial(final) electron eigenvector in bands m(n) 
     !! ph_evec_q: phonon eigenvector branchs 
     !! ph_en: phonon energy in mode (s,qvec)
-    !! gmixed_ik: e-ph matrix element
+    !! gmixed: e-ph matrix element in mixed Wannier-Bloch representation
+    !! wannspace: the species that is in Wannier representation
 
     class(epw_wannier), intent(in) :: wann
     type(crystal), intent(in) :: crys
     
-    real(dp),intent(in) :: qvec(3), ph_en
+    real(dp),intent(in) :: kvec(3), qvec(3), ph_en
     complex(dp),intent(in) :: el_evec_k(wann%numwannbands),&
          el_evec_kp(wann%numwannbands), ph_evec_q(wann%numbranches), &
-         gmixed_ik(wann%numwannbands, wann%numwannbands, wann%numbranches, wann%nwsq)
-    integer(kind=4) :: ip, ig, np, mp, sp, mtype
-    complex(dp) :: caux, u(wann%numbranches), UkpgkUk(wann%numbranches, wann%nwsq), &
-         UkpgkUkuq(wann%nwsq), gbloch, overlap(wann%numwannbands,wann%numwannbands), glprefac
+         gmixed(:,:,:,:)
+    character(len = 2) :: wannspace
+    
+    !Local variables
+    integer(kind=4) :: ip, iws, nws, np, mp, sp, mtype
+    complex(dp) :: caux, u(wann%numbranches), gbloch, &
+         overlap(wann%numwannbands,wann%numwannbands), glprefac
+    complex(dp), allocatable :: UkpgUk(:, :), UkpgUkuq(:)
     real(dp) :: g2_epw, unm
 
+    if(wannspace /= 'el' .and. wannspace /= 'ph') then
+       call exit_with_message(&
+            "Invalid value of wannspace in call to g2_epw. Exiting.")
+    end if
+    
     !Mass normalize the phonon matrix
     do ip = 1, wann%numbranches ! d.o.f of basis atoms
        !demux atom type from d.o.f
@@ -837,8 +849,15 @@ contains
     if(ph_en == 0) then !zero out matrix elements for energy phonons
        g2_epw = 0
     else
-       UkpgkUk = 0 !g(k,Rp) rotated by the electron U(k), U(k') matrices
-       UkpgkUkuq = 0 !above quantity rotated by the phonon u(q) matrix
+       if(wannspace == 'ph') then
+          nws = wann%nwsg
+       else
+          nws = wann%nwsk
+       end if
+       
+       allocate(UkpgUk(wann%numbranches, nws), UkpgUkuq(nws))
+       UkpgUk = 0 !g(k,Rp) or g(Re,q) rotated by the electron U(k), U(k') matrices
+       UkpgUkuq = 0 !above quantity rotated by the phonon u(q) matrix
        gbloch = 0
 
        !Create the <n'|m'> overlap matrix
@@ -847,30 +866,35 @@ contains
              overlap(mp,np) = conjg(el_evec_kp(np))*el_evec_k(mp)
           end do
        end do
-
-       do ig = 1, wann%nwsg !over matrix elements WS cell
+       
+       do iws = 1, nws !over matrix elements WS cell
           !Apply electron rotations
           do sp = 1, wann%numbranches
              caux = 0
              do np = 1, wann%numwannbands !over final electron band
                 do mp = 1, wann%numwannbands !over initial electron band
-                   caux = caux + overlap(mp,np)*gmixed_ik(np, mp, sp, ig)
+                   caux = caux + overlap(mp,np)*gmixed(np, mp, sp, iws)
                 end do
              end do
-             UkpgkUk(sp, ig) = UkpgkUk(sp, ig) + caux
+             UkpgUk(sp, iws) = UkpgUk(sp, iws) + caux
           end do
        end do
 
-       do ig = 1, wann%nwsg !over matrix elements WS cell
+       do iws = 1, nws !over matrix elements WS cell
           !Apply phonon rotation
-          UkpgkUkuq(ig) = UkpgkUkuq(ig) + dot_product(conjg(u),UkpgkUk(:, ig))
+          UkpgUkuq(iws) = UkpgUkuq(iws) + dot_product(conjg(u),UkpgUk(:, iws))
        end do
 
-       do ig = 1, wann%nwsg !over matrix elements WS cell
-          !Fourier transform to q-space
-          caux = exp(twopiI*dot_product(qvec, wann%rcells_g(ig, :)))&
-               /wann%gwsdeg(ig)
-          gbloch = gbloch + caux*UkpgkUkuq(ig)
+       do iws = 1, nws !over matrix elements WS cell
+          if(wannspace == 'ph') then
+             !Fourier transform to q-space
+             caux = expi(twopi*dot_product(qvec, wann%rcells_g(iws, :)))&
+                  /wann%gwsdeg(iws)
+          else
+             caux = expi(twopi*dot_product(kvec, wann%rcells_k(iws,:)))&
+                  /wann%elwsdeg(iws)
+          end if
+          gbloch = gbloch + caux*UkpgUkuq(iws)
        end do
 
        if(crys%polar) then !Long-range correction
@@ -884,6 +908,86 @@ contains
             ph_en*g2unitfactor !eV^2
     end if
   end function g2_epw
+
+!!$  function g2_epw(wann, crys, qvec, el_evec_k, el_evec_kp, ph_evec_q, ph_en, gmixed_ik)
+!!$    !! Function to calculate |g|^2.
+!!$    !! This works with EPW real space data
+!!$    !! qvec: phonon wave vector in crystal coords
+!!$    !! el_evec_k(kp): initial(final) electron eigenvector in bands m(n) 
+!!$    !! ph_evec_q: phonon eigenvector branchs 
+!!$    !! ph_en: phonon energy in mode (s,qvec)
+!!$    !! gmixed_ik: e-ph matrix element
+!!$
+!!$    class(epw_wannier), intent(in) :: wann
+!!$    type(crystal), intent(in) :: crys
+!!$    
+!!$    real(dp),intent(in) :: qvec(3), ph_en
+!!$    complex(dp),intent(in) :: el_evec_k(wann%numwannbands),&
+!!$         el_evec_kp(wann%numwannbands), ph_evec_q(wann%numbranches), &
+!!$         gmixed_ik(wann%numwannbands, wann%numwannbands, wann%numbranches, wann%nwsq)
+!!$    integer(kind=4) :: ip, ig, np, mp, sp, mtype
+!!$    complex(dp) :: caux, u(wann%numbranches), UkpgkUk(wann%numbranches, wann%nwsq), &
+!!$         UkpgkUkuq(wann%nwsq), gbloch, overlap(wann%numwannbands,wann%numwannbands), glprefac
+!!$    real(dp) :: g2_epw, unm
+!!$
+!!$    !Mass normalize the phonon matrix
+!!$    do ip = 1, wann%numbranches ! d.o.f of basis atoms
+!!$       !demux atom type from d.o.f
+!!$       mtype = (ip - 1)/3 + 1 
+!!$       !normalize and conjugate eigenvector
+!!$       u(ip) = ph_evec_q(ip)/sqrt(crys%masses(crys%atomtypes(mtype)))
+!!$    end do
+!!$
+!!$    if(ph_en == 0) then !zero out matrix elements for energy phonons
+!!$       g2_epw = 0
+!!$    else
+!!$       UkpgkUk = 0 !g(k,Rp) rotated by the electron U(k), U(k') matrices
+!!$       UkpgkUkuq = 0 !above quantity rotated by the phonon u(q) matrix
+!!$       gbloch = 0
+!!$
+!!$       !Create the <n'|m'> overlap matrix
+!!$       do np = 1, wann%numwannbands !over final electron band
+!!$          do mp = 1, wann%numwannbands !over initial electron band
+!!$             overlap(mp,np) = conjg(el_evec_kp(np))*el_evec_k(mp)
+!!$          end do
+!!$       end do
+!!$
+!!$       do ig = 1, wann%nwsg !over matrix elements WS cell
+!!$          !Apply electron rotations
+!!$          do sp = 1, wann%numbranches
+!!$             caux = 0
+!!$             do np = 1, wann%numwannbands !over final electron band
+!!$                do mp = 1, wann%numwannbands !over initial electron band
+!!$                   caux = caux + overlap(mp,np)*gmixed_ik(np, mp, sp, ig)
+!!$                end do
+!!$             end do
+!!$             UkpgkUk(sp, ig) = UkpgkUk(sp, ig) + caux
+!!$          end do
+!!$       end do
+!!$
+!!$       do ig = 1, wann%nwsg !over matrix elements WS cell
+!!$          !Apply phonon rotation
+!!$          UkpgkUkuq(ig) = UkpgkUkuq(ig) + dot_product(conjg(u),UkpgkUk(:, ig))
+!!$       end do
+!!$
+!!$       do ig = 1, wann%nwsg !over matrix elements WS cell
+!!$          !Fourier transform to q-space
+!!$          caux = exp(twopiI*dot_product(qvec, wann%rcells_g(ig, :)))&
+!!$               /wann%gwsdeg(ig)
+!!$          gbloch = gbloch + caux*UkpgkUkuq(ig)
+!!$       end do
+!!$
+!!$       if(crys%polar) then !Long-range correction
+!!$          unm = dot_product(conjg(el_evec_k),el_evec_kp)
+!!$          call long_range_prefac(wann, crys, &
+!!$               matmul(crys%reclattvecs,qvec)*bohr2nm,u,glprefac)
+!!$          gbloch = gbloch + glprefac*unm
+!!$       end if
+!!$
+!!$       g2_epw = 0.5_dp*real(gbloch*conjg(gbloch))/ &
+!!$            ph_en*g2unitfactor !eV^2
+!!$    end if
+!!$  end function g2_epw
   
   subroutine long_range_prefac(wann, crys, q, uqs, glprefac)
     !! Calculate the long-range correction prefactor of
@@ -1173,9 +1277,9 @@ contains
 
        !Calculate |g(k,k')|^2
        !(q is the same as k')
-       g2_qpath(i) = g2_epw(wann, crys, kp, el_evecs_k(m, :), &
+       g2_qpath(i) = g2_epw(wann, crys, k, kp, el_evecs_k(m, :), &
             el_evecs_kp(n, :), ph_evecs_path(i, s, :), ph_ens_path(i, s), &
-            gmixed_gamma)
+            gmixed_gamma, 'ph')
 
        !print*, el_ens_kp(n), ph_ens_path(i,s)*1e3, sqrt(g2_qpath(i))*1.0d3
     end do
