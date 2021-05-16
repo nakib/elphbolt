@@ -7,6 +7,7 @@ module bz_sums
   use phonon_module, only: phonon
   use electron_module, only: electron
   use delta, only: delta_fn_tetra
+  use symmetry_module, only: symmetry, symmetrize_3x3_tensor
 
   implicit none
 
@@ -234,7 +235,7 @@ contains
   end subroutine calculate_ph_dos_iso
 
   subroutine calculate_transport_coeff(species, field, T, deg, chempot, ens, vels, &
-       volume, mesh, response, conc)
+       volume, mesh, response, sym, conc)
     !! Subroutine to calculate transport coefficients.
     !!
     !! species Type of particle
@@ -253,6 +254,7 @@ contains
     character(len = 1), intent(in) :: field
     integer(k8), intent(in) :: mesh(3), deg
     real(dp), intent(in) :: T, chempot, ens(:,:), vels(:,:,:), volume, response(:,:,:)
+    type(symmetry), intent(in) :: sym
     real(dp), intent(in), optional :: conc
     
     !Local variables
@@ -332,7 +334,10 @@ contains
     ! A/m/K for alpha/T
     trans_coeff_hc = A_hc*trans_coeff_hc
     trans_coeff_cc = A_cc*trans_coeff_cc
-    sync all
+
+    !Symmetrize transport tensor
+    call symmetrize_3x3_tensor(trans_coeff_hc, sym%crotations)
+    call symmetrize_3x3_tensor(trans_coeff_cc, sym%crotations)
 
     if(this_image() == 1) then
        if(species == 'el' .and. field == 'E') then

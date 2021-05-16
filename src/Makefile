@@ -14,7 +14,7 @@ symmetry.o symmetry.mod: params.mod misc.mod numerics.mod crystal.mod spglib_wra
 wannier.o wannier.mod: params.mod misc.mod crystal.mod numerics.mod
 electron.o electron.mod: params.mod misc.mod numerics.mod crystal.mod symmetry.o wannier.mod delta.mod
 phonon.o phonon.mod: params.mod misc.mod numerics.mod crystal.mod symmetry.o wannier.mod delta.mod
-bz_sums.mod bz_sums.mod: params.o misc.mod electron.mod phonon.mod
+bz_sums.mod bz_sums.mod: params.o misc.mod electron.mod phonon.mod symmetry.mod
 interactions.o interactions.mod: params.mod misc.mod wannier.mod crystal.mod electron.mod phonon.mod numerics.mod delta.mod
 bte.o bte.mod: params.mod misc.mod numerics.mod crystal.mod symmetry.mod phonon.mod electron.mod interactions.mod bz_sums.mod
 elphbolt.o elphbolt.mod: params.mod numerics.mod crystal.mod wannier.mod symmetry.mod electron.mod phonon.mod bz_sums.mod interactions.mod bte.mod

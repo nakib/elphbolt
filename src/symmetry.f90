@@ -10,7 +10,8 @@ module symmetry_module
   implicit none
 
   private
-  public symmetry, find_equiv_map, find_irred_wedge, create_fbz2ibz_map, fbz2ibz
+  public symmetry, find_equiv_map, find_irred_wedge, create_fbz2ibz_map, &
+       fbz2ibz, symmetrize_3x3_tensor
 
   type symmetry
      !! Data and procedure related to symmetries.
@@ -390,5 +391,24 @@ contains
        fbz2ibz_map(iwv) = fbz2ibz(indexlist(iwv),nwv_irred,nequiv,ibz2fbz_map)
     end do
   end subroutine create_fbz2ibz_map
+  
+  subroutine symmetrize_3x3_tensor(tensor, crotations)
+    !! Symmetrize a 3x3 tensor.
+
+    real(dp), intent(inout) :: tensor(3,3)
+    real(dp), intent(in) :: crotations(:,:,:)
+    integer(k8) :: irot, nrots
+    real(dp) :: aux(3,3)
+
+    nrots = size(crotations(1, 1, :))
+    
+    aux(:,:) = 0.0_dp
+    do irot = 1, nrots
+       aux(:,:) = aux(:,:) + matmul(crotations(:, :, irot),&
+            matmul(tensor, transpose(crotations(:, :, irot))))
+    end do
+
+    tensor(:,:) = aux(:,:)/nrots
+  end subroutine symmetrize_3x3_tensor
   
 end module symmetry_module

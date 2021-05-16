@@ -339,7 +339,7 @@ contains
     !Local variables
     integer(k8) :: iq, iqstart, iqend, chunk, num_active_images
 
-    call print_message("Doing g(Re,Rp) -> g(Re,q) for all IBZ q...")
+    call print_message("Calculating g(Re,Rp) -> g(Re,q) for all IBZ q...")
 
     call distribute_points(ph%nq_irred, chunk, iqstart, iqend, num_active_images)
 
@@ -365,7 +365,7 @@ contains
     !Local variables
     integer(k8) :: ik, ikstart, ikend, chunk, num_active_images
 
-    call print_message("Doing g(Re,Rp) -> g(k,Rp) for all IBZ k...")
+    call print_message("Calculating g(Re,Rp) -> g(k,Rp) for all IBZ k...")
 
     call distribute_points(el%nk_irred, chunk, ikstart, ikend, num_active_images)
 
@@ -419,9 +419,9 @@ contains
     end if
 
     if(key == 'g') then
-       call print_message("Doing g(Re,q) -> |g(k,q)|^2 for all IBZ phonons...")
+       call print_message("Calculating g(Re,q) -> |g(k,q)|^2 for all IBZ phonons...")
     else
-       call print_message("Doing ph-e transition probabilities for all IBZ phonons...")
+       call print_message("Calculating ph-e transition probabilities for all IBZ phonons...")
     end if
     
     !Set output directory of transition probilities
@@ -683,9 +683,9 @@ contains
     end if
 
     if(key == 'g') then
-       call print_message("Doing g(k,Rp) -> |g(k,q)|^2 for all IBZ electrons...")
+       call print_message("Calculating g(k,Rp) -> |g(k,q)|^2 for all IBZ electrons...")
     else
-       call print_message("Doing e-ph transition probabilities for all IBZ electrons...")
+       call print_message("Calculating e-ph transition probabilities for all IBZ electrons...")
     end if
 
     !Set output directory of transition probilities

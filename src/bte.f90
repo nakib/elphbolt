@@ -98,7 +98,7 @@ contains
 
        !Calculate transport coefficient
        call calculate_transport_coeff('ph', 'E', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
-            crys%volume, ph%qmesh, bt%ph_response, el%conc)
+            crys%volume, ph%qmesh, bt%ph_response, sym, el%conc)
 
        !Change to data output directory
        call chdir(trim(adjustl(Tdir)))
@@ -136,7 +136,7 @@ contains
        
        !Calculate transport coefficient
        call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, el%ens, el%vels, &
-            crys%volume, el%kmesh, bt%el_response, el%conc)
+            crys%volume, el%kmesh, bt%el_response, sym, el%conc)
        
        !Change to data output directory
        call chdir(trim(adjustl(Tdir)))
@@ -166,7 +166,7 @@ contains
 
           !Calculate transport coefficient
           call calculate_transport_coeff('ph', 'E', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
-               crys%volume, ph%qmesh, bt%ph_response, el%conc)
+               crys%volume, ph%qmesh, bt%ph_response, sym, el%conc)
        end if
 
        if(num%ebte) then
@@ -181,7 +181,7 @@ contains
 
           !Calculate transport coefficient
           call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, el%ens, el%vels, &
-               crys%volume, el%kmesh, bt%el_response, el%conc)
+               crys%volume, el%kmesh, bt%el_response, sym, el%conc)
        end if
        
        !if(is_converged(coeff_new, coeff_old)) exit
