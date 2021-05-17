@@ -83,7 +83,7 @@ contains
        bt%ph_rta_rates_ibz = rates_3ph + rates_phe
 
        !Calculate field term (F0 or G0)
-       call calculate_field_term('ph', 'E', ph%nequiv, ph%ibz2fbz_map, &
+       call calculate_field_term('ph', 'T', ph%nequiv, ph%ibz2fbz_map, &
             crys%T, 0.0_dp, ph%ens, ph%vels, bt%ph_rta_rates_ibz, bt%ph_field_term)
 
        !Symmetrize field term
@@ -97,7 +97,7 @@ contains
        bt%ph_response = bt%ph_field_term
 
        !Calculate transport coefficient
-       call calculate_transport_coeff('ph', 'E', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
+       call calculate_transport_coeff('ph', 'T', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
             crys%volume, ph%qmesh, bt%ph_response, sym, el%conc)
 
        !Change to data output directory
@@ -121,7 +121,7 @@ contains
        bt%el_rta_rates_ibz = rates_eph ! + other channels
        
        !Calculate field term (I0 or J0)
-       call calculate_field_term('el', 'E', el%nequiv, el%ibz2fbz_map, &
+       call calculate_field_term('el', 'T', el%nequiv, el%ibz2fbz_map, &
             crys%T, el%chempot, el%ens, el%vels, bt%el_rta_rates_ibz, bt%el_field_term, el%indexlist)
 
        !Symmetrize field term
@@ -135,7 +135,7 @@ contains
        bt%el_response = bt%el_field_term
        
        !Calculate transport coefficient
-       call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, el%ens, el%vels, &
+       call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, el%ens, el%vels, &
             crys%volume, el%kmesh, bt%el_response, sym, el%conc)
        
        !Change to data output directory
@@ -153,7 +153,7 @@ contains
 !!$    !!!!
 !!$    
     !Start iterator
-    do it = 1, 10
+    do it = 1, 30
        if(num%phbte) then
           call iterate_bte_ph(crys%T, num%datadumpdir, .True., ph, el, bt%ph_rta_rates_ibz, &
                bt%ph_field_term, bt%ph_response, bt%el_response)
@@ -165,7 +165,7 @@ contains
           end do
 
           !Calculate transport coefficient
-          call calculate_transport_coeff('ph', 'E', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
+          call calculate_transport_coeff('ph', 'T', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
                crys%volume, ph%qmesh, bt%ph_response, sym, el%conc)
        end if
 
@@ -180,7 +180,7 @@ contains
           end do
 
           !Calculate transport coefficient
-          call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, el%ens, el%vels, &
+          call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, el%ens, el%vels, &
                crys%volume, el%kmesh, bt%el_response, sym, el%conc)
        end if
        

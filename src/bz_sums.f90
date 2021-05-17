@@ -289,10 +289,10 @@ contains
        end if
     else if(species == 'el') then
        if(field == 'T') then
-          A_cc = deg*fac
-          pow_cc = 1
-          A_hc = sign(1.0_dp, conc)*qe*A_cc
-          pow_hc = 0 
+          A_cc = deg*sign(1.0_dp, conc)*qe*fac
+          pow_cc = 0
+          A_hc = deg*qe*fac
+          pow_hc = 1 
        else if(field == 'E') then
           A_cc = deg*fac
           pow_cc = 0
@@ -347,7 +347,7 @@ contains
 
        if(species == 'el' .and. field == 'T') then
           print*, 'sigmaS [A/m/K] = ', trans_coeff_cc
-          print*, 'kappa0_el/T [W/m/K] = ', trans_coeff_hc
+          print*, 'kappa0_el [W/m/K] = ', trans_coeff_hc
        end if
 
        if(species == 'ph' .and. field == 'E') then
