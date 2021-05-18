@@ -235,7 +235,7 @@ contains
   end subroutine calculate_ph_dos_iso
 
   subroutine calculate_transport_coeff(species, field, T, deg, chempot, ens, vels, &
-       volume, mesh, response, sym, conc)
+       volume, mesh, response, sym, conc, trans_coeff_hc, trans_coeff_cc)
     !! Subroutine to calculate transport coefficients.
     !!
     !! species Type of particle
@@ -248,19 +248,20 @@ contains
     !! volume Primitive cell volume in nm^3
     !! mesh Wave vector grid
     !! response FBZ response function
-    !! conc [Optional] Carrier concentration in cm^-3
+    !! conc Carrier concentration in cm^-3
+    !! trans_coeff_hc Heat current coefficient
+    !! trans_coeff_cc Charge current coefficient
 
     character(len = 2), intent(in) :: species
     character(len = 1), intent(in) :: field
     integer(k8), intent(in) :: mesh(3), deg
-    real(dp), intent(in) :: T, chempot, ens(:,:), vels(:,:,:), volume, response(:,:,:)
+    real(dp), intent(in) :: T, chempot, ens(:,:), vels(:,:,:), volume, response(:,:,:), conc
     type(symmetry), intent(in) :: sym
-    real(dp), intent(in), optional :: conc
+    real(dp), intent(out) :: trans_coeff_hc(3,3), trans_coeff_cc(3,3) !h(c)c = heat(charge) current
     
     !Local variables
     integer(k8) :: ik, ib, icart, nk, nbands, pow_hc, pow_cc
-    real(dp) :: dist_factor, e, v, fac, A_hc, A_cc, &
-         trans_coeff_hc(3,3), trans_coeff_cc(3,3) !h(c)c = heat(charge) current
+    real(dp) :: dist_factor, e, v, fac, A_hc, A_cc
     
     nk = size(ens(:,1))
     nbands = size(ens(1,:))
@@ -339,25 +340,25 @@ contains
     call symmetrize_3x3_tensor(trans_coeff_hc, sym%crotations)
     call symmetrize_3x3_tensor(trans_coeff_cc, sym%crotations)
 
-    if(this_image() == 1) then
-       if(species == 'el' .and. field == 'E') then
-          print*, 'sigma [1/Omega/m] = ', trans_coeff_cc
-          print*, 'alpha_el/T [A/m/K] = ', trans_coeff_hc/T
-       end if
-
-       if(species == 'el' .and. field == 'T') then
-          print*, 'sigmaS [A/m/K] = ', trans_coeff_cc
-          print*, 'kappa0_el [W/m/K] = ', trans_coeff_hc
-       end if
-
-       if(species == 'ph' .and. field == 'E') then
-          print*, 'alpha_ph/T [A/m/K] = ', trans_coeff_hc/T
-       end if
-       
-       if(species == 'ph' .and. field == 'T') then
-          print*, 'kappa_ph [W/m/K] = ', trans_coeff_hc
-       end if
-       print*, '______________'
-    end if
+!!$    if(this_image() == 1) then
+!!$       if(species == 'el' .and. field == 'E') then
+!!$          print*, 'sigma [1/Omega/m] = ', trans_coeff_cc
+!!$          print*, 'alpha_el/T [A/m/K] = ', trans_coeff_hc/T
+!!$       end if
+!!$
+!!$       if(species == 'el' .and. field == 'T') then
+!!$          print*, 'sigmaS [A/m/K] = ', trans_coeff_cc
+!!$          print*, 'kappa0_el [W/m/K] = ', trans_coeff_hc
+!!$       end if
+!!$
+!!$       if(species == 'ph' .and. field == 'E') then
+!!$          print*, 'alpha_ph/T [A/m/K] = ', trans_coeff_hc/T
+!!$       end if
+!!$       
+!!$       if(species == 'ph' .and. field == 'T') then
+!!$          print*, 'kappa_ph [W/m/K] = ', trans_coeff_hc
+!!$       end if
+!!$       print*, '______________'
+!!$    end if
   end subroutine calculate_transport_coeff
 end module bz_sums

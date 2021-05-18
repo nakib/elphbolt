@@ -120,6 +120,19 @@ contains
     twonorm = sqrt(twonorm)
   end function twonorm
 
+  pure real(dp) function trace(mat)
+    !! Trace of square matrix
+
+    real(dp), intent(in) :: mat(:,:)
+    integer(k8) :: i, dim
+
+    dim = size(mat(:, 1))
+    trace = 0.0_dp
+    do i = 1, dim
+       trace = trace + mat(i, i)
+    end do
+  end function trace
+
   subroutine sort_int(list)
     !! Swap sort list of integers
 
@@ -268,7 +281,7 @@ contains
   end function mux_state
 
   subroutine demux_state(m, nbands, iband, ik)
-    !!Demultiplex a state index into (band index, wave vector index) pair
+    !! Demultiplex a state index into (band index, wave vector index) pair
     !!
     !! m is the multiplexed state index
     !! nbands is the number of bands

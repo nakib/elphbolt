@@ -37,13 +37,19 @@ module numerics_module
      logical :: read_V
      !! Choose if earlier ph-ph vertices are to be used.
      logical :: tetrahedra
-     !! Choose is the tetrahedron method for delta function evaluation will be used.
+     !! Choose if the tetrahedron method for delta function evaluation will be used.
      logical :: phe
      !! Choose if ph-e interaction will be included.
      logical :: phbte
      !! Choose if phonon BTE will be solved.
      logical :: ebte
      !! Choose if electron BTE will be solved.
+     logical :: drag
+     !! Choose if the drag effect will be included.
+     integer(k8) :: maxiter
+     !! Maximum number of iterations in the BTE solver.
+     real(dp) :: conv_thres
+     !! BTE iteration convergence criterion.
    contains
 
      procedure :: initialize=>read_input_and_setup
@@ -58,13 +64,13 @@ contains
     class(numerics), intent(out) :: n
 
     !Local variables
-    integer(k8) :: mesh_ref, qmesh(3)
-    real(dp) :: fsthick
+    integer(k8) :: mesh_ref, qmesh(3), maxiter
+    real(dp) :: fsthick, conv_thres
     character(len = 1024) :: datadumpdir
-    logical :: read_gq2, read_gk2, read_V, tetrahedra, phe, phbte, ebte
+    logical :: read_gq2, read_gk2, read_V, tetrahedra, phe, phbte, ebte, drag
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
-         read_V, tetrahedra, phe, phbte, ebte
+         read_V, tetrahedra, phe, phbte, ebte, maxiter, conv_thres, drag
 
     !Open input file
     open(1, file = 'input.nml', status = 'old')
@@ -81,6 +87,9 @@ contains
     phe = .false.
     phbte = .false.
     ebte = .false.
+    drag = .true.
+    maxiter = 50
+    conv_thres = 0.0001_dp
     read(1, nml = numerics)
     if(any(qmesh <= 0) .or. mesh_ref < 1 .or. fsthick < 0 .or. .not.(phbte .or. ebte)) then
        call exit_with_message('Bad input(s) in numerics.')
@@ -96,6 +105,9 @@ contains
     n%phe = phe
     n%phbte = phbte
     n%ebte = ebte
+    n%maxiter = maxiter
+    n%conv_thres = conv_thres
+    n%drag = drag
     
     !Create data dump directory
     if(this_image() == 1) call system('mkdir ' // trim(adjustl(n%datadumpdir)))
