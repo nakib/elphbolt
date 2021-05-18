@@ -324,6 +324,10 @@ contains
           end if
        end do
     else !Decoupled BTEs
+       call print_message("--------------------------------------------")
+       if(this_image() == 1) then
+          write(*,*) "iter    k_ph[W/m/K]         alpha_ph/T[A/m/K]"
+       end if
        if(num%phbte) then !Phonon BTE
           !call print_message("Iterating the decoupled phonon BTE...")
           do it_ph = 1, num%maxiter
@@ -343,8 +347,8 @@ contains
              ph_kappa_scalar = trace(ph_kappa)/3.0_dp
              ph_alphabyT_scalar = trace(ph_alphabyT)/3.0_dp             
              if(this_image() == 1) then
-                write(*,"(I3, A, 1E16.8, A, 1E16.8)") it_ph, "        ", ph_kappa_scalar, &
-                     "        ", ph_alphabyT_scalar
+                write(*,"(I3, A, 1E16.8, A, 1E16.8)") it_ph, "    ", ph_kappa_scalar, &
+                     "    ", ph_alphabyT_scalar
              end if
 
              if(converged(ph_kappa_scalar_old, ph_kappa_scalar, num%conv_thres) .and. &
@@ -359,6 +363,10 @@ contains
        end if
        
        if(num%ebte) then !Electron BTE
+          if(this_image() == 1) then
+             write(*,*) "iter    k0_el[W/m/K]        sigmaS[A/m/K", &
+                  "          sigma[1/Ohm/m]      alpha_el/T[A/m/K]"
+          end if
           do it_el = 1, num%maxiter
              !call print_message("Iterating the decoupled electron BTE...")
              call iterate_bte_el(crys%T, num%datadumpdir, .False., el, ph, sym,&
@@ -382,8 +390,8 @@ contains
              el_alphabyT_scalar = trace(el_alphabyT)/3.0_dp
              if(this_image() == 1) then
                 write(*,"(I3, A, 1E16.8, A, 1E16.8, A, 1E16.8, A, 1E16.8)") it_el, &
-                     "        ", el_kappa0_scalar, "         ", el_sigmaS_scalar, &
-                     "         ", el_sigma_scalar, "         ", el_alphabyT_scalar
+                     "    ", el_kappa0_scalar, "     ", el_sigmaS_scalar, &
+                     "     ", el_sigma_scalar, "     ", el_alphabyT_scalar
              end if
 
              !Check convergence
