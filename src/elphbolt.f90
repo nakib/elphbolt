@@ -99,7 +99,7 @@ program elphbolt
      call calculate_3ph_interaction(ph, crys, num, 'W')
   end if
   
-  !RTA solution
+  !Solve BTEs
   if(num%phbte) then
      if(num%phe) then
         call bt%solve_bte(num, crys, sym, ph, el)
