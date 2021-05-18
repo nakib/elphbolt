@@ -60,9 +60,12 @@ contains
     real(dp), allocatable :: rates_3ph(:,:), rates_phe(:,:), rates_eph(:,:)
     real(dp) :: ph_kappa(3, 3) = 0.0_dp, ph_alphabyT(3, 3) = 0.0_dp, &
          el_sigma(3, 3) = 0.0_dp, el_sigmaS(3, 3) = 0.0_dp, &
-         el_alphabyT(3, 3) = 0.0_dp, el_kappa0(3, 3) = 0.0_dp, dummy(3, 3) = 0.0_dp
+         el_alphabyT(3, 3) = 0.0_dp, el_kappa0(3, 3) = 0.0_dp, dummy(3, 3) = 0.0_dp, &
+         ph_kappa_scalar, ph_kappa_scalar_old, el_sigma_scalar, el_sigma_scalar_old, &
+         el_sigmaS_scalar, el_sigmaS_scalar_old, el_kappa0_scalar, el_kappa0_scalar_old, &
+         ph_alphabyT_scalar, ph_alphabyT_scalar_old
 
-    call print_message("Solving BTE in the RTA...")
+    call print_message("Solving the BTEs...")
     
     !Create output folder tagged by temperature and change into it
     write(tag, "(E9.3)") crys%T
@@ -73,7 +76,7 @@ contains
     sync all
 
     if(this_image() == 1) then
-       write(*,*) "iter        k0_el(el)[W/m/K]        sigmaS[A/m/K]        k_ph[W/m/K]"
+       write(*,*) "iter        k0_el[W/m/K]            sigmaS[A/m/K]            k_ph[W/m/K]"
     end if
        
     if(num%phbte) then
@@ -156,25 +159,34 @@ contains
     !Change back to cwd
     call chdir(trim(adjustl(num%cwd)))
 
+    !Calculate and print transport scalars
+    el_kappa0_scalar = trace(el_kappa0)/3.0_dp
+    el_sigmaS_scalar = trace(el_sigmaS)/3.0_dp
+    ph_kappa_scalar = trace(ph_kappa)/3.0_dp
+
     if(this_image() == 1) then
-       write(*,"(I3, A, 1E16.8, A, 1E16.8, A, 1E16.8)") 0, "        ", trace(el_kappa0)/3.0_dp, &
-            "         ", trace(el_sigmaS)/3.0_dp, "         ", trace(ph_kappa)/3.0_dp
+       write(*,"(I3, A, 1E16.8, A, 1E16.8, A, 1E16.8)") 0, "        ", el_kappa0_scalar, &
+            "         ", el_sigmaS_scalar, "          ", ph_kappa_scalar
     end if
-    
+
 !!$    !!!!
 !!$    !TODO Need a more elegant solution to jumping between directories...
 !!$    !!!!
 !!$
-    
-    !Start iterator
-    do it_ph = 1, num%maxiter       
-       if(num%drag) then
+
+    el_kappa0_scalar_old = el_kappa0_scalar
+    el_sigmaS_scalar_old = el_sigmaS_scalar
+    ph_kappa_scalar_old = ph_kappa_scalar
+
+    if(num%drag) then !Coupled BTEs
+       !Start iterator
+       do it_ph = 1, num%maxiter       
           !Scheme: for each step of phonon response, fully iterate the electron response.
 
           !Iterate phonon response once
           call iterate_bte_ph(crys%T, num%datadumpdir, .True., ph, el, bt%ph_rta_rates_ibz, &
                bt%ph_field_term, bt%ph_response, bt%el_response)
-          
+
           !Calculate phonon transport coefficients
           call calculate_transport_coeff('ph', 'T', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
                crys%volume, ph%qmesh, bt%ph_response, sym, el%conc, ph_kappa, dummy)
@@ -188,18 +200,66 @@ contains
              call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
                   el%ens, el%vels, crys%volume, el%kmesh, bt%el_response, sym, el%conc, &
                   el_kappa0, el_sigmaS)
+
+             !Calculate electron transport scalars
+             el_kappa0_scalar = trace(el_kappa0)/3.0_dp
+             el_sigmaS_scalar = trace(el_sigmaS)/3.0_dp
+
+             !Check convergence
+             if(converged(el_kappa0_scalar_old, el_kappa0_scalar, num%conv_thres) .and. &
+                  converged(el_sigmaS_scalar_old, el_sigmaS_scalar, num%conv_thres)) then
+                exit
+             else
+                el_kappa0_scalar_old = el_kappa0_scalar
+                el_sigmaS_scalar_old = el_sigmaS_scalar
+             end if
           end do
-       else
-          if(num%phbte) then
+
+          !Calculate phonon transport scalar
+          ph_kappa_scalar = trace(ph_kappa)/3.0_dp
+
+          !Check convergence
+          if(converged(ph_kappa_scalar_old, ph_kappa_scalar, num%conv_thres)) then
+             exit
+          else
+             ph_kappa_scalar_old = ph_kappa_scalar
+          end if
+
+          if(this_image() == 1) then
+             write(*,"(I3, A, 1E16.8, A, 1E16.8, A, 1E16.8)") it_ph, "        ", el_kappa0_scalar, &
+                  "         ", el_sigmaS_scalar, "         ", ph_kappa_scalar
+          end if
+       end do
+    else !Decoupled BTEs
+       if(num%phbte) then !Phonon BTE
+          !call print_message("Iterating the decoupled phonon BTE...")
+          do it_ph = 1, num%maxiter
              call iterate_bte_ph(crys%T, num%datadumpdir, .False., ph, el, bt%ph_rta_rates_ibz, &
                   bt%ph_field_term, bt%ph_response, bt%el_response)
 
              !Calculate phonon transport coefficients
              call calculate_transport_coeff('ph', 'T', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
                   crys%volume, ph%qmesh, bt%ph_response, sym, el%conc, ph_kappa, dummy)
-          end if
 
-          if(num%ebte) then
+             !Calculate and print phonon transport scalar
+             ph_kappa_scalar = trace(ph_kappa)/3.0_dp
+             if(this_image() == 1) then
+                write(*,"(I3, A, 1E16.8)") it_ph, "        ", ph_kappa_scalar
+             end if
+             
+             !Check convergence
+             if(converged(ph_kappa_scalar_old, ph_kappa_scalar, num%conv_thres)) then
+                call print_message("--------------------------------------------")
+                exit
+             else
+                ph_kappa_scalar_old = ph_kappa_scalar
+             end if
+          end do
+       end if
+       
+       if(num%ebte) then !Electron BTE
+          do it_el = 1, num%maxiter
+             !call print_message("Iterating the decoupled electron BTE...")
              call iterate_bte_el(crys%T, num%datadumpdir, .False., el, ph, sym,&
                   bt%el_rta_rates_ibz, bt%el_field_term, bt%el_response, bt%ph_response)
 
@@ -207,16 +267,27 @@ contains
              call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
                   el%ens, el%vels, crys%volume, el%kmesh, bt%el_response, sym, el%conc, &
                   el_kappa0, el_sigmaS)
-          end if
-       end if
 
-       if(this_image() == 1) then
-          write(*,"(I3, A, 1E16.8, A, 1E16.8, A, 1E16.8)") it_ph, "        ", trace(el_kappa0)/3.0_dp, &
-               "         ", trace(el_sigmaS)/3.0_dp, "         ", trace(ph_kappa)/3.0_dp
+             !Calculate and print electron transport scalars
+             el_kappa0_scalar = trace(el_kappa0)/3.0_dp
+             el_sigmaS_scalar = trace(el_sigmaS)/3.0_dp
+             if(this_image() == 1) then
+                write(*,"(I3, A, 1E16.8, A, 1E16.8)") it_el, "        ", el_kappa0_scalar, &
+                     "         ", el_sigmaS_scalar
+             end if
+             
+             !Check convergence
+             if(converged(el_kappa0_scalar_old, el_kappa0_scalar, num%conv_thres) .and. &
+                  converged(el_sigmaS_scalar_old, el_sigmaS_scalar, num%conv_thres)) then
+                call print_message("--------------------------------------------")
+                exit
+             else
+                el_kappa0_scalar_old = el_kappa0_scalar
+                el_sigmaS_scalar_old = el_sigmaS_scalar
+             end if
+          end do
        end if
-       
-       !if(is_converged(coeff_new, coeff_old)) exit
-    end do
+    end if
   end subroutine solve_bte
 
   subroutine calculate_field_term(species, field, nequiv, ibz2fbz_map, &
@@ -662,4 +733,13 @@ contains
             matmul(el%symmetrizers(:,:,ik_fbz),transpose(response_el(ik_fbz,:,:))))
     end do
   end subroutine iterate_bte_el
+
+  pure logical function converged(oldval, newval, thres)
+    !! Function to check if newval is the same as oldval
+
+    real(dp), intent(in) :: oldval, newval, thres
+
+    converged = .False.
+    if(abs(newval - oldval) < thres) converged = .True. 
+  end function converged
 end module bte_module
