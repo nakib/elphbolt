@@ -65,14 +65,15 @@ contains
     !Local variables
     character(len = 1024) :: tag, Tdir
     integer(k8) :: iq, ik, it_ph, it_el, icart
-    real(dp), allocatable :: rates_3ph(:,:), rates_phe(:,:), rates_eph(:,:)
+    real(dp), allocatable :: rates_3ph(:,:), rates_phe(:,:), rates_eph(:,:), &
+         I_el(:,:,:), I_ph(:,:,:)
     real(dp) :: ph_kappa(3, 3) = 0.0_dp, ph_alphabyT(3, 3) = 0.0_dp, &
          el_sigma(3, 3) = 0.0_dp, el_sigmaS(3, 3) = 0.0_dp, &
          el_alphabyT(3, 3) = 0.0_dp, el_kappa0(3, 3) = 0.0_dp, dummy(3, 3) = 0.0_dp, &
          ph_kappa_scalar, ph_kappa_scalar_old, el_sigma_scalar, el_sigma_scalar_old, &
          el_sigmaS_scalar, el_sigmaS_scalar_old, el_kappa0_scalar, el_kappa0_scalar_old, &
          ph_alphabyT_scalar, ph_alphabyT_scalar_old, el_alphabyT_scalar, el_alphabyT_scalar_old, &
-         KO_dev, tot_alphabyT_scalar
+         KO_dev, tot_alphabyT_scalar, lambda
 
     call print_message("Solving the BTEs...")
     
@@ -208,6 +209,9 @@ contains
 
        !Write RTA scattering rates to file
        call write2file_rank2_real('el.W_rta_eph', rates_eph)
+
+       !These will be needed later
+       allocate(I_ph(el%nk, el%numbands, 3), I_el(el%nk, el%numbands, 3))
     end if
 
     !Change back to cwd
@@ -243,7 +247,7 @@ contains
     el_alphabyT_scalar_old = el_alphabyT_scalar
     ph_alphabyT_scalar_old = ph_alphabyT_scalar
 
-    if(num%drag) then !Coupled BTEs
+    if(num%drag) then !Coupled BTEs       
        !Start iterator
        do it_ph = 1, num%maxiter       
           !Scheme: for each step of phonon response, fully iterate the electron response.
@@ -263,21 +267,31 @@ contains
 
           !Iterate electron response all the way
           do it_el = 1, num%maxiter
+             !E field:
              call iterate_bte_el(crys%T, num%datadumpdir, .True., el, ph, sym,&
                   bt%el_rta_rates_ibz, bt%el_field_term_E, bt%el_response_E, bt%ph_response_E)        
-!!$             call iterate_bte_el(crys%T, num%datadumpdir, .True., el, ph, sym,&
-!!$                  bt%el_rta_rates_ibz, bt%el_field_term_T, bt%el_response_T, bt%ph_response_T)
-             !Enforce Kelvin-Onsager relation
-             do icart = 1, 3
-                bt%el_response_T(:,:,icart) = (el%ens(:,:) - el%chempot)/qe/crys%T*&
-                     bt%el_response_E(:,:,icart)
-             end do
 
              !Calculate electron transport coefficients
              call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, &
                   el%ens, el%vels, crys%volume, el%kmesh, bt%el_response_E, sym, &
                   el%conc, el_alphabyT, el_sigma)
              el_alphabyT = el_alphabyT/crys%T
+
+             !delT field:
+             call iterate_bte_el(crys%T, num%datadumpdir, .True., el, ph, sym,&
+                  bt%el_rta_rates_ibz, bt%el_field_term_T, bt%el_response_T, bt%ph_response_T)
+             !Enforce Kelvin-Onsager relation:
+             !Fix "electron" part
+             do icart = 1, 3
+                I_el(:,:,icart) = (el%ens(:,:) - el%chempot)/qe/crys%T*&
+                     bt%el_response_E(:,:,icart)
+             end do
+             !Correct "phonon" part
+             I_ph = bt%el_response_T - I_el
+             call correct_Iph(I_ph, trace(ph_alphabyT)/3.0_dp, lambda)
+             bt%el_response_T = I_el + lambda*I_ph
+
+             !Calculate electron transport coefficients
              call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
                   el%ens, el%vels, crys%volume, el%kmesh, bt%el_response_T, sym, el%conc, &
                   el_kappa0, el_sigmaS)
@@ -369,26 +383,30 @@ contains
        
        if(num%ebte) then !Electron BTE
           if(this_image() == 1) then
-             write(*,*) "iter    k0_el[W/m/K]        sigmaS[A/m/K", &
-                  "          sigma[1/Ohm/m]      alpha_el/T[A/m/K]"
+             write(*,*) "iter    k0_el[W/m/K]        sigmaS[A/m/K]", &
+                  "         sigma[1/Ohm/m]      alpha_el/T[A/m/K]"
           end if
           do it_el = 1, num%maxiter
-             !call print_message("Iterating the decoupled electron BTE...")
+             !E field:
              call iterate_bte_el(crys%T, num%datadumpdir, .False., el, ph, sym,&
                   bt%el_rta_rates_ibz, bt%el_field_term_E, bt%el_response_E, bt%ph_response_E)
-!!$             call iterate_bte_el(crys%T, num%datadumpdir, .False., el, ph, sym,&
-!!$                  bt%el_rta_rates_ibz, bt%el_field_term_T, bt%el_response_T, bt%ph_response_T)
-             !Enforce Kelvin-Onsager relation
-             do icart = 1, 3
-                bt%el_response_T(:,:,icart) = (el%ens(:,:) - el%chempot)/qe/crys%T*&
-                     bt%el_response_E(:,:,icart)
-             end do
 
              !Calculate electron transport coefficients
              call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, &
                   el%ens, el%vels, crys%volume, el%kmesh, bt%el_response_E, sym, &
                   el%conc, el_alphabyT, el_sigma)
              el_alphabyT = el_alphabyT/crys%T
+
+             !delT field:
+             
+             call iterate_bte_el(crys%T, num%datadumpdir, .False., el, ph, sym,&
+                  bt%el_rta_rates_ibz, bt%el_field_term_T, bt%el_response_T, bt%ph_response_T)
+             !Enforce Kelvin-Onsager relation
+             do icart = 1, 3
+                bt%el_response_T(:,:,icart) = (el%ens(:,:) - el%chempot)/qe/crys%T*&
+                     bt%el_response_E(:,:,icart)
+             end do
+
              call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
                   el%ens, el%vels, crys%volume, el%kmesh, bt%el_response_T, sym, el%conc, &
                   el_kappa0, el_sigmaS)
@@ -420,6 +438,40 @@ contains
           end do
        end if
     end if
+    
+  contains
+
+    subroutine correct_Iph(I_ph, constraint, lambda)
+      !! Subroutine to find scaling correction to I_ph.
+
+      real(dp), intent(in) :: I_ph(:,:,:), constraint
+      real(dp), intent(out) :: lambda
+
+      !Internal variables
+      integer(k8) :: it, maxiter
+      real(dp) :: a, b, aux(3,3), sigmaS(3,3), thresh, sigmaS_scalar
+      
+      a = 0.0_dp !lower bound
+      b = 2.0_dp !upper bound
+      maxiter = 100
+      thresh = 1.0e-6_dp
+      do it = 1, maxiter
+         lambda = 0.5_dp*(a + b)
+         !Calculate electron transport coefficients
+         call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
+              el%ens, el%vels, crys%volume, el%kmesh, lambda*I_ph, sym, el%conc, &
+              dummy, sigmaS)         
+         sigmaS_scalar = trace(sigmaS)/3.0_dp
+
+         if(abs(sigmaS_scalar - constraint) < thresh) then
+            exit
+         else if(abs(sigmaS_scalar) < abs(constraint)) then
+            a = lambda
+         else
+            b = lambda
+         end if
+      end do
+    end subroutine correct_Iph
   end subroutine solve_bte
 
   subroutine calculate_field_term(species, field, nequiv, ibz2fbz_map, &
