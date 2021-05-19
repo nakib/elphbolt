@@ -2,7 +2,7 @@ module bte_module
   !! Module containing type and procedures related to the solution of the
   !! Boltzmann transport equation (BTE).
 
-  use params, only: dp, k8, qe
+  use params, only: dp, k8, qe, kB
   use misc, only: print_message, exit_with_message, write2file_rank2_real, &
        distribute_points, demux_state, binsearch, interpolate, demux_vector, &
        trace
@@ -64,7 +64,7 @@ contains
 
     !Local variables
     character(len = 1024) :: tag, Tdir
-    integer(k8) :: iq, ik, it_ph, it_el
+    integer(k8) :: iq, ik, it_ph, it_el, icart
     real(dp), allocatable :: rates_3ph(:,:), rates_phe(:,:), rates_eph(:,:)
     real(dp) :: ph_kappa(3, 3) = 0.0_dp, ph_alphabyT(3, 3) = 0.0_dp, &
          el_sigma(3, 3) = 0.0_dp, el_sigmaS(3, 3) = 0.0_dp, &
@@ -264,18 +264,23 @@ contains
           !Iterate electron response all the way
           do it_el = 1, num%maxiter
              call iterate_bte_el(crys%T, num%datadumpdir, .True., el, ph, sym,&
-                  bt%el_rta_rates_ibz, bt%el_field_term_T, bt%el_response_T, bt%ph_response_T)
-             call iterate_bte_el(crys%T, num%datadumpdir, .True., el, ph, sym,&
-                  bt%el_rta_rates_ibz, bt%el_field_term_E, bt%el_response_E, bt%ph_response_E)
+                  bt%el_rta_rates_ibz, bt%el_field_term_E, bt%el_response_E, bt%ph_response_E)        
+!!$             call iterate_bte_el(crys%T, num%datadumpdir, .True., el, ph, sym,&
+!!$                  bt%el_rta_rates_ibz, bt%el_field_term_T, bt%el_response_T, bt%ph_response_T)
+             !Enforce Kelvin-Onsager relation
+             do icart = 1, 3
+                bt%el_response_T(:,:,icart) = (el%ens(:,:) - el%chempot)/qe/crys%T*&
+                     bt%el_response_E(:,:,icart)
+             end do
 
              !Calculate electron transport coefficients
-             call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
-                  el%ens, el%vels, crys%volume, el%kmesh, bt%el_response_T, sym, el%conc, &
-                  el_kappa0, el_sigmaS)
              call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, &
                   el%ens, el%vels, crys%volume, el%kmesh, bt%el_response_E, sym, &
                   el%conc, el_alphabyT, el_sigma)
              el_alphabyT = el_alphabyT/crys%T
+             call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
+                  el%ens, el%vels, crys%volume, el%kmesh, bt%el_response_T, sym, el%conc, &
+                  el_kappa0, el_sigmaS)
 
              !Calculate electron transport scalars
              el_kappa0_scalar = trace(el_kappa0)/3.0_dp
@@ -370,18 +375,23 @@ contains
           do it_el = 1, num%maxiter
              !call print_message("Iterating the decoupled electron BTE...")
              call iterate_bte_el(crys%T, num%datadumpdir, .False., el, ph, sym,&
-                  bt%el_rta_rates_ibz, bt%el_field_term_T, bt%el_response_T, bt%ph_response_T)
-             call iterate_bte_el(crys%T, num%datadumpdir, .False., el, ph, sym,&
                   bt%el_rta_rates_ibz, bt%el_field_term_E, bt%el_response_E, bt%ph_response_E)
+!!$             call iterate_bte_el(crys%T, num%datadumpdir, .False., el, ph, sym,&
+!!$                  bt%el_rta_rates_ibz, bt%el_field_term_T, bt%el_response_T, bt%ph_response_T)
+             !Enforce Kelvin-Onsager relation
+             do icart = 1, 3
+                bt%el_response_T(:,:,icart) = (el%ens(:,:) - el%chempot)/qe/crys%T*&
+                     bt%el_response_E(:,:,icart)
+             end do
 
              !Calculate electron transport coefficients
-             call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
-                  el%ens, el%vels, crys%volume, el%kmesh, bt%el_response_T, sym, el%conc, &
-                  el_kappa0, el_sigmaS)
              call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, &
                   el%ens, el%vels, crys%volume, el%kmesh, bt%el_response_E, sym, &
                   el%conc, el_alphabyT, el_sigma)
              el_alphabyT = el_alphabyT/crys%T
+             call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
+                  el%ens, el%vels, crys%volume, el%kmesh, bt%el_response_T, sym, el%conc, &
+                  el_kappa0, el_sigmaS)
 
              !Calculate and print electron transport scalars
              el_kappa0_scalar = trace(el_kappa0)/3.0_dp
