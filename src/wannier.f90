@@ -63,7 +63,7 @@ module wannier_module
    contains
 
      procedure :: read=>read_EPW_Wannier, el_wann_epw, ph_wann_epw, &
-          gkRp_epw, gReq_epw, g2_epw
+          gkRp_epw, gReq_epw, g2_epw, deallocate_wannier
      procedure :: test_wannier
 
   end type epw_wannier
@@ -1136,6 +1136,16 @@ contains
     !Change back to working directory
     call chdir(num%cwd)
   end subroutine gReq_epw
+
+  subroutine deallocate_wannier(wann)
+    !! Deallocates some Wannier quantities
+
+    class(epw_wannier), intent(inout) :: wann
+    
+    deallocate(wann%rcells_k, wann%rcells_q, wann%rcells_g, &
+         wann%elwsdeg, wann%phwsdeg, wann%gwsdeg, &
+         wann%Hwann, wann%gwann, wann%Dphwann)
+  end subroutine deallocate_wannier
 
   !For testing and debugging:
   subroutine gmixed_epw_gamma(wann, num)

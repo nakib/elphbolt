@@ -101,6 +101,9 @@ program elphbolt
      call calculate_3ph_interaction(ph, crys, num, 'W')
   end if
 
+  !Deallocate Wannier quantities
+  call wann%deallocate_wannier
+  
   call subtitle("Calculating transport...")
   
   !Solve BTEs
