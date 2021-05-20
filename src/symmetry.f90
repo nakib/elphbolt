@@ -3,7 +3,7 @@ module symmetry_module
   !! Brillouin zone symmetries.
 
   use params, only: dp, k8
-  use misc, only: mux_vector, demux_mesh, demux_vector, exit_with_message
+  use misc, only: mux_vector, demux_mesh, demux_vector, exit_with_message, subtitle
   use crystal_module !, only :: crystal
   use spglib_wrapper, only: get_operations, get_cartesian_operations, get_num_operations
   
@@ -62,7 +62,7 @@ contains
     real(dp), allocatable :: translations(:,:), ctranslations(:,:)
     real(dp) :: tmp1(3,3), tmp2(3,3), tmp3(3,3)
 
-    if(this_image() == 1) print*, 'Analyzing symmetry...'
+    call subtitle("Analyzing symmetry...")
     
     !Number of points in wave vector mesh
     nq = product(mesh)

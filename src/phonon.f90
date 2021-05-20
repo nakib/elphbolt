@@ -2,7 +2,7 @@ module phonon_module
   !! Module containing type and procedures related to the phononic properties.
 
   use params, only: dp, k8
-  use misc, only: print_message
+  use misc, only: print_message, subtitle
   use numerics_module, only: numerics
   use wannier_module, only: epw_wannier, phonon_espresso
   use crystal_module, only: crystal, calculate_wavevectors_full
@@ -91,6 +91,8 @@ contains
     type(crystal), intent(in) :: crys
     type(symmetry), intent(in) :: sym
     type(numerics), intent(in) :: num
+
+    call subtitle("Setting up phonons...")
 
     !Set phonon branches
     ph%numbranches = crys%numatoms*3

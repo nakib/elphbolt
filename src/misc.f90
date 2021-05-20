@@ -459,4 +459,47 @@ contains
     
     interpolation = aux
   end subroutine interpolate
+
+  subroutine welcome
+    !! Subroutine to print a pretty banner.
+
+    if(this_image() == 1) then
+       write(*,'(A75)') "+-------------------------------------------------------------------------+"
+       write(*,'(A75)') "| \                                                                       |"
+       write(*,'(A75)') "|  \                                                                      |"
+       write(*,'(A75)') "|   \   \                                                                 |"
+       write(*,'(A75)') "|    \   \                                                                |"
+       write(*,'(A75)') "|   __\   \              _        _    _           _    _                 |"
+       write(*,'(A75)') "|   \      \         ___| |      | |  |.|__   ___ | |  / /_               |"
+       write(*,'(A75)') "|    \    __\       / _ \ |   _  | |  |.'_ \ / _ \| | / __/               |"
+       write(*,'(A75)') "|     \  \         |  __/ | |/ \_|/ \ |.|_) | (_) | |/ /_                 |"
+       write(*,'(A75)') "|      \ \          \___|_|/|__/ |   ||..__/ \___/|_|\__/                 |"
+       write(*,'(A75)') "|       \ \                /|                                             |"
+       write(*,'(A75)') "|        \\                \|                                             |"
+       write(*,'(A75)') "|         \\                                                              |"
+       write(*,'(A75)') "|          \                                                              |"
+       write(*,'(A75)') "|           \                                                             |"
+       write(*,'(A75)') "| A solver for the coupled electron-phonon Boltzmann transport equations. |"
+       write(*,'(A75)') "| Copyright (C) 2020- Nakib Haider Protik.                                |"
+       write(*,'(A75)') "| This is a 'free as in freedom' software distributed under the GPLv3.    |"
+       write(*,'(A75)') "+-------------------------------------------------------------------------+" 
+       print*, ' '
+       print*, 'Number of compute processes = ', num_images()
+    end if
+  end subroutine welcome
+
+  subroutine subtitle(text)
+    !! Subroutine to print a subtitle.
+
+    character(len = *), intent(in) :: text
+    integer(k8) :: length
+    character(len = 75) :: string2print
+
+    length = len(text)
+    
+    string2print = '___________________________________________________________________________'
+    if(this_image() == 1) write(*,'(A75)') string2print
+    string2print(75 - length + 1 : 75) = text
+    if(this_image() == 1) write(*,'(A75)') string2print
+  end subroutine subtitle
 end module misc

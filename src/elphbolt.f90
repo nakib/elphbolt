@@ -7,6 +7,7 @@ program elphbolt
   !! and Phys. Rev. B 102, 245202 (2020) with both the electron-phonon and phonon-phonon
   !! interactions computed ab initio.
 
+  use misc, only: welcome, print_message, subtitle
   use params, only: k8, dp
   use numerics_module, only: numerics
   use crystal_module, only: crystal
@@ -29,10 +30,9 @@ program elphbolt
   type(phonon) :: ph
   type(bte) :: bt
 
-  if(this_image() == 1) then
-     print*, 'Number of images = ', num_images()
-  end if
-
+  !Print banner and other info.
+  call welcome
+  
   !Set up crystal
   call crys%initialize
   
@@ -65,6 +65,8 @@ program elphbolt
   !Calculate phonon density of states
   call calculate_dos(ph, num%tetrahedra)
 
+  call subtitle("Calculating interactions...")
+  
   if(num%phe) then
      if(.not. num%read_gq2) then
         !Calculate mixed Bloch-Wannier space e-ph vertex g(Re,q)
@@ -98,17 +100,11 @@ program elphbolt
      !Calculate ph-ph transition probabilities
      call calculate_3ph_interaction(ph, crys, num, 'W')
   end if
+
+  call subtitle("Calculating transport...")
   
   !Solve BTEs
-  if(num%phbte) then
-     if(num%phe) then
-        call bt%solve_bte(num, crys, sym, ph, el)
-     else
-        call bt%solve_bte(num, crys, sym, ph)
-     end if
-  end if
+  call bt%solve_bte(num, crys, sym, ph, el)
 
-!!$  if(num%ebte) then
-!!$     call bt%solve_bte(num, crys, sym, ph, el)
-!!$  end if
+  call print_message('______________________Thanks for using elphbolt. Bye!______________________')
 end program elphbolt

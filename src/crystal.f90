@@ -2,7 +2,8 @@ module crystal_module
   !! Module containing type and procedures related to the crystal structure.
 
   use params, only: dp, k8, twopi
-  use misc, only: exit_with_message, print_message, cross_product, demux_vector
+  use misc, only: exit_with_message, print_message, cross_product, demux_vector, &
+       subtitle
 
   implicit none
 
@@ -70,7 +71,7 @@ contains
     namelist /crystal_info/ name, elements, atomtypes, basis, lattvecs, &
          polar, born, epsilon, masses, T
 
-    if(this_image() == 1) print*, 'Setting up crystal...'
+    call subtitle("Setting up crystal...")
 
     !Open input file
     open(1, file = 'input.nml', status = 'old')
@@ -143,8 +144,8 @@ contains
        print*, c%reclattvecs(:,3)
        print*, 'Brillouin zone volume =', c%volume_bz, '1/nm^3'
 
-       print*, 'System is polar. ', c%polar
        if(c%polar) then
+          print*, 'System is polar.'
           print*, 'Dielectric tensor:'
           print*, c%epsilon(:,1)
           print*, c%epsilon(:,2)

@@ -4,7 +4,7 @@ module wannier_module
   use params, only: dp, k8, Ryd2eV, Ryd2radTHz, oneI, pi, twopi, twopiI, &
        Ryd2amu, bohr2nm
   use misc, only: exit_with_message, print_message, expi, twonorm, &
-       distribute_points, demux_state, mux_vector
+       distribute_points, demux_state, mux_vector, subtitle
   use numerics_module, only: numerics
   use crystal_module, only: crystal
   
@@ -81,6 +81,8 @@ contains
     integer(k8) :: coarse_qmesh(3)
 
     namelist /wannier/ coarse_qmesh
+
+    call subtitle("Reading EPW Wannier information...")
 
     !Open input file
     open(1, file = 'input.nml', status = 'old')

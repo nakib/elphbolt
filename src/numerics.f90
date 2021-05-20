@@ -2,7 +2,7 @@ module numerics_module
   !! Module containing type and procedures related to the numerics.
 
   use params, only: dp, k8, twopi
-  use misc, only: exit_with_message
+  use misc, only: exit_with_message, subtitle
 
   implicit none
 
@@ -72,6 +72,8 @@ contains
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
          read_V, tetrahedra, phe, phbte, ebte, maxiter, conv_thres, drag
 
+    call subtitle("Reading numerics information...")
+    
     !Open input file
     open(1, file = 'input.nml', status = 'old')
 

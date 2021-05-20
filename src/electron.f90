@@ -2,7 +2,8 @@ module electron_module
   !! Module containing types and procedures related to the electronic properties.
 
   use params, only: dp, k8
-  use misc, only: exit_with_message, print_message, demux_state, sort, binsearch
+  use misc, only: exit_with_message, print_message, demux_state, sort, &
+       binsearch, subtitle
   use numerics_module, only: numerics
   use wannier_module, only: epw_wannier
   use crystal_module, only: crystal, calculate_wavevectors_full
@@ -129,6 +130,8 @@ contains
     namelist /electrons/ enref, spindeg, numbands, numtransbands, &
          indlowband, indhighband, metallic, indhighvalence, indlowconduction, &
          conc
+
+    call subtitle("Setting up electrons...")
     
     !Open input file
     open(1, file = 'input.nml', status = 'old')
