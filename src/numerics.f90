@@ -86,9 +86,9 @@ contains
     read_gk2 = .false.
     read_V = .false.
     tetrahedra = .false.
-    phe = .false.
-    phbte = .false.
-    ebte = .false.
+    phe = .true.
+    phbte = .true.
+    ebte = .true.
     drag = .true.
     maxiter = 50
     conv_thres = 0.0001_dp

@@ -104,8 +104,6 @@ program elphbolt
   !Deallocate Wannier quantities
   call wann%deallocate_wannier
   
-  call subtitle("Calculating transport...")
-  
   !Solve BTEs
   call bt%solve_bte(num, crys, sym, ph, el)
 

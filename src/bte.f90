@@ -5,7 +5,7 @@ module bte_module
   use params, only: dp, k8, qe, kB
   use misc, only: print_message, exit_with_message, write2file_rank2_real, &
        distribute_points, demux_state, binsearch, interpolate, demux_vector, &
-       trace
+       trace, subtitle
   use numerics_module, only: numerics
   use crystal_module, only: crystal
   use symmetry_module, only: symmetry
@@ -54,7 +54,7 @@ contains
 
   subroutine solve_bte(bt, num, crys, sym, ph, el)
     !! Subroutine to solve the BTE
-
+    
     class(bte), intent(out) :: bt
     type(numerics), intent(in) :: num
     type(crystal), intent(in) :: crys
@@ -75,8 +75,8 @@ contains
          ph_alphabyT_scalar, ph_alphabyT_scalar_old, el_alphabyT_scalar, el_alphabyT_scalar_old, &
          KO_dev, tot_alphabyT_scalar, lambda
 
-    call print_message("Solving the BTEs...")
-    
+    call subtitle("Calculating transport...")
+
     !Create output folder tagged by temperature and change into it
     write(tag, "(E9.3)") crys%T
     Tdir = trim(adjustl(num%cwd))//'/T'//trim(adjustl(tag))
@@ -85,134 +85,128 @@ contains
     end if
     sync all
 
-    if(this_image() == 1) then
-       write(*,*) "iter     k0_el[W/m/K]         sigmaS[A/m/K]         k_ph[W/m/K]", &
-            "         sigma[1/Ohm/m]         alpha_el/T[A/m/K]         alpha_ph/T[A/m/K]", &
-            "         KO dev.[%]"
+    !if(num%phbte) then
+    !Calculate RTA scattering rates
+    if(present(el)) then
+       call calculate_ph_rta_rates(rates_3ph, rates_phe, num, crys, ph, el)
+    else
+       call calculate_ph_rta_rates(rates_3ph, rates_phe, num, crys, ph)
     end if
-       
-    if(num%phbte) then
-       !Calculate RTA scattering rates
-       if(present(el)) then
-          call calculate_ph_rta_rates(rates_3ph, rates_phe, num, crys, ph, el)
-       else
-          call calculate_ph_rta_rates(rates_3ph, rates_phe, num, crys, ph)
-       end if
 
-       !Allocate total RTA scattering rates
-       allocate(bt%ph_rta_rates_ibz(ph%nq_irred, ph%numbranches))
+    !Allocate total RTA scattering rates
+    allocate(bt%ph_rta_rates_ibz(ph%nq_irred, ph%numbranches))
 
-       !Matthiessen's rule
-       bt%ph_rta_rates_ibz = rates_3ph + rates_phe
-       
-       !gradT field:
-       
-       ! Calculate field term (gradT=>F0)
-       call calculate_field_term('ph', 'T', ph%nequiv, ph%ibz2fbz_map, &
-            crys%T, 0.0_dp, ph%ens, ph%vels, bt%ph_rta_rates_ibz, bt%ph_field_term_T)
-       
-       ! Symmetrize field term
-       do iq = 1, ph%nq
-          bt%ph_field_term_T(iq,:,:)=transpose(&
-               matmul(ph%symmetrizers(:,:,iq),transpose(bt%ph_field_term_T(iq,:,:))))
-       end do
+    !Matthiessen's rule
+    bt%ph_rta_rates_ibz = rates_3ph + rates_phe
 
-       ! RTA solution of BTE
-       allocate(bt%ph_response_T(ph%nq, ph%numbranches, 3))
-       bt%ph_response_T = bt%ph_field_term_T
-       
-       ! Calculate transport coefficient
-       call calculate_transport_coeff('ph', 'T', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
-            crys%volume, ph%qmesh, bt%ph_response_T, sym, el%conc, ph_kappa, dummy)
-       !--!
-       
-       !E field:
-       ! Calculate field term (E=>G0)
-       call calculate_field_term('ph', 'E', ph%nequiv, ph%ibz2fbz_map, &
-            crys%T, 0.0_dp, ph%ens, ph%vels, bt%ph_rta_rates_ibz, bt%ph_field_term_E)
-       
-       ! RTA solution of BTE
-       allocate(bt%ph_response_E(ph%nq, ph%numbranches, 3))
-       bt%ph_response_E = bt%ph_field_term_E
-       
-       ! Calculate transport coefficient
-       call calculate_transport_coeff('ph', 'E', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
-            crys%volume, ph%qmesh, bt%ph_response_E, sym, el%conc, ph_alphabyT, dummy)
-       ph_alphabyT = ph_alphabyT/crys%T
-       !--!
-       
-       !Change to data output directory
-       call chdir(trim(adjustl(Tdir)))
+    !gradT field:
 
-       !Write RTA scattering rates to file
-       call write2file_rank2_real('ph.W_rta_3ph', rates_3ph)
-       call write2file_rank2_real('ph.W_rta_phe', rates_phe)
-       call write2file_rank2_real('ph.W_rta', bt%ph_rta_rates_ibz)
-    end if
+    ! Calculate field term (gradT=>F0)
+    call calculate_field_term('ph', 'T', ph%nequiv, ph%ibz2fbz_map, &
+         crys%T, 0.0_dp, ph%ens, ph%vels, bt%ph_rta_rates_ibz, bt%ph_field_term_T)
+
+    ! Symmetrize field term
+    do iq = 1, ph%nq
+       bt%ph_field_term_T(iq,:,:)=transpose(&
+            matmul(ph%symmetrizers(:,:,iq),transpose(bt%ph_field_term_T(iq,:,:))))
+    end do
+
+    ! RTA solution of BTE
+    allocate(bt%ph_response_T(ph%nq, ph%numbranches, 3))
+    bt%ph_response_T = bt%ph_field_term_T
+
+    ! Calculate transport coefficient
+    call calculate_transport_coeff('ph', 'T', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
+         crys%volume, ph%qmesh, bt%ph_response_T, sym, el%conc, ph_kappa, dummy)
+    !--!
+
+    !E field:
+    ! Calculate field term (E=>G0)
+    call calculate_field_term('ph', 'E', ph%nequiv, ph%ibz2fbz_map, &
+         crys%T, 0.0_dp, ph%ens, ph%vels, bt%ph_rta_rates_ibz, bt%ph_field_term_E)
+
+    ! RTA solution of BTE
+    allocate(bt%ph_response_E(ph%nq, ph%numbranches, 3))
+    bt%ph_response_E = bt%ph_field_term_E
+
+    ! Calculate transport coefficient
+    call calculate_transport_coeff('ph', 'E', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
+         crys%volume, ph%qmesh, bt%ph_response_E, sym, el%conc, ph_alphabyT, dummy)
+    ph_alphabyT = ph_alphabyT/crys%T
+    !--!
+
+    !Change to data output directory
+    call chdir(trim(adjustl(Tdir)))
+
+    !Write RTA scattering rates to file
+    call write2file_rank2_real('ph.W_rta_3ph', rates_3ph)
+    call write2file_rank2_real('ph.W_rta_phe', rates_phe)
+    call write2file_rank2_real('ph.W_rta', bt%ph_rta_rates_ibz)
+    !end if
 
     !Change back to cwd
     call chdir(trim(adjustl(num%cwd)))
 
-    if(num%ebte) then
-       !Calculate RTA scattering rates
-       call calculate_el_rta_rates(rates_eph, num, crys, el)
+    !if(num%ebte) then
+    !Calculate RTA scattering rates
+    call calculate_el_rta_rates(rates_eph, num, crys, el)
 
-       !Allocate total RTA scattering rates
-       allocate(bt%el_rta_rates_ibz(el%nk_irred, el%numbands))
-       bt%el_rta_rates_ibz = rates_eph ! + other channels
+    !Allocate total RTA scattering rates
+    allocate(bt%el_rta_rates_ibz(el%nk_irred, el%numbands))
+    bt%el_rta_rates_ibz = rates_eph ! + other channels
 
-       !gradT field:
-       ! Calculate field term (gradT=>I0)
-       call calculate_field_term('el', 'T', el%nequiv, el%ibz2fbz_map, &
-            crys%T, el%chempot, el%ens, el%vels, bt%el_rta_rates_ibz, &
-            bt%el_field_term_T, el%indexlist)
+    !gradT field:
+    ! Calculate field term (gradT=>I0)
+    call calculate_field_term('el', 'T', el%nequiv, el%ibz2fbz_map, &
+         crys%T, el%chempot, el%ens, el%vels, bt%el_rta_rates_ibz, &
+         bt%el_field_term_T, el%indexlist)
 
-       ! Symmetrize field term
-       do ik = 1, el%nk
-          bt%el_field_term_T(ik,:,:)=transpose(&
-               matmul(el%symmetrizers(:,:,ik),transpose(bt%el_field_term_T(ik,:,:))))
-       end do
+    ! Symmetrize field term
+    do ik = 1, el%nk
+       bt%el_field_term_T(ik,:,:)=transpose(&
+            matmul(el%symmetrizers(:,:,ik),transpose(bt%el_field_term_T(ik,:,:))))
+    end do
 
-       ! RTA solution of BTE
-       allocate(bt%el_response_T(el%nk, el%numbands, 3))
-       bt%el_response_T = bt%el_field_term_T
+    ! RTA solution of BTE
+    allocate(bt%el_response_T(el%nk, el%numbands, 3))
+    bt%el_response_T = bt%el_field_term_T
 
-       ! Calculate transport coefficient
-       call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, el%ens, &
-            el%vels, crys%volume, el%kmesh, bt%el_response_T, sym, el%conc, el_kappa0, el_sigmaS)
-       !--!
-       
-       !E field:
-       ! Calculate field term (E=>J0)
-       call calculate_field_term('el', 'E', el%nequiv, el%ibz2fbz_map, &
-            crys%T, el%chempot, el%ens, el%vels, bt%el_rta_rates_ibz, &
-            bt%el_field_term_E, el%indexlist)
+    ! Calculate transport coefficient
+    call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, el%ens, &
+         el%vels, crys%volume, el%kmesh, bt%el_response_T, sym, el%conc, el_kappa0, el_sigmaS)
+    !--!
 
-       ! Symmetrize field term
-       do ik = 1, el%nk
-          bt%el_field_term_E(ik,:,:)=transpose(&
-               matmul(el%symmetrizers(:,:,ik),transpose(bt%el_field_term_E(ik,:,:))))
-       end do
+    !E field:
+    ! Calculate field term (E=>J0)
+    call calculate_field_term('el', 'E', el%nequiv, el%ibz2fbz_map, &
+         crys%T, el%chempot, el%ens, el%vels, bt%el_rta_rates_ibz, &
+         bt%el_field_term_E, el%indexlist)
 
-       ! RTA solution of BTE
-       allocate(bt%el_response_E(el%nk, el%numbands, 3))
-       bt%el_response_E = bt%el_field_term_E
+    ! Symmetrize field term
+    do ik = 1, el%nk
+       bt%el_field_term_E(ik,:,:)=transpose(&
+            matmul(el%symmetrizers(:,:,ik),transpose(bt%el_field_term_E(ik,:,:))))
+    end do
 
-       ! Calculate transport coefficient
-       call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, el%ens, el%vels, &
-            crys%volume, el%kmesh, bt%el_response_E, sym, el%conc, el_alphabyT, el_sigma)
-       el_alphabyT = el_alphabyT/crys%T
-       !--!
-       
-       !Change to data output directory
-       call chdir(trim(adjustl(Tdir)))
+    ! RTA solution of BTE
+    allocate(bt%el_response_E(el%nk, el%numbands, 3))
+    bt%el_response_E = bt%el_field_term_E
 
-       !Write RTA scattering rates to file
-       call write2file_rank2_real('el.W_rta_eph', rates_eph)
+    ! Calculate transport coefficient
+    call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, el%ens, el%vels, &
+         crys%volume, el%kmesh, bt%el_response_E, sym, el%conc, el_alphabyT, el_sigma)
+    el_alphabyT = el_alphabyT/crys%T
+    !--!
 
-       !These will be needed later
-       allocate(I_ph(el%nk, el%numbands, 3), I_el(el%nk, el%numbands, 3))
-    end if
+    !Change to data output directory
+    call chdir(trim(adjustl(Tdir)))
+
+    !Write RTA scattering rates to file
+    call write2file_rank2_real('el.W_rta_eph', rates_eph)
+
+    !These will be needed later
+    allocate(I_ph(el%nk, el%numbands, 3), I_el(el%nk, el%numbands, 3))
+    !end if
 
     !Change back to cwd
     call chdir(trim(adjustl(num%cwd)))
@@ -231,14 +225,6 @@ contains
     KO_dev = 100.0_dp*abs(&
          (el_sigmaS_scalar - tot_alphabyT_scalar)/tot_alphabyT_scalar)
     if(KO_dev < 1.0e-6) KO_dev = 0.0_dp
-    
-    if(this_image() == 1) then
-       write(*,"(I3, A, 1E16.8, A, 1E16.8, A, 1E16.8, A, 1E16.8, &
-            A, 1E16.8, A, 1E16.8, A, 1E16.8)") 0, "     ", el_kappa0_scalar, &
-            "      ", el_sigmaS_scalar, "     ", ph_kappa_scalar, &
-            "    ", el_sigma_scalar, "        ", el_alphabyT_scalar, &
-            "         ", ph_alphabyT_scalar, "          ", KO_dev
-    end if
 
     el_kappa0_scalar_old = el_kappa0_scalar
     el_sigmaS_scalar_old = el_sigmaS_scalar
@@ -246,8 +232,25 @@ contains
     el_sigma_scalar_old = el_sigma_scalar 
     el_alphabyT_scalar_old = el_alphabyT_scalar
     ph_alphabyT_scalar_old = ph_alphabyT_scalar
+    
+    if(num%drag) then !Coupled BTEs
+       call print_message("Coupled electron-phonon transport:")
+       call print_message("----------------------------------")
 
-    if(num%drag) then !Coupled BTEs       
+       if(this_image() == 1) then
+          write(*,*) "iter     k0_el[W/m/K]         sigmaS[A/m/K]         k_ph[W/m/K]", &
+               "         sigma[1/Ohm/m]         alpha_el/T[A/m/K]         alpha_ph/T[A/m/K]", &
+               "         KO dev.[%]"
+       end if
+       !RTA
+       if(this_image() == 1) then
+          write(*,"(I3, A, 1E16.8, A, 1E16.8, A, 1E16.8, A, 1E16.8, &
+               A, 1E16.8, A, 1E16.8, A, 1E16.8)") 0, "     ", el_kappa0_scalar, &
+               "      ", el_sigmaS_scalar, "     ", ph_kappa_scalar, &
+               "    ", el_sigma_scalar, "        ", el_alphabyT_scalar, &
+               "         ", ph_alphabyT_scalar, "          ", KO_dev
+       end if
+
        !Start iterator
        do it_ph = 1, num%maxiter       
           !Scheme: for each step of phonon response, fully iterate the electron response.
@@ -319,7 +322,7 @@ contains
           !Calculate phonon transport scalar
           ph_kappa_scalar = trace(ph_kappa)/3.0_dp
           ph_alphabyT_scalar = trace(ph_alphabyT)/3.0_dp
-          
+
           !Check convergence
           if(converged(ph_kappa_scalar_old, ph_kappa_scalar, num%conv_thres) .and. &
                converged(ph_alphabyT_scalar_old, ph_alphabyT_scalar, num%conv_thres)) then
@@ -328,7 +331,7 @@ contains
              ph_kappa_scalar_old = ph_kappa_scalar
              ph_alphabyT_scalar_old = ph_alphabyT_scalar
           end if
-          
+
           tot_alphabyT_scalar = el_alphabyT_scalar + ph_alphabyT_scalar
           KO_dev = 100.0_dp*abs(&
                (el_sigmaS_scalar - tot_alphabyT_scalar)/tot_alphabyT_scalar)
@@ -342,13 +345,20 @@ contains
                   "         ", ph_alphabyT_scalar, "          ", KO_dev
           end if
        end do
-    else !Decoupled BTEs
-       call print_message("--------------------------------------------")
-       if(this_image() == 1) then
-          write(*,*) "iter    k_ph[W/m/K]         alpha_ph/T[A/m/K]"
-       end if
+    else
        if(num%phbte) then !Phonon BTE
-          !call print_message("Iterating the decoupled phonon BTE...")
+          call print_message("Decoupled phonon transport:")
+          call print_message("---------------------------")
+
+          if(this_image() == 1) then
+             write(*,*) "iter    k_ph[W/m/K]         alpha_ph/T[A/m/K]"
+          end if
+
+          if(this_image() == 1) then
+             write(*,"(I3, A, 1E16.8, A, 1E16.8)") 0, "    ", ph_kappa_scalar, &
+                  "    ", ph_alphabyT_scalar
+          end if
+
           do it_ph = 1, num%maxiter
              call iterate_bte_ph(crys%T, num%datadumpdir, .False., ph, el, bt%ph_rta_rates_ibz, &
                   bt%ph_field_term_T, bt%ph_response_T, bt%el_response_T)
@@ -361,7 +371,7 @@ contains
              call calculate_transport_coeff('ph', 'E', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
                   crys%volume, ph%qmesh, bt%ph_response_E, sym, el%conc, ph_alphabyT, dummy)
              ph_alphabyT = ph_alphabyT/crys%T
-             
+
              !Calculate and print phonon transport scalar
              ph_kappa_scalar = trace(ph_kappa)/3.0_dp
              ph_alphabyT_scalar = trace(ph_alphabyT)/3.0_dp             
@@ -372,7 +382,6 @@ contains
 
              if(converged(ph_kappa_scalar_old, ph_kappa_scalar, num%conv_thres) .and. &
                   converged(ph_alphabyT_scalar_old, ph_alphabyT_scalar, num%conv_thres)) then
-                call print_message("--------------------------------------------")
                 exit
              else
                 ph_kappa_scalar_old = ph_kappa_scalar
@@ -380,11 +389,20 @@ contains
              end if
           end do
        end if
-       
+
        if(num%ebte) then !Electron BTE
+          call print_message("Decoupled electron transport:")
+          call print_message("-----------------------------")
+
           if(this_image() == 1) then
              write(*,*) "iter    k0_el[W/m/K]        sigmaS[A/m/K]", &
                   "         sigma[1/Ohm/m]      alpha_el/T[A/m/K]"
+          end if
+
+          if(this_image() == 1) then
+             write(*,"(I3, A, 1E16.8, A, 1E16.8, A, 1E16.8, A, 1E16.8)") 0, &
+                  "    ", el_kappa0_scalar, "     ", el_sigmaS_scalar, &
+                  "     ", el_sigma_scalar, "     ", el_alphabyT_scalar
           end if
           do it_el = 1, num%maxiter
              !E field:
@@ -398,7 +416,7 @@ contains
              el_alphabyT = el_alphabyT/crys%T
 
              !delT field:
-             
+
              call iterate_bte_el(crys%T, num%datadumpdir, .False., el, ph, sym,&
                   bt%el_rta_rates_ibz, bt%el_field_term_T, bt%el_response_T, bt%ph_response_T)
              !Enforce Kelvin-Onsager relation
@@ -438,7 +456,7 @@ contains
           end do
        end if
     end if
-    
+
   contains
 
     subroutine correct_Iph(I_ph, constraint, lambda)
@@ -450,7 +468,7 @@ contains
       !Internal variables
       integer(k8) :: it, maxiter
       real(dp) :: a, b, aux(3,3), sigmaS(3,3), thresh, sigmaS_scalar
-      
+
       a = 0.0_dp !lower bound
       b = 2.0_dp !upper bound
       maxiter = 100
@@ -496,7 +514,7 @@ contains
     real(dp), intent(in) :: T, chempot, ens(:,:), vels(:,:,:), rta_rates_ibz(:,:)
     real(dp), allocatable, intent(out) :: field_term(:,:,:)
     integer(k8), intent(in), optional :: el_indexlist(:)
-    
+
     !Local variables
     integer(k8) :: ik_ibz, ik_fbz, ieq, ib, nk_ibz, nk, nbands, pow, &
          im, chunk, num_active_images
@@ -528,27 +546,27 @@ contains
 
     !Number of IBZ wave vectors
     nk_ibz = size(rta_rates_ibz(:,1))
-    
+
     !Number of FBZ wave vectors
     nk = size(ens(:,1))
 
     !Number of bands
     nbands = size(ens(1,:))
-    
+
     !Allocate and initialize field term
     allocate(field_term(nk, nbands, 3))
     field_term(:,:,:) = 0.0_dp
 
     !No field-coupling case
     trivial_case = species == 'ph' .and. field == 'E'
-    
+
     if(.not. trivial_case) then
        !Allocate start and end coarrays
        allocate(start[*], end[*])
 
        !Divide IBZ states among images
        call distribute_points(nk_ibz, chunk, start, end, num_active_images)
-       
+
        !Allocate and initialize field term coarrays
        allocate(field_term_reduce(nk, nbands, 3)[*])
        field_term_reduce(:,:,:) = 0.0_dp
