@@ -40,7 +40,7 @@ contains
        Index_i, Index_j, Index_k, ifc3, phases_q2q3, ntrip, nb)
     !! Function to calculate the 3-ph interaction vertex |V-|^2.
     
-    integer(k8), intent(in) :: Index_i(ntrip), Index_j(ntrip), Index_k(ntrip), ntrip, nb
+    integer(k8), intent(in) :: ntrip, Index_i(ntrip), Index_j(ntrip), Index_k(ntrip), nb
     complex(dp), intent(in) :: phases_q2q3(ntrip), ev1_s1(nb), conjg_ev2_s2(nb), conjg_ev3_s3(nb)
     real(dp), intent(in) :: ifc3(3, 3, 3, ntrip)
 
