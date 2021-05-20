@@ -54,7 +54,7 @@ contains
     integer(k8), intent(in) :: mesh(3)
 
     !Internal variables:
-    integer(k8) :: i, j, k, ii, jj, kk, ll, info, nq
+    integer(k8) :: i, j, k, ii, jj, kk, ll, info, nq, nlen
     integer(k8) :: P(3)
     integer(k8), allocatable :: rtmp(:,:,:), local_equiv_map(:,:)
     logical, allocatable :: valid(:)
@@ -83,8 +83,11 @@ contains
     sym%rotations(:,:,1:sym%nsymm) = sym%rotations_orig
 
     if(this_image() == 1) then
-       print*, "Crystal symmetry group = ", trim(sym%international)
-       print*, "Number of crystal symmetries (without time-reversal) = ", sym%nsymm
+       !This is a hacky fix to the problem of a trailing binary character
+       !printing that happens on some machines.
+       nlen = len(trim(sym%international)) - 1
+       write(*, "(A, A)") "Crystal symmetry group = ", sym%international(1:nlen)
+       write(*, "(A, I5)") "Number of crystal symmetries (without time-reversal) = ", sym%nsymm
     end if
 
     !Get symmertry operations in Cartesian basis.
@@ -136,7 +139,7 @@ contains
        end do
     end do
     if(this_image() == 1 .and. ll == 0) then
-       print*, "Number of duplicated rotations to be discarded = ", ll
+       write(*, "(A, I5)") "Number of duplicated rotations to be discarded = ", ll
     end if
 
     !Filter out those rotations through a series of move_alloc calls.
@@ -323,8 +326,8 @@ contains
     !Check for error
     if(nwavevecs /= counter) call exit_with_message("Severe error: Could not find irreducible wedge.")
 
-    if(this_image() == 1) write(*, *) "Number of FBZ wave vectors = ", counter
-    if(this_image() == 1) write(*, *) "Number IBZ wave vectors = ", nwavevecs_irred
+    if(this_image() == 1) write(*, "(A, I10)") " Number of FBZ wave vectors = ", counter
+    if(this_image() == 1) write(*, "(A, I10)") " Number IBZ wave vectors = ", nwavevecs_irred
 
     !Deallocate some internal data
     deallocate(runninglist)

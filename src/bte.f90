@@ -81,7 +81,7 @@ contains
     write(tag, "(E9.3)") crys%T
     Tdir = trim(adjustl(num%cwd))//'/T'//trim(adjustl(tag))
     if(this_image() == 1) then
-       call system('mkdir '//trim(adjustl(Tdir)))
+       call system('mkdir -p '//trim(adjustl(Tdir)))
     end if
     sync all
 

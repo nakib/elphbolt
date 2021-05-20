@@ -21,7 +21,7 @@
 
 ! Thin, specialized wrapper around spglib, a library by Atsushi Togo.
 
-! Small change in data type declaration
+! Small change in data type declaration -- Nakib H. Protik
 
 module spglib_wrapper
   !! Wrapper for spglib from ShengBTE.
@@ -135,14 +135,14 @@ contains
     integer(kind=C_INT),dimension(3,3,nops) :: crotations
     real(kind=C_DOUBLE),dimension(3,nops) :: ctranslations
     character(len=11,kind=C_CHAR) :: intertmp
-
+    
     clattice=transpose(lattice)
     cnatoms=natoms
     ctypes=types
     cpositions=positions
     cnops=nops
-    intertmp = '          ' !Empty spaces
-    
+    intertmp = '           ' !Empty spaces
+        
     ! If nops changes value, something went wrong. Checking
     ! this condition is up to the user.
     newnops = spg_get_symmetry(crotations,ctranslations,cnops,&

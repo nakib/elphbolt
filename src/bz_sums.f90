@@ -76,8 +76,8 @@ contains
     end if
 
     if(this_image() == 1) then
-       print*, 'Carrier concentration =', signconc*aux, ' cm^-3'
-       print*, 'Chemical potential = ', el%chempot, ' eV'
+       write(*, "(A, 1E16.8, A)") ' Calculated carrier concentration = ', signconc*aux, ' cm^-3'
+       write(*, "(A, 1E16.8, A)") ' Corresponding chemical potential = ', el%chempot, ' eV'
     end if
   end subroutine calculate_chempot
   

@@ -196,6 +196,14 @@ contains
     el%kmesh = el%mesh_ref*num%qmesh
     el%fsthick = num%fsthick
 
+    !Print out information.
+    if(this_image() == 1) then
+       write(*, "(A, I1)") "Spin degeneracy = ", el%spindeg
+       write(*, "(A, I5)") "Number of electronic bands = ", el%numbands
+       write(*, "(A, 1E16.8)") "Reference electron energy = ", el%enref
+       write(*, "(A, 1E16.8)") "Specified carrier concentration = ", el%conc
+    end if
+    
     !Calculate electrons
     call calculate_electrons(el, wann, crys, sym, num)
   end subroutine read_input_and_setup
@@ -220,6 +228,9 @@ contains
     !I/O related
     character(len = 1024) :: filename, numcols
 
+    call print_message("Energy unrestricted calculation:")
+    call print_message("--------------------------------")
+    
     !Set initial FBZ total number of wave vectors
     el%nk = product(el%kmesh)
     
@@ -265,6 +276,9 @@ contains
           end do
        end do
     end do
+    
+    call print_message("Transport energy window restricted calculation:")
+    call print_message("-----------------------------------------------")
     
     ! 5. Find energy window restricted FBZ blocks.
     !    After this step, el%nk, el%indexlist will refer
@@ -345,7 +359,8 @@ contains
                el%nstates_inwindow = el%nstates_inwindow + 1
        end do
     end do
-    if(this_image() == 1) write(*, *) "Number of energy restricted FBZ blocks states = ", el%nstates_inwindow
+    if(this_image() == 1) write(*, "(A, I10)") &
+         " Number of energy restricted FBZ blocks states = ", el%nstates_inwindow
 
     ! 11. Create FBZ blocks to IBZ blocks map
     call print_message("Calculating FBZ -> IBZ mappings...")
@@ -380,7 +395,7 @@ contains
           el%nstates_irred_inwindow = el%nstates_irred_inwindow + 1
        end if
     end do
-    if(this_image() == 1) write(*, *) "Number of energy restricted IBZ blocks states = ", &
+    if(this_image() == 1) write(*, "(A, I10)") " Number of energy restricted IBZ blocks states = ", &
          el%nstates_irred_inwindow
     
     !Calculate list of IBZ in-window states = (wave vector index, band index)

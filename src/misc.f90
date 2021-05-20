@@ -20,7 +20,7 @@ contains
     character(len = *), intent(in) :: message
 
     if(this_image() == 1) then
-       print*, trim(message)
+       write(*, "(A)") trim(message)
        stop
     end if
   end subroutine exit_with_message
@@ -30,7 +30,7 @@ contains
     
     character(len = *), intent(in) :: message
 
-    if(this_image() == 1) print*, trim(message)
+    if(this_image() == 1) write(*, "(A)") trim(message)
   end subroutine print_message
 
   subroutine write2file_rank2_real(filename, data)
@@ -470,10 +470,10 @@ contains
        write(*,'(A75)') "|   \   \                                                                 |"
        write(*,'(A75)') "|    \   \                                                                |"
        write(*,'(A75)') "|   __\   \              _        _    _           _    _                 |"
-       write(*,'(A75)') "|   \      \         ___|.|      |.|  |.|__   ___ |.|_ / /__              |"
-       write(*,'(A75)') "|    \    __\       / _ \.|   _  |.|_ |.'_ \ / _ \|.|_  ___/              |"
-       write(*,'(A75)') "|     \  \         |  __/.| |/ \_|/  \|.|_) : (_) |.|/ /__                |"
-       write(*,'(A75)') "|      \ \          \___|_|/|__/ |   /|.___/ \___/|_|\___/                |"
+       write(*,'(A75)') "|   \      \         ___|.|      |.|  | |__   ___ |.|_ / /__              |"
+       write(*,'(A75)') "|    \    __\       / _ \.|   _  |.|_ | '_ \ / _ \|.|_  ___/              |"
+       write(*,'(A75)') "|     \  \         |  __/.| |/ \_|/  \| |_) : (_) |.|/ /__                |"
+       write(*,'(A75)') "|      \ \          \___|_|/|__/ |   /| ___/ \___/|_|\___/                |"
        write(*,'(A75)') "|       \ \                /|                                             |"
        write(*,'(A75)') "|        \\                \|                                             |"
        write(*,'(A75)') "|         \\                '                                             |"

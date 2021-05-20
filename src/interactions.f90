@@ -92,7 +92,7 @@ contains
     Wdir = trim(adjustl(num%datadumpdir))//'W_T'//trim(adjustl(tag))
     if(this_image() == 1 .and. key == 'W') then
        !Create directory
-       call system('mkdir '//trim(adjustl(Wdir)))
+       call system('mkdir -p '//trim(adjustl(Wdir)))
     end if
     sync all
    
@@ -117,8 +117,8 @@ contains
     call distribute_points(nstates_irred, chunk, start, end, num_active_images)
 
     if(this_image() == 1) then
-       print*, "   #states = ", nstates_irred
-       print*, "   #states/image = ", chunk
+       write(*, "(A, I10)") " #states = ", nstates_irred
+       write(*, "(A, I10)") " #states/image = ", chunk
     end if
 
     !Run over first phonon IBZ states
@@ -370,8 +370,8 @@ contains
     call distribute_points(el%nk_irred, chunk, ikstart, ikend, num_active_images)
 
     if(this_image() == 1) then
-       print*, "   #k = ", el%nk_irred
-       print*, "   #k/image = ", chunk
+       write(*, "(A, I10)") " #k = ", el%nk_irred
+       write(*, "(A, I10)") " #k/image = ", chunk
     end if
 
     do ik = ikstart, ikend
@@ -429,7 +429,7 @@ contains
     Ydir = trim(adjustl(num%datadumpdir))//'Y_T'//trim(adjustl(tag))
     if(this_image() == 1 .and. key == 'Y') then
        !Create directory
-       call system('mkdir '//trim(adjustl(Ydir)))
+       call system('mkdir -p '//trim(adjustl(Ydir)))
     end if
     sync all
     
@@ -450,8 +450,8 @@ contains
     call distribute_points(nstates_irred, chunk, start, end, num_active_images)
     
     if(this_image() == 1) then
-       print*, "   #states = ", nstates_irred
-       print*, "   #states/image = ", chunk
+       write(*, "(A, I10)") " #states = ", nstates_irred
+       write(*, "(A, I10)") " #states/image = ", chunk
     end if
 
     do istate = start, end !over IBZ blocks states
@@ -693,7 +693,7 @@ contains
     Xdir = trim(adjustl(num%datadumpdir))//'X_T'//trim(adjustl(tag))
     if(this_image() == 1 .and. key == 'X') then
        !Create directory
-       call system('mkdir '//trim(adjustl(Xdir)))
+       call system('mkdir -p '//trim(adjustl(Xdir)))
     end if
     sync all
     
@@ -714,8 +714,8 @@ contains
     call distribute_points(nstates_irred, chunk, start, end, num_active_images)
     
     if(this_image() == 1) then
-       print*, "   #states = ", nstates_irred
-       print*, "   #states/image = ", chunk
+       write(*, "(A, I10)") " #states = ", nstates_irred
+       write(*, "(A, I10)") " #states/image = ", chunk
     end if
 
     do istate = start, end !over IBZ blocks states

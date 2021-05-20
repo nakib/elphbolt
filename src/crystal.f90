@@ -131,28 +131,35 @@ contains
 
     !Print out crystal and reciprocal lattice information.
     if(this_image() == 1) then
-       print*, 'Material: ', c%name
-       print*, 'Lattice vectors [nm]:'
-       print*, c%lattvecs(:,1)
-       print*, c%lattvecs(:,2)
-       print*, c%lattvecs(:,3)
-       print*, 'Primitive cell volume =', c%volume, 'nm^3'
+       write(*, "(A, A)") 'Material: ', c%name
+       write(*,"(A)") 'Lattice vectors [nm]:'
+       write(*,"(3(1E16.8,x))") c%lattvecs(:,1)
+       write(*,"(3(1E16.8,x))") c%lattvecs(:,2)
+       write(*,"(3(1E16.8,x))") c%lattvecs(:,3)
+       write(*,"(A,(1E16.8,x),A)") 'Primitive cell volume =', c%volume, 'nm^3'
 
-       print*, 'Reciprocal lattice vectors [1/nm]:'
-       print*, c%reclattvecs(:,1)
-       print*, c%reclattvecs(:,2)
-       print*, c%reclattvecs(:,3)
-       print*, 'Brillouin zone volume =', c%volume_bz, '1/nm^3'
+       write(*,"(A)") 'Reciprocal lattice vectors [1/nm]:'
+       write(*,"(3(1E16.8,x))") c%reclattvecs(:,1)
+       write(*,"(3(1E16.8,x))") c%reclattvecs(:,2)
+       write(*,"(3(1E16.8,x))") c%reclattvecs(:,3)
+       write(*,"(A,(1E16.8,x),A)") 'Brillouin zone volume =', c%volume_bz, '1/nm^3'
 
        if(c%polar) then
-          print*, 'System is polar.'
-          print*, 'Dielectric tensor:'
-          print*, c%epsilon(:,1)
-          print*, c%epsilon(:,2)
-          print*, c%epsilon(:,3)
+          write(*,"(A)") 'System is polar.'
+          write(*,"(A)") 'Dielectric tensor:'
+          do i = 1, 3
+             write(*,"(3(1E16.8,x))") c%epsilon(:,i)
+          end do
+          write(*,"(A)") 'Born effective charges:'
+          do i = 1, c%numatoms
+             write(*,"(A, I3)") "  Atom ", i
+             do j = 1, 3
+                write(*,"(3(1E16.8,x))") c%born(:,j,i)
+             end do
+          end do
        end if
        
-       print*, 'Crystal temperature =', c%T, 'K'
+       write(*,"(A, F7.2, A)") 'Crystal temperature = ', c%T, ' K'
     end if
   end subroutine read_input_and_setup_crystal
 

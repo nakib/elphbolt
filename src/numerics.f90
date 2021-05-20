@@ -96,6 +96,9 @@ contains
     if(any(qmesh <= 0) .or. mesh_ref < 1 .or. fsthick < 0 .or. .not.(phbte .or. ebte)) then
        call exit_with_message('Bad input(s) in numerics.')
     end if
+    if(.not. tetrahedra) then
+       call exit_with_message('At present only the tetrahedra method is supported.')
+    end if
     n%qmesh = qmesh
     n%mesh_ref = mesh_ref
     n%fsthick = fsthick
@@ -112,13 +115,13 @@ contains
     n%drag = drag
     
     !Create data dump directory
-    if(this_image() == 1) call system('mkdir ' // trim(adjustl(n%datadumpdir)))
+    if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(n%datadumpdir)))
 
     !Create matrix elements data directories
     n%g2dir = trim(adjustl(n%datadumpdir))//'g2'
-    if(this_image() == 1) call system('mkdir ' // trim(adjustl(n%g2dir)))
+    if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(n%g2dir)))
     n%Vdir = trim(adjustl(n%datadumpdir))//'V'
-    if(this_image() == 1) call system('mkdir ' // trim(adjustl(n%Vdir)))
+    if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(n%Vdir)))
     
     !Close input file
     close(1)
@@ -126,5 +129,26 @@ contains
     !Set current work directory.
     call getcwd(n%cwd)
     n%cwd = trim(n%cwd)
+
+    !Print out information.
+    if(this_image() == 1) then
+       write(*, "(A, (3I5,x))") "q-mesh = ", n%qmesh
+       write(*, "(A, (3I5,x))") "k-mesh = ", n%mesh_ref*n%qmesh
+       write(*, "(A, 1E16.8, A)") "Fermi window thickness = ", n%fsthick, " eV"
+       write(*, "(A, A)") "Working directory = ", trim(n%cwd)
+       write(*, "(A, A)") "Data dump directory = ", trim(n%datadumpdir)
+       write(*, "(A, A)") "e-ph directory = ", trim(n%g2dir)
+       write(*, "(A, A)") "ph-ph directory = ", trim(n%Vdir)
+       write(*, "(A, L)") "Reuse e-ph matrix elements: ", n%read_gk2
+       write(*, "(A, L)") "Reuse ph-e matrix elements: ", n%read_gq2
+       write(*, "(A, L)") "Reuse ph-ph matrix elements: ", n%read_V
+       write(*, "(A, L)") "Use tetrahedron method: ", n%tetrahedra
+       write(*, "(A, L)") "Include ph-e interaction: ", n%phe
+       write(*, "(A, L)") "Calculate phonon BTE: ", n%phbte
+       write(*, "(A, L)") "Calculate electron BTE: ", n%ebte
+       write(*, "(A, L)") "Include drag: ", n%drag
+       write(*, "(A, I5)") "Maximum number of BTE iterations = ", n%maxiter
+       write(*, "(A, 1E16.8)") "BTE convergence threshold = ", n%conv_thres
+    end if
   end subroutine read_input_and_setup
 end module numerics_module
