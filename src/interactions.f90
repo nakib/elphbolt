@@ -1,3 +1,19 @@
+! Copyright (C) 2020- Nakib Haider Protik <nakib.haider.protik@gmail.com>
+! This file is part of elphbolt <https://github.com/nakib/elphbolt>.
+!
+! elphbolt is free software: you can redistribute it and/or modify
+! it under the terms of the GNU General Public License as published by
+! the Free Software Foundation, either version 3 of the License, or
+! (at your option) any later version.
+!
+! elphbolt is distributed in the hope that it will be useful,
+! but WITHOUT ANY WARRANTY; without even the implied warranty of
+! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+! GNU General Public License for more details.
+!
+! You should have received a copy of the GNU General Public License
+! along with elphbolt. If not, see <http://www.gnu.org/licenses/>.
+
 module interactions
   !! Module containing the procedures related to the computation of interactions.
 
