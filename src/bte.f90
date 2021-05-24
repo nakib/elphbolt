@@ -39,6 +39,8 @@ module bte_module
   type bte
      !! Data and procedures related to the BTE.
 
+     real(dp), allocatable :: ph_rta_rates_iso_ibz(:,:)
+     !! Phonon RTA scattering rates on the IBZ due to isotope scattering.
      real(dp), allocatable :: ph_rta_rates_ibz(:,:)
      !! Phonon RTA scattering rates on the IBZ.
      real(dp), allocatable :: ph_field_term_T(:,:,:)
@@ -71,7 +73,7 @@ contains
   subroutine solve_bte(bt, num, crys, sym, ph, el)
     !! Subroutine to solve the BTE
     
-    class(bte), intent(out) :: bt
+    class(bte), intent(inout) :: bt
     type(numerics), intent(in) :: num
     type(crystal), intent(in) :: crys
     type(symmetry), intent(in) :: sym
@@ -101,7 +103,6 @@ contains
     end if
     sync all
 
-    !if(num%phbte) then
     !Calculate RTA scattering rates
     if(present(el)) then
        call calculate_ph_rta_rates(rates_3ph, rates_phe, num, crys, ph, el)
@@ -111,9 +112,11 @@ contains
 
     !Allocate total RTA scattering rates
     allocate(bt%ph_rta_rates_ibz(ph%nq_irred, ph%numbranches))
-
+    
     !Matthiessen's rule
     bt%ph_rta_rates_ibz = rates_3ph + rates_phe
+    if(num%phiso) bt%ph_rta_rates_ibz(:,:) = &
+         bt%ph_rta_rates_ibz(:,:) + bt%ph_rta_rates_iso_ibz(:,:)  
 
     !gradT field:
 

@@ -56,6 +56,8 @@ module numerics_module
      !! Choose if the tetrahedron method for delta function evaluation will be used.
      logical :: phe
      !! Choose if ph-e interaction will be included.
+     logical :: phiso
+     !! Use phonon-isotope scattering?
      logical :: phbte
      !! Choose if phonon BTE will be solved.
      logical :: ebte
@@ -83,10 +85,10 @@ contains
     integer(k8) :: mesh_ref, qmesh(3), maxiter
     real(dp) :: fsthick, conv_thres
     character(len = 1024) :: datadumpdir
-    logical :: read_gq2, read_gk2, read_V, tetrahedra, phe, phbte, ebte, drag
+    logical :: read_gq2, read_gk2, read_V, tetrahedra, phe, phiso, phbte, ebte, drag
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
-         read_V, tetrahedra, phe, phbte, ebte, maxiter, conv_thres, drag
+         read_V, tetrahedra, phe, phiso, phbte, ebte, maxiter, conv_thres, drag
 
     call subtitle("Reading numerics information...")
     
@@ -103,6 +105,7 @@ contains
     read_V = .false.
     tetrahedra = .false.
     phe = .true.
+    phiso = .true.
     phbte = .true.
     ebte = .true.
     drag = .true.
@@ -124,6 +127,7 @@ contains
     n%read_V = read_V
     n%tetrahedra = tetrahedra
     n%phe = phe
+    n%phiso = phiso
     n%phbte = phbte
     n%ebte = ebte
     n%maxiter = maxiter

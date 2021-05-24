@@ -17,7 +17,7 @@
 module bz_sums
   !! Module containing the procedures to do Brillouin zone sums.
 
-  use params, only: dp, k8, kB, qe
+  use params, only: dp, k8, kB, qe, pi, hbar_eVps
   use misc, only: exit_with_message, print_message, write2file_rank2_real, &
        distribute_points, Bose, Fermi
   use phonon_module, only: phonon
@@ -173,25 +173,32 @@ contains
     sync all
   end subroutine calculate_el_dos
 
-  subroutine calculate_ph_dos_iso(ph, usetetra)
+  subroutine calculate_ph_dos_iso(ph, usetetra, gfactors, atomtypes, W_phiso, phiso)
     !! Calculate the phonon density of states (DOS) in units of 1/energy and,
     !! optionally, the phonon-isotope scattering rates.
     !!
-    !! The DOS and isotopr scattering rates will be evaluates on the IBZ mesh energies.
+    !! The DOS and isotope scattering rates will be evaluates on the IBZ mesh energies.
     !!
     !! ph Phonon data type
     !! usetetra Use the tetrahedron method for delta functions?
 
     type(phonon), intent(inout) :: ph
-    logical, intent(in) :: usetetra
+    logical, intent(in) :: usetetra, phiso
+    real(dp), intent(in) :: gfactors(:)
+    integer(k8), intent(in) :: atomtypes(:)
+    real(dp), intent(out), allocatable :: W_phiso(:,:)
     
     !Local variables
-    integer(k8) :: iq, ib, iqp, ibp, im, chunk, counter, num_active_images
+    integer(k8) :: iq, ib, iqp, ibp, im, chunk, counter, num_active_images, &
+         pol, a, numatoms
     integer(k8), allocatable :: start[:], end[:]
-    real(dp) :: e, delta
-    real(dp), allocatable :: dos_chunk(:,:)[:]
+    real(dp) :: e, delta, aux
+    real(dp), allocatable :: dos_chunk(:,:)[:], W_phiso_chunk(:,:)[:]
+    
+    call print_message("Calculating phonon density of states and isotope scattering...")
 
-    call print_message("Calculating phonon density of states...")
+    !Number of basis atoms
+    numatoms = size(atomtypes)
     
     !Allocate start and end coarrays
     allocate(start[*], end[*])
@@ -201,13 +208,17 @@ contains
     
     !Allocate small work variable chunk for each image
     allocate(dos_chunk(chunk, ph%numbranches)[*])
+    if(phiso) allocate(W_phiso_chunk(chunk, ph%numbranches)[*])
     
-    !Allocate dos
+    !Allocate dos and W_phiso
     allocate(ph%dos(ph%nq_irred, ph%numbranches))
+    allocate(W_phiso(ph%nq_irred, ph%numbranches))
 
-    !Initialize dos arrays
+    !Initialize arrays and coarrays
     ph%dos(:,:) = 0.0_dp
     dos_chunk(:,:) = 0.0_dp
+    W_phiso(:,:) = 0.0_dp
+    if(phiso) W_phiso_chunk(:,:) = 0.0_dp
 
     counter = 0
     do iq = start, end !Run over IBZ wave vectors
@@ -230,22 +241,36 @@ contains
                    !
                    !TODO need to implement Gaussian broadening
                    !
+
+                   if(phiso) then
+                      !Calculate phonon-isotope scattering in the Tamura model
+                      do a = 1, numatoms
+                         pol = (a - 1)*3
+                         aux = (abs(dot_product(&
+                              ph%evecs(ph%indexlist_irred(iq), ib, pol + 1 : pol + 3), &
+                              ph%evecs(iqp, ibp, pol + 1 : pol + 3))))**2
+                         W_phiso_chunk(counter, ib) = W_phiso_chunk(counter, ib) + &
+                              delta*aux*gfactors(atomtypes(a))*e**2
+                      end do
+                   end if
                 end if
              end do
           end do
        end do
     end do
-
+    if(phiso) W_phiso_chunk = W_phiso_chunk*0.5_dp*pi/hbar_eVps !THz
     sync all
     
-    !Collect dos_chunks into dos
+    !Collect chunks into full array
     do im = 1, num_active_images
        ph%dos(start[im]:end[im], :) = dos_chunk(:,:)[im]
+       if(phiso) W_phiso(start[im]:end[im], :) = W_phiso_chunk(:,:)[im]
     end do
     sync all
 
-    !Write dos to file
+    !Write to file
     call write2file_rank2_real(ph%prefix // '.dos', ph%dos)
+    call write2file_rank2_real(ph%prefix // '.W_rta_phiso', W_phiso)
 
     sync all
   end subroutine calculate_ph_dos_iso

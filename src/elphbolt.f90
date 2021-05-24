@@ -79,7 +79,8 @@ program elphbolt
   call ph%initialize(wann, crys, sym, num)
 
   !Calculate phonon density of states
-  call calculate_dos(ph, num%tetrahedra)
+  call calculate_dos(ph, num%tetrahedra, crys%gfactors, &
+       crys%atomtypes, bt%ph_rta_rates_iso_ibz, num%phiso)
 
   call subtitle("Calculating interactions...")
   
