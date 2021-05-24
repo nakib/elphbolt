@@ -79,7 +79,7 @@ contains
     type(electron), intent(in), optional :: el
 
     !Local variables
-    character(len = 1024) :: tag, Tdir
+    character(len = 1024) :: tag, Tdir, tableheader
     integer(k8) :: iq, ik, it_ph, it_el, icart
     real(dp), allocatable :: rates_3ph(:,:), rates_phe(:,:), rates_eph(:,:), &
          I_el(:,:,:), I_ph(:,:,:)
@@ -254,9 +254,10 @@ contains
        call print_message("----------------------------------")
 
        if(this_image() == 1) then
-          write(*,*) "iter     k0_el[W/m/K]         sigmaS[A/m/K]         k_ph[W/m/K]", &
-               "         sigma[1/Ohm/m]         alpha_el/T[A/m/K]         alpha_ph/T[A/m/K]", &
-               "         KO dev.[%]"
+          tableheader = "iter     k0_el[W/m/K]         sigmaS[A/m/K]         k_ph[W/m/K]"&
+          //"         sigma[1/Ohm/m]         alpha_el/T[A/m/K]         alpha_ph/T[A/m/K]"&
+          //"         KO dev.[%]"
+          write(*,*) trim(tableheader)
        end if
        !RTA
        if(this_image() == 1) then

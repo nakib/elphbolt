@@ -518,7 +518,7 @@ contains
           read(1) nprocs
           if(allocated(g2_istate)) deallocate(g2_istate, Y_istate, istate1, istate2)
           allocate(g2_istate(nprocs))
-          read(1) g2_istate
+          if(nprocs > 0) read(1) g2_istate
           close(1)
 
           !Change back to working directory
@@ -777,7 +777,7 @@ contains
           if(allocated(g2_istate)) deallocate(g2_istate, Xplus_istate, Xminus_istate, &
                istate_el, istate_ph)
           allocate(g2_istate(nprocs))
-          read(1) g2_istate
+          if(nprocs > 0) read(1) g2_istate
           close(1)
 
           !Change back to working directory
@@ -1186,11 +1186,13 @@ contains
     open(1, file = trim(adjustl(filepath)), status = 'old', access = 'stream')
     read(1) N
     allocate(TP(N))
-    read(1) TP
+    if(N > 0) read(1) TP
     if(present(istate1) .and. present(istate2)) then
        allocate(istate1(N), istate2(N))
-       read(1) istate1
-       read(1) istate2
+       if(N > 0) then
+          read(1) istate1
+          read(1) istate2
+       end if
     end if
     close(1)
   end subroutine read_transition_probs_eph
