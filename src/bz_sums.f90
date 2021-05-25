@@ -109,10 +109,12 @@ contains
     real(dp) :: beta, fFD
     integer(k8) :: ib, ik
 
-    beta = 1.0_dp/kB/crys%T
+    beta = 1.0_dp/kB/crys%T/qe !1/J
     crys%qTF=0.d0
 
     if(crys%polar) then
+       call print_message("Calculating Thomas-Fermi screening...")
+       
        do ib = 1, el%numbands
           do ik = 1, el%nk
              fFD = Fermi(el%ens(ik, ib), el%chempot, crys%T)

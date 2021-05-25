@@ -497,13 +497,15 @@ contains
        write(*,'(A75)') "|           \                                                             |"
        write(*,'(A75)') "| A solver for the coupled electron-phonon Boltzmann transport equations. |"
        write(*,'(A75)') "| Copyright (C) 2020- Nakib Haider Protik.                                |"
-       write(*,'(A75)') "| This is a 'free as in freedom' software, distributed under the GPLv3.   |"
+       write(*,'(A75)') "|                                                                         |"
+       write(*,'(A75)') "| This is a 'free as in freedom'[*] software, distributed under the GPLv3.|"
+       write(*,'(A75)') "| [*] https://www.gnu.org/philosophy/free-sw.en.html                      |"
        write(*,'(A75)') "+-------------------------------------------------------------------------+" 
        print*, ' '
-       print*, 'Number of compute processes = ', num_images()
+       write(*, "(A, I1)") 'Number of coarray images = ', num_images()
     end if
   end subroutine welcome
-
+  
   subroutine subtitle(text)
     !! Subroutine to print a subtitle.
 

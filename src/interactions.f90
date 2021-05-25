@@ -39,7 +39,7 @@ contains
   pure real(dp) function gchimp2(el, crys, q)
     !! Function to calculate the squared electron-charged impurity vertex.
     !!
-    !! This is the Fourier transform of the Yukawa potential, c.f. eq. 33
+    !! This is the Fourier transform of the Yukawa potential, c.f. Eq. 33
     !! of RevModPhys.53.745 (1981).
 
     type(crystal), intent(in) :: crys

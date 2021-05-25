@@ -62,6 +62,8 @@ module numerics_module
      !! Choose if phonon BTE will be solved.
      logical :: ebte
      !! Choose if electron BTE will be solved.
+     logical :: elchimp
+     !! Use electron-charged impurity scattering?
      logical :: drag
      !! Choose if the drag effect will be included.
      integer(k8) :: maxiter
@@ -85,10 +87,11 @@ contains
     integer(k8) :: mesh_ref, qmesh(3), maxiter
     real(dp) :: fsthick, conv_thres
     character(len = 1024) :: datadumpdir
-    logical :: read_gq2, read_gk2, read_V, tetrahedra, phe, phiso, phbte, ebte, drag
+    logical :: read_gq2, read_gk2, read_V, tetrahedra, phe, phiso, phbte, &
+         ebte, elchimp, drag
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
-         read_V, tetrahedra, phe, phiso, phbte, ebte, maxiter, conv_thres, drag
+         read_V, tetrahedra, phe, phiso, phbte, ebte, maxiter, conv_thres, drag, elchimp
 
     call subtitle("Reading numerics information...")
     
@@ -108,6 +111,7 @@ contains
     phiso = .true.
     phbte = .true.
     ebte = .true.
+    elchimp = .false.
     drag = .true.
     maxiter = 50
     conv_thres = 0.0001_dp
@@ -130,6 +134,7 @@ contains
     n%phiso = phiso
     n%phbte = phbte
     n%ebte = ebte
+    n%elchimp = elchimp
     n%maxiter = maxiter
     n%conv_thres = conv_thres
     n%drag = drag
@@ -165,6 +170,7 @@ contains
        write(*, "(A, L)") "Use tetrahedron method: ", n%tetrahedra
        write(*, "(A, L)") "Include ph-e interaction: ", n%phe
        write(*, "(A, L)") "Include ph-isotope interaction: ", n%phiso
+       write(*, "(A, L)") "Include electron-charged impurity interaction: ", n%elchimp
        write(*, "(A, L)") "Calculate phonon BTE: ", n%phbte
        write(*, "(A, L)") "Calculate electron BTE: ", n%ebte
        write(*, "(A, L)") "Include drag: ", n%drag
