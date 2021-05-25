@@ -1076,16 +1076,13 @@ contains
        end if
     end do
 
-    sync all
-
     !Reduce coarray partial sums
-    do im = 1, num_active_images
-       rta_rates_3ph(:,:) = rta_rates_3ph(:,:) + rta_rates_3ph_psum(:,:)[im]
-       if(present(el)) then
-          rta_rates_phe(:,:) = rta_rates_phe(:,:) + rta_rates_phe_psum(:,:)[im]
-       end if
-    end do
-    sync all
+    call co_sum(rta_rates_3ph_psum)
+    rta_rates_3ph = rta_rates_3ph_psum
+    if(present(el)) then
+       call co_sum(rta_rates_phe_psum)
+       rta_rates_phe = rta_rates_phe_psum
+    end if
   end subroutine calculate_ph_rta_rates
 
   subroutine calculate_el_rta_rates(rta_rates_eph, num, crys, el)
@@ -1158,13 +1155,9 @@ contains
        end do
     end do
 
-    sync all
-
     !Reduce coarray partial sums
-    do im = 1, num_active_images
-       rta_rates_eph(:,:) = rta_rates_eph(:,:) + rta_rates_eph_psum(:,:)[im]
-    end do
-    sync all
+    call co_sum(rta_rates_eph_psum)
+    rta_rates_eph = rta_rates_eph_psum
   end subroutine calculate_el_rta_rates
   
   subroutine read_transition_probs_3ph(filepath, T, istate2, istate3)

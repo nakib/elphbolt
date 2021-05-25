@@ -609,18 +609,14 @@ contains
           end do
        end do
        
-       sync all
-
        !Reduce field term coarrays
-       do im = 1, num_active_images
-          !Units:
-          ! nm.eV/K for phonons, gradT-field
-          ! nm.eV/K for electrons, gradT-field
-          ! nm.C for electrons, E-field
-          field_term(:,:,:) = field_term(:,:,:) + field_term_reduce(:,:,:)[im]
-       end do
+       !Units:
+       ! nm.eV/K for phonons, gradT-field
+       ! nm.eV/K for electrons, gradT-field
+       ! nm.C for electrons, E-field
+       call co_sum(field_term_reduce)
+       field_term = field_term_reduce
     end if
-    sync all
   end subroutine calculate_field_term
 
   subroutine iterate_bte_ph(T, datadumpdir, drag, ph, el, rta_rates_ibz, &
@@ -779,14 +775,9 @@ contains
        end do
     end do
 
-    sync all
-
     !Update the response function
-    response_ph(:,:,:) = 0.0_dp
-    do im = 1, num_active_images
-       response_ph(:,:,:) = response_ph(:,:,:) + response_ph_reduce(:,:,:)[im]
-    end do
-    sync all
+    call co_sum(response_ph_reduce)
+    response_ph = response_ph_reduce
 
     !Symmetrize response function
     do iq1_fbz = 1, nq
@@ -940,14 +931,9 @@ contains
        end do
     end do
 
-    sync all
-
     !Update the response function
-    response_el(:,:,:) = 0.0_dp
-    do im = 1, num_active_images
-       response_el(:,:,:) = response_el(:,:,:) + response_el_reduce(:,:,:)[im]
-    end do
-    sync all
+    call co_sum(response_el_reduce)
+    response_el = response_el_reduce
 
     !Symmetrize response function
     do ik_fbz = 1, nk
