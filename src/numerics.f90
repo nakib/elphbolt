@@ -164,6 +164,7 @@ contains
        write(*, "(A, L)") "Reuse ph-ph matrix elements: ", n%read_V
        write(*, "(A, L)") "Use tetrahedron method: ", n%tetrahedra
        write(*, "(A, L)") "Include ph-e interaction: ", n%phe
+       write(*, "(A, L)") "Include ph-isotope interaction: ", n%phiso
        write(*, "(A, L)") "Calculate phonon BTE: ", n%phbte
        write(*, "(A, L)") "Calculate electron BTE: ", n%ebte
        write(*, "(A, L)") "Include drag: ", n%drag

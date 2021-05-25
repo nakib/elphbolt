@@ -32,7 +32,7 @@ program elphbolt
   use phonon_module, only: phonon
   use wannier_module, only: epw_wannier
   use bte_module, only: bte
-  use bz_sums, only: calculate_dos, calculate_chempot
+  use bz_sums, only: calculate_dos, calculate_chempot, calculate_qTF
   use interactions, only: calculate_gReq, calculate_gkRp, calculate_3ph_interaction, &
        calculate_eph_interaction_ibzq, calculate_eph_interaction_ibzk
   
@@ -74,6 +74,9 @@ program elphbolt
 
   !Calculate chemical potential
   call calculate_chempot(el, crys%T, crys%volume)
+
+  !Calculate Thomas-Fermi screening
+  call calculate_qTF(crys, el)
   
   !Calculate phonons
   call ph%initialize(wann, crys, sym, num)

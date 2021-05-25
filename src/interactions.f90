@@ -17,7 +17,7 @@
 module interactions
   !! Module containing the procedures related to the computation of interactions.
 
-  use params, only: k8, dp, pi, twopi, amu, qe, hbar_eVps
+  use params, only: k8, dp, pi, twopi, amu, qe, hbar_eVps, perm0
   use misc, only: exit_with_message, print_message, distribute_points, &
        demux_state, mux_vector, mux_state, expi, Bose, binsearch, Fermi
   use wannier_module, only: epw_wannier
@@ -35,10 +35,23 @@ module interactions
        calculate_eph_interaction_ibzq, calculate_eph_interaction_ibzk, calculate_el_rta_rates
 
 contains
-  
+
+  pure real(dp) function gchimp2(el, crys, q)
+    !! Function to calculate the squared electron-charged impurity vertex.
+    !!
+    !! This is the Fourier transform of the Yukawa potential, c.f. eq. 33
+    !! of RevModPhys.53.745 (1981).
+
+    type(crystal), intent(in) :: crys
+    type(electron), intent(in) :: el
+    real(dp), intent(in) :: q
+
+    gchimp2 = el%chimp_conc*(el%Z*qe/(perm0*crys%epsilon0)/(q**2 + crys%qTF**2))**2
+  end function gchimp2
+
   pure real(dp) function Vm2_3ph(ev1_s1, conjg_ev2_s2, conjg_ev3_s3, &
        Index_i, Index_j, Index_k, ifc3, phases_q2q3, ntrip, nb)
-    !! Function to calculate the 3-ph interaction vertex |V-|^2.
+    !! Function to calculate the squared 3-ph interaction vertex |V-|^2.
     
     integer(k8), intent(in) :: ntrip, Index_i(ntrip), Index_j(ntrip), Index_k(ntrip), nb
     complex(dp), intent(in) :: phases_q2q3(ntrip), ev1_s1(nb), conjg_ev2_s2(nb), conjg_ev3_s3(nb)

@@ -19,7 +19,7 @@ module crystal_module
 
   use params, only: dp, k8, twopi
   use misc, only: exit_with_message, print_message, cross_product, demux_vector, &
-       subtitle
+       subtitle, trace
 
   implicit none
 
@@ -44,9 +44,17 @@ module crystal_module
      logical :: polar
      !! Is the system polar?
      real(dp) :: epsilon(3,3)
-     !! Dielectric tensor
+     !! Dielectric tensor.
      real(dp), allocatable :: born(:,:,:)
-     !! Born effective charge
+     !! Born effective charge.
+     logical :: read_epsilon0
+     !! Read static dielectric constant?
+     real(dp) :: epsilon0
+     !! Static dielectric constant.
+     real(dp) :: epsiloninf
+     !! High frequency dielectric constant.
+     real(dp) :: qTF
+     !! Thomas-Fermi screening wave vector.
      real(dp), allocatable :: basis(:,:)
      !! Basis vectors (crystal coordinates).
      real(dp), allocatable :: basis_cart(:,:)
@@ -82,14 +90,16 @@ contains
     integer(k8) :: i, j, k, numelements, numatoms
     integer(k8), allocatable :: atomtypes(:)
     real(dp), allocatable :: masses(:), gfactors(:), born(:,:,:), basis(:,:), basis_cart(:,:)
-    real(dp) :: epsilon(3,3), lattvecs(3,3), volume, reclattvecs(3,3), volume_bz, T
+    real(dp) :: epsilon(3,3), lattvecs(3,3), volume, reclattvecs(3,3), volume_bz, T, &
+         epsilon0, epsiloninf
     character(len=3), allocatable :: elements(:)
     character(len=100) :: name
-    logical :: polar, autoisotopes, phiso
+    logical :: polar, autoisotopes, phiso, read_epsilon0
     
     namelist /allocations/ numelements, numatoms
     namelist /crystal_info/ name, elements, atomtypes, basis, lattvecs, &
-         polar, born, epsilon, masses, T, autoisotopes, phiso
+         polar, born, epsilon, read_epsilon0, epsilon0, epsiloninf, &
+         masses, T, autoisotopes, phiso
 
     call subtitle("Setting up crystal...")
 
@@ -115,7 +125,10 @@ contains
     !Read crystal_info
     autoisotopes = .true.
     polar = .false.
+    read_epsilon0 = .false.
     epsilon = 0.0_dp
+    epsilon0 = 0.0_dp
+    epsiloninf = 0.0_dp
     born = 0.0_dp
     T = -1.0_dp
     read(1, nml = crystal_info)
@@ -133,11 +146,20 @@ contains
     c%epsilon = epsilon
     c%basis = basis
     c%polar = polar
+    c%read_epsilon0 = read_epsilon0
+    c%epsiloninf = epsiloninf
     c%lattvecs = lattvecs
     c%T = T
     c%autoisotopes = autoisotopes
     c%masses = masses
     c%gfactors = 0.0_dp
+
+    !Set static dielectric constant
+    if(c%read_epsilon0) then
+       c%epsilon0 = epsilon0
+    else
+       c%epsilon0 = trace(c%epsilon)/3.0_dp
+    end if
 
     !If required, calculate isotopic average masses and g-factors
     if(autoisotopes) then
@@ -185,11 +207,13 @@ contains
           end do
           write(*,"(A)") 'Born effective charges:'
           do i = 1, c%numatoms
-             write(*,"(A, I3)") "  Atom ", i
+             write(*,"(A)") trim(c%elements(i))
              do j = 1, 3
                 write(*,"(3(1E16.8,x))") c%born(:,j,i)
              end do
           end do
+          write(*,"(A,1E16.8)") 'Static dielectric to be used for screening = ', c%epsilon0
+          write(*,"(A,1E16.8)") 'High-frequency dielectric to be used for screening = ', c%epsiloninf
        end if
        write(*,"(A, F7.2, A)") 'Crystal temperature = ', c%T, ' K'
     end if

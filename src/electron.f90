@@ -73,6 +73,10 @@ module electron_module
      !! Chemical potential
      real(dp) :: conc
      !! Electron(-)/hole(+) carrier concentration.
+     real(dp) :: chimp_conc
+     !! Concentration of charged impurities.
+     real(dp) :: Z
+     !! Ionization number of dopant.
      real(dp), allocatable :: wavevecs(:,:)
      !! List of all electron wave vectors (crystal coordinates).
      real(dp), allocatable :: wavevecs_irred(:,:)
@@ -138,14 +142,14 @@ contains
     type(numerics), intent(in) :: num
 
     !Local variables
-    real(dp) :: enref, conc
+    real(dp) :: enref, conc, chimp_conc
     integer(k8) :: spindeg, numbands, numtransbands, indlowband, indhighband, &
          indhighvalence, indlowconduction
     logical :: metallic
 
     namelist /electrons/ enref, spindeg, numbands, numtransbands, &
          indlowband, indhighband, metallic, indhighvalence, indlowconduction, &
-         conc
+         conc, chimp_conc
 
     call subtitle("Setting up electrons...")
     
@@ -162,6 +166,7 @@ contains
     indlowconduction = -1
     metallic = .false.
     conc = 0.0_dp
+    chimp_conc = 0.0_dp
     read(1, nml = electrons)
     if(spindeg < 1 .or. spindeg > 2) then
        call exit_with_message('spindeg can be 1 or 2.')
@@ -203,6 +208,12 @@ contains
     el%metallic = metallic
     el%enref = enref
     el%conc = conc
+    el%chimp_conc = chimp_conc
+    if(el%chimp_conc /= 0.0_dp) then
+       el%Z = abs(el%conc/el%chimp_conc)
+    else
+       el%Z = 0.0_dp
+    end if
     
     !Close input file
     close(1)
@@ -218,6 +229,8 @@ contains
        write(*, "(A, I5)") "Number of electronic bands = ", el%numbands
        write(*, "(A, 1E16.8)") "Reference electron energy = ", el%enref
        write(*, "(A, 1E16.8)") "Specified carrier concentration = ", el%conc
+       write(*, "(A, 1E16.8)") "Charged impurity concentration = ", el%chimp_conc
+       write(*, "(A, 1E16.8)") "Ionization of impurity = ", el%Z
     end if
     
     !Calculate electrons

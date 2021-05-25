@@ -17,17 +17,18 @@
 module bz_sums
   !! Module containing the procedures to do Brillouin zone sums.
 
-  use params, only: dp, k8, kB, qe, pi, hbar_eVps
+  use params, only: dp, k8, kB, qe, pi, hbar_eVps, perm0
   use misc, only: exit_with_message, print_message, write2file_rank2_real, &
        distribute_points, Bose, Fermi
   use phonon_module, only: phonon
   use electron_module, only: electron
+  use crystal_module, only: crystal
   use delta, only: delta_fn_tetra
   use symmetry_module, only: symmetry, symmetrize_3x3_tensor
 
   implicit none
 
-  public calculate_dos, calculate_transport_coeff, calculate_chempot
+  public calculate_dos, calculate_transport_coeff, calculate_chempot, calculate_qTF
   private calculate_el_dos, calculate_ph_dos_iso
 
   interface calculate_dos
@@ -92,10 +93,40 @@ contains
     end if
 
     if(this_image() == 1) then
-       write(*, "(A, 1E16.8, A)") ' Calculated carrier concentration = ', signconc*aux, ' cm^-3'
+       write(*, "(A, 1E16.8, A)") ' Calculated carrier concentration = ', signconc*aux, ' 1/cm3'
        write(*, "(A, 1E16.8, A)") ' Corresponding chemical potential = ', el%chempot, ' eV'
     end if
   end subroutine calculate_chempot
+
+  subroutine calculate_qTF(crys, el)
+    !! Calculate Thomas-Fermi screening wavevector in the simple electron-gas model.
+    ! qTF**2 = spindeg*e^2*beta/nptq/vol_pcell/perm0/kappainf*Sum_{BZ}f0_{k}(1-f0_{k})
+
+    type(crystal), intent(inout) :: crys
+    type(electron), intent(in) :: el
+
+    !Local variables
+    real(dp) :: beta, fFD
+    integer(k8) :: ib, ik
+
+    beta = 1.0_dp/kB/crys%T
+    crys%qTF=0.d0
+
+    if(crys%polar) then
+       do ib = 1, el%numbands
+          do ik = 1, el%nk
+             fFD = Fermi(el%ens(ik, ib), el%chempot, crys%T)
+             crys%qTF = crys%qTF + fFD*(1.0_dp - fFD)
+          end do
+       end do
+       crys%qTF = sqrt(1.0e9_dp*crys%qTF*el%spindeg*beta*qe**2/product(el%kmesh)&
+            /crys%volume/perm0/crys%epsiloninf) !nm^-1
+
+       if(this_image() == 1) then
+          write(*, "(A, 1E16.8, A)") ' Thomas-Fermi screening wave length = ', crys%qTF, ' 1/nm'
+       end if
+    end if
+  end subroutine calculate_qTF
   
   subroutine calculate_el_dos(el, usetetra)
     !! Calculate the density of states (DOS) in units of 1/energy. 
