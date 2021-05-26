@@ -111,6 +111,9 @@ program elphbolt
   !Calculate e-ph transition probabilities
   call calculate_eph_interaction_ibzk(wann, crys, el, ph, num, 'X')
 
+  !Calculate e-ch. imp. transition probabilities
+  !TODO call calculate_echimp_interaction_ibzk()
+
   if(num%phbte) then
      if(.not. num%read_V) then
         !Calculate ph-ph vertex
