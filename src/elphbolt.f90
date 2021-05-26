@@ -113,7 +113,9 @@ program elphbolt
   call calculate_eph_interaction_ibzk(wann, crys, el, ph, num, 'X')
 
   !Calculate e-ch. imp. transition probabilities
-  call calculate_echimp_interaction_ibzk(crys, el, num)
+  if(num%elchimp) then
+     call calculate_echimp_interaction_ibzk(crys, el, num)
+  end if
 
   if(num%phbte) then
      if(.not. num%read_V) then

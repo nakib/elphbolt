@@ -32,7 +32,7 @@ module interactions
 
   private
   public calculate_gReq, calculate_gkRp, calculate_3ph_interaction, &
-       calculate_ph_rta_rates, read_transition_probs_3ph, read_transition_probs_eph, &
+       calculate_ph_rta_rates, read_transition_probs_3ph, read_transition_probs_e, &
        calculate_eph_interaction_ibzq, calculate_eph_interaction_ibzk, &
        calculate_echimp_interaction_ibzk, calculate_el_rta_rates
 
@@ -43,13 +43,14 @@ contains
     !! v1, v2: velocities in cartesian coordinates
     
     real(dp), intent(in) :: v1(3),v2(3)
-    real(dp) :: v1sc, v2sc
+    real(dp) :: v1sc, v2sc, thresh
 
+    thresh = 1.0e-4_dp
     transfac = 0.0_dp
     v1sc = twonorm(v1)
     v2sc = twonorm(v2)
-    if(v1sc .ne. v2sc .and. v1sc .gt. 1.d-4 .and. v2sc .gt. 1.d-4) then
-       transfac = 1.d0 - dot_product(v1,v2)/v1sc/v2sc
+    if(v1sc /= v2sc .and. v1sc > thresh .and. v2sc > thresh) then
+       transfac = 1.0_dp - dot_product(v1,v2)/v1sc/v2sc
     end if
   end function transfac
 
@@ -67,11 +68,11 @@ contains
        do j = -1, 1
           do k = -1, 1
              distfromcorners(count) = twonorm(matmul(reclattvecs, q - (/i, j, k/)))
-             count = count+1
+             count = count + 1
           end do
        end do
     end do
-    qdist=minval(distfromcorners)
+    qdist = minval(distfromcorners)
   end function qdist
   
   pure real(dp) function gchimp2(el, crys, q)
@@ -84,9 +85,7 @@ contains
     type(electron), intent(in) :: el
     real(dp), intent(in) :: q
 
-    !gchimp2 = 1.0e24_dp*el%chimp_conc*((el%Z*qe)**2/(perm0*crys%epsilon0)/&
-    !     (q**2 + crys%qTF**2))**2 !J^2
-    gchimp2 = 1.0e24_dp*el%chimp_conc*(el%Z**2/(perm0*crys%epsilon0)/&
+    gchimp2 = 1.0e-3_dp*el%chimp_conc/crys%volume*(qe*el%Z**2/(perm0*crys%epsilon0)/&
          (q**2 + crys%qTF**2))**2 !ev^2
   end function gchimp2
 
@@ -1041,13 +1040,12 @@ contains
     real(dp) :: k(3), kp(3), q_mag, const, en_el, delta, g2, vk(3), vkp(3)
     real(dp), allocatable :: Xchimp_istate(:)
     integer(k8), allocatable :: istate_el(:)
-    character(len = 1024) :: filename, Xdir, tag
+    character(len = 1024) :: filename, Xdir
 
     call print_message("Calculating e-ch. imp. transition probabilities for all IBZ electrons...")
 
     !Set output directory of transition probilities
-    write(tag, "(E9.3)") crys%T
-    Xdir = trim(adjustl(num%datadumpdir))//'Xchimp_T'//trim(adjustl(tag))
+    Xdir = trim(adjustl(num%datadumpdir))//'Xchimp'
     if(this_image() == 1) then
        !Create directory
        call system('mkdir -p '//trim(adjustl(Xdir)))
@@ -1245,7 +1243,7 @@ contains
 
           !Read Y from file
           if(allocated(Y)) deallocate(Y)
-          call read_transition_probs_eph(trim(adjustl(filepath_Y)), nprocs_phe, Y)
+          call read_transition_probs_e(trim(adjustl(filepath_Y)), nprocs_phe, Y)
 
           do iproc = 1, nprocs_phe
              rta_rates_phe_psum(iq, s) = rta_rates_phe_psum(iq, s) + el%spindeg*Y(iproc)
@@ -1262,12 +1260,12 @@ contains
     end if
   end subroutine calculate_ph_rta_rates
 
-  subroutine calculate_el_rta_rates(rta_rates_eph, num, crys, el)
+  subroutine calculate_el_rta_rates(rta_rates_eph, rta_rates_echimp, num, crys, el)
     !! Subroutine for parallel reading of the e-ph transition probabilities
     !! from disk and calculating the relaxation time approximation (RTA)
     !! scattering rates for the e-ph channel.
 
-    real(dp), allocatable, intent(out) :: rta_rates_eph(:,:)
+    real(dp), allocatable, intent(out) :: rta_rates_eph(:,:), rta_rates_echimp(:,:)
     type(numerics), intent(in) :: num
     type(crystal), intent(in) :: crys
     type(electron), intent(in) :: el
@@ -1276,12 +1274,15 @@ contains
     integer(k8) :: nstates_irred, procs, istate, nprocs_eph, &
          iproc, chunk, m, ik, im, num_active_images
     integer(k8), allocatable :: start[:], end[:]
-    real(dp), allocatable :: rta_rates_eph_psum(:,:)[:], X(:)
-    character(len = 1024) :: filepath_Xp, filepath_Xm, Xdir, tag
+    real(dp), allocatable :: rta_rates_eph_psum(:,:)[:], &
+         rta_rates_echimp_psum(:,:)[:], X(:)
+    character(len = 1024) :: filepath_Xp, filepath_Xm, Xeph_dir, &
+         Xechimp_dir, tag
 
     !Set output directory of transition probilities
     write(tag, "(E9.3)") crys%T
-    Xdir = trim(adjustl(num%datadumpdir))//'X_T'//trim(adjustl(tag))
+    Xeph_dir = trim(adjustl(num%datadumpdir))//'X_T'//trim(adjustl(tag))
+    Xechimp_dir = trim(adjustl(num%datadumpdir))//'Xchimp'
 
     !Total number of IBZ blocks states
     nstates_irred = el%nk_irred*el%numbands
@@ -1295,10 +1296,16 @@ contains
     !Allocate and initialize scattering rates coarrays
     allocate(rta_rates_eph_psum(el%nk_irred, el%numbands)[*])
     rta_rates_eph_psum(:, :) = 0.0_dp
-
+    if(num%elchimp) then
+       allocate(rta_rates_echimp_psum(el%nk_irred, el%numbands)[*])
+       rta_rates_echimp_psum(:, :) = 0.0_dp
+    end if
+    
     !Allocate and initialize scattering rates
     allocate(rta_rates_eph(el%nk_irred, el%numbands))
     rta_rates_eph(:, :) = 0.0_dp
+    allocate(rta_rates_echimp(el%nk_irred, el%numbands))
+    rta_rates_echimp(:, :) = 0.0_dp
 
     do istate = start, end !over IBZ blocks states
        !Demux state index into band (m) and wave vector (ik) indices
@@ -1309,11 +1316,11 @@ contains
        
        !Set X+ filename
        write(tag, '(I9)') istate
-       filepath_Xp = trim(adjustl(Xdir))//'/Xplus.istate'//trim(adjustl(tag))
+       filepath_Xp = trim(adjustl(Xeph_dir))//'/Xplus.istate'//trim(adjustl(tag))
        
        !Read X+ from file
        if(allocated(X)) deallocate(X)
-       call read_transition_probs_eph(trim(adjustl(filepath_Xp)), nprocs_eph, X)
+       call read_transition_probs_e(trim(adjustl(filepath_Xp)), nprocs_eph, X)
        
        do iproc = 1, nprocs_eph
           rta_rates_eph_psum(ik, m) = rta_rates_eph_psum(ik, m) + X(iproc) 
@@ -1321,20 +1328,39 @@ contains
 
        !Set X- filename
        write(tag, '(I9)') istate
-       filepath_Xm = trim(adjustl(Xdir))//'/Xminus.istate'//trim(adjustl(tag))
+       filepath_Xm = trim(adjustl(Xeph_dir))//'/Xminus.istate'//trim(adjustl(tag))
 
        !Read X- from file
        if(allocated(X)) deallocate(X)
-       call read_transition_probs_eph(trim(adjustl(filepath_Xm)), nprocs_eph, X)
-       
+       call read_transition_probs_e(trim(adjustl(filepath_Xm)), nprocs_eph, X)
+
        do iproc = 1, nprocs_eph
           rta_rates_eph_psum(ik, m) = rta_rates_eph_psum(ik, m) + X(iproc) 
        end do
+
+       if(num%elchimp) then
+          !Set Xchimp filename
+          write(tag, '(I9)') istate
+          filepath_Xm = trim(adjustl(Xechimp_dir))//'/Xchimp.istate'//trim(adjustl(tag))
+
+          !Read Xchimp from file
+          if(allocated(X)) deallocate(X)
+          call read_transition_probs_e(trim(adjustl(filepath_Xm)), nprocs_eph, X)
+
+          do iproc = 1, nprocs_eph
+             rta_rates_echimp_psum(ik, m) = rta_rates_echimp_psum(ik, m) + X(iproc) 
+          end do
+       end if
     end do
 
     !Reduce coarray partial sums
     call co_sum(rta_rates_eph_psum)
     rta_rates_eph = rta_rates_eph_psum
+    if(num%elchimp) then
+       call co_sum(rta_rates_echimp_psum)
+       rta_rates_echimp = rta_rates_echimp_psum
+    end if
+    
   end subroutine calculate_el_rta_rates
   
   subroutine read_transition_probs_3ph(filepath, T, istate2, istate3)
@@ -1354,8 +1380,8 @@ contains
     close(1)
   end subroutine read_transition_probs_3ph
 
-  subroutine read_transition_probs_eph(filepath, N, TP, istate1, istate2)
-    !! Subroutine to read transition probabilities from disk for e-ph/ph-e processes.
+  subroutine read_transition_probs_e(filepath, N, TP, istate1, istate2)
+    !! Subroutine to read transition probabilities from disk for e-ph/e-chimp/ph-e processes.
     !! This is different from the read_transition_probs_3ph subroutine in that this
     !! returns the number interaction processes and also allocates the return arrays
     !! accordingly.
@@ -1370,13 +1396,18 @@ contains
     read(1) N
     allocate(TP(N))
     if(N > 0) read(1) TP
-    if(present(istate1) .and. present(istate2)) then
-       allocate(istate1(N), istate2(N))
+    if(present(istate1)) then
+       allocate(istate1(N))
        if(N > 0) then
           read(1) istate1
-          read(1) istate2
+       end if
+       if(present(istate2)) then
+          allocate(istate2(N))
+          if(N > 0) then
+             read(1) istate2
+          end if
        end if
     end if
     close(1)
-  end subroutine read_transition_probs_eph
+  end subroutine read_transition_probs_e
 end module interactions

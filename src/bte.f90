@@ -28,7 +28,7 @@ module bte_module
   use phonon_module, only: phonon
   use electron_module, only: electron
   use interactions, only: calculate_ph_rta_rates, read_transition_probs_3ph, &
-       read_transition_probs_eph, calculate_el_rta_rates
+       read_transition_probs_e, calculate_el_rta_rates
   use bz_sums, only: calculate_transport_coeff
 
   implicit none
@@ -52,6 +52,8 @@ module bte_module
      real(dp), allocatable :: ph_response_E(:,:,:)
      !! Phonon response function for E field on the FBZ.
      
+     real(dp), allocatable :: el_rta_rates_echimp_ibz(:,:)
+     !! Electron RTA scattering rates on the IBZ due to charged impurity scattering.
      real(dp), allocatable :: el_rta_rates_ibz(:,:)
      !! Electron RTA scattering rates on the IBZ.
      real(dp), allocatable :: el_field_term_T(:,:,:)
@@ -114,9 +116,8 @@ contains
     allocate(bt%ph_rta_rates_ibz(ph%nq_irred, ph%numbranches))
     
     !Matthiessen's rule
-    bt%ph_rta_rates_ibz = rates_3ph + rates_phe
-    if(num%phiso) bt%ph_rta_rates_ibz(:,:) = &
-         bt%ph_rta_rates_ibz(:,:) + bt%ph_rta_rates_iso_ibz(:,:)  
+    bt%ph_rta_rates_ibz = rates_3ph + rates_phe + &
+         bt%ph_rta_rates_iso_ibz(:,:)
 
     !gradT field:
 
@@ -157,7 +158,7 @@ contains
     !Change to data output directory
     call chdir(trim(adjustl(Tdir)))
 
-    !Write RTA scattering rates to file
+    !Write T-dependent RTA scattering rates to file
     call write2file_rank2_real('ph.W_rta_3ph', rates_3ph)
     call write2file_rank2_real('ph.W_rta_phe', rates_phe)
     call write2file_rank2_real('ph.W_rta', bt%ph_rta_rates_ibz)
@@ -165,14 +166,14 @@ contains
 
     !Change back to cwd
     call chdir(trim(adjustl(num%cwd)))
-
+    
     !if(num%ebte) then
     !Calculate RTA scattering rates
-    call calculate_el_rta_rates(rates_eph, num, crys, el)
+    call calculate_el_rta_rates(rates_eph, bt%el_rta_rates_echimp_ibz, num, crys, el)
 
     !Allocate total RTA scattering rates
     allocate(bt%el_rta_rates_ibz(el%nk_irred, el%numbands))
-    bt%el_rta_rates_ibz = rates_eph ! + other channels
+    bt%el_rta_rates_ibz = rates_eph + bt%el_rta_rates_echimp_ibz
 
     !gradT field:
     ! Calculate field term (gradT=>I0)
@@ -230,6 +231,9 @@ contains
     !Change back to cwd
     call chdir(trim(adjustl(num%cwd)))
 
+    !Write e-chimp RTA scattering rates to file
+    call write2file_rank2_real('el.W_rta_echimp', bt%el_rta_rates_echimp_ibz)
+    
     !Calculate and print transport scalars
     !gradT:
     el_kappa0_scalar = trace(el_kappa0)/3.0_dp
@@ -720,7 +724,7 @@ contains
           if(allocated(Y)) deallocate(Y)
           if(allocated(istate_el1)) deallocate(istate_el1)
           if(allocated(istate_el2)) deallocate(istate_el2)
-          call read_transition_probs_eph(trim(adjustl(filepath_Y)), nprocs_phe, Y, &
+          call read_transition_probs_e(trim(adjustl(filepath_Y)), nprocs_phe, Y, &
                istate_el1, istate_el2)
        end if
 
@@ -863,7 +867,7 @@ contains
        filepath_Xplus = trim(adjustl(Xdir))//'/Xplus.istate'//trim(adjustl(tag))
 
        !Read X+ from file
-       call read_transition_probs_eph(trim(adjustl(filepath_Xplus)), nprocs, Xplus, &
+       call read_transition_probs_e(trim(adjustl(filepath_Xplus)), nprocs, Xplus, &
             istate_el, istate_ph)
 
        !Set X- filename
@@ -871,7 +875,7 @@ contains
        filepath_Xminus = trim(adjustl(Xdir))//'/Xminus.istate'//trim(adjustl(tag))
 
        !Read X- from file
-       call read_transition_probs_eph(trim(adjustl(filepath_Xminus)), nprocs, Xminus)
+       call read_transition_probs_e(trim(adjustl(filepath_Xminus)), nprocs, Xminus)
 
        !Sum over the number of equivalent k-points of the IBZ point
        do ieq = 1, el%nequiv(ik_ibz)
