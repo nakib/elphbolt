@@ -34,7 +34,8 @@ program elphbolt
   use bte_module, only: bte
   use bz_sums, only: calculate_dos, calculate_chempot, calculate_qTF
   use interactions, only: calculate_gReq, calculate_gkRp, calculate_3ph_interaction, &
-       calculate_eph_interaction_ibzq, calculate_eph_interaction_ibzk
+       calculate_eph_interaction_ibzq, calculate_eph_interaction_ibzk, &
+       calculate_echimp_interaction_ibzk
   
   implicit none
   
@@ -112,7 +113,7 @@ program elphbolt
   call calculate_eph_interaction_ibzk(wann, crys, el, ph, num, 'X')
 
   !Calculate e-ch. imp. transition probabilities
-  !TODO call calculate_echimp_interaction_ibzk()
+  call calculate_echimp_interaction_ibzk(crys, el, num)
 
   if(num%phbte) then
      if(.not. num%read_V) then

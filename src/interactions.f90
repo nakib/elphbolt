@@ -19,7 +19,8 @@ module interactions
 
   use params, only: k8, dp, pi, twopi, amu, qe, hbar_eVps, perm0
   use misc, only: exit_with_message, print_message, distribute_points, &
-       demux_state, mux_vector, mux_state, expi, Bose, binsearch, Fermi
+       demux_state, mux_vector, mux_state, expi, Bose, binsearch, Fermi, &
+       twonorm
   use wannier_module, only: epw_wannier
   use crystal_module, only: crystal
   use electron_module, only: electron
@@ -32,10 +33,47 @@ module interactions
   private
   public calculate_gReq, calculate_gkRp, calculate_3ph_interaction, &
        calculate_ph_rta_rates, read_transition_probs_3ph, read_transition_probs_eph, &
-       calculate_eph_interaction_ibzq, calculate_eph_interaction_ibzk, calculate_el_rta_rates
+       calculate_eph_interaction_ibzq, calculate_eph_interaction_ibzk, &
+       calculate_echimp_interaction_ibzk, calculate_el_rta_rates
 
 contains
 
+  pure real(dp) function transfac(v1, v2)
+    !! Calculate the "transport factor" that suppresses forward scattering
+    !! v1, v2: velocities in cartesian coordinates
+    
+    real(dp), intent(in) :: v1(3),v2(3)
+    real(dp) :: v1sc, v2sc
+
+    transfac = 0.0_dp
+    v1sc = twonorm(v1)
+    v2sc = twonorm(v2)
+    if(v1sc .ne. v2sc .and. v1sc .gt. 1.d-4 .and. v2sc .gt. 1.d-4) then
+       transfac = 1.d0 - dot_product(v1,v2)/v1sc/v2sc
+    end if
+  end function transfac
+
+  pure real(dp) function qdist(q, reclattvecs)
+    !! Function to calculate the smallest wave vector distance in the BZ.
+    !! q is in crystal coordinates.
+    !! qdist will be in nm^-1
+    
+    real(dp), intent(in) :: q(3), reclattvecs(3, 3)
+    real(dp) :: distfromcorners(3**3)
+    integer(k8) :: i, j, k, count
+
+    count = 1
+    do i = -1, 1
+       do j = -1, 1
+          do k = -1, 1
+             distfromcorners(count) = twonorm(matmul(reclattvecs, q - (/i, j, k/)))
+             count = count+1
+          end do
+       end do
+    end do
+    qdist=minval(distfromcorners)
+  end function qdist
+  
   pure real(dp) function gchimp2(el, crys, q)
     !! Function to calculate the squared electron-charged impurity vertex.
     !!
@@ -46,7 +84,10 @@ contains
     type(electron), intent(in) :: el
     real(dp), intent(in) :: q
 
-    gchimp2 = el%chimp_conc*(el%Z*qe/(perm0*crys%epsilon0)/(q**2 + crys%qTF**2))**2
+    !gchimp2 = 1.0e24_dp*el%chimp_conc*((el%Z*qe)**2/(perm0*crys%epsilon0)/&
+    !     (q**2 + crys%qTF**2))**2 !J^2
+    gchimp2 = 1.0e24_dp*el%chimp_conc*(el%Z**2/(perm0*crys%epsilon0)/&
+         (q**2 + crys%qTF**2))**2 !ev^2
   end function gchimp2
 
   pure real(dp) function Vm2_3ph(ev1_s1, conjg_ev2_s2, conjg_ev3_s3, &
@@ -980,6 +1021,142 @@ contains
     end if
     sync all
   end subroutine calculate_eph_interaction_ibzk
+
+  subroutine calculate_echimp_interaction_ibzk(crys, el, num)
+    !! Parallel driver of |g_e-chimp(k,k')|^2 over IBZ electron states.
+    !!
+    !
+    !In the FBZ and IBZ blocks a wave vector was retained when at least one
+    !band belonged within the energy window. Here the bands outside the energy
+    !window will be skipped in the calculation as they are irrelevant for transport.
+
+    type(crystal), intent(in) :: crys
+    type(electron), intent(in) :: el
+    type(numerics), intent(in) :: num
+    
+    !Local variables
+    integer(k8) :: nstates_irred, istate, m, ik, n, ikp, &
+         start, end, chunk, k_indvec(3), kp_indvec(3), &
+         q_indvec(3), count, nprocs, num_active_images
+    real(dp) :: k(3), kp(3), q_mag, const, en_el, delta, g2, vk(3), vkp(3)
+    real(dp), allocatable :: Xchimp_istate(:)
+    integer(k8), allocatable :: istate_el(:)
+    character(len = 1024) :: filename, Xdir, tag
+
+    call print_message("Calculating e-ch. imp. transition probabilities for all IBZ electrons...")
+
+    !Set output directory of transition probilities
+    write(tag, "(E9.3)") crys%T
+    Xdir = trim(adjustl(num%datadumpdir))//'Xchimp_T'//trim(adjustl(tag))
+    if(this_image() == 1) then
+       !Create directory
+       call system('mkdir -p '//trim(adjustl(Xdir)))
+    end if
+    sync all
+    
+    !Conversion factor in transition probability expression
+    const = twopi/hbar_eVps
+
+    !Length of 
+    nprocs = el%nstates_inwindow
+    allocate(Xchimp_istate(nprocs), istate_el(nprocs))
+    Xchimp_istate(:) = 0.0_dp
+    istate_el(:) = 0_k8
+    
+    !Total number of IBZ blocks states
+    nstates_irred = el%nk_irred*el%numbands
+    
+    call distribute_points(nstates_irred, chunk, start, end, num_active_images)
+    
+    if(this_image() == 1) then
+       write(*, "(A, I10)") " #states = ", nstates_irred
+       write(*, "(A, I10)") " #states/image = ", chunk
+    end if
+
+    do istate = start, end !over IBZ blocks states
+       !Demux state index into band (m) and wave vector (ik) indices
+       call demux_state(istate, el%numbands, m, ik)
+
+       !Electron energy
+       en_el = el%ens_irred(ik, m)
+
+       !Apply energy window to initial (IBZ blocks) electron
+       if(abs(en_el - el%enref) > el%fsthick) cycle
+
+       !Velocity of initial electron
+       vk = el%vels_irred(ik, m, :)
+       
+       !Initial (IBZ blocks) wave vector (crystal coords.)
+       k = el%wavevecs_irred(ik, :)
+
+       !Convert from crystal to 0-based index vector
+       k_indvec = nint(k*el%kmesh)
+
+       !Initialize eligible process counter for this state
+       count = 0
+       
+       !Run over final (FBZ blocks) electron wave vectors
+       do ikp = 1, el%nk
+          !Final wave vector (crystal coords.)
+          kp = el%wavevecs(ikp, :)
+
+          !Convert from crystal to 0-based index vector
+          kp_indvec = nint(kp*el%kmesh)
+
+          !Find interacting phonon wave vector
+          !Note that q, k, and k' are all on the same mesh
+          q_indvec = modulo(kp_indvec - k_indvec, el%kmesh) !0-based index vector
+
+          !Calculate length of the wave vector
+          q_mag = qdist(q_indvec/dble(el%kmesh), crys%reclattvecs)
+
+          !Calculate matrix element
+          g2 = gchimp2(el, crys, q_mag)
+         
+          !Run over final electron bands
+          do n = 1, el%numbands
+             !Apply energy window to final electron
+             if(abs(el%ens(ikp, n) - el%enref) > el%fsthick) cycle
+                      
+             !Increment g2 processes counter
+             count = count + 1
+
+             !Velocity of final electron
+             vkp = el%vels(ikp, n, :)
+             
+             !Evaulate delta function
+             delta = delta_fn_tetra(en_el, ikp, n, el%kmesh, el%tetramap, &
+                  el%tetracount, el%tetra_evals)
+
+             !Save Xchimp
+             Xchimp_istate(count) = g2*transfac(vk, vkp)*delta
+             
+             !Save final electron state
+             istate_el(count) = mux_state(el%numbands, n, ikp)
+             end do !n
+       end do !ikp
+
+       !Multiply constant factor, unit factor, etc.
+       Xchimp_istate(1:count) = const*Xchimp_istate(1:count) !THz
+       
+       !Change to data output directory
+       call chdir(trim(adjustl(Xdir)))
+
+       !Write data in binary format
+       !Note: this will overwrite existing data!
+       write (filename, '(I9)') istate
+       filename = 'Xchimp.istate'//trim(adjustl(filename))
+       open(1, file = trim(filename), status = 'replace', access = 'stream')
+       write(1) count
+       write(1) Xchimp_istate(1:count)
+       write(1) istate_el(1:count)
+       close(1)       
+
+       !Change back to working directory
+       call chdir(num%cwd)
+    end do
+    sync all
+  end subroutine calculate_echimp_interaction_ibzk
   
   subroutine calculate_ph_rta_rates(rta_rates_3ph, rta_rates_phe, num, crys, ph, el)
     !! Subroutine for parallel reading of the 3-ph and ph-e transition probabilities
