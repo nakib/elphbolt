@@ -217,12 +217,6 @@ contains
        end if
        write(*,"(A, F7.2, A)") 'Crystal temperature = ', c%T, ' K'
     end if
-
-    !Below is from ShengBTE:
-
-    if(autoisotopes) then
-
-    end if
   end subroutine read_input_and_setup_crystal
 
   subroutine calculate_wavevectors_full(mesh, wavevecs, blocks, indexlist)

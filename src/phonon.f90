@@ -17,10 +17,10 @@
 module phonon_module
   !! Module containing type and procedures related to the phononic properties.
 
-  use params, only: dp, k8
-  use misc, only: print_message, subtitle
+  use params, only: dp, k8, bohr2nm, pi, twopi, Ryd2eV, oneI
+  use misc, only: print_message, subtitle, expi
   use numerics_module, only: numerics
-  use wannier_module, only: epw_wannier, phonon_espresso
+  use wannier_module, only: epw_wannier
   use crystal_module, only: crystal, calculate_wavevectors_full
   use symmetry_module, only: symmetry, find_irred_wedge, create_fbz2ibz_map
   use delta, only: form_tetrahedra_3d, fill_tetrahedra_3d
@@ -28,11 +28,11 @@ module phonon_module
   implicit none
 
   private
-  public phonon
+  public phonon, phonon_espresso
   
   type phonon
      !! Data and procedures related to phonons.
-
+     
      character(len = 2) :: prefix = 'ph'
      !! Prefix idenitfying particle type.
      integer(k8) :: numbranches
@@ -79,6 +79,11 @@ module phonon_module
      !! List of phonon velocities on IBZ.
      complex(dp), allocatable :: evecs(:,:,:)
      !! List of all phonon eigenvectors on IBZ.
+     integer(k8) :: scell(3)
+     !! q-mesh used in DFPT or, equivalently, supercell used in finite displencement
+     !! method for calculating the 2nd order force constants.
+     real(dp), allocatable :: ifc2(:,:,:,:,:,:,:)
+     !! Second order force constants (ifc2) tensor.
      real(dp), allocatable :: ifc3(:,:,:,:)
      !! Third order force constants (ifc3) tensor.
      integer(k8) :: numtriplets
@@ -89,6 +94,10 @@ module phonon_module
      !! Label of primitive cell atoms in the ifc3 triplet.
      real(dp), allocatable :: dos(:,:)
      !! Branch resolved density of states.
+
+     !Data read from ifc2 file. This will be used in the phonon calculation.
+     real(dp) :: rws(124, 0:3), cell_r(1:3, 0:3), cell_g(1:3, 0:3)
+     real(dp), allocatable :: mm(:,:), rr(:,:,:)
       
    contains
 
@@ -117,11 +126,14 @@ contains
     !Set number of phonon wave vectors
     ph%nq = product(ph%qmesh(:))
 
+    !Read ifc2 and related quantities
+    call read_ifc2(ph, crys)
+    
     !Calculate harmonic properties
     call calculate_phonons(ph, wann, crys, sym, num)
-
+    
     !Read ifc3s and related quantities
-    call read_ifc3(ph, crys)    
+    call read_ifc3(ph, crys)
   end subroutine initialize
   
   subroutine calculate_phonons(ph, wann, crys, sym, num)
@@ -154,10 +166,10 @@ contains
     !Calculate FBZ phonon quantities
     allocate(ph%ens(ph%nq, ph%numbranches))
     allocate(ph%vels(ph%nq, ph%numbranches, 3))
-    allocate(ph%evecs(ph%nq, ph%numbranches, ph%numbranches))    
-!!$    call wann%ph_wann_epw(crys, ph%nq, ph%wavevecs, ph%ens)
-    call phonon_espresso(crys, wann%coarse_qmesh, ph%wavevecs, &
-         ph%ens, ph%vels, ph%evecs)
+    allocate(ph%evecs(ph%nq, ph%numbranches, ph%numbranches))
+    !call phonon_espresso(ph, crys, ph%nq, ph%wavevecs, &
+    !ph%ens, ph%vels, ph%evecs)
+    call phonon_espresso(ph, crys, ph%nq, ph%wavevecs, ph%ens, ph%evecs, ph%vels)
 
     !Calculate IBZ mesh
     call print_message("Calculating IBZ and IBZ -> FBZ mappings...")
@@ -234,7 +246,124 @@ contains
        call fill_tetrahedra_3d(ph%tetra, ph%ens, ph%tetra_evals)
     end if
   end subroutine calculate_phonons
+  
+  subroutine read_ifc2(ph, crys)
+    !! Read the 2nd order force constants from the Quantum Espresso format.
+    !! This is adapted from ShengBTE.
+    
+    class(phonon), intent(inout) :: ph
+    type(crystal), intent(in) :: crys
 
+    !Local variables
+    integer(k8) :: qscell(3), tipo(crys%numatoms), t1, t2, t3, i, j, &
+         iat, jat, ibrav, ipol, jpol, m1, m2, m3, ntype, nat, nfc2 
+    real(dp) :: r(crys%numatoms, 3), wscell(3,0:3), celldm(6), at(3,3), &
+         mass(crys%numelements), zeff(crys%numatoms, 3, 3), eps(3, 3), &
+         dnrm2
+    character(len = 1) :: polar_key
+    character(len = 6) :: label(crys%numelements)
+    real(dp), parameter :: massfactor=1.8218779_dp*6.022e-4_dp
+
+    allocate(ph%mm(crys%numatoms, crys%numatoms))
+    allocate(ph%rr(crys%numatoms, crys%numatoms, 3))
+    
+    open(1,file="espresso.ifc2",status="old")
+    !Read some stuff that will not be used in the code.
+    read(1,*) ntype, nat, ibrav, celldm(1:6)
+    if (ibrav==0) then
+       read(1,*) ((at(i,j),i=1,3),j=1,3)
+    end if
+
+    do i = 1, ntype
+       read(1, *) j, label(i), mass(i)
+    end do
+    mass = crys%masses/massfactor
+    
+    do i = 1, nat
+       read(1, *) j, tipo(i), r(i, 1:3)
+    end do
+    r = transpose(matmul(crys%lattvecs, crys%basis))/bohr2nm
+    
+    read(1, *) polar_key
+    if(polar_key == "T") then
+       do i = 1, 3
+          read(1, *) eps(i, 1:3)
+       end do
+       do i = 1, nat
+          read(1, *)
+          do j = 1, 3
+             read(1, *) zeff(i, j, 1:3)
+          end do
+       end do
+    end if
+    read(1,*) qscell(1:3)
+
+    ph%scell = qscell
+    
+    !Read the force constants.
+    allocate(ph%ifc2(3, 3, nat, nat, ph%scell(1), ph%scell(2), ph%scell(3)))
+    nfc2 = 3*3*nat*nat
+    do i = 1, nfc2
+       read(1, *) ipol, jpol, iat, jat
+       do j = 1, ph%scell(1)*ph%scell(2)*ph%scell(3)
+          read(1, *) t1, t2, t3, &
+               ph%ifc2(ipol, jpol, iat, jat, t1, t2, t3)
+       end do
+    end do
+    close(1)
+    
+    !Enforce the conservation of momentum in the simplest way possible.
+    do i = 1, 3
+       do j = 1, 3
+          do iat = 1, nat
+             ph%ifc2(i, j, iat, iat, 1, 1, 1) = ph%ifc2(i, j, iat, iat, 1, 1, 1) - &
+                  sum(ph%ifc2(i, j, iat, :, :, :, :))
+          end do
+       end do
+    end do
+
+    ph%cell_r(:, 1:3) = transpose(crys%lattvecs)/bohr2nm
+    do i = 1, 3
+       ph%cell_r(i, 0) = dnrm2(3, ph%cell_r(i, 1:3), 1)
+    end do
+    ph%cell_g(:, 1:3) = transpose(crys%reclattvecs)*bohr2nm
+    do i = 1, 3
+       ph%cell_g(i, 0) = dnrm2(3, ph%cell_g(i, 1:3), 1)
+    end do
+
+    wscell(1,1:3) = ph%cell_r(1,1:3)*ph%scell(1)
+    wscell(2,1:3) = ph%cell_r(2,1:3)*ph%scell(2)
+    wscell(3,1:3) = ph%cell_r(3,1:3)*ph%scell(3)
+
+    j = 1
+    do m1 = -2, 2
+       do m2 = -2, 2
+          do m3 = -2, 2
+             if(all((/m1, m2, m3/).eq.0)) then
+                cycle
+             end if
+             do i = 1, 3
+                ph%rws(j, i) = wscell(1, i)*m1 + wscell(2, i)*m2 + wscell(3, i)*m3
+             end do
+             ph%rws(j, 0) = 0.5*dot_product(ph%rws(j, 1:3), ph%rws(j, 1:3))
+             j = j + 1
+          end do
+       end do
+    end do
+
+    do i = 1, nat
+       ph%mm(i, i) = mass(tipo(i))
+       ph%rr(i, i, :) = 0
+       do j = i + 1, nat
+          ph%mm(i, j) = sqrt(mass(tipo(i))*mass(tipo(j)))
+          ph%rr(i, j, 1:3) = r(i, 1:3) - r(j, 1:3)
+          ph%mm(j, i) = ph%mm(i, j)
+          ph%rr(j, i, 1:3) = -ph%rr(i, j, 1:3)
+       end do
+    end do
+    
+  end subroutine read_ifc2
+  
   subroutine read_ifc3(ph, crys)
     !! Read the 3rd order force constants in the thirdorder.py format.
     !! This subroutine is adapted from ShengBTE.
@@ -245,7 +374,7 @@ contains
     !Local variables
     real(dp) :: tmp(3,3)
     integer(k8) :: ii, jj, ll, mm, nn, ltem, mtem, ntem, info, P(3)
-
+    
     !The file is in a simple sparse format, described in detail in
     !the user documentation. See Doc/ShengBTE.pdf.
     open(1, file = 'FORCE_CONSTANTS_3RD', status = "old")
@@ -275,5 +404,289 @@ contains
     tmp = crys%lattvecs
     call dgesv(3, ph%numtriplets, tmp, 3, P, ph%R_k, 3, info)
     ph%R_k = matmul(crys%lattvecs, anint(ph%R_k/10.0_dp)) !nm
-  end subroutine read_ifc3      
+  end subroutine read_ifc3
+
+  subroutine phonon_espresso(ph, crys, nk, kpoints, omegas, eigenvect, velocities)
+    !! Subroutine to calculate phonons from the 2nd order force constants.
+    !! This is adapted from Quantum Espresso and ShengBTE.
+
+    type(phonon), intent(in) :: ph
+    type(crystal), intent(in) :: crys
+    real(kind=8), intent(in) :: kpoints(nk, 3)
+    real(kind=8), intent(out) :: omegas(nk, ph%numbranches)
+    real(kind=8), optional, intent(out) :: velocities(nk, ph%numbranches, 3)
+    complex(kind=8), optional, intent(out) :: eigenvect(nk, ph%numbranches, ph%numbranches)
+
+    ! QE's 2nd-order files are in Ryd units.
+    real(kind=8),parameter :: toTHz=20670.687,&
+         massfactor=1.8218779*6.022e-4
+
+    integer(k8) :: ir,nreq,ntype,nat,nbranches
+    integer(k8) :: i,j,ipol,jpol,iat,jat,idim,jdim,t1,t2,t3,m1,m2,m3,ik
+    integer(k8) :: ndim,nk,nwork,ncell_g(3)
+    integer(kind=8),allocatable :: tipo(:)
+    character(len=5),allocatable :: label(:)
+    real(kind=8) :: weight,total_weight,exp_g,ck
+    real(kind=8) :: r_ws(3), at(3,3)
+    real(kind=8) :: alpha,geg,gmax,kt,gr,volume_r,dnrm2
+    real(kind=8) :: zig(3),zjg(3),dgeg(3),t(0:3),g(0:3),g_old(0:3)
+    real(kind=8), allocatable :: omega2(:),rwork(:)
+    real(kind=8),allocatable :: k(:,:),mass(:),r(:,:),eps(:,:)
+    real(kind=8),allocatable :: eival(:,:),vels(:,:,:),zeff(:,:,:)
+    complex(kind=8) :: auxi(3)
+    complex(kind=8),allocatable :: cauxiliar(:),eigenvectors(:,:),work(:)
+    complex(kind=8),allocatable :: dyn(:,:),dyn_s(:,:,:),dyn_g(:,:,:)
+    complex(kind=8),allocatable :: ddyn(:,:,:),ddyn_s(:,:,:,:),ddyn_g(:,:,:,:)
+
+    ! Quantum Espresso's 2nd-order format contains information about
+    ! lattice vectors, atomic positions, Born effective charges and so
+    ! forth in its header. The information is read but completely
+    ! ignored. It is the user's responsibility to ensure that
+    ! it is consistent with the CONTROL file.
+    nwork = 1
+    ntype = crys%numelements
+    nat = crys%numatoms
+    ndim = 3*nat
+    nbranches = ndim
+    
+    allocate(omega2(nbranches))
+    allocate(work(nwork))
+    allocate(rwork(max(1,9*nat-2)))
+    allocate(k(nk,3))
+    allocate(mass(ntype))
+    allocate(tipo(nat))
+    allocate(eps(3,3))
+    allocate(zeff(nat,3,3))    
+    allocate(dyn(ndim,ndim))
+    allocate(dyn_s(nk,ndim,ndim))
+    allocate(dyn_g(nk,ndim,ndim))
+    allocate(eival(ndim,nk))
+    allocate(eigenvectors(ndim,ndim))
+    allocate(cauxiliar(ndim))
+    if(present(velocities)) then
+       allocate(ddyn(ndim,ndim,3))
+       allocate(ddyn_s(nk,ndim,ndim,3))
+       allocate(ddyn_g(nk,ndim,ndim,3))
+       allocate(vels(ndim,nk,3))
+    end if
+    
+    mass = crys%masses/massfactor
+    tipo = crys%atomtypes
+    eps = transpose(crys%epsilon)
+    do i = 1, nat
+       zeff(i, :, :) = transpose(crys%born(:, :, i))
+    end do
+    
+    ! Make sure operations are performed in consistent units.
+    do ik = 1, nk
+       k(ik, :) = matmul(crys%reclattvecs, kpoints(ik, :))
+    end do
+    k = k*bohr2nm
+    
+    volume_r = crys%volume/bohr2nm**3
+
+    gmax=14.
+    alpha=(twopi*bohr2nm/dnrm2(3,crys%lattvecs(:,1),1))**2
+    geg=gmax*4.*alpha
+    ncell_g=int(sqrt(geg)/ph%cell_g(:,0))+1
+    
+    dyn_s = 0.0_dp
+    if(present(velocities)) ddyn_s = 0.0_dp
+    
+    do iat=1,nat
+       do jat=1,nat
+          total_weight=0.0d0
+          do m1=-2*ph%scell(1),2*ph%scell(1)
+             do m2=-2*ph%scell(2),2*ph%scell(2)
+                do m3=-2*ph%scell(3),2*ph%scell(3)
+                   do i=1,3
+                      t(i)=m1*ph%cell_r(1,i)+m2*ph%cell_r(2,i)+m3*ph%cell_r(3,i)
+                      r_ws(i)=t(i)+ph%rr(iat,jat,i)
+                   end do
+                   weight=0.d0
+                   nreq=1
+                   j=0
+                   Do ir=1,124
+                      ck=dot_product(r_ws,ph%rws(ir,1:3))-ph%rws(ir,0)
+                      if(ck.gt.1e-6) then
+                         j=1
+                         cycle
+                      end if
+                      if(abs(ck).lt.1e-6) then
+                         nreq=nreq+1
+                      end if
+                   end do
+                   if(j.eq.0) then
+                      weight=1.d0/dble(nreq)
+                   end if
+                   if(weight.gt.0.d0) then
+                      t1=mod(m1+1,ph%scell(1))
+                      if(t1.le.0) then
+                         t1=t1+ph%scell(1)
+                      end if
+                      t2=mod(m2+1,ph%scell(2))
+                      if(t2.Le.0) then
+                         t2=t2+ph%scell(2)
+                      end if
+                      t3=mod(m3+1,ph%scell(3))
+                      if(t3.le.0) then
+                         t3=t3+ph%scell(3)
+                      end if
+                      do ik=1,nk
+                         kt=dot_product(k(ik,1:3),t(1:3))
+                         do ipol=1,3
+                            idim = (iat-1)*3+ipol
+                            do jpol=1,3
+                               jdim = (jat-1)*3+jpol
+                               dyn_s(ik,idim,jdim)=dyn_s(ik,idim,jdim)+&
+                                    ph%ifc2(ipol,jpol,iat,jat,t1,t2,t3)*&
+                                    expi(-kt)*weight
+                               if(present(velocities)) then
+                                  ddyn_s(ik,idim,jdim,1:3)=ddyn_s(ik,idim,jdim,1:3)-&
+                                       oneI*t(1:3)*&
+                                       ph%ifc2(ipol,jpol,iat,jat,t1,t2,t3)*&
+                                       expi(-kt)*weight
+                               end if
+                            end do
+                         end do
+                      end do
+                   end if
+                   total_weight=total_weight+weight
+                end do
+             end do
+          end do
+       end do
+    end do
+    ! The nonanalytic correction has two components in this
+    ! approximation. Results may differ slightly between this method
+    ! and the one implemented in the previous subroutine.
+    dyn_g = 0.0_dp
+    if(present(velocities)) ddyn_g = 0.0_dp
+    if(crys%polar) then
+       do m1=-ncell_g(1),ncell_g(1)
+          do m2=-ncell_g(2),ncell_g(2)
+             do m3=-ncell_g(3),ncell_g(3)
+                g(1:3)=m1*ph%cell_g(1,1:3)+&
+                     m2*ph%cell_g(2,1:3)+m3*ph%cell_g(3,1:3)
+                geg=dot_product(g(1:3),matmul(eps,g(1:3)))
+                if(geg.gt.0.0d0.and.geg/alpha/4.0d0.lt.gmax) then
+                   exp_g=exp(-geg/alpha/4.0d0)/geg
+                   do iat=1,nat
+                      zig(1:3)=matmul(g(1:3),zeff(iat,1:3,1:3))
+                      auxi(1:3)=0.
+                      do jat=1,nat
+                         gr=dot_product(g(1:3),ph%rr(iat,jat,1:3))
+                         zjg(1:3)=matmul(g(1:3),zeff(jat,1:3,1:3))
+                         auxi(1:3)=auxi(1:3)+zjg(1:3)*expi(gr)
+                      end do
+                      do ipol=1,3
+                         idim=(iat-1)*3+ipol
+                         do jpol=1,3
+                            jdim=(iat-1)*3+jpol
+                            dyn_g(1:nk,idim,jdim)=dyn_g(1:nk,idim,jdim)-&
+                                 exp_g*zig(ipol)*auxi(jpol)
+                         end do
+                      end do
+                   end do
+                end if
+                g_old(0:3)=g(0:3)
+                do ik=1,nk
+                   g(1:3)=g_old(1:3)+k(ik,1:3)
+                   geg=dot_product(g(1:3),matmul(eps,g(1:3)))
+                   if (geg.gt.0.0d0.and.geg/alpha/4.0d0.lt.gmax) then
+                      exp_g=exp(-geg/alpha/4.0d0)/geg
+                      dgeg=matmul(eps+transpose(eps),g(1:3))
+                      do iat=1,nat
+                         zig(1:3)=matmul(g(1:3),zeff(iat,1:3,1:3))
+                         do jat=1,nat
+                            gr=dot_product(g(1:3),ph%rr(iat,jat,1:3))
+                            zjg(1:3)=matmul(g(1:3),zeff(jat,1:3,1:3))
+                            do ipol=1,3
+                               idim=(iat-1)*3+ipol
+                               do jpol=1,3
+                                  jdim=(jat-1)*3+jpol
+                                  dyn_g(ik,idim,jdim)=dyn_g(ik,idim,jdim)+&
+                                       exp_g*zig(ipol)*zjg(jpol)*expi(gr)
+                                  if(present(velocities)) then
+                                     do i=1,3
+                                        ddyn_g(ik,idim,jdim,i)=ddyn_g(ik,idim,jdim,i)+&
+                                             exp_g*expi(gr)*&
+                                             (zjg(jpol)*zeff(iat,i,ipol)+zig(ipol)*zeff(jat,i,jpol)+&
+                                             zig(ipol)*zjg(jpol)*oneI*ph%rr(iat,jat,i)-&
+                                             zig(ipol)*zjg(jpol)*(dgeg(i)/alpha/4.0+dgeg(i)/geg))
+                                     end do
+                                  end if
+                               end do
+                            end do
+                         end do
+                      end do
+                   end if
+                end do
+             end do
+          end do
+       end do
+       dyn_g = dyn_g*8.0_dp*pi/volume_r
+       if(present(velocities)) ddyn_g = ddyn_g*8.0_dp*pi/volume_r
+    end if
+    
+    ! Once the dynamical matrix has been built, the frequencies and
+    ! group velocities are extracted exactly like in the previous
+    ! subroutine.
+    do ik = 1, nk
+       dyn(:,:) = dyn_s(ik,:,:) + dyn_g(ik,:,:)
+       if(present(velocities)) then
+          ddyn(:,:,:) = ddyn_s(ik,:,:,:) + ddyn_g(ik,:,:,:)
+       end if
+
+       do ipol=1,3
+          do jpol=1,3
+             do iat=1,nat
+                do jat=1,nat
+                   idim=(iat-1)*3+ipol
+                   jdim=(jat-1)*3+jpol
+                   dyn(idim,jdim)=dyn(idim,jdim)/ph%mm(iat,jat)
+                   if(present(velocities)) then
+                      ddyn(idim,jdim,1:3)=ddyn(idim,jdim,1:3)/ph%mm(iat,jat)
+                   end if
+                end do
+             end do
+          end do
+       end do
+       
+       call zheev("V","U",nbranches,dyn(:,:),nbranches,omega2,work,-1,rwork,i)
+       if(real(work(1)).gt.nwork) then
+          nwork=nint(2*real(work(1)))
+          deallocate(work)
+          allocate(work(nwork))
+       end if
+       call zheev("V","U",nbranches,dyn(:,:),nbranches,omega2,work,nwork,rwork,i)
+       
+       if(present(eigenvect)) then
+          eigenvect(ik,:,:) = transpose(dyn(:,:))
+       end if
+       
+       omegas(ik,:)=sign(sqrt(abs(omega2)),omega2)
+
+       if(present(velocities)) then
+          do i=1,nbranches
+             do j=1,3
+                velocities(ik,i,j)=real(dot_product(dyn(:,i),&
+                     matmul(ddyn(:,:,j),dyn(:,i))))
+             end do
+             velocities(ik,i,:)=velocities(ik,i,:)/(2.*omegas(ik,i))
+          end do
+       end if
+
+       !Take care of gamma point.
+       if(all(k(ik,1:3) == 0)) then
+          omegas(ik, 1:3) = 0.0_dp
+          if(present(velocities)) velocities(ik, :, :) = 0.0_dp
+       end if
+    end do
+
+    ! Return the result to the units used in the rest of ShengBTE.
+    !omegas=omegas*toTHz !THz
+    omegas=omegas*Ryd2eV !eV
+    if(present(velocities)) velocities=velocities*toTHz*bohr2nm
+  end subroutine phonon_espresso
 end module phonon_module

@@ -496,7 +496,7 @@ contains
       a = 0.0_dp !lower bound
       b = 2.0_dp !upper bound
       maxiter = 100
-      thresh = 1.0e-6_dp
+      thresh = 1.0e-7_dp
       do it = 1, maxiter
          lambda = 0.5_dp*(a + b)
          !Calculate electron transport coefficients

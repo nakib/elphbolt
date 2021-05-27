@@ -24,7 +24,7 @@ module interactions
   use wannier_module, only: epw_wannier
   use crystal_module, only: crystal
   use electron_module, only: electron
-  use phonon_module, only: phonon
+  use phonon_module, only: phonon, phonon_espresso
   use numerics_module, only: numerics
   use delta, only: delta_fn_tetra
 
@@ -737,8 +737,8 @@ contains
     integer(k8) :: nstates_irred, istate, m, ik, n, ikp, s, &
          iq, start, end, chunk, k_indvec(3), kp_indvec(3), &
          q_indvec(3), count, nprocs, num_active_images
-    real(dp) :: k(3), kp(3), q(3), ph_ens_iq(1, ph%numbranches), const, bosefac, &
-         fermi_minus_fac, fermi_plus_fac, en_ph, en_el, delta, occup_fac
+    real(dp) :: k(3), kp(3), q(3), ph_ens_iq(1, ph%numbranches), qlist(1, 3), &
+         const, bosefac, fermi_minus_fac, fermi_plus_fac, en_ph, en_el, delta, occup_fac
     real(dp), allocatable :: g2_istate(:), Xplus_istate(:), Xminus_istate(:)
     integer(k8), allocatable :: istate_el(:), istate_ph(:)
     complex(dp) :: gkRp_ik(wann%numwannbands,wann%numwannbands,wann%numbranches,wann%nwsq), &
@@ -868,8 +868,10 @@ contains
              iq = mux_vector(q_indvec, el%kmesh, 0_k8)
 
              !Calculate the fine mesh phonon.
-             call wann%ph_wann_epw(crys, 1_k8, q, ph_ens_iq, ph_evecs_iq)
-             !TODO: for consistency, above we should also use ifcs
+             qlist(1, :) = q
+             call phonon_espresso(ph, crys, 1_k8, qlist, &
+                  ph_ens_iq, ph_evecs_iq)
+             !call wann%ph_wann_epw(crys, 1_k8, qlist, ph_ens_iq, ph_evecs_iq)
           else !Original (coarser) mesh phonon
              q_indvec = modulo(q_indvec/el%mesh_ref, ph%qmesh) !0-based index vector
              q = q_indvec/dble(ph%qmesh) !crystal coords.

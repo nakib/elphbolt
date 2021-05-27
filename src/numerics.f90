@@ -91,7 +91,8 @@ contains
          ebte, elchimp, drag
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
-         read_V, tetrahedra, phe, phiso, phbte, ebte, maxiter, conv_thres, drag, elchimp
+         read_V, tetrahedra, phe, phiso, phbte, ebte, maxiter, conv_thres, drag, &
+         elchimp
 
     call subtitle("Reading numerics information...")
     
