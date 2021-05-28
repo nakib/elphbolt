@@ -206,50 +206,6 @@ contains
     integer(k8), optional, intent(in) :: indexlist(:)
     integer(k8), intent(out) :: equiv_map(:,:)
 
-    integer(k8) :: nmesh
-    integer(k8), allocatable :: index_mesh(:,:)
-    integer(k8) :: i, isym, ivec(3), base
-    real(dp) :: vec(3), vec_star(3, nsymm_rot), dnrm2
-
-    if(present(indexlist)) then
-       nmesh = size(indexlist)
-    else
-       nmesh = product(mesh)
-    end if
-
-    allocate(index_mesh(3,nmesh))
-
-    !Create mesh of demuxed 0-based indices.
-    base = 0
-    if(present(indexlist)) then
-       call demux_mesh(index_mesh,nmesh,mesh,base,indexlist)
-    else
-       call demux_mesh(index_mesh,nmesh,mesh,base)
-    end if
-
-    do i = 1,nmesh !Run over total number of wave vectors.
-       call find_star(index_mesh(:,i),vec_star,mesh,qrotations) !Find star of wave vector.
-       do isym = 1,nsymm_rot !Run over all rotational symmetries of system.
-          vec = vec_star(:,isym) !Pick image.
-          ivec = nint(vec) !Snap to nearest integer grid.
-          !Check norm and save mapping:
-          if(dnrm2(3,abs(vec - dble(ivec)),1) >= 1e-2_dp) then
-             equiv_map(isym,i) = -1
-          else
-             equiv_map(isym,i) = mux_vector(modulo(ivec,mesh),mesh,base)
-          end if
-       end do
-    end do
-  end subroutine find_equiv_map
-
-  subroutine find_equiv_map_parallel(nsymm_rot,equiv_map,mesh,qrotations,indexlist)
-    !! Subroutine to create the map of equivalent wave vectors.
-
-    integer(k8), intent(in) :: nsymm_rot, mesh(3)
-    real(dp), intent(in) :: qrotations(:,:,:)
-    integer(k8), optional, intent(in) :: indexlist(:)
-    integer(k8), intent(out) :: equiv_map(:,:)
-
     integer(k8) :: nmesh, chunk, counter, im, num_active_images
     integer(k8), allocatable :: index_mesh(:,:), start[:], end[:]
     integer(k8) :: i, isym, ivec(3), base
@@ -304,7 +260,7 @@ contains
        equiv_map(:, start[im]:end[im]) = equiv_map_chunk(:,:)[im]
     end do
     sync all
-  end subroutine find_equiv_map_parallel
+  end subroutine find_equiv_map
 
   subroutine find_irred_wedge(mesh,nwavevecs_irred,wavevecs_irred, &
        indexlist_irred,nequivalent,nsymm_rot,qrotations,ibz2fbz_map,equivalence_map,blocks,indexlist)
@@ -353,10 +309,8 @@ contains
 
     if(blocks) then
        call find_equiv_map(nsymm_rot, equivalence_map, mesh, qrotations, indexlist)
-       !call find_equiv_map_parallel(nsymm_rot, equivalence_map, mesh, qrotations, indexlist)
     else
        call find_equiv_map(nsymm_rot, equivalence_map, mesh, qrotations)
-       !call find_equiv_map_parallel(nsymm_rot, equivalence_map, mesh, qrotations)
     end if
 
     allocate(indexlist_irred_tmp(nwavevecs), nequivalent_tmp(nwavevecs), &
