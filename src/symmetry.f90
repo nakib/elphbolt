@@ -19,7 +19,8 @@ module symmetry_module
   !! Brillouin zone symmetries.
 
   use params, only: dp, k8
-  use misc, only: mux_vector, demux_mesh, demux_vector, exit_with_message, subtitle
+  use misc, only: mux_vector, demux_mesh, demux_vector, &
+       exit_with_message, subtitle, distribute_points
   use crystal_module !, only :: crystal
   use spglib_wrapper, only: get_operations, get_cartesian_operations, get_num_operations
   
@@ -241,6 +242,70 @@ contains
     end do
   end subroutine find_equiv_map
 
+  subroutine find_equiv_map_parallel(nsymm_rot,equiv_map,mesh,qrotations,indexlist)
+    !! Subroutine to create the map of equivalent wave vectors.
+
+    integer(k8), intent(in) :: nsymm_rot, mesh(3)
+    real(dp), intent(in) :: qrotations(:,:,:)
+    integer(k8), optional, intent(in) :: indexlist(:)
+    integer(k8), intent(out) :: equiv_map(:,:)
+
+    integer(k8) :: nmesh, chunk, counter, im, num_active_images
+    integer(k8), allocatable :: index_mesh(:,:), start[:], end[:]
+    integer(k8) :: i, isym, ivec(3), base
+    real(dp) :: vec(3), vec_star(3, nsymm_rot), dnrm2
+    integer(k8), allocatable :: equiv_map_chunk(:,:)[:]
+
+    if(present(indexlist)) then
+       nmesh = size(indexlist)
+    else
+       nmesh = product(mesh)
+    end if
+
+    allocate(index_mesh(3,nmesh))
+
+    !Create mesh of demuxed 0-based indices.
+    base = 0
+    if(present(indexlist)) then
+       call demux_mesh(index_mesh,nmesh,mesh,base,indexlist)
+    else
+       call demux_mesh(index_mesh,nmesh,mesh,base)
+    end if
+
+    !Allocate start and end coarrays
+    allocate(start[*], end[*])
+    
+    !Divide wave vectors among images
+    call distribute_points(nmesh, chunk, start, end, num_active_images)
+
+    !Allocate small work variable chunk for each image
+    allocate(equiv_map_chunk(nsymm_rot, chunk)[*])
+
+    counter = 0
+    do i = start, end !Run over total number of wave vectors.
+       !Increase counter
+       counter = counter + 1
+       call find_star(index_mesh(:,i),vec_star,mesh,qrotations) !Find star of wave vector.
+       do isym = 1, nsymm_rot !Run over all rotational symmetries of system.
+          vec = vec_star(:,isym) !Pick image.
+          ivec = nint(vec) !Snap to nearest integer grid.
+          !Check norm and save mapping:
+          if(dnrm2(3,abs(vec - dble(ivec)),1) >= 1e-2_dp) then
+             equiv_map_chunk(isym, counter) = -1
+          else
+             equiv_map_chunk(isym, counter) = mux_vector(modulo(ivec,mesh),mesh,base)
+          end if
+       end do
+    end do
+    
+    !Collect equiv_map_chunks in equiv_map
+    sync all
+    do im = 1, num_active_images
+       equiv_map(:, start[im]:end[im]) = equiv_map_chunk(:,:)[im]
+    end do
+    sync all
+  end subroutine find_equiv_map_parallel
+
   subroutine find_irred_wedge(mesh,nwavevecs_irred,wavevecs_irred, &
        indexlist_irred,nequivalent,nsymm_rot,qrotations,ibz2fbz_map,equivalence_map,blocks,indexlist)
     !! Find the irreducible wedge of the FBZ and other quantities.
@@ -288,8 +353,10 @@ contains
 
     if(blocks) then
        call find_equiv_map(nsymm_rot, equivalence_map, mesh, qrotations, indexlist)
+       !call find_equiv_map_parallel(nsymm_rot, equivalence_map, mesh, qrotations, indexlist)
     else
        call find_equiv_map(nsymm_rot, equivalence_map, mesh, qrotations)
+       !call find_equiv_map_parallel(nsymm_rot, equivalence_map, mesh, qrotations)
     end if
 
     allocate(indexlist_irred_tmp(nwavevecs), nequivalent_tmp(nwavevecs), &
