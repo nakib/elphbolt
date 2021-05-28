@@ -502,7 +502,7 @@ contains
        write(*,'(A75)') "| [*] https://www.gnu.org/philosophy/free-sw.en.html                      |"
        write(*,'(A75)') "+-------------------------------------------------------------------------+" 
        print*, ' '
-       write(*, "(A, I1)") 'Number of coarray images = ', num_images()
+       write(*, "(A, I5)") 'Number of coarray images = ', num_images()
     end if
   end subroutine welcome
   

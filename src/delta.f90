@@ -54,7 +54,7 @@ contains
     delta_fn_tetra = 0.0_dp
 
     !Total number of tetrahedra in the system
-    numtetra = product(mesh)*6.0_dp
+    numtetra = product(mesh)*6.0_k8
     
     !Grab number of tetrahedra in which wave vector belongs
     num = tetracount(ik)
@@ -237,7 +237,7 @@ contains
     
     do ik = 1, nk !Run over all wave vectors in FBZ
        if(blocks) then !For energy window restricted FBZ
-          call demux_vector(indexlist(ik) - 1, ijk, mesh, 1_k8)
+          call demux_vector(indexlist(ik), ijk, mesh, 1_k8)
        else !For unrestristed FBZ
           call demux_vector(ik, ijk, mesh, 1_k8)
        end if

@@ -109,7 +109,7 @@ contains
     !Set values from input:
     ! Read allocations
     read(1, nml = allocations)
-    if(numelements < 1 .or. numatoms < 1 .or. numatoms > numelements) then
+    if(numelements < 1 .or. numatoms < 1 .or. numatoms < numelements) then
        call exit_with_message('Bad input(s) in allocations.')
     end if
     c%numelements = numelements
@@ -184,7 +184,7 @@ contains
     if(this_image() == 1) then
        write(*, "(A, A)") 'Material: ', c%name
        if(c%autoisotopes) write(*,"(A)") 'Isotopic average of masses will be used.'
-       do i = 1, c%numatoms
+       do i = 1, c%numelements
           write(*,"(A, A, 1E16.8, A)") trim(c%elements(i)), " mass = ", c%masses(i), " u"
        end do
        write(*,"(A)") 'Lattice vectors [nm]:'
@@ -207,7 +207,7 @@ contains
           end do
           write(*,"(A)") 'Born effective charges:'
           do i = 1, c%numatoms
-             write(*,"(A)") trim(c%elements(i))
+             write(*,"(A)") trim(c%elements(c%atomtypes(i)))
              do j = 1, 3
                 write(*,"(3(1E16.8,x))") c%born(:,j,i)
              end do
