@@ -869,9 +869,10 @@ contains
 
              !Calculate the fine mesh phonon.
              qlist(1, :) = q
-             call phonon_espresso(ph, crys, 1_k8, qlist, &
-                  ph_ens_iq, ph_evecs_iq)
-             !call wann%ph_wann_epw(crys, 1_k8, qlist, ph_ens_iq, ph_evecs_iq)
+             !This could be very slow:
+             !call phonon_espresso(ph, crys, 1_k8, qlist, ph_ens_iq, ph_evecs_iq)
+             !This is much faster:
+             call wann%ph_wann_epw(crys, 1_k8, qlist, ph_ens_iq, ph_evecs_iq)
           else !Original (coarser) mesh phonon
              q_indvec = modulo(q_indvec/el%mesh_ref, ph%qmesh) !0-based index vector
              q = q_indvec/dble(ph%qmesh) !crystal coords.
