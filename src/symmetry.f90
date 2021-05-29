@@ -291,10 +291,11 @@ contains
 
     !Local variables
     integer(k8) :: nwavevecs, i, imux, s, image, imagelist(nsymm_rot), &
-         nrunninglist, counter, ijk(3)
+         nrunninglist, counter, ijk(3), aux, num_active_images, chunk
     integer(k8), allocatable :: runninglist(:), &
-         indexlist_irred_tmp(:), nequivalent_tmp(:), ibz2fbz_map_tmp(:,:,:)
-    logical :: proceed
+         indexlist_irred_tmp(:), nequivalent_tmp(:), ibz2fbz_map_tmp(:,:,:), &
+         start[:], end[:], check[:]
+    logical :: in_list
 
     if(blocks .and. .not. present(indexlist)) &
          call exit_with_message("If blocks is true then indexlist must be present")
@@ -315,13 +316,16 @@ contains
 
     allocate(indexlist_irred_tmp(nwavevecs), nequivalent_tmp(nwavevecs), &
          runninglist(nwavevecs), ibz2fbz_map_tmp(nsymm_rot, nwavevecs, 2))
-
+    
+    !Allocate coarrays
+    allocate(start[*], end[*], check[*])
+    
+    runninglist = 0
+    nrunninglist = 0
     nwavevecs_irred = 0
     nequivalent_tmp = 0
-    nrunninglist = 0
-    runninglist = 0
     counter = 0
-    do i = 1,nwavevecs !Take a point from the FBZ
+    do i = 1, nwavevecs !Take a point from the FBZ
        !Get the muxed index of the wave vector
        if(blocks) then
           imux = indexlist(i)
@@ -330,15 +334,27 @@ contains
        end if
 
        !Check if point is not already in the running list of points
-       proceed = .not. any(runninglist(1:nrunninglist) == imux)
-       if(proceed) then
+       in_list = .false.
+       if(nrunninglist > 0) then
+          !Divide wave vectors among images
+          call distribute_points(nrunninglist, chunk, start, end, num_active_images)
+
+          check = 0
+          if(any(runninglist(start:end) == imux)) check = 1
+          call co_sum(check)
+
+          if(check > 0) in_list = .true.
+       end if
+       sync all
+
+       if(.not. in_list) then
           !Increment irreducible point counter
           nwavevecs_irred = nwavevecs_irred + 1
           !Save point to irreducible wedge list
           indexlist_irred_tmp(nwavevecs_irred) = imux
 
           !Generate images of this irreducible point
-          do s = 1,nsymm_rot !Take a rotation
+          do s = 1, nsymm_rot !Take a rotation
              image = equivalence_map(s, i) !This is the image
 
              !Check if image is not already in the list of images
@@ -346,13 +362,14 @@ contains
                 !Increment equivalent image counter
                 nequivalent_tmp(nwavevecs_irred) = & 
                      nequivalent_tmp(nwavevecs_irred) + 1
+                aux = nequivalent_tmp(nwavevecs_irred)
                 !Save image to list of images and running list of
                 !points that have already been considered
-                imagelist(nequivalent_tmp(nwavevecs_irred)) = image
+                imagelist(aux) = image
                 nrunninglist = nrunninglist + 1
                 runninglist(nrunninglist) = image
                 !Save mapping of the irreducible point to its FBZ image
-                ibz2fbz_map_tmp(nequivalent_tmp(nwavevecs_irred), &
+                ibz2fbz_map_tmp(aux, &
                      nwavevecs_irred, :) = (/s, image/)
              end if
           end do
@@ -378,10 +395,10 @@ contains
 
     !Deallocate some internal data
     deallocate(indexlist_irred_tmp, nequivalent_tmp, ibz2fbz_map_tmp)
-
+    
     !Create crystal coords IBZ wave vectors
     allocate(wavevecs_irred(nwavevecs_irred,3))
-    do i = 1,nwavevecs_irred !run over total number of vectors
+    do i = 1, nwavevecs_irred !run over total number of vectors
        imux = indexlist_irred(i)
        call demux_vector(imux, ijk, mesh, 0_k8) !get 0-based (i,j,k) indices
 

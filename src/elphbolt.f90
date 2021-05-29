@@ -70,8 +70,6 @@ program elphbolt
   !Calculate electrons
   call el%initialize(wann, crys, sym, num)
 
-  call exit
-
   !Calculate electron density of states
   call calculate_dos(el, num%tetrahedra)
 
