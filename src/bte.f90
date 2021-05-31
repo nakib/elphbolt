@@ -27,8 +27,8 @@ module bte_module
   use symmetry_module, only: symmetry
   use phonon_module, only: phonon
   use electron_module, only: electron
-  use interactions, only: calculate_ph_rta_rates, read_transition_probs_3ph, &
-       read_transition_probs_e, calculate_el_rta_rates
+  use interactions, only: calculate_ph_rta_rates, read_transition_probs_e, &
+       calculate_el_rta_rates
   use bz_sums, only: calculate_transport_coeff
 
   implicit none
@@ -644,9 +644,10 @@ contains
     character(len = *), intent(in) :: datadumpdir
 
     !Local variables
-    integer(k8) :: nstates_irred, nprocs_3ph, chunk, istate1, numbranches, s1, &
+    integer(k8) :: nstates_irred, chunk, istate1, numbranches, s1, &
          iq1_ibz, ieq, iq1_sym, iq1_fbz, iproc, iq2, s2, iq3, s3, im, nq, &
-         num_active_images, numbands, ik, ikp, m, n, nprocs_phe, aux1, aux2
+         num_active_images, numbands, ik, ikp, m, n, nprocs_phe, aux1, aux2, &
+         nprocs_3ph_plus, nprocs_3ph_minus
     integer(k8), allocatable :: istate2_plus(:), istate3_plus(:), &
          istate2_minus(:), istate3_minus(:), istate_el1(:), istate_el2(:), &
          start[:], end[:]
@@ -671,14 +672,6 @@ contains
     
     !Total number of IBZ states
     nstates_irred = size(rta_rates_ibz(:,1))*numbranches
-
-    !Total number of 3-phonon processes for a given initial phonon state.
-    nprocs_3ph = nq*numbranches**2
-
-    !Allocate arrays
-    allocate(Wp(nprocs_3ph), Wm(nprocs_3ph))
-    allocate(istate2_plus(nprocs_3ph), istate3_plus(nprocs_3ph), &
-         istate2_minus(nprocs_3ph), istate3_minus(nprocs_3ph))
     
     !Allocate coarrays
     allocate(start[*], end[*])
@@ -706,14 +699,20 @@ contains
        filepath_Wp = trim(adjustl(Wdir))//'/Wp.istate'//trim(adjustl(tag))
 
        !Read W+ from file
-       call read_transition_probs_3ph(trim(adjustl(filepath_Wp)), Wp, &
+       if(allocated(Wp)) deallocate(Wp)
+       if(allocated(istate2_plus)) deallocate(istate2_plus)
+       if(allocated(istate3_plus)) deallocate(istate3_plus)
+       call read_transition_probs_e(trim(adjustl(filepath_Wp)), nprocs_3ph_plus, Wp, &
             istate2_plus, istate3_plus)
 
        !Set W- filename
        filepath_Wm = trim(adjustl(Wdir))//'/Wm.istate'//trim(adjustl(tag))
 
        !Read W- from file
-       call read_transition_probs_3ph(trim(adjustl(filepath_Wm)), Wm, &
+       if(allocated(Wm)) deallocate(Wm)
+       if(allocated(istate2_minus)) deallocate(istate2_minus)
+       if(allocated(istate3_minus)) deallocate(istate3_minus)
+       call read_transition_probs_e(trim(adjustl(filepath_Wm)), nprocs_3ph_minus, Wm, &
             istate2_minus, istate3_minus)
 
        if(drag) then
@@ -734,9 +733,8 @@ contains
           iq1_fbz = ph%ibz2fbz_map(ieq, iq1_ibz, 2) !image due to symmetry
 
           !Sum over scattering processes
-          do iproc = 1, nprocs_3ph
-             !Self contribution from plus processes:
-             
+          !Self contribution from plus processes:
+          do iproc = 1, nprocs_3ph_plus
              !Grab 2nd and 3rd phonons
              call demux_state(istate2_plus(iproc), numbranches, s2, iq2)
              call demux_state(istate3_plus(iproc), numbranches, s3, iq3)
@@ -744,16 +742,17 @@ contains
              response_ph_reduce(iq1_fbz, s1, :) = response_ph_reduce(iq1_fbz, s1, :) + &
                   Wp(iproc)*(response_ph(ph%equiv_map(iq1_sym, iq3), s3, :) - &
                   response_ph(ph%equiv_map(iq1_sym, iq2), s2, :))
-
-             !Self contribution from minus processes:
-             
+          end do
+          
+          !Self contribution from minus processes:
+          do iproc = 1, nprocs_3ph_minus
              !Grab 2nd and 3rd phonons
              call demux_state(istate2_minus(iproc), numbranches, s2, iq2)
              call demux_state(istate3_minus(iproc), numbranches, s3, iq3)
 
              response_ph_reduce(iq1_fbz, s1, :) = response_ph_reduce(iq1_fbz, s1, :) + &
-                     0.5_dp*Wm(iproc)*(response_ph(ph%equiv_map(iq1_sym, iq3), s3, :) + &
-                     response_ph(ph%equiv_map(iq1_sym, iq2), s2, :))
+                  0.5_dp*Wm(iproc)*(response_ph(ph%equiv_map(iq1_sym, iq3), s3, :) + &
+                  response_ph(ph%equiv_map(iq1_sym, iq2), s2, :))
           end do
 
           !Drag contribution:

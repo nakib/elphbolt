@@ -186,6 +186,8 @@ contains
        end if ! .not. (e <= e1 .or. e >= e4)
     end do !itk
 
+    if(delta_fn_tetra < 1.0e-12_dp) delta_fn_tetra = 0.0_dp
+    
     !Normalize with the total number of tetrahedra
     delta_fn_tetra = delta_fn_tetra/numtetra
   end function delta_fn_tetra

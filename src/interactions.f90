@@ -32,7 +32,7 @@ module interactions
 
   private
   public calculate_gReq, calculate_gkRp, calculate_3ph_interaction, &
-       calculate_ph_rta_rates, read_transition_probs_3ph, read_transition_probs_e, &
+       calculate_ph_rta_rates, read_transition_probs_e, &
        calculate_eph_interaction_ibzq, calculate_eph_interaction_ibzk, &
        calculate_echimp_interaction_ibzk, calculate_el_rta_rates
 
@@ -138,7 +138,7 @@ contains
     integer(k8) :: start, end, chunk, istate1, nstates_irred, &
          nprocs, s1, s2, s3, iq1_ibz, iq1, iq2, iq3_minus, it, &
          q1_indvec(3), q2_indvec(3), q3_minus_indvec(3), index_minus, index_plus, &
-         neg_iq2, neg_q2_indvec(3), num_active_images
+         neg_iq2, neg_q2_indvec(3), num_active_images, plus_count, minus_count
     real(dp) :: en1, en2, en3, massfac, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
          occup_fac, Vp2_index_plus, const, bose2, bose3, delta_minus, delta_plus
     real(dp), allocatable :: Vm2(:), Wm(:), Wp(:)
@@ -171,9 +171,9 @@ contains
     !Total number of IBZ blocks states
     nstates_irred = ph%nq_irred*ph%numbranches
 
-    !Total number of 3-phonon processes for a given initial phonon state
+    !Maximum total number of 3-phonon processes for a given initial phonon state
     nprocs = ph%nq*ph%numbranches**2
-
+    
     !Allocate |V^-|^2 and, if needed, W- and W+
     allocate(Vm2(nprocs))
     if(key == 'W') then
@@ -192,8 +192,24 @@ contains
 
     !Run over first phonon IBZ states
     do istate1 = start, end
-       !Initialize transition probabilities
+       !Load |V^-|^2 from disk for scattering rates calculation
        if(key == 'W') then
+          !Change to data output directory
+          call chdir(trim(adjustl(num%Vdir)))
+
+          !Read data in binary format
+          write (filename, '(I9)') istate1
+          filename = 'Vm2.istate'//trim(adjustl(filename))
+          open(1, file = trim(filename), status = 'old', access = 'stream')
+          read(1) Vm2
+          close(1)
+
+          !Change back to working directory
+          call chdir(num%cwd)
+
+          !Initialize transition probabilities
+          plus_count = 0_k8
+          minus_count = 0_k8
           Wp(:) = 0.0_dp
           Wm(:) = 0.0_dp
           istate2_plus(:) = 0_k8
@@ -201,7 +217,7 @@ contains
           istate2_minus(:) = 0_k8
           istate3_minus(:) = 0_k8
        end if
-
+       
        !Demux state index into branch (s) and wave vector (iq) indices
        call demux_state(istate1, ph%numbranches, s1, iq1_ibz)
 
@@ -217,22 +233,6 @@ contains
 
        !Convert from crystal to 0-based index vector
        q1_indvec = nint(q1*ph%qmesh)
-
-       !Load |V^-|^2 from disk for scattering rates calculation
-       if(key == 'W') then
-          !Change to data output directory
-          call chdir(trim(adjustl(num%Vdir)))
-
-          !Read data in binary format
-          write (filename, '(I9)') istate1
-          filename = 'Vm2.istate'//trim(adjustl(filename))
-          open(1, file = trim(filename), status = 'old', access = 'stream')
-          read(1) Vm2
-          close(1)
-
-          !Change back to working directory
-          call chdir(num%cwd)
-       end if
        
        !Run over second (FBZ) phonon wave vectors
        do iq2 = 1, ph%nq
@@ -294,7 +294,7 @@ contains
 
                 delta_plus = delta_fn_tetra(en3 - en1, neg_iq2, s2, ph%qmesh, ph%tetramap, &
                      ph%tetracount, ph%tetra_evals)
-                
+
                 if(key == 'V') then
                    if(en1*en2*en3 == 0.0_dp .or. &
                         (delta_minus == 0.0_dp .and. delta_plus == 0.0_dp)) then
@@ -309,6 +309,8 @@ contains
                 end if
 
                 if(key == 'W') then
+                   if(en1*en2*en3 == 0.0_dp) cycle
+                   
                    !Bose factor for phonon 3
                    bose3 = Bose(en3, crys%T)
 
@@ -319,11 +321,16 @@ contains
                    ! = (bose2 + bose3 + 1)
                    occup_fac = (bose2 + bose3 + 1.0_dp)
 
-                   !Save W-
-                   if(en1*en2*en3 /= 0.0_dp) then
-                      Wm(index_minus) = Vm2(index_minus)*occup_fac*delta_minus/en1/en2/en3
-                   end if
+                   !Non-zero process counter
+                   if(delta_minus > 0.0_dp) then
+                      minus_count = minus_count + 1
 
+                      !Save W-
+                      Wm(minus_count) = Vm2(index_minus)*occup_fac*delta_minus/en1/en2/en3
+                      istate2_minus(minus_count) = mux_state(ph%numbranches, s2, iq2)
+                      istate3_minus(minus_count) = mux_state(ph%numbranches, s3, iq3_minus)
+                   end if
+                 
                    !Calculate W+:
 
                    !Grab corresponding plus process using
@@ -335,17 +342,16 @@ contains
                    !(bose1 + 1)*(bose2 + 1)*bose3/(bose1*(bose1 + 1))
                    ! = bose2 - bose3.
                    occup_fac = (bose2 - bose3)
-                   
-                   !Save W+
-                   if(en1*en2*en3 /= 0.0_dp) then
-                      Wp(index_plus) = Vp2_index_plus*occup_fac*delta_plus/en1/en2/en3
+
+                   !Non-zero process counter
+                   if(delta_plus > 0.0_dp) then
+                      plus_count = plus_count + 1
+
+                      !Save W+
+                      Wp(plus_count) = Vp2_index_plus*occup_fac*delta_plus/en1/en2/en3
+                      istate2_plus(plus_count) = mux_state(ph%numbranches, s2, neg_iq2)
+                      istate3_plus(plus_count) = mux_state(ph%numbranches, s3, iq3_minus)
                    end if
-                   
-                   !Save 2nd and 3rd phonon states
-                   istate2_minus(index_minus) = mux_state(ph%numbranches, s2, iq2)
-                   istate2_plus(index_plus) = mux_state(ph%numbranches, s2, neg_iq2)
-                   istate3_minus(index_minus) = mux_state(ph%numbranches, s3, iq3_minus)
-                   istate3_plus(index_plus) = istate3_minus(index_minus)
                 end if
              end do !s3
           end do !s2
@@ -379,21 +385,23 @@ contains
 
           filename_Wm = 'Wm.istate'//trim(adjustl(filename))
           open(1, file = trim(filename_Wm), status = 'replace', access = 'stream')
-          write(1) Wm
-          write(1) istate2_minus
-          write(1) istate3_minus
+          write(1) minus_count
+          write(1) Wm(1:minus_count)
+          write(1) istate2_minus(1:minus_count)
+          write(1) istate3_minus(1:minus_count)
           close(1)
 
           filename_Wp = 'Wp.istate'//trim(adjustl(filename))
           open(1, file = trim(filename_Wp), status = 'replace', access = 'stream')
-          write(1) Wp
-          write(1) istate2_plus
-          write(1) istate3_plus
+          write(1) plus_count
+          write(1) Wp(1:plus_count)
+          write(1) istate2_plus(1:plus_count)
+          write(1) istate3_plus(1:plus_count)
           close(1)
        end if
 
        !Change back to working directory
-       call chdir(num%cwd)
+       call chdir(num%cwd)       
     end do !istate1
     sync all
   end subroutine calculate_3ph_interaction
@@ -1172,8 +1180,8 @@ contains
     type(electron), intent(in), optional :: el
 
     !Local variables
-    integer(k8) :: nstates_irred, procs, istate, nprocs_3ph, nprocs_phe, &
-         iproc, chunk, s, iq, im, num_active_images
+    integer(k8) :: nstates_irred, procs, istate, nprocs_3ph_plus, nprocs_3ph_minus, &
+         nprocs_phe, iproc, chunk, s, iq, im, num_active_images
     integer(k8), allocatable :: start[:], end[:]
     real(dp), allocatable :: rta_rates_3ph_psum(:,:)[:], rta_rates_phe_psum(:,:)[:], &
          W(:), Y(:)
@@ -1190,7 +1198,7 @@ contains
     nstates_irred = ph%nq_irred*ph%numbranches
 
     !Total number of 3-phonon processes for a given phonon state
-    nprocs_3ph = ph%nq*ph%numbranches**2
+    !nprocs_3ph = ph%nq*ph%numbranches**2
 
     !Allocate start and end coarrays
     allocate(start[*], end[*])
@@ -1212,7 +1220,7 @@ contains
     rta_rates_phe(:, :) = 0.0_dp
     
     !Allocate transition probabilities variable
-    allocate(W(nprocs_3ph))
+    !allocate(W(nprocs_3ph))
     
     !Run over first phonon IBZ states
     do istate = start, end
@@ -1224,9 +1232,11 @@ contains
        filepath_Wp = trim(adjustl(Wdir))//'/Wp.istate'//trim(adjustl(tag))
        
        !Read W+ from file
-       call read_transition_probs_3ph(trim(adjustl(filepath_Wp)), W)
+       !call read_transition_probs_3ph(trim(adjustl(filepath_Wp)), W)
+       if(allocated(W)) deallocate(W)
+       call read_transition_probs_e(trim(adjustl(filepath_Wp)), nprocs_3ph_plus, W)
 
-       do iproc = 1, nprocs_3ph
+       do iproc = 1, nprocs_3ph_plus
           rta_rates_3ph_psum(iq, s) = rta_rates_3ph_psum(iq, s) + W(iproc) 
        end do
 
@@ -1234,9 +1244,11 @@ contains
        filepath_Wm = trim(adjustl(Wdir))//'/Wm.istate'//trim(adjustl(tag))
        
        !Read W- from file
-       call read_transition_probs_3ph(trim(adjustl(filepath_Wm)), W)
+       !call read_transition_probs_3ph(trim(adjustl(filepath_Wm)), W)
+       if(allocated(W)) deallocate(W)
+       call read_transition_probs_e(trim(adjustl(filepath_Wm)), nprocs_3ph_minus, W)
 
-       do iproc = 1, nprocs_3ph
+       do iproc = 1, nprocs_3ph_minus
           rta_rates_3ph_psum(iq, s) = rta_rates_3ph_psum(iq, s) + 0.5_dp*W(iproc)
        end do
 
@@ -1366,28 +1378,8 @@ contains
     
   end subroutine calculate_el_rta_rates
   
-  subroutine read_transition_probs_3ph(filepath, T, istate2, istate3)
-    !! Subroutine to read the phonon transition probabilities from disk.
-
-    character(len = *), intent(in) :: filepath
-    real(dp), intent(out) :: T(:)
-    integer(k8), intent(out), optional :: istate2(:), istate3(:)
-
-    !Read data
-    open(1, file = trim(adjustl(filepath)), status = 'old', access = 'stream')
-    read(1) T
-    if(present(istate2) .and. present(istate3)) then
-       read(1) istate2
-       read(1) istate3
-    end if
-    close(1)
-  end subroutine read_transition_probs_3ph
-
   subroutine read_transition_probs_e(filepath, N, TP, istate1, istate2)
-    !! Subroutine to read transition probabilities from disk for e-ph/e-chimp/ph-e processes.
-    !! This is different from the read_transition_probs_3ph subroutine in that this
-    !! returns the number interaction processes and also allocates the return arrays
-    !! accordingly.
+    !! Subroutine to read transition probabilities from disk for interaction processes.
 
     character(len = *), intent(in) :: filepath
     integer(k8), intent(out) :: N
