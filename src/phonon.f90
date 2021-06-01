@@ -220,10 +220,13 @@ contains
                symmetrizers_chunk(:, :, iq - start + 1)/kk
        end if
     end do
+    
     allocate(ph%symmetrizers(3, 3, ph%nq))
+    sync all
     do im = 1, num_active_images
        ph%symmetrizers(:, :, start[im]:end[im]) = symmetrizers_chunk(:,:,:)[im]
     end do
+    sync all
     deallocate(symmetrizers_chunk)
     
     !Symmetrize phonon energies and velocities.
