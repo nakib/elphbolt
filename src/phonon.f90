@@ -18,7 +18,7 @@ module phonon_module
   !! Module containing type and procedures related to the phononic properties.
 
   use params, only: dp, k8, bohr2nm, pi, twopi, Ryd2eV, oneI
-  use misc, only: print_message, subtitle, expi
+  use misc, only: print_message, subtitle, expi, distribute_points
   use numerics_module, only: numerics
   use wannier_module, only: epw_wannier
   use crystal_module, only: crystal, calculate_wavevectors_full
@@ -47,8 +47,6 @@ module phonon_module
      !! List of all phonon wave vectors (crystal coordinates).
      real(dp), allocatable :: wavevecs_irred(:,:)
      !! List of irreducible phonon wave vectors (crystal coordinates).
-     integer(k8), allocatable :: indexlist(:)
-     !! List of muxed indices of the FBZ wave vectors.
      integer(k8), allocatable :: indexlist_irred(:)
      !! List of muxed indices of the IBZ wedge.
      integer(k8), allocatable :: nequiv(:)
@@ -155,7 +153,12 @@ contains
     type(numerics), intent(in) :: num
     
     !Local variables
-    integer(k8) :: i, iq, ii, jj, kk, l, il, s, ib
+    integer(k8) :: i, iq, ii, jj, kk, l, il, s, ib, im, chunk, &
+         num_active_images
+    integer(k8), allocatable :: start[:], end[:]
+    integer(k8), allocatable :: indexlist(:)
+    real(dp), allocatable :: ens_chunk(:,:)[:], vels_chunk(:,:,:)[:]
+    complex(dp), allocatable :: evecs_chunk(:,:,:)[:]
     !Switch for mesh utilites with or without energy restriction
     logical :: blocks
     character(len = 1024) :: numcols
@@ -164,22 +167,37 @@ contains
 
     call print_message("Calculating phonon FBZ quantities...")
 
-    allocate(ph%indexlist(ph%nq))
-    do iq = 1, ph%nq
-       ph%indexlist(iq) = iq
-    end do
+    !Allocate start and end coarrays
+    allocate(start[*], end[*])
+
+    !Divide wave vectors among images
+    call distribute_points(ph%nq, chunk, start, end, num_active_images)
+
+    !Allocate small work variable chunk for each image
+    allocate(ens_chunk(chunk, ph%numbranches)[*])
+    allocate(vels_chunk(chunk, ph%numbranches, 3)[*])
+    allocate(evecs_chunk(chunk, ph%numbranches, ph%numbranches)[*])
 
     !Calculate FBZ mesh
     call calculate_wavevectors_full(ph%qmesh, ph%wavevecs, blocks)
-
+    
     !Calculate FBZ phonon quantities
+    call phonon_espresso(ph, crys, chunk, ph%wavevecs(start:end, :), &
+         ens_chunk, evecs_chunk, vels_chunk)
+
+    !Gather the chunks from the images
     allocate(ph%ens(ph%nq, ph%numbranches))
     allocate(ph%vels(ph%nq, ph%numbranches, 3))
     allocate(ph%evecs(ph%nq, ph%numbranches, ph%numbranches))
-    !call phonon_espresso(ph, crys, ph%nq, ph%wavevecs, &
-    !ph%ens, ph%vels, ph%evecs)
-    call phonon_espresso(ph, crys, ph%nq, ph%wavevecs, ph%ens, ph%evecs, ph%vels)
-
+    sync all
+    do im = 1, num_active_images
+       ph%ens(start[im]:end[im], :) = ens_chunk(:,:)[im]
+       ph%vels(start[im]:end[im], :, :) = vels_chunk(:,:,:)[im]
+       ph%evecs(start[im]:end[im], :, :) = evecs_chunk(:,:,:)[im]
+    end do
+    sync all
+    deallocate(ens_chunk, vels_chunk, evecs_chunk)
+    
     !Calculate IBZ mesh
     call print_message("Calculating IBZ and IBZ -> FBZ mappings...")
     call find_irred_wedge(ph%qmesh, ph%nq_irred, ph%wavevecs_irred, &
@@ -225,9 +243,14 @@ contains
     
     !Create FBZ to IBZ map
     call print_message("Calculating FBZ -> IBZ mappings...")
-    call create_fbz2ibz_map(ph%fbz2ibz_map, ph%nq, ph%nq_irred, ph%indexlist, &
+    allocate(indexlist(ph%nq))
+    do iq = 1, ph%nq
+       indexlist(iq) = iq
+    end do
+    call create_fbz2ibz_map(ph%fbz2ibz_map, ph%nq, ph%nq_irred, indexlist, &
          ph%nequiv, ph%ibz2fbz_map)
-
+    deallocate(indexlist)
+    
     !Print out irreducible phonon energies and velocities
     if(this_image() == 1) then
        write(numcols, "(I0)") ph%numbranches
