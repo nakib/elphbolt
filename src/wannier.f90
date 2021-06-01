@@ -357,9 +357,6 @@ contains
           if(energies(iq,ib) < -0.005_dp) then
              call exit_with_message('Large negative phonon energy found! Stopping!')             
           else if(energies(iq,ib) < 0 .and. energies(iq,ib) > -0.005_dp) then
-             print*, 'Warning! Small negative phonon energy for q-point, branch =', &
-                  iq, ib
-             print*, 'Setting it to zero. Please check Wannier parameters.'
              energies(iq,ib) = 0
           end if
        end do
