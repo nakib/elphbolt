@@ -127,7 +127,7 @@ module electron_module
      
    contains
 
-     procedure :: initialize=>read_input_and_setup
+     procedure :: initialize=>read_input_and_setup, deallocate_eigenvecs
   end type electron
 
 contains
@@ -537,4 +537,12 @@ contains
     energies(1:nk, :) = energies_tmp(1:nk, :)
     velocities(1:nk, :, :) = velocities_tmp(1:nk, :, :)
   end subroutine fbz_blocks_quantities
+
+  subroutine deallocate_eigenvecs(el)
+    !! Deallocate the electron eigenvectors
+
+    class(electron), intent(inout) :: el
+
+    deallocate(el%evecs, el%evecs_irred)
+  end subroutine deallocate_eigenvecs
 end module electron_module

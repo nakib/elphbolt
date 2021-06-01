@@ -112,6 +112,12 @@ program elphbolt
   !Calculate e-ph transition probabilities
   call calculate_eph_interaction_ibzk(wann, crys, el, ph, num, 'X')
 
+  !Deallocate Wannier quantities
+  call wann%deallocate_wannier
+  
+  !After this point the electron eigenvectors are not needed
+  call el%deallocate_eigenvecs
+  
   !Calculate e-ch. imp. transition probabilities
   if(num%elchimp) then
      call calculate_echimp_interaction_ibzk(crys, el, num)
@@ -127,8 +133,8 @@ program elphbolt
      call calculate_3ph_interaction(ph, crys, num, 'W')
   end if
 
-  !Deallocate Wannier quantities
-  call wann%deallocate_wannier
+  !After this point the phonon eigenvectors are not needed
+  call ph%deallocate_eigenvecs
   
   !Solve BTEs
   call bt%solve_bte(num, crys, sym, ph, el)
