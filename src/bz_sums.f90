@@ -181,10 +181,6 @@ contains
 
                    !Sum over delta function
                    dos_chunk(counter, ib) = dos_chunk(counter, ib) + delta
-
-                   !
-                   !TODO need to implement Gaussian broadening
-                   !
                 end if
              end do
           end do
