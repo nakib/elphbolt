@@ -174,11 +174,13 @@ contains
     !Maximum total number of 3-phonon processes for a given initial phonon state
     nprocs = ph%nq*ph%numbranches**2
     
-    !Allocate |V^-|^2 and, if needed, W- and W+
-    allocate(Vm2_1(nprocs), Vm2_2(nprocs))
-    ! Above, we split the V- vertices into two parts:
+    !Allocate |V^-|^2
+    if(key == 'V') allocate(Vm2_1(nprocs), Vm2_2(nprocs))
+    ! Above, we split the |V-|^2 vertices into two parts:
     ! 1. that are non-zero when the minus-type processes are energetically allowed
     ! 2. that are non-zero when the symmetry-related plus-type processes are energetically allowed
+
+    !Allocate W- and W+
     if(key == 'W') then
        allocate(Wp(nprocs), Wm(nprocs))
        allocate(istate2_plus(nprocs), istate3_plus(nprocs),&
@@ -204,12 +206,16 @@ contains
           write (filename, '(I9)') istate1
           filename = 'Vm2.istate'//trim(adjustl(filename))
           open(1, file = trim(filename), status = 'old', access = 'stream')
+
           read(1) minus_count
-          if(.not. allocated(Vm2_1)) allocate(Vm2_1(minus_count))
-          if(minus_count > 0) read(1) Vm2_1(1:minus_count)
+          if(allocated(Vm2_1)) deallocate(Vm2_1)
+          allocate(Vm2_1(minus_count))
+          if(minus_count > 0) read(1) Vm2_1
+
           read(1) plus_count
-          if(.not. allocated(Vm2_2)) allocate(Vm2_2(plus_count))
-          if(plus_count > 0) read(1) Vm2_2(1:plus_count)
+          if(allocated(Vm2_2)) deallocate(Vm2_2)
+          allocate(Vm2_2(plus_count))
+          if(plus_count > 0) read(1) Vm2_2
           close(1)
 
           !Change back to working directory
@@ -300,10 +306,10 @@ contains
 
                 !Evaluate delta functions
                 delta_minus = delta_fn_tetra(en1 - en3, iq2, s2, ph%qmesh, ph%tetramap, &
-                     ph%tetracount, ph%tetra_evals)
+                     ph%tetracount, ph%tetra_evals) !minus process
 
                 delta_plus = delta_fn_tetra(en3 - en1, neg_iq2, s2, ph%qmesh, ph%tetramap, &
-                     ph%tetracount, ph%tetra_evals)
+                     ph%tetracount, ph%tetra_evals) !plus process
                 
                 if(key == 'V') then
                    if(en1*en2*en3 == 0.0_dp) cycle
@@ -347,8 +353,8 @@ contains
                    ! = (bose2 + bose3 + 1)
                    occup_fac = (bose2 + bose3 + 1.0_dp)
 
-                   !Non-zero process counter
                    if(delta_minus > 0.0_dp) then
+                      !Non-zero process counter
                       minus_count = minus_count + 1
 
                       !Save W-
@@ -369,8 +375,8 @@ contains
                    ! = bose2 - bose3.
                    occup_fac = (bose2 - bose3)
 
-                   !Non-zero process counter
                    if(delta_plus > 0.0_dp) then
+                      !Non-zero process counter
                       plus_count = plus_count + 1
 
                       !Save W+

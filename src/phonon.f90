@@ -442,9 +442,10 @@ contains
 
     type(phonon), intent(in) :: ph
     type(crystal), intent(in) :: crys
-    real(kind=8), intent(in) :: kpoints(nk, 3)
-    real(kind=8), intent(out) :: omegas(nk, ph%numbranches)
-    real(kind=8), optional, intent(out) :: velocities(nk, ph%numbranches, 3)
+    integer(k8), intent(in) :: nk
+    real(dp), intent(in) :: kpoints(nk, 3)
+    real(dp), intent(out) :: omegas(nk, ph%numbranches)
+    real(dp), optional, intent(out) :: velocities(nk, ph%numbranches, 3)
     complex(kind=8), optional, intent(out) :: eigenvect(nk, ph%numbranches, ph%numbranches)
 
     ! QE's 2nd-order files are in Ryd units.
@@ -453,20 +454,20 @@ contains
 
     integer(k8) :: ir,nreq,ntype,nat,nbranches
     integer(k8) :: i,j,ipol,jpol,iat,jat,idim,jdim,t1,t2,t3,m1,m2,m3,ik
-    integer(k8) :: ndim,nk,nwork,ncell_g(3)
-    integer(kind=8),allocatable :: tipo(:)
+    integer(k8) :: ndim,nwork,ncell_g(3)
+    integer(k8),allocatable :: tipo(:)
     character(len=5),allocatable :: label(:)
-    real(kind=8) :: weight,total_weight,exp_g,ck
-    real(kind=8) :: r_ws(3), at(3,3)
-    real(kind=8) :: alpha,geg,gmax,kt,gr,volume_r,dnrm2
-    real(kind=8) :: zig(3),zjg(3),dgeg(3),t(0:3),g(0:3),g_old(0:3)
-    real(kind=8), allocatable :: omega2(:),rwork(:)
-    real(kind=8),allocatable :: k(:,:),mass(:),r(:,:),eps(:,:)
-    real(kind=8),allocatable :: eival(:,:),vels(:,:,:),zeff(:,:,:)
-    complex(kind=8) :: auxi(3)
-    complex(kind=8),allocatable :: cauxiliar(:),eigenvectors(:,:),work(:)
-    complex(kind=8),allocatable :: dyn(:,:),dyn_s(:,:,:),dyn_g(:,:,:)
-    complex(kind=8),allocatable :: ddyn(:,:,:),ddyn_s(:,:,:,:),ddyn_g(:,:,:,:)
+    real(dp) :: weight,total_weight,exp_g,ck
+    real(dp) :: r_ws(3), at(3,3)
+    real(dp) :: alpha,geg,gmax,kt,gr,volume_r,dnrm2
+    real(dp) :: zig(3),zjg(3),dgeg(3),t(0:3),g(0:3),g_old(0:3)
+    real(dp), allocatable :: omega2(:),rwork(:)
+    real(dp),allocatable :: k(:,:),mass(:),r(:,:),eps(:,:)
+    real(dp),allocatable :: eival(:,:),vels(:,:,:),zeff(:,:,:)
+    complex(dp) :: auxi(3)
+    complex(dp),allocatable :: cauxiliar(:),eigenvectors(:,:),work(:)
+    complex(dp),allocatable :: dyn(:,:),dyn_s(:,:,:),dyn_g(:,:,:)
+    complex(dp),allocatable :: ddyn(:,:,:),ddyn_s(:,:,:,:),ddyn_g(:,:,:,:)
 
     ! Quantum Espresso's 2nd-order format contains information about
     ! lattice vectors, atomic positions, Born effective charges and so
