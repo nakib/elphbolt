@@ -54,8 +54,6 @@ module phonon_module
      integer(k8), allocatable :: ibz2fbz_map(:,:,:)
      !! Map from an IBZ phonon point to its images.
      !! The third axis contains the pair (symmetry index, image).
-     integer(k8), allocatable :: fbz2ibz_map(:)
-     !! Map from an FBZ phonon point to its IBZ wedge image.
      integer(k8), allocatable :: equiv_map(:,:)
      !! Map of equivalent points under rotations.
      !! Axis 1 runs over rotations.
@@ -156,7 +154,6 @@ contains
     integer(k8) :: i, iq, ii, jj, kk, l, il, s, ib, im, chunk, &
          num_active_images
     integer(k8), allocatable :: start[:], end[:]
-    integer(k8), allocatable :: indexlist(:)
     real(dp), allocatable :: ens_chunk(:,:)[:], vels_chunk(:,:,:)[:]
     complex(dp), allocatable :: evecs_chunk(:,:,:)[:]
     !Switch for mesh utilites with or without energy restriction
@@ -240,17 +237,7 @@ contains
           end do
        end do
     end do
-    
-    !Create FBZ to IBZ map
-    call print_message("Calculating FBZ -> IBZ mappings...")
-    allocate(indexlist(ph%nq))
-    do iq = 1, ph%nq
-       indexlist(iq) = iq
-    end do
-    call create_fbz2ibz_map(ph%fbz2ibz_map, ph%nq, ph%nq_irred, indexlist, &
-         ph%nequiv, ph%ibz2fbz_map)
-    deallocate(indexlist)
-    
+
     !Print out irreducible phonon energies and velocities
     if(this_image() == 1) then
        write(numcols, "(I0)") ph%numbranches
