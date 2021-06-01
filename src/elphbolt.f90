@@ -133,8 +133,8 @@ program elphbolt
      call calculate_3ph_interaction(ph, crys, num, 'W')
   end if
 
-  !After this point the phonon eigenvectors are not needed
-  call ph%deallocate_eigenvecs
+  !After this point the phonon eigenvectors and other quantities that are not needed
+  call ph%deallocate_phonon_quantities
   
   !Solve BTEs
   call bt%solve_bte(num, crys, sym, ph, el)

@@ -451,6 +451,8 @@ contains
        end do
        close(1)
     end if
+    !Deallocating this here since this is not used later in the program
+    deallocate(el%IBZ_inwindow_states)
 
     !Print out irreducible electron energies
     write(numcols, "(I0)") el%numbands

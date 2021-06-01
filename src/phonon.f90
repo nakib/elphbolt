@@ -101,7 +101,7 @@ module phonon_module
       
    contains
 
-     procedure :: initialize, deallocate_eigenvecs
+     procedure :: initialize, deallocate_phonon_quantities
      
   end type phonon
 
@@ -136,13 +136,14 @@ contains
     call read_ifc3(ph, crys)
   end subroutine initialize
 
-  subroutine deallocate_eigenvecs(ph)
+  subroutine deallocate_phonon_quantities(ph)
     !! Deallocate the electron eigenvectors
 
     class(phonon), intent(inout) :: ph
 
-    deallocate(ph%evecs)
-  end subroutine deallocate_eigenvecs
+    deallocate(ph%evecs, ph%ifc2, ph%ifc3, ph%Index_i, ph%Index_j, ph%Index_k, &
+         ph%mm, ph%rr)    
+  end subroutine deallocate_phonon_quantities
   
   subroutine calculate_phonons(ph, wann, crys, sym, num)
     !! Calculate phonon quantities on the FBZ and IBZ meshes.
