@@ -154,7 +154,8 @@ contains
     integer(k8) :: i, iq, ii, jj, kk, l, il, s, ib, im, chunk, &
          num_active_images
     integer(k8), allocatable :: start[:], end[:]
-    real(dp), allocatable :: ens_chunk(:,:)[:], vels_chunk(:,:,:)[:]
+    real(dp), allocatable :: ens_chunk(:,:)[:], vels_chunk(:,:,:)[:], &
+         symmetrizers_chunk(:,:,:)[:]
     complex(dp), allocatable :: evecs_chunk(:,:,:)[:]
     !Switch for mesh utilites with or without energy restriction
     logical :: blocks
@@ -200,23 +201,30 @@ contains
     call find_irred_wedge(ph%qmesh, ph%nq_irred, ph%wavevecs_irred, &
          ph%indexlist_irred, ph%nequiv, sym%nsymm_rot, sym%qrotations, &
          ph%ibz2fbz_map, ph%equiv_map, blocks)
-
+    
     !Create symmetrizers of wave vector dependent vectors ShengBTE style
-    allocate(ph%symmetrizers(3, 3, ph%nq))
-    ph%symmetrizers = 0.0_dp
-    do iq = 1, ph%nq
+    allocate(symmetrizers_chunk(3, 3, chunk)[*])
+    symmetrizers_chunk = 0.0_dp
+    do iq = start, end
        kk = 0
        do jj = 1, sym%nsymm
           if(ph%equiv_map(jj, iq) == iq) then
-             ph%symmetrizers(:, :, iq) = ph%symmetrizers(:, :, iq) + &
+             symmetrizers_chunk(:, :, iq - start + 1) = &
+                  symmetrizers_chunk(:, :, iq - start + 1) + &
                   sym%crotations_orig(:, :, jj)
              kk = kk + 1
           end if
        end do
        if(kk > 1) then
-          ph%symmetrizers(:, :, iq) = ph%symmetrizers(:, :, iq)/kk
+          symmetrizers_chunk(:, :, iq - start + 1) = &
+               symmetrizers_chunk(:, :, iq - start + 1)/kk
        end if
     end do
+    allocate(ph%symmetrizers(3, 3, ph%nq))
+    do im = 1, num_active_images
+       ph%symmetrizers(:, :, start[im]:end[im]) = symmetrizers_chunk(:,:,:)[im]
+    end do
+    deallocate(symmetrizers_chunk)
     
     !Symmetrize phonon energies and velocities.
     do i = 1, ph%nq_irred !an irreducible point
@@ -237,7 +245,7 @@ contains
           end do
        end do
     end do
-
+    
     !Print out irreducible phonon energies and velocities
     if(this_image() == 1) then
        write(numcols, "(I0)") ph%numbranches
