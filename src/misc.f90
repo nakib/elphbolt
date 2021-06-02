@@ -71,6 +71,43 @@ contains
     end if
   end subroutine write2file_rank2_real
 
+  subroutine append2file_transport_tensor(filename, it, data)
+    !! Append 3x3 tensor to file.
+
+    character(len = *), intent(in) :: filename
+    integer(k8), intent(in), optional :: it
+    real(dp), intent(in), optional :: data(:,:,:)
+
+    integer(k8) :: ib, nb
+    character(len = 1024) :: numcols, bandtag
+
+    if(this_image() == 1) then
+       nb = size(data(:, 1, 1))
+       write(numcols, "(I0)") 9
+
+       if(it == 0) then
+          open(1, file = trim(filename//"tot"), status = "replace")
+       else
+          open(1, file = trim(filename//"tot"), access = "append", status = "old")
+       end if
+       write(1, "(I3, " //trim(adjustl(numcols))//"E20.10)") &
+            it, sum(data, dim = 1)
+       close(1)
+       
+       do ib = 1, nb
+          write(bandtag, "(I0)") ib
+          if(it == 0) then
+             open(2, file = trim(filename//bandtag), status = "replace")
+          else
+             open(2, file = trim(filename//bandtag), access = "append", status = "old")
+          end if
+          write(2, "(I3, " //trim(adjustl(numcols))//"E20.10)") &
+               it, data(ib, :, :)
+          close(2)
+       end do
+    end if
+  end subroutine append2file_transport_tensor
+
   subroutine int_div(num, denom, q, r)
     !! Quotient(q) and remainder(r) of the integer division num/denom.
 

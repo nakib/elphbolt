@@ -21,7 +21,7 @@ module bte_module
   use params, only: dp, k8, qe, kB
   use misc, only: print_message, exit_with_message, write2file_rank2_real, &
        distribute_points, demux_state, binsearch, interpolate, demux_vector, &
-       trace, subtitle
+       trace, subtitle, append2file_transport_tensor
   use numerics_module, only: numerics
   use crystal_module, only: crystal
   use symmetry_module, only: symmetry
@@ -127,7 +127,6 @@ contains
          bt%ph_rta_rates_iso_ibz(:,:)
 
     !gradT field:
-
     ! Calculate field term (gradT=>F0)
     call calculate_field_term('ph', 'T', ph%nequiv, ph%ibz2fbz_map, &
          crys%T, 0.0_dp, ph%ens, ph%vels, bt%ph_rta_rates_ibz, bt%ph_field_term_T)
@@ -145,7 +144,7 @@ contains
     ! Calculate transport coefficient
     call calculate_transport_coeff('ph', 'T', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
          crys%volume, ph%qmesh, bt%ph_response_T, sym, ph_kappa, dummy)
-    !--!
+    !---------------------------------------------------------------------------------!
 
     !E field:
     ! Calculate field term (E=>G0)
@@ -160,7 +159,7 @@ contains
     call calculate_transport_coeff('ph', 'E', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
          crys%volume, ph%qmesh, bt%ph_response_E, sym, ph_alphabyT, dummy)
     ph_alphabyT = ph_alphabyT/crys%T
-    !--!
+    !---------------------------------------------------------------------------------!
 
     !Change to data output directory
     call chdir(trim(adjustl(Tdir)))
@@ -169,7 +168,6 @@ contains
     call write2file_rank2_real('ph.W_rta_3ph', rates_3ph)
     call write2file_rank2_real('ph.W_rta_phe', rates_phe)
     call write2file_rank2_real('ph.W_rta', bt%ph_rta_rates_ibz)
-    !end if
 
     !Change back to cwd
     call chdir(trim(adjustl(num%cwd)))
@@ -255,7 +253,6 @@ contains
     tot_alphabyT_scalar = el_alphabyT_scalar + ph_alphabyT_scalar
     KO_dev = 100.0_dp*abs(&
          (el_sigmaS_scalar - tot_alphabyT_scalar)/tot_alphabyT_scalar)
-    if(KO_dev < 1.0e-6) KO_dev = 0.0_dp
 
     el_kappa0_scalar_old = el_kappa0_scalar
     el_sigmaS_scalar_old = el_sigmaS_scalar
@@ -265,6 +262,18 @@ contains
     ph_alphabyT_scalar_old = ph_alphabyT_scalar
     
     if(num%drag) then !Coupled BTEs
+       !Append RTA coefficients
+       ! Change to data output directory
+       call chdir(trim(adjustl(Tdir)))
+       call append2file_transport_tensor('drag_ph_kappa_', 0_k8, ph_kappa)
+       call append2file_transport_tensor('drag_ph_alphabyT_', 0_k8, ph_alphabyT)
+       call append2file_transport_tensor('drag_el_sigmaS_', 0_k8, el_sigmaS)
+       call append2file_transport_tensor('drag_el_sigma_', 0_k8, el_sigma)
+       call append2file_transport_tensor('drag_el_alphabyT_', 0_k8, el_alphabyT)
+       call append2file_transport_tensor('drag_el_kappa0_', 0_k8, el_kappa0)
+       ! Change back to cwd
+       call chdir(trim(adjustl(num%cwd)))
+
        call print_message("Coupled electron-phonon transport:")
        call print_message("----------------------------------")
 
@@ -277,12 +286,12 @@ contains
        !RTA
        if(this_image() == 1) then
           write(*,"(I3, A, 1E16.8, A, 1E16.8, A, 1E16.8, A, 1E16.8, &
-               A, 1E16.8, A, 1E16.8, A, 1E16.8)") 0, "     ", el_kappa0_scalar, &
+               A, 1E16.8, A, 1E16.8, A, 1F6.3)") 0, "     ", el_kappa0_scalar, &
                "      ", el_sigmaS_scalar, "     ", ph_kappa_scalar, &
                "    ", el_sigma_scalar, "        ", el_alphabyT_scalar, &
-               "         ", ph_alphabyT_scalar, "          ", KO_dev
+               "         ", ph_alphabyT_scalar, "           ", KO_dev
        end if
-
+       
        !Start iterator
        do it_ph = 1, num%maxiter       
           !Scheme: for each step of phonon response, fully iterate the electron response.
@@ -355,6 +364,11 @@ contains
           ph_kappa_scalar = trace(sum(ph_kappa, dim = 1))/3.0_dp
           ph_alphabyT_scalar = trace(sum(ph_alphabyT, dim = 1))/3.0_dp
           
+          
+          
+          ! Format: files tagged by band, full tensor for every iteration
+          !         another file for band summed tensor
+          
           !Check convergence
           if(converged(ph_kappa_scalar_old, ph_kappa_scalar, num%conv_thres) .and. &
                converged(ph_alphabyT_scalar_old, ph_alphabyT_scalar, num%conv_thres)) then
@@ -362,131 +376,178 @@ contains
           else
              ph_kappa_scalar_old = ph_kappa_scalar
              ph_alphabyT_scalar_old = ph_alphabyT_scalar
+
+             !Print out band resolved transport coefficients
+             ! Change to data output directory
+             call chdir(trim(adjustl(Tdir)))
+             call append2file_transport_tensor('drag_ph_kappa_', it_ph, ph_kappa)
+             call append2file_transport_tensor('drag_ph_alphabyT_', it_ph, ph_alphabyT)
+             call append2file_transport_tensor('drag_el_sigmaS_', it_ph, el_sigmaS)
+             call append2file_transport_tensor('drag_el_sigma_', it_ph, el_sigma)
+             call append2file_transport_tensor('drag_el_alphabyT_', it_ph, el_alphabyT)
+             call append2file_transport_tensor('drag_el_kappa0_', it_ph, el_kappa0)
+             ! Change back to cwd
+             call chdir(trim(adjustl(num%cwd)))
           end if
 
           tot_alphabyT_scalar = el_alphabyT_scalar + ph_alphabyT_scalar
           KO_dev = 100.0_dp*abs(&
                (el_sigmaS_scalar - tot_alphabyT_scalar)/tot_alphabyT_scalar)
-          if(KO_dev < 1.0e-6) KO_dev = 0.0_dp
 
           if(this_image() == 1) then
              write(*,"(I3, A, 1E16.8, A, 1E16.8, A, 1E16.8, A, 1E16.8, &
-                  A, 1E16.8, A, 1E16.8, A, 1E16.8)") it_ph, "     ", el_kappa0_scalar, &
+                  A, 1E16.8, A, 1E16.8, A, 1F6.3)") it_ph, "     ", el_kappa0_scalar, &
                   "      ", el_sigmaS_scalar, "     ", ph_kappa_scalar, &
                   "    ", el_sigma_scalar, "        ", el_alphabyT_scalar, &
-                  "         ", ph_alphabyT_scalar, "          ", KO_dev
+                  "         ", ph_alphabyT_scalar, "           ", KO_dev
           end if
        end do
-    else
-       if(num%phbte) then !Phonon BTE
-          call print_message("Decoupled phonon transport:")
-          call print_message("---------------------------")
+    end if !drag
+    
+    if(num%phbte) then !Phonon BTE
+       !Append RTA coefficients
+       ! Change to data output directory
+       call chdir(trim(adjustl(Tdir)))
+       call append2file_transport_tensor('nodrag_ph_kappa_', 0_k8, ph_kappa)
+       call append2file_transport_tensor('nodrag_ph_alphabyT_', 0_k8, ph_alphabyT)
+       ! Change back to cwd
+       call chdir(trim(adjustl(num%cwd)))
+       
+       call print_message("Decoupled phonon transport:")
+       call print_message("---------------------------")
 
-          if(this_image() == 1) then
-             write(*,*) "iter    k_ph[W/m/K]         alpha_ph/T[A/m/K]"
-          end if
+       if(this_image() == 1) then
+          write(*,*) "iter    k_ph[W/m/K]         alpha_ph/T[A/m/K]"
+       end if
 
+       if(this_image() == 1) then
+          write(*,"(I3, A, 1E16.8, A, 1E16.8)") 0, "    ", ph_kappa_scalar, &
+               "    ", ph_alphabyT_scalar
+       end if
+
+       do it_ph = 1, num%maxiter
+          call iterate_bte_ph(crys%T, num%datadumpdir, .False., ph, el, bt%ph_rta_rates_ibz, &
+               bt%ph_field_term_T, bt%ph_response_T, bt%el_response_T)
+          call iterate_bte_ph(crys%T, num%datadumpdir, .False., ph, el, bt%ph_rta_rates_ibz, &
+               bt%ph_field_term_E, bt%ph_response_E, bt%el_response_E)
+
+          !Calculate phonon transport coefficients
+          call calculate_transport_coeff('ph', 'T', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
+               crys%volume, ph%qmesh, bt%ph_response_T, sym, ph_kappa, dummy)
+          call calculate_transport_coeff('ph', 'E', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
+               crys%volume, ph%qmesh, bt%ph_response_E, sym, ph_alphabyT, dummy)
+          ph_alphabyT = ph_alphabyT/crys%T
+
+          !Calculate and print phonon transport scalar
+          ph_kappa_scalar = trace(sum(ph_kappa, dim = 1))/3.0_dp
+          ph_alphabyT_scalar = trace(sum(ph_alphabyT, dim = 1))/3.0_dp
           if(this_image() == 1) then
-             write(*,"(I3, A, 1E16.8, A, 1E16.8)") 0, "    ", ph_kappa_scalar, &
+             write(*,"(I3, A, 1E16.8, A, 1E16.8)") it_ph, "    ", ph_kappa_scalar, &
                   "    ", ph_alphabyT_scalar
           end if
 
-          do it_ph = 1, num%maxiter
-             call iterate_bte_ph(crys%T, num%datadumpdir, .False., ph, el, bt%ph_rta_rates_ibz, &
-                  bt%ph_field_term_T, bt%ph_response_T, bt%el_response_T)
-             call iterate_bte_ph(crys%T, num%datadumpdir, .False., ph, el, bt%ph_rta_rates_ibz, &
-                  bt%ph_field_term_E, bt%ph_response_E, bt%el_response_E)
+          if(converged(ph_kappa_scalar_old, ph_kappa_scalar, num%conv_thres) .and. &
+               converged(ph_alphabyT_scalar_old, ph_alphabyT_scalar, num%conv_thres)) then
+             exit
+          else
+             !Print out band resolved transport coefficients
+             ! Change to data output directory
+             call chdir(trim(adjustl(Tdir)))
+             call append2file_transport_tensor('nodrag_ph_kappa_', it_ph, ph_kappa)
+             call append2file_transport_tensor('nodrag_ph_alphabyT_', it_ph, ph_alphabyT)
+             ! Change back to cwd
+             call chdir(trim(adjustl(num%cwd)))
+             
+             ph_kappa_scalar_old = ph_kappa_scalar
+             ph_alphabyT_scalar_old = ph_alphabyT_scalar
+          end if
+       end do
+    end if
 
-             !Calculate phonon transport coefficients
-             call calculate_transport_coeff('ph', 'T', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
-                  crys%volume, ph%qmesh, bt%ph_response_T, sym, ph_kappa, dummy)
-             call calculate_transport_coeff('ph', 'E', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
-                  crys%volume, ph%qmesh, bt%ph_response_E, sym, ph_alphabyT, dummy)
-             ph_alphabyT = ph_alphabyT/crys%T
+    if(num%ebte) then !Electron BTE
+       !Append RTA coefficients
+       ! Change to data output directory
+       call chdir(trim(adjustl(Tdir)))
+       call append2file_transport_tensor('nodrag_el_sigmaS_', 0_k8, el_sigmaS)
+       call append2file_transport_tensor('nodrag_el_sigma_', 0_k8, el_sigma)
+       call append2file_transport_tensor('nodrag_el_alphabyT_', 0_k8, el_alphabyT)
+       call append2file_transport_tensor('nodrag_el_kappa0_', 0_k8, el_kappa0)
+       ! Change back to cwd
+       call chdir(trim(adjustl(num%cwd)))
+       
+       call print_message("Decoupled electron transport:")
+       call print_message("-----------------------------")
 
-             !Calculate and print phonon transport scalar
-             ph_kappa_scalar = trace(sum(ph_kappa, dim = 1))/3.0_dp
-             ph_alphabyT_scalar = trace(sum(ph_alphabyT, dim = 1))/3.0_dp
-             if(this_image() == 1) then
-                write(*,"(I3, A, 1E16.8, A, 1E16.8)") it_ph, "    ", ph_kappa_scalar, &
-                     "    ", ph_alphabyT_scalar
-             end if
-
-             if(converged(ph_kappa_scalar_old, ph_kappa_scalar, num%conv_thres) .and. &
-                  converged(ph_alphabyT_scalar_old, ph_alphabyT_scalar, num%conv_thres)) then
-                exit
-             else
-                ph_kappa_scalar_old = ph_kappa_scalar
-                ph_alphabyT_scalar_old = ph_alphabyT_scalar
-             end if
-          end do
+       if(this_image() == 1) then
+          write(*,*) "iter    k0_el[W/m/K]        sigmaS[A/m/K]", &
+               "         sigma[1/Ohm/m]      alpha_el/T[A/m/K]"
        end if
 
-       if(num%ebte) then !Electron BTE
-          call print_message("Decoupled electron transport:")
-          call print_message("-----------------------------")
+       if(this_image() == 1) then
+          write(*,"(I3, A, 1E16.8, A, 1E16.8, A, 1E16.8, A, 1E16.8)") 0, &
+               "    ", el_kappa0_scalar, "     ", el_sigmaS_scalar, &
+               "     ", el_sigma_scalar, "     ", el_alphabyT_scalar
+       end if
+       do it_el = 1, num%maxiter
+          !E field:
+          call iterate_bte_el(crys%T, num%datadumpdir, .False., el, ph, sym,&
+               bt%el_rta_rates_ibz, bt%el_field_term_E, bt%el_response_E, bt%ph_response_E)
 
-          if(this_image() == 1) then
-             write(*,*) "iter    k0_el[W/m/K]        sigmaS[A/m/K]", &
-                  "         sigma[1/Ohm/m]      alpha_el/T[A/m/K]"
-          end if
+          !Calculate electron transport coefficients
+          call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, &
+               el%ens, el%vels, crys%volume, el%kmesh, bt%el_response_E, sym, &
+               el_alphabyT, el_sigma)
+          el_alphabyT = el_alphabyT/crys%T
 
+          !delT field:
+
+          call iterate_bte_el(crys%T, num%datadumpdir, .False., el, ph, sym,&
+               bt%el_rta_rates_ibz, bt%el_field_term_T, bt%el_response_T, bt%ph_response_T)
+          !Enforce Kelvin-Onsager relation
+          do icart = 1, 3
+             bt%el_response_T(:,:,icart) = (el%ens(:,:) - el%chempot)/qe/crys%T*&
+                  bt%el_response_E(:,:,icart)
+          end do
+
+          call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
+               el%ens, el%vels, crys%volume, el%kmesh, bt%el_response_T, sym, &
+               el_kappa0, el_sigmaS)
+
+          !Calculate and print electron transport scalars
+          el_kappa0_scalar = trace(sum(el_kappa0, dim = 1))/3.0_dp
+          el_sigmaS_scalar = trace(sum(el_sigmaS, dim = 1))/3.0_dp
+          el_sigma_scalar = trace(sum(el_sigma, dim = 1))/3.0_dp
+          el_alphabyT_scalar = trace(sum(el_alphabyT, dim = 1))/3.0_dp
           if(this_image() == 1) then
-             write(*,"(I3, A, 1E16.8, A, 1E16.8, A, 1E16.8, A, 1E16.8)") 0, &
+             write(*,"(I3, A, 1E16.8, A, 1E16.8, A, 1E16.8, A, 1E16.8)") it_el, &
                   "    ", el_kappa0_scalar, "     ", el_sigmaS_scalar, &
                   "     ", el_sigma_scalar, "     ", el_alphabyT_scalar
           end if
-          do it_el = 1, num%maxiter
-             !E field:
-             call iterate_bte_el(crys%T, num%datadumpdir, .False., el, ph, sym,&
-                  bt%el_rta_rates_ibz, bt%el_field_term_E, bt%el_response_E, bt%ph_response_E)
 
-             !Calculate electron transport coefficients
-             call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, &
-                  el%ens, el%vels, crys%volume, el%kmesh, bt%el_response_E, sym, &
-                  el_alphabyT, el_sigma)
-             el_alphabyT = el_alphabyT/crys%T
-
-             !delT field:
-
-             call iterate_bte_el(crys%T, num%datadumpdir, .False., el, ph, sym,&
-                  bt%el_rta_rates_ibz, bt%el_field_term_T, bt%el_response_T, bt%ph_response_T)
-             !Enforce Kelvin-Onsager relation
-             do icart = 1, 3
-                bt%el_response_T(:,:,icart) = (el%ens(:,:) - el%chempot)/qe/crys%T*&
-                     bt%el_response_E(:,:,icart)
-             end do
-
-             call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
-                  el%ens, el%vels, crys%volume, el%kmesh, bt%el_response_T, sym, &
-                  el_kappa0, el_sigmaS)
-
-             !Calculate and print electron transport scalars
-             el_kappa0_scalar = trace(sum(el_kappa0, dim = 1))/3.0_dp
-             el_sigmaS_scalar = trace(sum(el_sigmaS, dim = 1))/3.0_dp
-             el_sigma_scalar = trace(sum(el_sigma, dim = 1))/3.0_dp
-             el_alphabyT_scalar = trace(sum(el_alphabyT, dim = 1))/3.0_dp
-             if(this_image() == 1) then
-                write(*,"(I3, A, 1E16.8, A, 1E16.8, A, 1E16.8, A, 1E16.8)") it_el, &
-                     "    ", el_kappa0_scalar, "     ", el_sigmaS_scalar, &
-                     "     ", el_sigma_scalar, "     ", el_alphabyT_scalar
-             end if
-
-             !Check convergence
-             if(converged(el_kappa0_scalar_old, el_kappa0_scalar, num%conv_thres) .and. &
-                  converged(el_sigmaS_scalar_old, el_sigmaS_scalar, num%conv_thres) .and. &
-                  converged(el_sigma_scalar_old, el_sigma_scalar, num%conv_thres) .and. &
-                  converged(el_alphabyT_scalar_old, el_alphabyT_scalar, num%conv_thres)) then
-                call print_message("--------------------------------------------")
-                exit
-             else
-                el_kappa0_scalar_old = el_kappa0_scalar
-                el_sigmaS_scalar_old = el_sigmaS_scalar
-                el_sigma_scalar_old = el_sigma_scalar
-                el_alphabyT_scalar_old = el_alphabyT_scalar
-             end if
-          end do
-       end if
+          !Check convergence
+          if(converged(el_kappa0_scalar_old, el_kappa0_scalar, num%conv_thres) .and. &
+               converged(el_sigmaS_scalar_old, el_sigmaS_scalar, num%conv_thres) .and. &
+               converged(el_sigma_scalar_old, el_sigma_scalar, num%conv_thres) .and. &
+               converged(el_alphabyT_scalar_old, el_alphabyT_scalar, num%conv_thres)) then
+             call print_message("--------------------------------------------")
+             exit
+          else
+             !Print out band resolved transport coefficients
+             ! Change to data output directory
+             call chdir(trim(adjustl(Tdir)))
+             call append2file_transport_tensor('nodrag_el_sigmaS_', it_el, el_sigmaS)
+             call append2file_transport_tensor('nodrag_el_sigma_', it_el, el_sigma)
+             call append2file_transport_tensor('nodrag_el_alphabyT_', it_el, el_alphabyT)
+             call append2file_transport_tensor('nodrag_el_kappa0_', it_el, el_kappa0)
+             ! Change back to cwd
+             call chdir(trim(adjustl(num%cwd)))
+             
+             el_kappa0_scalar_old = el_kappa0_scalar
+             el_sigmaS_scalar_old = el_sigmaS_scalar
+             el_sigma_scalar_old = el_sigma_scalar
+             el_alphabyT_scalar_old = el_alphabyT_scalar
+          end if
+       end do
     end if
 
   contains
