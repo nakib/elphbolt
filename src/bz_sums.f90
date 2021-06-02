@@ -28,7 +28,7 @@ module bz_sums
 
   implicit none
 
-  public calculate_dos, calculate_transport_coeff, calculate_chempot, calculate_qTF
+  public calculate_dos, calculate_transport_coeff, calculate_qTF
   private calculate_el_dos, calculate_ph_dos_iso
 
   interface calculate_dos
@@ -36,67 +36,67 @@ module bz_sums
   end interface calculate_dos
   
 contains
-
-  subroutine calculate_chempot(el, T, vol)
-    !! Subroutine to calculate the chemical potential for a
-    !! given carrier concentration.
-
-    type(electron), intent(inout) :: el
-    real(dp), intent(in) :: T, vol
-
-    !Local variables
-    real(dp) :: a, b, aux, const, absconc, signconc, mu, thresh
-    integer(k8) :: ib, ik, it, ngrid, maxiter
-
-    call print_message("Calculating chemical potential...")
-
-    !Total number of points in full mesh
-    ngrid = product(el%kmesh)
-
-    !Normalization and units factor
-    const = el%spindeg/dble(ngrid)/vol/(1.0e-21_dp)
-
-    !Maximum number of iterations
-    maxiter = 1000
-
-    !Convergence threshold
-    thresh = 1.0e-12_dp
-
-    !Absolute value and sign of concentration
-    absconc = abs(el%conc)
-    signconc = sign(1.0_dp, el%conc)
-
-    a = el%enref - 20.0_dp !guess lower bound
-    b = el%enref + 20.0_dp !guess upper bound
-    do it = 1, maxiter
-       mu = 0.5_dp*(a + b)
-       aux = 0.0_dp
-       do ib = 1, el%numbands
-          do ik = 1, el%nk
-             aux = aux + Fermi(el%ens(ik, ib), mu, T)
-          end do
-       end do
-       aux = aux*const !cm^-3
-       if(abs(aux - absconc)/absconc < thresh) then
-          exit
-       else if(aux < absconc) then
-          a = mu
-       else
-          b = mu
-       end if
-    end do
-    el%chempot = mu
-
-    if(abs(aux - absconc)/absconc > thresh) then
-       call exit_with_message(&
-            "Could not converge to correct chemical potential. Exiting.")
-    end if
-
-    if(this_image() == 1) then
-       write(*, "(A, 1E16.8, A)") ' Calculated carrier concentration = ', signconc*aux, ' 1/cm3'
-       write(*, "(A, 1E16.8, A)") ' Corresponding chemical potential = ', el%chempot, ' eV'
-    end if
-  end subroutine calculate_chempot
+  
+!!$  subroutine calculate_chempot(el, T, vol)
+!!$    !! Subroutine to calculate the chemical potential for a
+!!$    !! given carrier concentration.
+!!$
+!!$    type(electron), intent(inout) :: el
+!!$    real(dp), intent(in) :: T, vol
+!!$
+!!$    !Local variables
+!!$    real(dp) :: a, b, aux, const, absconc, signconc, mu, thresh
+!!$    integer(k8) :: ib, ik, it, ngrid, maxiter
+!!$
+!!$    call print_message("Calculating chemical potential...")
+!!$
+!!$    !Total number of points in full mesh
+!!$    ngrid = product(el%kmesh)
+!!$
+!!$    !Normalization and units factor
+!!$    const = el%spindeg/dble(ngrid)/vol/(1.0e-21_dp)
+!!$
+!!$    !Maximum number of iterations
+!!$    maxiter = 1000
+!!$
+!!$    !Convergence threshold
+!!$    thresh = 1.0e-12_dp
+!!$
+!!$    !Absolute value and sign of concentration
+!!$    absconc = abs(el%conc)
+!!$    signconc = sign(1.0_dp, el%conc)
+!!$
+!!$    a = el%enref - 20.0_dp !guess lower bound
+!!$    b = el%enref + 20.0_dp !guess upper bound
+!!$    do it = 1, maxiter
+!!$       mu = 0.5_dp*(a + b)
+!!$       aux = 0.0_dp
+!!$       do ib = 1, el%numbands
+!!$          do ik = 1, el%nk
+!!$             aux = aux + Fermi(el%ens(ik, ib), mu, T)
+!!$          end do
+!!$       end do
+!!$       aux = aux*const !cm^-3
+!!$       if(abs(aux - absconc)/absconc < thresh) then
+!!$          exit
+!!$       else if(aux < absconc) then
+!!$          a = mu
+!!$       else
+!!$          b = mu
+!!$       end if
+!!$    end do
+!!$    el%chempot = mu
+!!$
+!!$    if(abs(aux - absconc)/absconc > thresh) then
+!!$       call exit_with_message(&
+!!$            "Could not converge to correct chemical potential. Exiting.")
+!!$    end if
+!!$
+!!$    if(this_image() == 1) then
+!!$       write(*, "(A, 1E16.8, A)") ' Calculated carrier concentration = ', signconc*aux, ' 1/cm3'
+!!$       write(*, "(A, 1E16.8, A)") ' Corresponding chemical potential = ', el%chempot, ' eV'
+!!$    end if
+!!$  end subroutine calculate_chempot
 
   subroutine calculate_qTF(crys, el)
     !! Calculate Thomas-Fermi screening wavevector in the simple electron-gas model.
@@ -301,7 +301,7 @@ contains
   end subroutine calculate_ph_dos_iso
 
   subroutine calculate_transport_coeff(species, field, T, deg, chempot, ens, vels, &
-       volume, mesh, response, sym, conc, trans_coeff_hc, trans_coeff_cc)
+       volume, mesh, response, sym, trans_coeff_hc, trans_coeff_cc)
     !! Subroutine to calculate transport coefficients.
     !!
     !! species Type of particle
@@ -321,7 +321,7 @@ contains
     character(len = 2), intent(in) :: species
     character(len = 1), intent(in) :: field
     integer(k8), intent(in) :: mesh(3), deg
-    real(dp), intent(in) :: T, chempot, ens(:,:), vels(:,:,:), volume, response(:,:,:), conc
+    real(dp), intent(in) :: T, chempot, ens(:,:), vels(:,:,:), volume, response(:,:,:)
     type(symmetry), intent(in) :: sym
     real(dp), intent(out) :: trans_coeff_hc(3,3), trans_coeff_cc(3,3) !h(c)c = heat(charge) current
     
@@ -347,7 +347,7 @@ contains
           A_cc = 0.0_dp
           pow_cc = 0
        else if(field == 'E') then
-          A_hc = sign(1.0_dp, conc)*fac
+          A_hc = -fac
           pow_hc = 1
           A_cc = 0.0_dp
           pow_cc = 0
@@ -356,14 +356,14 @@ contains
        end if
     else if(species == 'el') then
        if(field == 'T') then
-          A_cc = deg*sign(1.0_dp, conc)*qe*fac
+          A_cc = -deg*qe*fac
           pow_cc = 0
           A_hc = deg*qe*fac
           pow_hc = 1 
        else if(field == 'E') then
           A_cc = deg*fac
           pow_cc = 0
-          A_hc = sign(1.0_dp, conc)*A_cc
+          A_hc = -A_cc
           pow_hc = 1
        else
           call exit_with_message("Unknown field type in calculate_transport_coefficient. Exiting.")
@@ -405,26 +405,112 @@ contains
     !Symmetrize transport tensor
     call symmetrize_3x3_tensor(trans_coeff_hc, sym%crotations)
     call symmetrize_3x3_tensor(trans_coeff_cc, sym%crotations)
-
-!!$    if(this_image() == 1) then
-!!$       if(species == 'el' .and. field == 'E') then
-!!$          print*, 'sigma [1/Omega/m] = ', trans_coeff_cc
-!!$          print*, 'alpha_el/T [A/m/K] = ', trans_coeff_hc/T
-!!$       end if
-!!$
-!!$       if(species == 'el' .and. field == 'T') then
-!!$          print*, 'sigmaS [A/m/K] = ', trans_coeff_cc
-!!$          print*, 'kappa0_el [W/m/K] = ', trans_coeff_hc
-!!$       end if
-!!$
-!!$       if(species == 'ph' .and. field == 'E') then
-!!$          print*, 'alpha_ph/T [A/m/K] = ', trans_coeff_hc/T
-!!$       end if
-!!$       
-!!$       if(species == 'ph' .and. field == 'T') then
-!!$          print*, 'kappa_ph [W/m/K] = ', trans_coeff_hc
-!!$       end if
-!!$       print*, '______________'
-!!$    end if
   end subroutine calculate_transport_coeff
+
+!!$  subroutine calculate_transport_coeff(species, field, T, deg, chempot, ens, vels, &
+!!$       volume, mesh, response, sym, conc, trans_coeff_hc, trans_coeff_cc)
+!!$    !! Subroutine to calculate transport coefficients.
+!!$    !!
+!!$    !! species Type of particle
+!!$    !! field Type of field
+!!$    !! T Temperature in K
+!!$    !! deg Degeneracy
+!!$    !! chempot Chemical potential in eV
+!!$    !! ens FBZ energies in eV
+!!$    !! vels FBZ velocities in Km/s
+!!$    !! volume Primitive cell volume in nm^3
+!!$    !! mesh Wave vector grid
+!!$    !! response FBZ response function
+!!$    !! conc Carrier concentration in cm^-3
+!!$    !! trans_coeff_hc Heat current coefficient
+!!$    !! trans_coeff_cc Charge current coefficient
+!!$
+!!$    character(len = 2), intent(in) :: species
+!!$    character(len = 1), intent(in) :: field
+!!$    integer(k8), intent(in) :: mesh(3), deg
+!!$    real(dp), intent(in) :: T, chempot, ens(:,:), vels(:,:,:), volume, response(:,:,:), conc
+!!$    type(symmetry), intent(in) :: sym
+!!$    real(dp), intent(out) :: trans_coeff_hc(3,3), trans_coeff_cc(3,3) !h(c)c = heat(charge) current
+!!$    
+!!$    !Local variables
+!!$    integer(k8) :: ik, ib, icart, nk, nbands, pow_hc, pow_cc
+!!$    real(dp) :: dist_factor, e, v, fac, A_hc, A_cc
+!!$    
+!!$    nk = size(ens(:,1))
+!!$    nbands = size(ens(1,:))
+!!$
+!!$    !Common multiplicative factor
+!!$    fac = 1.0e21/kB/T/volume/product(mesh) 
+!!$    
+!!$    !Do checks related to particle and field type
+!!$    if(species == 'ph') then
+!!$       if(chempot /= 0.0_dp) then
+!!$          call exit_with_message(&
+!!$               "Phonon chemical potential non-zero in calculate_transport_coefficient. Exiting.")
+!!$       end if
+!!$       if(field == 'T') then
+!!$          A_hc = qe*fac
+!!$          pow_hc = 1
+!!$          A_cc = 0.0_dp
+!!$          pow_cc = 0
+!!$       else if(field == 'E') then
+!!$          A_hc = sign(1.0_dp, conc)*fac
+!!$          pow_hc = 1
+!!$          A_cc = 0.0_dp
+!!$          pow_cc = 0
+!!$       else
+!!$          call exit_with_message("Unknown field type in calculate_transport_coefficient. Exiting.")
+!!$       end if
+!!$    else if(species == 'el') then
+!!$       if(field == 'T') then
+!!$          A_cc = deg*sign(1.0_dp, conc)*qe*fac
+!!$          pow_cc = 0
+!!$          A_hc = deg*qe*fac
+!!$          pow_hc = 1 
+!!$       else if(field == 'E') then
+!!$          A_cc = deg*fac
+!!$          pow_cc = 0
+!!$          A_hc = sign(1.0_dp, conc)*A_cc
+!!$          pow_hc = 1
+!!$       else
+!!$          call exit_with_message("Unknown field type in calculate_transport_coefficient. Exiting.")
+!!$       end if
+!!$    else
+!!$       call exit_with_message("Unknown particle species in calculate_transport_coefficient. Exiting.")
+!!$    end if
+!!$    
+!!$    trans_coeff_hc(:,:) = 0.0_dp
+!!$    trans_coeff_cc(:,:) = 0.0_dp
+!!$    do ik = 1, nk
+!!$       do ib = 1, nbands
+!!$          e = ens(ik, ib)
+!!$          if(species == 'ph') then
+!!$             if(e == 0.0_dp) cycle !Ignore zero energies phonons
+!!$             dist_factor = Bose(e, T)
+!!$             dist_factor = dist_factor*(1.0_dp + dist_factor)
+!!$          else
+!!$             dist_factor = Fermi(e, chempot, T)
+!!$             dist_factor = dist_factor*(1.0_dp - dist_factor)
+!!$          end if
+!!$          do icart = 1, 3
+!!$             v = vels(ik, ib, icart)
+!!$             trans_coeff_hc(icart, :) = trans_coeff_hc(icart, :) + &
+!!$                  (e - chempot)**pow_hc*dist_factor*v*response(ik, ib, :)
+!!$             trans_coeff_cc(icart, :) = trans_coeff_cc(icart, :) + &
+!!$                  (e - chempot)**pow_cc*dist_factor*v*response(ik, ib, :)
+!!$          end do
+!!$       end do
+!!$    end do
+!!$    !Units:
+!!$    ! W/m/K for thermal conductivity
+!!$    ! 1/Omega/m for charge conductivity
+!!$    ! V/K for thermopower
+!!$    ! A/m/K for alpha/T
+!!$    trans_coeff_hc = A_hc*trans_coeff_hc
+!!$    trans_coeff_cc = A_cc*trans_coeff_cc
+!!$
+!!$    !Symmetrize transport tensor
+!!$    call symmetrize_3x3_tensor(trans_coeff_hc, sym%crotations)
+!!$    call symmetrize_3x3_tensor(trans_coeff_cc, sym%crotations)
+!!$  end subroutine calculate_transport_coeff
 end module bz_sums

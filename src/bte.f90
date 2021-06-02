@@ -137,7 +137,7 @@ contains
 
     ! Calculate transport coefficient
     call calculate_transport_coeff('ph', 'T', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
-         crys%volume, ph%qmesh, bt%ph_response_T, sym, el%conc, ph_kappa, dummy)
+         crys%volume, ph%qmesh, bt%ph_response_T, sym, ph_kappa, dummy)
     !--!
 
     !E field:
@@ -151,7 +151,7 @@ contains
 
     ! Calculate transport coefficient
     call calculate_transport_coeff('ph', 'E', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
-         crys%volume, ph%qmesh, bt%ph_response_E, sym, el%conc, ph_alphabyT, dummy)
+         crys%volume, ph%qmesh, bt%ph_response_E, sym, ph_alphabyT, dummy)
     ph_alphabyT = ph_alphabyT/crys%T
     !--!
 
@@ -193,7 +193,7 @@ contains
 
     ! Calculate transport coefficient
     call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, el%ens, &
-         el%vels, crys%volume, el%kmesh, bt%el_response_T, sym, el%conc, el_kappa0, el_sigmaS)
+         el%vels, crys%volume, el%kmesh, bt%el_response_T, sym, el_kappa0, el_sigmaS)
     !--!
 
     !E field:
@@ -214,7 +214,7 @@ contains
 
     ! Calculate transport coefficient
     call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, el%ens, el%vels, &
-         crys%volume, el%kmesh, bt%el_response_E, sym, el%conc, el_alphabyT, el_sigma)
+         crys%volume, el%kmesh, bt%el_response_E, sym, el_alphabyT, el_sigma)
     el_alphabyT = el_alphabyT/crys%T
     !--!
 
@@ -287,9 +287,9 @@ contains
 
           !Calculate phonon transport coefficients
           call calculate_transport_coeff('ph', 'T', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
-               crys%volume, ph%qmesh, bt%ph_response_T, sym, el%conc, ph_kappa, dummy)
+               crys%volume, ph%qmesh, bt%ph_response_T, sym, ph_kappa, dummy)
           call calculate_transport_coeff('ph', 'E', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
-               crys%volume, ph%qmesh, bt%ph_response_E, sym, el%conc, ph_alphabyT, dummy)
+               crys%volume, ph%qmesh, bt%ph_response_E, sym, ph_alphabyT, dummy)
           ph_alphabyT = ph_alphabyT/crys%T
 
           !Iterate electron response all the way
@@ -301,7 +301,7 @@ contains
              !Calculate electron transport coefficients
              call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, &
                   el%ens, el%vels, crys%volume, el%kmesh, bt%el_response_E, sym, &
-                  el%conc, el_alphabyT, el_sigma)
+                  el_alphabyT, el_sigma)
              el_alphabyT = el_alphabyT/crys%T
 
              !delT field:
@@ -320,7 +320,7 @@ contains
 
              !Calculate electron transport coefficients
              call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
-                  el%ens, el%vels, crys%volume, el%kmesh, bt%el_response_T, sym, el%conc, &
+                  el%ens, el%vels, crys%volume, el%kmesh, bt%el_response_T, sym, &
                   el_kappa0, el_sigmaS)
 
              !Calculate electron transport scalars
@@ -391,9 +391,9 @@ contains
 
              !Calculate phonon transport coefficients
              call calculate_transport_coeff('ph', 'T', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
-                  crys%volume, ph%qmesh, bt%ph_response_T, sym, el%conc, ph_kappa, dummy)
+                  crys%volume, ph%qmesh, bt%ph_response_T, sym, ph_kappa, dummy)
              call calculate_transport_coeff('ph', 'E', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
-                  crys%volume, ph%qmesh, bt%ph_response_E, sym, el%conc, ph_alphabyT, dummy)
+                  crys%volume, ph%qmesh, bt%ph_response_E, sym, ph_alphabyT, dummy)
              ph_alphabyT = ph_alphabyT/crys%T
 
              !Calculate and print phonon transport scalar
@@ -436,7 +436,7 @@ contains
              !Calculate electron transport coefficients
              call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, &
                   el%ens, el%vels, crys%volume, el%kmesh, bt%el_response_E, sym, &
-                  el%conc, el_alphabyT, el_sigma)
+                  el_alphabyT, el_sigma)
              el_alphabyT = el_alphabyT/crys%T
 
              !delT field:
@@ -450,7 +450,7 @@ contains
              end do
 
              call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
-                  el%ens, el%vels, crys%volume, el%kmesh, bt%el_response_T, sym, el%conc, &
+                  el%ens, el%vels, crys%volume, el%kmesh, bt%el_response_T, sym, &
                   el_kappa0, el_sigmaS)
 
              !Calculate and print electron transport scalars
@@ -501,7 +501,7 @@ contains
          lambda = 0.5_dp*(a + b)
          !Calculate electron transport coefficients
          call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
-              el%ens, el%vels, crys%volume, el%kmesh, lambda*I_ph, sym, el%conc, &
+              el%ens, el%vels, crys%volume, el%kmesh, lambda*I_ph, sym, &
               dummy, sigmaS)         
          sigmaS_scalar = trace(sigmaS)/3.0_dp
 

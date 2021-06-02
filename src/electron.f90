@@ -19,7 +19,7 @@ module electron_module
 
   use params, only: dp, k8
   use misc, only: exit_with_message, print_message, demux_state, sort, &
-       binsearch, subtitle
+       binsearch, subtitle, Fermi
   use numerics_module, only: numerics
   use wannier_module, only: epw_wannier
   use crystal_module, only: crystal, calculate_wavevectors_full
@@ -46,10 +46,10 @@ module electron_module
      !! Lowest transport band index.
      integer(k8) :: indhighband
      !! Highest transport band index.
-     integer(k8) :: indhighvalence
-     !! Highest valence band index.
-     integer(k8) :: indlowconduction
-     !! Lowest conduction band index.
+!!$     integer(k8) :: indhighvalence
+!!$     !! Highest valence band index.
+!!$     integer(k8) :: indlowconduction
+!!$     !! Lowest conduction band index.
      integer(k8) :: mesh_ref
      !! Electron mesh refinement factor compared to the phonon mesh.
      integer(k8) :: kmesh(3)
@@ -70,9 +70,9 @@ module electron_module
      real(dp) :: fsthick
      !! Fermi surface thickness in (eV).
      real(dp) :: chempot
-     !! Chemical potential
-     real(dp) :: conc
-     !! Electron(-)/hole(+) carrier concentration.
+     !! Chemical potential.
+     real(dp), allocatable :: conc(:)
+     !! Band resolved carrier concentration.
      real(dp) :: chimp_conc
      !! Concentration of charged impurities.
      real(dp) :: Z
@@ -121,13 +121,13 @@ module electron_module
      !! List of IBZ wedge electron eigenvectors.
      logical :: metallic
      !! Is the system metallic?
-     !! Semimetals and semiconductors require providing conduction and/or valence bands.
      real(dp), allocatable :: dos(:,:)
      !! Band resolved density of states.
      
    contains
 
-     procedure :: initialize=>read_input_and_setup, deallocate_eigenvecs
+     procedure :: initialize=>read_input_and_setup, deallocate_eigenvecs, &
+          calculate_carrier_conc
   end type electron
 
 contains
@@ -142,15 +142,15 @@ contains
     type(numerics), intent(in) :: num
 
     !Local variables
-    real(dp) :: enref, conc, chimp_conc
-    integer(k8) :: spindeg, numbands, numtransbands, indlowband, indhighband, &
-         indhighvalence, indlowconduction
+    real(dp) :: enref, chempot, Z !, conc, chimp_conc
+    integer(k8) :: ib, spindeg, numbands, numtransbands, indlowband, indhighband!, &
+         !indhighvalence, indlowconduction
     logical :: metallic
 
     namelist /electrons/ enref, spindeg, numbands, numtransbands, &
-         indlowband, indhighband, metallic, indhighvalence, indlowconduction, &
-         conc, chimp_conc
-
+         indlowband, indhighband, metallic, chempot, Z!, &
+         !indhighvalence, indlowconduction
+         
     call subtitle("Setting up electrons...")
     
     !Open input file
@@ -162,11 +162,10 @@ contains
     numtransbands = -1
     indlowband = -1
     indhighband = -1
-    indhighvalence = -1
-    indlowconduction = -1
+    !indhighvalence = -1
+    !indlowconduction = -1
     metallic = .false.
-    conc = 0.0_dp
-    chimp_conc = 0.0_dp
+    Z = 0
     read(1, nml = electrons)
     if(spindeg < 1 .or. spindeg > 2) then
        call exit_with_message('spindeg can be 1 or 2.')
@@ -183,37 +182,18 @@ contains
     if(indhighband < 1) then
        call exit_with_message('indhighband should be > 0.')
     end if
-    if(.not. metallic) then
-       if(indhighvalence < 1 .and. indlowconduction < 1) then
-          call exit_with_message('Either indhighvalence or indlowconduction should be >= 1.')
-       end if
-       if(indhighvalence >= 1) then
-          if(indhighvalence < indlowband) then
-             call exit_with_message('indhighvalence should be >= indlowband.')
-          end if
-       end if
-       if(indlowconduction >= 1) then
-          if(indlowconduction > indhighband) then
-             call exit_with_message('indlowconduction should be <= indhighband.')
-          end if
-       end if
-    end if
+    
     el%spindeg = spindeg
     el%numbands = numbands
     el%numtransbands = numtransbands
     el%indlowband = indlowband
     el%indhighband = indhighband
-    el%indhighvalence = indhighvalence
-    el%indlowconduction = indlowconduction
+!!$    el%indhighvalence = indhighvalence
+!!$    el%indlowconduction = indlowconduction
     el%metallic = metallic
     el%enref = enref
-    el%conc = conc
-    el%chimp_conc = chimp_conc
-    if(el%chimp_conc /= 0.0_dp) then
-       el%Z = abs(el%conc/el%chimp_conc)
-    else
-       el%Z = 0.0_dp
-    end if
+    el%chempot = chempot
+    el%Z = Z
     
     !Close input file
     close(1)
@@ -228,13 +208,25 @@ contains
        write(*, "(A, I1)") "Spin degeneracy = ", el%spindeg
        write(*, "(A, I5)") "Number of electronic bands = ", el%numbands
        write(*, "(A, 1E16.8)") "Reference electron energy = ", el%enref
-       write(*, "(A, 1E16.8)") "Specified carrier concentration = ", el%conc
-       write(*, "(A, 1E16.8)") "Charged impurity concentration = ", el%chimp_conc
-       write(*, "(A, 1E16.8)") "Ionization of impurity = ", el%Z
     end if
     
     !Calculate electrons
     call calculate_electrons(el, wann, crys, sym, num)
+
+    !Calculate carrier concentration
+    call el%calculate_carrier_conc(crys%T, crys%volume)
+    el%chimp_conc = sum(el%conc)/el%Z
+
+    !Print out information.
+    if(this_image() == 1) then
+       write(*, "(A, 1E16.8)") "Chemical potential = ", el%chempot
+       write(*, "(A, 1E16.8)") 'Calculated carrier concentration:'
+       do ib = el%indlowband, el%indhighband
+          write(*, "(A, I5, A, 1E16.8, A)") ' Band: ', ib, ', concentration: ', el%conc(ib), ' cm^-3'
+       end do
+       write(*, "(A, 1E16.8)") "Charged impurity concentration = ", el%chimp_conc
+       write(*, "(A, 1E16.8)") "Ionization of impurity = ", el%Z
+    end if
   end subroutine read_input_and_setup
   
   subroutine calculate_electrons(el, wann, crys, sym, num)
@@ -464,7 +456,7 @@ contains
        end do
        close(1)
     end if
-
+    
     !Calculate electron tetrahedra
     if(num%tetrahedra) then
        call print_message("Calculating electron mesh tetrahedra...")
@@ -539,6 +531,32 @@ contains
     energies(1:nk, :) = energies_tmp(1:nk, :)
     velocities(1:nk, :, :) = velocities_tmp(1:nk, :, :)
   end subroutine fbz_blocks_quantities
+
+  subroutine calculate_carrier_conc(el, T, vol)
+    !! Subroutine to calculate the band resolved carrier concentration
+    !! for a given chemical potential and temperature.
+
+    class(electron), intent(inout) :: el
+    real(dp), intent(in) :: T, vol
+
+    !Local variables
+    real(dp) :: const
+    integer(k8) :: ib, ik
+
+    !Allocate conc
+    allocate(el%conc(el%numbands))
+    el%conc = 0.0_dp
+    
+    !Normalization and units factor
+    const = el%spindeg/dble(product(el%kmesh))/vol/(1.0e-21_dp)
+
+    do ik = 1, el%nk
+       do ib = el%indlowband, el%indhighband
+          el%conc(ib) = el%conc(ib) + Fermi(el%ens(ik, ib), el%chempot, T)
+       end do
+    end do
+    el%conc = el%conc*const !cm^-3
+  end subroutine calculate_carrier_conc
 
   subroutine deallocate_eigenvecs(el)
     !! Deallocate the electron eigenvectors
