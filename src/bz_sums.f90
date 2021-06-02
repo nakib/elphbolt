@@ -323,7 +323,8 @@ contains
     integer(k8), intent(in) :: mesh(3), deg
     real(dp), intent(in) :: T, chempot, ens(:,:), vels(:,:,:), volume, response(:,:,:)
     type(symmetry), intent(in) :: sym
-    real(dp), intent(out) :: trans_coeff_hc(3,3), trans_coeff_cc(3,3) !h(c)c = heat(charge) current
+    real(dp), intent(out) :: trans_coeff_hc(:,:,:), trans_coeff_cc(:,:,:)
+    ! Above, h(c)c = heat(charge) current
     
     !Local variables
     integer(k8) :: ik, ib, icart, nk, nbands, pow_hc, pow_cc
@@ -331,7 +332,7 @@ contains
     
     nk = size(ens(:,1))
     nbands = size(ens(1,:))
-
+    
     !Common multiplicative factor
     fac = 1.0e21/kB/T/volume/product(mesh) 
     
@@ -372,8 +373,8 @@ contains
        call exit_with_message("Unknown particle species in calculate_transport_coefficient. Exiting.")
     end if
     
-    trans_coeff_hc(:,:) = 0.0_dp
-    trans_coeff_cc(:,:) = 0.0_dp
+    trans_coeff_hc = 0.0_dp
+    trans_coeff_cc = 0.0_dp
     do ik = 1, nk
        do ib = 1, nbands
           e = ens(ik, ib)
@@ -387,9 +388,9 @@ contains
           end if
           do icart = 1, 3
              v = vels(ik, ib, icart)
-             trans_coeff_hc(icart, :) = trans_coeff_hc(icart, :) + &
+             trans_coeff_hc(ib, icart, :) = trans_coeff_hc(ib, icart, :) + &
                   (e - chempot)**pow_hc*dist_factor*v*response(ik, ib, :)
-             trans_coeff_cc(icart, :) = trans_coeff_cc(icart, :) + &
+             trans_coeff_cc(ib, icart, :) = trans_coeff_cc(ib, icart, :) + &
                   (e - chempot)**pow_cc*dist_factor*v*response(ik, ib, :)
           end do
        end do
@@ -403,114 +404,9 @@ contains
     trans_coeff_cc = A_cc*trans_coeff_cc
 
     !Symmetrize transport tensor
-    call symmetrize_3x3_tensor(trans_coeff_hc, sym%crotations)
-    call symmetrize_3x3_tensor(trans_coeff_cc, sym%crotations)
+    do ib = 1, nbands
+       call symmetrize_3x3_tensor(trans_coeff_hc(ib, :, :), sym%crotations)
+       call symmetrize_3x3_tensor(trans_coeff_cc(ib, :, :), sym%crotations)
+    end do
   end subroutine calculate_transport_coeff
-
-!!$  subroutine calculate_transport_coeff(species, field, T, deg, chempot, ens, vels, &
-!!$       volume, mesh, response, sym, conc, trans_coeff_hc, trans_coeff_cc)
-!!$    !! Subroutine to calculate transport coefficients.
-!!$    !!
-!!$    !! species Type of particle
-!!$    !! field Type of field
-!!$    !! T Temperature in K
-!!$    !! deg Degeneracy
-!!$    !! chempot Chemical potential in eV
-!!$    !! ens FBZ energies in eV
-!!$    !! vels FBZ velocities in Km/s
-!!$    !! volume Primitive cell volume in nm^3
-!!$    !! mesh Wave vector grid
-!!$    !! response FBZ response function
-!!$    !! conc Carrier concentration in cm^-3
-!!$    !! trans_coeff_hc Heat current coefficient
-!!$    !! trans_coeff_cc Charge current coefficient
-!!$
-!!$    character(len = 2), intent(in) :: species
-!!$    character(len = 1), intent(in) :: field
-!!$    integer(k8), intent(in) :: mesh(3), deg
-!!$    real(dp), intent(in) :: T, chempot, ens(:,:), vels(:,:,:), volume, response(:,:,:), conc
-!!$    type(symmetry), intent(in) :: sym
-!!$    real(dp), intent(out) :: trans_coeff_hc(3,3), trans_coeff_cc(3,3) !h(c)c = heat(charge) current
-!!$    
-!!$    !Local variables
-!!$    integer(k8) :: ik, ib, icart, nk, nbands, pow_hc, pow_cc
-!!$    real(dp) :: dist_factor, e, v, fac, A_hc, A_cc
-!!$    
-!!$    nk = size(ens(:,1))
-!!$    nbands = size(ens(1,:))
-!!$
-!!$    !Common multiplicative factor
-!!$    fac = 1.0e21/kB/T/volume/product(mesh) 
-!!$    
-!!$    !Do checks related to particle and field type
-!!$    if(species == 'ph') then
-!!$       if(chempot /= 0.0_dp) then
-!!$          call exit_with_message(&
-!!$               "Phonon chemical potential non-zero in calculate_transport_coefficient. Exiting.")
-!!$       end if
-!!$       if(field == 'T') then
-!!$          A_hc = qe*fac
-!!$          pow_hc = 1
-!!$          A_cc = 0.0_dp
-!!$          pow_cc = 0
-!!$       else if(field == 'E') then
-!!$          A_hc = sign(1.0_dp, conc)*fac
-!!$          pow_hc = 1
-!!$          A_cc = 0.0_dp
-!!$          pow_cc = 0
-!!$       else
-!!$          call exit_with_message("Unknown field type in calculate_transport_coefficient. Exiting.")
-!!$       end if
-!!$    else if(species == 'el') then
-!!$       if(field == 'T') then
-!!$          A_cc = deg*sign(1.0_dp, conc)*qe*fac
-!!$          pow_cc = 0
-!!$          A_hc = deg*qe*fac
-!!$          pow_hc = 1 
-!!$       else if(field == 'E') then
-!!$          A_cc = deg*fac
-!!$          pow_cc = 0
-!!$          A_hc = sign(1.0_dp, conc)*A_cc
-!!$          pow_hc = 1
-!!$       else
-!!$          call exit_with_message("Unknown field type in calculate_transport_coefficient. Exiting.")
-!!$       end if
-!!$    else
-!!$       call exit_with_message("Unknown particle species in calculate_transport_coefficient. Exiting.")
-!!$    end if
-!!$    
-!!$    trans_coeff_hc(:,:) = 0.0_dp
-!!$    trans_coeff_cc(:,:) = 0.0_dp
-!!$    do ik = 1, nk
-!!$       do ib = 1, nbands
-!!$          e = ens(ik, ib)
-!!$          if(species == 'ph') then
-!!$             if(e == 0.0_dp) cycle !Ignore zero energies phonons
-!!$             dist_factor = Bose(e, T)
-!!$             dist_factor = dist_factor*(1.0_dp + dist_factor)
-!!$          else
-!!$             dist_factor = Fermi(e, chempot, T)
-!!$             dist_factor = dist_factor*(1.0_dp - dist_factor)
-!!$          end if
-!!$          do icart = 1, 3
-!!$             v = vels(ik, ib, icart)
-!!$             trans_coeff_hc(icart, :) = trans_coeff_hc(icart, :) + &
-!!$                  (e - chempot)**pow_hc*dist_factor*v*response(ik, ib, :)
-!!$             trans_coeff_cc(icart, :) = trans_coeff_cc(icart, :) + &
-!!$                  (e - chempot)**pow_cc*dist_factor*v*response(ik, ib, :)
-!!$          end do
-!!$       end do
-!!$    end do
-!!$    !Units:
-!!$    ! W/m/K for thermal conductivity
-!!$    ! 1/Omega/m for charge conductivity
-!!$    ! V/K for thermopower
-!!$    ! A/m/K for alpha/T
-!!$    trans_coeff_hc = A_hc*trans_coeff_hc
-!!$    trans_coeff_cc = A_cc*trans_coeff_cc
-!!$
-!!$    !Symmetrize transport tensor
-!!$    call symmetrize_3x3_tensor(trans_coeff_hc, sym%crotations)
-!!$    call symmetrize_3x3_tensor(trans_coeff_cc, sym%crotations)
-!!$  end subroutine calculate_transport_coeff
 end module bz_sums

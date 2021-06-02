@@ -86,11 +86,10 @@ contains
     character(len = 1024) :: tag, Tdir, tableheader
     integer(k8) :: iq, ik, it_ph, it_el, icart
     real(dp), allocatable :: rates_3ph(:,:), rates_phe(:,:), rates_eph(:,:), &
-         I_el(:,:,:), I_ph(:,:,:)
-    real(dp) :: ph_kappa(3, 3) = 0.0_dp, ph_alphabyT(3, 3) = 0.0_dp, &
-         el_sigma(3, 3) = 0.0_dp, el_sigmaS(3, 3) = 0.0_dp, &
-         el_alphabyT(3, 3) = 0.0_dp, el_kappa0(3, 3) = 0.0_dp, dummy(3, 3) = 0.0_dp, &
-         ph_kappa_scalar, ph_kappa_scalar_old, el_sigma_scalar, el_sigma_scalar_old, &
+         I_el(:,:,:), I_ph(:,:,:), ph_kappa(:,:,:), ph_alphabyT(:,:,:), &
+         el_sigma(:,:,:), el_sigmaS(:,:,:), el_alphabyT(:,:,:), el_kappa0(:,:,:), &
+         dummy(:,:,:)
+    real(dp) :: ph_kappa_scalar, ph_kappa_scalar_old, el_sigma_scalar, el_sigma_scalar_old, &
          el_sigmaS_scalar, el_sigmaS_scalar_old, el_kappa0_scalar, el_kappa0_scalar_old, &
          ph_alphabyT_scalar, ph_alphabyT_scalar_old, el_alphabyT_scalar, el_alphabyT_scalar_old, &
          KO_dev, tot_alphabyT_scalar, lambda
@@ -108,9 +107,17 @@ contains
     !Calculate RTA scattering rates
     if(present(el)) then
        call calculate_ph_rta_rates(rates_3ph, rates_phe, num, crys, ph, el)
+
+       !Allocate electron transport coefficients
+       allocate(el_sigma(el%numbands, 3, 3), el_sigmaS(el%numbands, 3, 3), &
+            el_alphabyT(el%numbands, 3, 3), el_kappa0(el%numbands, 3, 3))
     else
        call calculate_ph_rta_rates(rates_3ph, rates_phe, num, crys, ph)
     end if
+
+    !Allocate phonon transport coefficients
+    allocate(ph_kappa(ph%numbranches, 3, 3), ph_alphabyT(ph%numbranches, 3, 3), &
+         dummy(ph%numbranches, 3, 3))
 
     !Allocate total RTA scattering rates
     allocate(bt%ph_rta_rates_ibz(ph%nq_irred, ph%numbranches))
@@ -124,7 +131,7 @@ contains
     ! Calculate field term (gradT=>F0)
     call calculate_field_term('ph', 'T', ph%nequiv, ph%ibz2fbz_map, &
          crys%T, 0.0_dp, ph%ens, ph%vels, bt%ph_rta_rates_ibz, bt%ph_field_term_T)
-
+    
     ! Symmetrize field term
     do iq = 1, ph%nq
        bt%ph_field_term_T(iq,:,:)=transpose(&
@@ -236,13 +243,14 @@ contains
     
     !Calculate and print transport scalars
     !gradT:
-    el_kappa0_scalar = trace(el_kappa0)/3.0_dp
-    el_sigmaS_scalar = trace(el_sigmaS)/3.0_dp
-    ph_kappa_scalar = trace(ph_kappa)/3.0_dp
+    el_kappa0_scalar = trace(sum(el_kappa0, dim = 1))/3.0_dp
+    el_sigmaS_scalar = trace(sum(el_sigmaS, dim = 1))/3.0_dp
+    ph_kappa_scalar = trace(sum(ph_kappa, dim = 1))/3.0_dp
+    
     !E:
-    el_sigma_scalar = trace(el_sigma)/3.0_dp
-    el_alphabyT_scalar = trace(el_alphabyT)/3.0_dp
-    ph_alphabyT_scalar = trace(ph_alphabyT)/3.0_dp
+    el_sigma_scalar = trace(sum(el_sigma, dim = 1))/3.0_dp
+    el_alphabyT_scalar = trace(sum(el_alphabyT, dim = 1))/3.0_dp
+    ph_alphabyT_scalar = trace(sum(ph_alphabyT, dim = 1))/3.0_dp
 
     tot_alphabyT_scalar = el_alphabyT_scalar + ph_alphabyT_scalar
     KO_dev = 100.0_dp*abs(&
@@ -315,7 +323,7 @@ contains
              end do
              !Correct "phonon" part
              I_ph = bt%el_response_T - I_el
-             call correct_Iph(I_ph, trace(ph_alphabyT)/3.0_dp, lambda)
+             call correct_Iph(I_ph, trace(sum(ph_alphabyT, dim = 1))/3.0_dp, lambda)
              bt%el_response_T = I_el + lambda*I_ph
 
              !Calculate electron transport coefficients
@@ -324,10 +332,10 @@ contains
                   el_kappa0, el_sigmaS)
 
              !Calculate electron transport scalars
-             el_kappa0_scalar = trace(el_kappa0)/3.0_dp
-             el_sigmaS_scalar = trace(el_sigmaS)/3.0_dp
-             el_sigma_scalar = trace(el_sigma)/3.0_dp
-             el_alphabyT_scalar = trace(el_alphabyT)/3.0_dp
+             el_kappa0_scalar = trace(sum(el_kappa0, dim = 1))/3.0_dp
+             el_sigmaS_scalar = trace(sum(el_sigmaS, dim = 1))/3.0_dp
+             el_sigma_scalar = trace(sum(el_sigma, dim = 1))/3.0_dp
+             el_alphabyT_scalar = trace(sum(el_alphabyT, dim = 1))/3.0_dp
 
              !Check convergence
              if(converged(el_kappa0_scalar_old, el_kappa0_scalar, num%conv_thres) .and. &
@@ -344,9 +352,9 @@ contains
           end do
 
           !Calculate phonon transport scalar
-          ph_kappa_scalar = trace(ph_kappa)/3.0_dp
-          ph_alphabyT_scalar = trace(ph_alphabyT)/3.0_dp
-
+          ph_kappa_scalar = trace(sum(ph_kappa, dim = 1))/3.0_dp
+          ph_alphabyT_scalar = trace(sum(ph_alphabyT, dim = 1))/3.0_dp
+          
           !Check convergence
           if(converged(ph_kappa_scalar_old, ph_kappa_scalar, num%conv_thres) .and. &
                converged(ph_alphabyT_scalar_old, ph_alphabyT_scalar, num%conv_thres)) then
@@ -397,8 +405,8 @@ contains
              ph_alphabyT = ph_alphabyT/crys%T
 
              !Calculate and print phonon transport scalar
-             ph_kappa_scalar = trace(ph_kappa)/3.0_dp
-             ph_alphabyT_scalar = trace(ph_alphabyT)/3.0_dp             
+             ph_kappa_scalar = trace(sum(ph_kappa, dim = 1))/3.0_dp
+             ph_alphabyT_scalar = trace(sum(ph_alphabyT, dim = 1))/3.0_dp
              if(this_image() == 1) then
                 write(*,"(I3, A, 1E16.8, A, 1E16.8)") it_ph, "    ", ph_kappa_scalar, &
                      "    ", ph_alphabyT_scalar
@@ -454,10 +462,10 @@ contains
                   el_kappa0, el_sigmaS)
 
              !Calculate and print electron transport scalars
-             el_kappa0_scalar = trace(el_kappa0)/3.0_dp
-             el_sigmaS_scalar = trace(el_sigmaS)/3.0_dp
-             el_sigma_scalar = trace(el_sigma)/3.0_dp
-             el_alphabyT_scalar = trace(el_alphabyT)/3.0_dp
+             el_kappa0_scalar = trace(sum(el_kappa0, dim = 1))/3.0_dp
+             el_sigmaS_scalar = trace(sum(el_sigmaS, dim = 1))/3.0_dp
+             el_sigma_scalar = trace(sum(el_sigma, dim = 1))/3.0_dp
+             el_alphabyT_scalar = trace(sum(el_alphabyT, dim = 1))/3.0_dp
              if(this_image() == 1) then
                 write(*,"(I3, A, 1E16.8, A, 1E16.8, A, 1E16.8, A, 1E16.8)") it_el, &
                      "    ", el_kappa0_scalar, "     ", el_sigmaS_scalar, &
@@ -491,7 +499,7 @@ contains
 
       !Internal variables
       integer(k8) :: it, maxiter
-      real(dp) :: a, b, aux(3,3), sigmaS(3,3), thresh, sigmaS_scalar
+      real(dp) :: a, b, aux(3,3), sigmaS(size(I_ph(1,:,1)), 3, 3), thresh, sigmaS_scalar
 
       a = 0.0_dp !lower bound
       b = 2.0_dp !upper bound
@@ -503,7 +511,7 @@ contains
          call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
               el%ens, el%vels, crys%volume, el%kmesh, lambda*I_ph, sym, &
               dummy, sigmaS)         
-         sigmaS_scalar = trace(sigmaS)/3.0_dp
+         sigmaS_scalar = trace(sum(sigmaS, dim = 1))/3.0_dp
 
          if(abs(sigmaS_scalar - constraint) < thresh) then
             exit
