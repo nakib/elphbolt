@@ -72,20 +72,29 @@ contains
     sync all
   end subroutine write2file_rank2_real
 
-  subroutine write2file_response(filename, data)
+  subroutine write2file_response(filename, data, bandlist)
     !! Write list of vectors to band/branch resolved files.
 
     character(len = *), intent(in) :: filename
     real(dp), intent(in) :: data(:,:,:)
+    integer(k8), intent(in), optional :: bandlist(:)
 
-    integer(k8) :: ib, nb, ik, nk, dim
+    integer(k8) :: ib, ibstart, ibend, nb, ik, nk, dim
     character(len = 1) :: numcols
     character(len = 1024) :: bandtag
     real(dp), allocatable :: aux(:,:)
 
     if(this_image() == 1) then
        nk = size(data(:, 1, 1))
-       nb = size(data(1, :, 1))
+       if(present(bandlist)) then
+          nb = size(bandlist)
+          ibstart = bandlist(1)
+          ibend = bandlist(nb)
+       else
+          nb = size(data(1, :, 1))
+          ibstart = 1
+          ibend = nb
+       end if
        dim = size(data(1, 1, :))
        write(numcols, "(I0)") dim
 
@@ -99,7 +108,7 @@ contains
        close(1)
 
        !Band/branch resolved
-       do ib = 1, nb
+       do ib = ibstart, ibend
           write(bandtag, "(I0)") ib
           open(2, file = trim(filename//bandtag), status = "replace")
           do ik = 1, nk
@@ -111,19 +120,30 @@ contains
     sync all
   end subroutine write2file_response
   
-  subroutine append2file_transport_tensor(filename, it, data)
+  subroutine append2file_transport_tensor(filename, it, data, bandlist)
     !! Append 3x3 tensor to band/branch resolved files.
 
     character(len = *), intent(in) :: filename
     integer(k8), intent(in) :: it
     real(dp), intent(in) :: data(:,:,:)
+    integer(k8), intent(in), optional :: bandlist(:)
 
-    integer(k8) :: ib, nb
+    integer(k8) :: ib, nb, ibstart, ibend
     character(len = 1) :: numcols
     character(len = 1024) :: bandtag
 
     if(this_image() == 1) then
-       nb = size(data(:, 1, 1))
+       !nb = size(data(:, 1, 1))
+       if(present(bandlist)) then
+          nb = size(bandlist)
+          ibstart = bandlist(1)
+          ibend = bandlist(nb)
+       else
+          nb = size(data(:, 1, 1))
+          ibstart = 1
+          ibend = nb
+       end if
+
        write(numcols, "(I0)") 9
 
        !Band/branch summed
@@ -137,7 +157,7 @@ contains
        close(1)
 
        !Band/branch resolved
-       do ib = 1, nb
+       do ib = ibstart, ibend
           write(bandtag, "(I0)") ib
           if(it == 0) then
              open(2, file = trim(filename//bandtag), status = "replace")

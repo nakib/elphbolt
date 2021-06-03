@@ -46,10 +46,8 @@ module electron_module
      !! Lowest transport band index.
      integer(k8) :: indhighband
      !! Highest transport band index.
-!!$     integer(k8) :: indhighvalence
-!!$     !! Highest valence band index.
-!!$     integer(k8) :: indlowconduction
-!!$     !! Lowest conduction band index.
+     integer(k8), allocatable :: bandlist(:)
+     !! List of transport active band indices.
      integer(k8) :: mesh_ref
      !! Electron mesh refinement factor compared to the phonon mesh.
      integer(k8) :: kmesh(3)
@@ -143,13 +141,11 @@ contains
 
     !Local variables
     real(dp) :: enref, chempot, Z !, conc, chimp_conc
-    integer(k8) :: ib, spindeg, numbands, numtransbands, indlowband, indhighband!, &
-         !indhighvalence, indlowconduction
+    integer(k8) :: ib, spindeg, numbands, indlowband, indhighband
     logical :: metallic
 
-    namelist /electrons/ enref, spindeg, numbands, numtransbands, &
-         indlowband, indhighband, metallic, chempot, Z!, &
-         !indhighvalence, indlowconduction
+    namelist /electrons/ enref, spindeg, numbands, &
+         indlowband, indhighband, metallic, chempot, Z
          
     call subtitle("Setting up electrons...")
     
@@ -159,11 +155,8 @@ contains
     !Read electrons information
     spindeg = 2 !Default calculation is non-spin polarized
     numbands = -1
-    numtransbands = -1
     indlowband = -1
     indhighband = -1
-    !indhighvalence = -1
-    !indlowconduction = -1
     metallic = .false.
     Z = 0
     read(1, nml = electrons)
@@ -172,9 +165,6 @@ contains
     end if
     if(numbands < 1) then
        call exit_with_message('numbands should be > 0.')
-    end if
-    if(numtransbands < 1) then
-       call exit_with_message('numtransbands should be > 0.')
     end if
     if(indlowband < 1) then
        call exit_with_message('indlowband should be > 0.')
@@ -185,11 +175,13 @@ contains
     
     el%spindeg = spindeg
     el%numbands = numbands
-    el%numtransbands = numtransbands
     el%indlowband = indlowband
     el%indhighband = indhighband
-!!$    el%indhighvalence = indhighvalence
-!!$    el%indlowconduction = indlowconduction
+    el%numtransbands = el%indhighband - el%indlowband + 1
+    allocate(el%bandlist(el%numtransbands))
+    do ib = 1, el%numtransbands
+       el%bandlist(ib) = indlowband + ib - 1
+    end do
     el%metallic = metallic
     el%enref = enref
     el%chempot = chempot
@@ -206,7 +198,10 @@ contains
     !Print out information.
     if(this_image() == 1) then
        write(*, "(A, I1)") "Spin degeneracy = ", el%spindeg
-       write(*, "(A, I5)") "Number of electronic bands = ", el%numbands
+       write(*, "(A, I5)") "Number of Wannier electronic bands = ", el%numbands
+       write(*, "(A, I5)") "Number of transport active electronic bands = ", el%numtransbands
+       write(*, "(A, I5, I5)") "Lowest and highest transport active electronic bands = ", &
+            el%bandlist(1), el%bandlist(el%numtransbands)
        write(*, "(A, 1E16.8)") "Reference electron energy = ", el%enref
     end if
     
@@ -291,7 +286,7 @@ contains
           el%ens(il,:) = el%ens_irred(i,:)
           
           !velocity
-          do ib = 1,wann%numwannbands
+          do ib = 1, el%numtransbands !wann%numwannbands
              !here use real space (Cartesian) rotations
              el%vels(il, ib, :) = matmul(sym%crotations(:, :, s), el%vels_irred(i, ib, :))
           end do
@@ -331,7 +326,7 @@ contains
     allocate(el_ens_tmp(el%nk, wann%numwannbands), el_vels_tmp(el%nk, wann%numwannbands, 3))
     call wann%el_wann_epw(crys, el%nk, el%wavevecs, el_ens_tmp, el_vels_tmp, el%evecs)
     deallocate(el_ens_tmp, el_vels_tmp) !free up memory
-
+    
     ! 8. Find IBZ of energy window restricted blocks
     !    After this step, el%nk_irred, el%indexlist_irred, 
     !    el%wavevecs_irred, el%nequiv, and el%ibz2fbz_map

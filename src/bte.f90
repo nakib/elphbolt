@@ -277,15 +277,15 @@ contains
     ! Change to data output directory
     call chdir(trim(adjustl(Tdir)))
     call append2file_transport_tensor('nodrag_ph_kappa_', 0_k8, ph_kappa)
-    call append2file_transport_tensor('nodrag_el_sigmaS_', 0_k8, el_sigmaS)
-    call append2file_transport_tensor('nodrag_el_sigma_', 0_k8, el_sigma)
-    call append2file_transport_tensor('nodrag_el_alphabyT_', 0_k8, el_alphabyT)
-    call append2file_transport_tensor('nodrag_el_kappa0_', 0_k8, el_kappa0)
+    call append2file_transport_tensor('nodrag_el_sigmaS_', 0_k8, el_sigmaS, el%bandlist)
+    call append2file_transport_tensor('nodrag_el_sigma_', 0_k8, el_sigma, el%bandlist)
+    call append2file_transport_tensor('nodrag_el_alphabyT_', 0_k8, el_alphabyT, el%bandlist)
+    call append2file_transport_tensor('nodrag_el_kappa0_', 0_k8, el_kappa0, el%bandlist)
 
     ! Print RTA band/branch resolved response functions
     call write2file_response('RTA_F0_', bt%ph_response_T) !gradT, ph
-    call write2file_response('RTA_I0_', bt%el_response_T) !gradT, el
-    call write2file_response('RTA_J0_', bt%el_response_E) !E, el
+    call write2file_response('RTA_I0_', bt%el_response_T, el%bandlist) !gradT, el
+    call write2file_response('RTA_J0_', bt%el_response_E, el%bandlist) !E, el
 
     ! Change back to cwd
     call chdir(trim(adjustl(num%cwd)))
@@ -296,10 +296,10 @@ contains
        call chdir(trim(adjustl(Tdir)))
        call append2file_transport_tensor('drag_ph_kappa_', 0_k8, ph_kappa)
        call append2file_transport_tensor('drag_ph_alphabyT_', 0_k8, ph_alphabyT)
-       call append2file_transport_tensor('drag_el_sigmaS_', 0_k8, el_sigmaS)
-       call append2file_transport_tensor('drag_el_sigma_', 0_k8, el_sigma)
-       call append2file_transport_tensor('drag_el_alphabyT_', 0_k8, el_alphabyT)
-       call append2file_transport_tensor('drag_el_kappa0_', 0_k8, el_kappa0)
+       call append2file_transport_tensor('drag_el_sigmaS_', 0_k8, el_sigmaS, el%bandlist)
+       call append2file_transport_tensor('drag_el_sigma_', 0_k8, el_sigma, el%bandlist)
+       call append2file_transport_tensor('drag_el_alphabyT_', 0_k8, el_alphabyT, el%bandlist)
+       call append2file_transport_tensor('drag_el_kappa0_', 0_k8, el_kappa0, el%bandlist)
        ! Change back to cwd
        call chdir(trim(adjustl(num%cwd)))
        
@@ -392,8 +392,8 @@ contains
              !Print RTA band/branch resolved response functions
              ! Change to data output directory
              call chdir(trim(adjustl(Tdir)))
-             call write2file_response('partdclp_I0_', bt%el_response_T) !gradT, el
-             call write2file_response('partdclp_J0_', bt%el_response_E) !E, el
+             call write2file_response('partdclp_I0_', bt%el_response_T, el%bandlist) !gradT, el
+             call write2file_response('partdclp_J0_', bt%el_response_E, el%bandlist) !E, el
              ! Change back to cwd
              call chdir(trim(adjustl(num%cwd)))
           end if
@@ -406,9 +406,9 @@ contains
              ! Change to data output directory
              call chdir(trim(adjustl(Tdir)))
              call write2file_response('drag_F0_', bt%ph_response_T) !gradT, ph
-             call write2file_response('drag_I0_', bt%el_response_T) !gradT, el
+             call write2file_response('drag_I0_', bt%el_response_T, el%bandlist) !gradT, el
              call write2file_response('drag_G0_', bt%ph_response_E) !E, ph
-             call write2file_response('drag_J0_', bt%el_response_E) !E, el
+             call write2file_response('drag_J0_', bt%el_response_E, el%bandlist) !E, el
              ! Change back to cwd
              call chdir(trim(adjustl(num%cwd)))
              exit
@@ -421,10 +421,10 @@ contains
              call chdir(trim(adjustl(Tdir)))
              call append2file_transport_tensor('drag_ph_kappa_', it_ph, ph_kappa)
              call append2file_transport_tensor('drag_ph_alphabyT_', it_ph, ph_alphabyT)
-             call append2file_transport_tensor('drag_el_sigmaS_', it_ph, el_sigmaS)
-             call append2file_transport_tensor('drag_el_sigma_', it_ph, el_sigma)
-             call append2file_transport_tensor('drag_el_alphabyT_', it_ph, el_alphabyT)
-             call append2file_transport_tensor('drag_el_kappa0_', it_ph, el_kappa0)
+             call append2file_transport_tensor('drag_el_sigmaS_', it_ph, el_sigmaS, el%bandlist)
+             call append2file_transport_tensor('drag_el_sigma_', it_ph, el_sigma, el%bandlist)
+             call append2file_transport_tensor('drag_el_alphabyT_', it_ph, el_alphabyT, el%bandlist)
+             call append2file_transport_tensor('drag_el_kappa0_', it_ph, el_kappa0, el%bandlist)
              ! Change back to cwd
              call chdir(trim(adjustl(num%cwd)))
           end if
@@ -553,8 +553,8 @@ contains
              !Print converged band resolved response functions
              ! Change to data output directory
              call chdir(trim(adjustl(Tdir)))
-             call write2file_response('nodrag_I0_', bt%el_response_T) !gradT, el
-             call write2file_response('nodrag_J0_', bt%el_response_E) !E, el
+             call write2file_response('nodrag_I0_', bt%el_response_T, el%bandlist) !gradT, el
+             call write2file_response('nodrag_J0_', bt%el_response_E, el%bandlist) !E, el
              ! Change back to cwd
              call chdir(trim(adjustl(num%cwd)))
              
@@ -564,10 +564,10 @@ contains
              !Print out band resolved transport coefficients
              ! Change to data output directory
              call chdir(trim(adjustl(Tdir)))
-             call append2file_transport_tensor('nodrag_el_sigmaS_', it_el, el_sigmaS)
-             call append2file_transport_tensor('nodrag_el_sigma_', it_el, el_sigma)
-             call append2file_transport_tensor('nodrag_el_alphabyT_', it_el, el_alphabyT)
-             call append2file_transport_tensor('nodrag_el_kappa0_', it_el, el_kappa0)
+             call append2file_transport_tensor('nodrag_el_sigmaS_', it_el, el_sigmaS, el%bandlist)
+             call append2file_transport_tensor('nodrag_el_sigma_', it_el, el_sigma, el%bandlist)
+             call append2file_transport_tensor('nodrag_el_alphabyT_', it_el, el_alphabyT, el%bandlist)
+             call append2file_transport_tensor('nodrag_el_kappa0_', it_el, el_kappa0, el%bandlist)
              ! Change back to cwd
              call chdir(trim(adjustl(num%cwd)))
              
