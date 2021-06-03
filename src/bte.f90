@@ -274,19 +274,10 @@ contains
             "         ", ph_alphabyT_scalar, "           ", KO_dev
     end if
 
-    !Append RTA coefficients in drag files
+    ! Append RTA coefficients in no-drag files
     ! Change to data output directory
     call chdir(trim(adjustl(Tdir)))
-    call append2file_transport_tensor('drag_ph_kappa_', 0_k8, ph_kappa)
-    call append2file_transport_tensor('drag_ph_alphabyT_', 0_k8, ph_alphabyT)
-    call append2file_transport_tensor('drag_el_sigmaS_', 0_k8, el_sigmaS)
-    call append2file_transport_tensor('drag_el_sigma_', 0_k8, el_sigma)
-    call append2file_transport_tensor('drag_el_alphabyT_', 0_k8, el_alphabyT)
-    call append2file_transport_tensor('drag_el_kappa0_', 0_k8, el_kappa0)
-
-    ! Append RTA coefficients in no-drag files
     call append2file_transport_tensor('nodrag_ph_kappa_', 0_k8, ph_kappa)
-    call append2file_transport_tensor('nodrag_ph_alphabyT_', 0_k8, ph_alphabyT)
     call append2file_transport_tensor('nodrag_el_sigmaS_', 0_k8, el_sigmaS)
     call append2file_transport_tensor('nodrag_el_sigma_', 0_k8, el_sigma)
     call append2file_transport_tensor('nodrag_el_alphabyT_', 0_k8, el_alphabyT)
@@ -295,6 +286,18 @@ contains
     call chdir(trim(adjustl(num%cwd)))
     
     if(num%drag) then !Coupled BTEs
+       !Append RTA coefficients in drag files
+       ! Change to data output directory
+       call chdir(trim(adjustl(Tdir)))
+       call append2file_transport_tensor('drag_ph_kappa_', 0_k8, ph_kappa)
+       call append2file_transport_tensor('drag_ph_alphabyT_', 0_k8, ph_alphabyT)
+       call append2file_transport_tensor('drag_el_sigmaS_', 0_k8, el_sigmaS)
+       call append2file_transport_tensor('drag_el_sigma_', 0_k8, el_sigma)
+       call append2file_transport_tensor('drag_el_alphabyT_', 0_k8, el_alphabyT)
+       call append2file_transport_tensor('drag_el_kappa0_', 0_k8, el_kappa0)
+       ! Change back to cwd
+       call chdir(trim(adjustl(num%cwd)))
+       
        call print_message("Coupled electron-phonon transport:")
        call print_message("----------------------------------")
 
