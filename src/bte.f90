@@ -198,7 +198,6 @@ contains
     ! Calculate transport coefficient
     call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, el%ens, &
          el%vels, crys%volume, el%kmesh, bt%el_response_T, sym, el_kappa0, el_sigmaS)
-    !--!
 
     !E field:
     ! Calculate field term (E=>J0)

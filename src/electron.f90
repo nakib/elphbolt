@@ -19,7 +19,7 @@ module electron_module
 
   use params, only: dp, k8
   use misc, only: exit_with_message, print_message, demux_state, sort, &
-       binsearch, subtitle, Fermi
+       binsearch, subtitle, Fermi, write2file_rank2_real, write2file_rank3_real 
   use numerics_module, only: numerics
   use wannier_module, only: epw_wannier
   use crystal_module, only: crystal, calculate_wavevectors_full
@@ -316,6 +316,9 @@ contains
     
     blocks = .true.
     call calculate_wavevectors_full(el%kmesh, el%wavevecs, blocks, el%indexlist) !wave vectors
+
+    !Print electron FBZ mesh
+    call write2file_rank2_real("el.wavevecs_fbz", el%wavevecs)
     
     !energies and velocities
     call fbz_blocks_quantities(el%indexlist, el%ens, el%vels)
@@ -339,6 +342,9 @@ contains
          el%indexlist_irred, el%nequiv, sym%nsymm_rot, sym%qrotations, &
          el%ibz2fbz_map, el%equiv_map, blocks, el%indexlist)
 
+    !Print electron IBZ mesh
+    call write2file_rank2_real("el.wavevecs_ibz", el%wavevecs_irred)
+    
     !Create symmetrizers of wave vector dependent vectors ShengBTE style
     allocate(el%symmetrizers(3, 3, el%nk))
     el%symmetrizers = 0.0_dp
@@ -429,7 +435,7 @@ contains
     !Write IBZ in-window states as text data to file
     if(this_image() == 1) then
        call chdir(num%cwd)
-       filename = 'IBZ_inwindow_states'
+       filename = 'el.inwindow_states_ibz'
        write(numcols,"(I0)") 2
        open(1,file=trim(filename),status='replace')
        write(1,*) "#k-vec index     band index"
@@ -441,16 +447,9 @@ contains
     !Deallocating this here since this is not used later in the program
     deallocate(el%IBZ_inwindow_states)
 
-    !Print out irreducible electron energies
-    write(numcols, "(I0)") el%numbands
-    if(this_image() == 1) then
-       open(1, file = "el.ens", status = "replace")
-       do i = 1, el%nk_irred
-          write(1, "(" // trim(adjustl(numcols)) // "E20.10)") &
-               el%ens_irred(i, :)
-       end do
-       close(1)
-    end if
+    !Print out irreducible electron energies and velocities
+    call write2file_rank2_real("el.ens_ibz", el%ens_irred)
+    call write2file_rank3_real("el.vels_ibz", el%vels_irred)
     
     !Calculate electron tetrahedra
     if(num%tetrahedra) then

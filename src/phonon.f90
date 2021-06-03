@@ -18,7 +18,8 @@ module phonon_module
   !! Module containing type and procedures related to the phononic properties.
 
   use params, only: dp, k8, bohr2nm, pi, twopi, Ryd2eV, oneI
-  use misc, only: print_message, subtitle, expi, distribute_points
+  use misc, only: print_message, subtitle, expi, distribute_points, &
+       write2file_rank2_real
   use numerics_module, only: numerics
   use wannier_module, only: epw_wannier
   use crystal_module, only: crystal, calculate_wavevectors_full
@@ -178,6 +179,9 @@ contains
 
     !Calculate FBZ mesh
     call calculate_wavevectors_full(ph%qmesh, ph%wavevecs, blocks)
+
+    !Print phonon FBZ mesh
+    call write2file_rank2_real("ph.wavevecs_fbz", ph%wavevecs)
     
     !Calculate FBZ phonon quantities
     call phonon_espresso(ph, crys, chunk, ph%wavevecs(start:end, :), &
@@ -201,6 +205,9 @@ contains
     call find_irred_wedge(ph%qmesh, ph%nq_irred, ph%wavevecs_irred, &
          ph%indexlist_irred, ph%nequiv, sym%nsymm_rot, sym%qrotations, &
          ph%ibz2fbz_map, ph%equiv_map, blocks)
+
+    !Print phonon IBZ mesh
+    call write2file_rank2_real("ph.wavevecs_ibz", ph%wavevecs_irred)
     
     !Create symmetrizers of wave vector dependent vectors ShengBTE style
     allocate(symmetrizers_chunk(3, 3, chunk)[*])
@@ -252,7 +259,7 @@ contains
     !Print out irreducible phonon energies and velocities
     if(this_image() == 1) then
        write(numcols, "(I0)") ph%numbranches
-       open(1, file = "ph.ens", status = "replace")
+       open(1, file = "ph.ens_ibz", status = "replace")
        do iq = 1, ph%nq_irred
           write(1, "(" // trim(adjustl(numcols)) // "E20.10)") &
                ph%ens(ph%indexlist_irred(iq), :)
@@ -260,7 +267,7 @@ contains
        close(1)
 
        write(numcols, "(I0)") 3*ph%numbranches
-       open(1, file = "ph.velocity", status = "replace")
+       open(1, file = "ph.vels_ibz", status = "replace")
        do iq = 1, ph%nq_irred
           write(1, "(" // trim(adjustl(numcols)) // "E20.10)") &
                ph%vels(ph%indexlist_irred(iq), :, :)

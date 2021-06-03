@@ -72,6 +72,29 @@ contains
     sync all
   end subroutine write2file_rank2_real
 
+  subroutine write2file_rank3_real(filename, data)
+    !! Write rank-3 data to file.
+
+    character(len = *), intent(in) :: filename
+    real(dp), intent(in) :: data(:,:,:)
+
+    integer(k8) :: ik, nk
+    character(len = 1024) :: numcols
+
+    nk = size(data(:, 1, 1))
+    write(numcols, "(I0)") size(data(1, :, 1))*size(data(1, 1, :))
+
+    if(this_image() == 1) then
+       open(1, file = trim(filename), status = "replace")
+       do ik = 1, nk
+          write(1, "(" // trim(adjustl(numcols)) // "E20.10)") &
+               data(ik, :, :)
+       end do
+       close(1)
+    end if
+    sync all
+  end subroutine write2file_rank3_real
+
   subroutine write2file_response(filename, data, bandlist)
     !! Write list of vectors to band/branch resolved files.
 
@@ -79,6 +102,7 @@ contains
     real(dp), intent(in) :: data(:,:,:)
     integer(k8), intent(in), optional :: bandlist(:)
 
+    !Local variables
     integer(k8) :: ib, ibstart, ibend, nb, ik, nk, dim
     character(len = 1) :: numcols
     character(len = 1024) :: bandtag
@@ -128,12 +152,12 @@ contains
     real(dp), intent(in) :: data(:,:,:)
     integer(k8), intent(in), optional :: bandlist(:)
 
+    !Local variables
     integer(k8) :: ib, nb, ibstart, ibend
     character(len = 1) :: numcols
     character(len = 1024) :: bandtag
 
     if(this_image() == 1) then
-       !nb = size(data(:, 1, 1))
        if(present(bandlist)) then
           nb = size(bandlist)
           ibstart = bandlist(1)
