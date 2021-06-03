@@ -69,22 +69,64 @@ contains
        end do
        close(1)
     end if
+    sync all
   end subroutine write2file_rank2_real
 
-  subroutine append2file_transport_tensor(filename, it, data)
-    !! Append 3x3 tensor to file.
+  subroutine write2file_response(filename, data)
+    !! Write list of vectors to band/branch resolved files.
 
     character(len = *), intent(in) :: filename
-    integer(k8), intent(in), optional :: it
-    real(dp), intent(in), optional :: data(:,:,:)
+    real(dp), intent(in) :: data(:,:,:)
+
+    integer(k8) :: ib, nb, ik, nk, dim
+    character(len = 1) :: numcols
+    character(len = 1024) :: bandtag
+    real(dp), allocatable :: aux(:,:)
+
+    if(this_image() == 1) then
+       nk = size(data(:, 1, 1))
+       nb = size(data(1, :, 1))
+       dim = size(data(1, 1, :))
+       write(numcols, "(I0)") dim
+
+       !Band/branch summed
+       open(1, file = trim(filename//"tot"), status = "replace")
+       allocate(aux(nk, 3))
+       aux = sum(data, dim = 2)
+       do ik = 1, nk
+          write(1, "(3(1E20.10),x)") aux(ik, :)
+       end do
+       close(1)
+
+       !Band/branch resolved
+       do ib = 1, nb
+          write(bandtag, "(I0)") ib
+          open(2, file = trim(filename//bandtag), status = "replace")
+          do ik = 1, nk
+             write(2, "(3(1E20.10),x)") data(ik, ib, :)
+          end do
+          close(2)
+       end do
+    end if
+    sync all
+  end subroutine write2file_response
+  
+  subroutine append2file_transport_tensor(filename, it, data)
+    !! Append 3x3 tensor to band/branch resolved files.
+
+    character(len = *), intent(in) :: filename
+    integer(k8), intent(in) :: it
+    real(dp), intent(in) :: data(:,:,:)
 
     integer(k8) :: ib, nb
-    character(len = 1024) :: numcols, bandtag
+    character(len = 1) :: numcols
+    character(len = 1024) :: bandtag
 
     if(this_image() == 1) then
        nb = size(data(:, 1, 1))
        write(numcols, "(I0)") 9
 
+       !Band/branch summed
        if(it == 0) then
           open(1, file = trim(filename//"tot"), status = "replace")
        else
@@ -93,7 +135,8 @@ contains
        write(1, "(I3, " //trim(adjustl(numcols))//"E20.10)") &
             it, sum(data, dim = 1)
        close(1)
-       
+
+       !Band/branch resolved
        do ib = 1, nb
           write(bandtag, "(I0)") ib
           if(it == 0) then
@@ -106,6 +149,7 @@ contains
           close(2)
        end do
     end if
+    sync all
   end subroutine append2file_transport_tensor
 
   subroutine int_div(num, denom, q, r)

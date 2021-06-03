@@ -21,7 +21,7 @@ module bte_module
   use params, only: dp, k8, qe, kB
   use misc, only: print_message, exit_with_message, write2file_rank2_real, &
        distribute_points, demux_state, binsearch, interpolate, demux_vector, &
-       trace, subtitle, append2file_transport_tensor
+       trace, subtitle, append2file_transport_tensor, write2file_response
   use numerics_module, only: numerics
   use crystal_module, only: crystal
   use symmetry_module, only: symmetry
@@ -172,7 +172,6 @@ contains
     !Change back to cwd
     call chdir(trim(adjustl(num%cwd)))
     
-    !if(num%ebte) then
     !Calculate RTA scattering rates
     call calculate_el_rta_rates(rates_eph, bt%el_rta_rates_echimp_ibz, num, crys, el)
 
@@ -282,6 +281,12 @@ contains
     call append2file_transport_tensor('nodrag_el_sigma_', 0_k8, el_sigma)
     call append2file_transport_tensor('nodrag_el_alphabyT_', 0_k8, el_alphabyT)
     call append2file_transport_tensor('nodrag_el_kappa0_', 0_k8, el_kappa0)
+
+    ! Print RTA band/branch resolved response functions
+    call write2file_response('RTA_F0_', bt%ph_response_T) !gradT, ph
+    call write2file_response('RTA_I0_', bt%el_response_T) !gradT, el
+    call write2file_response('RTA_J0_', bt%el_response_E) !E, el
+
     ! Change back to cwd
     call chdir(trim(adjustl(num%cwd)))
     
@@ -382,10 +387,30 @@ contains
           !Calculate phonon transport scalar
           ph_kappa_scalar = trace(sum(ph_kappa, dim = 1))/3.0_dp
           ph_alphabyT_scalar = trace(sum(ph_alphabyT, dim = 1))/3.0_dp
-                    
+
+          if(it_ph == 1) then
+             !Print RTA band/branch resolved response functions
+             ! Change to data output directory
+             call chdir(trim(adjustl(Tdir)))
+             call write2file_response('partdclp_I0_', bt%el_response_T) !gradT, el
+             call write2file_response('partdclp_J0_', bt%el_response_E) !E, el
+             ! Change back to cwd
+             call chdir(trim(adjustl(num%cwd)))
+          end if
+          
           !Check convergence
           if(converged(ph_kappa_scalar_old, ph_kappa_scalar, num%conv_thres) .and. &
                converged(ph_alphabyT_scalar_old, ph_alphabyT_scalar, num%conv_thres)) then
+
+             !Print converged band/branch resolved response functions
+             ! Change to data output directory
+             call chdir(trim(adjustl(Tdir)))
+             call write2file_response('drag_F0_', bt%ph_response_T) !gradT, ph
+             call write2file_response('drag_I0_', bt%el_response_T) !gradT, el
+             call write2file_response('drag_G0_', bt%ph_response_E) !E, ph
+             call write2file_response('drag_J0_', bt%el_response_E) !E, el
+             ! Change back to cwd
+             call chdir(trim(adjustl(num%cwd)))
              exit
           else
              ph_kappa_scalar_old = ph_kappa_scalar
@@ -446,9 +471,17 @@ contains
 
           if(converged(ph_kappa_scalar_old, ph_kappa_scalar, num%conv_thres) .and. &
                converged(ph_alphabyT_scalar_old, ph_alphabyT_scalar, num%conv_thres)) then
+
+             !Print converged branch resolved response functions
+             ! Change to data output directory
+             call chdir(trim(adjustl(Tdir)))
+             call write2file_response('nodrag_F0_', bt%ph_response_T) !gradT, ph
+             ! Change back to cwd
+             call chdir(trim(adjustl(num%cwd)))
+             
              exit
           else
-             !Print out band resolved transport coefficients
+             !Print out branch resolved transport coefficients
              ! Change to data output directory
              call chdir(trim(adjustl(Tdir)))
              call append2file_transport_tensor('nodrag_ph_kappa_', it_ph, ph_kappa)
@@ -516,6 +549,15 @@ contains
                converged(el_sigmaS_scalar_old, el_sigmaS_scalar, num%conv_thres) .and. &
                converged(el_sigma_scalar_old, el_sigma_scalar, num%conv_thres) .and. &
                converged(el_alphabyT_scalar_old, el_alphabyT_scalar, num%conv_thres)) then
+
+             !Print converged band resolved response functions
+             ! Change to data output directory
+             call chdir(trim(adjustl(Tdir)))
+             call write2file_response('nodrag_I0_', bt%el_response_T) !gradT, el
+             call write2file_response('nodrag_J0_', bt%el_response_E) !E, el
+             ! Change back to cwd
+             call chdir(trim(adjustl(num%cwd)))
+             
              call print_message("--------------------------------------------")
              exit
           else
