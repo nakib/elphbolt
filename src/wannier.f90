@@ -79,7 +79,7 @@ module wannier_module
    contains
 
      procedure :: read=>read_EPW_Wannier, el_wann_epw, ph_wann_epw, &
-          gkRp_epw, gReq_epw, g2_epw, deallocate_wannier
+          gkRp_epw, gReq_epw, g2_epw, deallocate_wannier, plot_along_path
      procedure :: test_wannier
 
   end type epw_wannier
@@ -875,4 +875,182 @@ contains
     end do
     close(1)
   end subroutine test_wannier
+
+  subroutine plot_along_path(wann, crys, num, kmesh)
+    !! Subroutine to plot bands, dispersions, e-ph matrix elements
+    !! using the Wannier interpolation method with EPW inputs.
+
+    class(epw_wannier), intent(in) :: wann
+    type(crystal), intent(in) :: crys
+    type(numerics), intent(in) :: num
+    integer(k8), intent(in) :: kmesh(3)
+
+    !Local variables
+    integer(k8) :: i, nqpath, m, n, s, k_indvec(3), q_indvec(3), deg_count, &
+         mp, np, sp
+    real(dp) :: k(3), kp(3), thres, aux, el_en, ph_en
+    real(dp), allocatable :: qpathvecs(:,:), ph_ens_path(:,:), &
+         el_ens_path(:,:), el_ens_kp(:), &
+         el_vels_kp(:,:), g2_qpath(:,:,:,:), el_ens_k(:), el_vels_k(:,:)
+    complex(dp), allocatable :: ph_evecs_path(:,:,:), el_evecs_kp(:,:), &
+         el_evecs_k(:,:), gmixed_k(:,:,:,:) 
+    character(len = 1024) :: filename
+    character(len=8) :: saux
+
+    call print_message("Plotting bands, dispersions, and e-ph vertex along path...")
+    
+    if(this_image() == 1) then
+
+       !Threshold used to measure degeneracy
+       thres = 1.0e-4_dp
+
+       !Read list of wavevectors in crystal coordinates
+       open(1, file = trim('highsympath.txt'), status = 'old')
+       read(1,*) nqpath
+       allocate(qpathvecs(nqpath, 3))
+       do i = 1, nqpath
+          read(1,*) qpathvecs(i,:)
+       end do
+
+       !Calculate phonon dispersions
+       allocate(ph_ens_path(nqpath, wann%numbranches), &
+            ph_evecs_path(nqpath, wann%numbranches, wann%numbranches))
+       call ph_wann_epw(wann, crys, nqpath, qpathvecs, ph_ens_path, ph_evecs_path)
+
+       !Output phonon dispersions
+       write(saux, "(I0)") wann%numbranches
+       open(1, file = "ph.ens_qpath", status="replace")
+       do i = 1, nqpath
+          write(1,"("//trim(adjustl(saux))//"E20.10)") ph_ens_path(i,:)
+       end do
+       close(1)
+
+       !Calculate electron bands
+       allocate(el_ens_path(nqpath, wann%numwannbands))
+       call el_wann_epw(wann, crys, nqpath, qpathvecs, el_ens_path)
+
+       !Output electron dispersions
+       write(saux,"(I0)") wann%numwannbands
+       open(1, file="el.ens_kpath",status="replace")
+       do i = 1, nqpath
+          write(1,"("//trim(adjustl(saux))//"E20.10)") el_ens_path(i,:)
+       end do
+       close(1)
+
+       allocate(el_ens_kp(wann%numwannbands), el_vels_kp(wann%numwannbands,3),&
+            el_evecs_kp(wann%numwannbands,wann%numwannbands))
+       allocate(g2_qpath(nqpath, wann%numbranches, wann%numwannbands, wann%numwannbands))
+
+       !Read wave vector of initial electron
+       open(1, file = trim('initialk.txt'), status = 'old')
+       read(1,*) k(:)
+       k_indvec = nint(k*kmesh)
+
+       !Calculate g(k, Rp)
+       call wann%gkRp_epw(num, 0_k8, k)
+
+       !Load gmixed from file
+       !Change to data output directory
+       call chdir(trim(adjustl(num%g2dir)))
+       allocate(gmixed_k(wann%numwannbands, wann%numwannbands, wann%numbranches, wann%nwsq))
+       filename = 'gkRp.ik0'
+       open(1, file = filename, status = "old", access = 'stream')
+       read(1) gmixed_k
+       close(1)
+       !Change back to working directory
+       call chdir(num%cwd)
+
+       allocate(el_ens_k(wann%numwannbands), el_vels_k(wann%numwannbands,3),&
+            el_evecs_k(wann%numwannbands,wann%numwannbands))
+       call el_wann_epw(wann, crys, 1_k8, k, el_ens_k, el_vels_k, el_evecs_k)
+
+       do i = 1, nqpath !Over phonon wave vectors path
+          q_indvec = nint(qpathvecs(i, :)*kmesh)
+          kp = (modulo(k_indvec + q_indvec, kmesh))/dble(kmesh)
+
+          !Calculate electrons at this final wave vector
+          call el_wann_epw(wann, crys, 1_k8, kp, el_ens_kp, el_vels_kp, el_evecs_kp)
+
+          do n = 1, wann%numwannbands
+             do m = 1, wann%numwannbands
+                do s = 1, wann%numbranches
+                   !Calculate |g(k,k')|^2
+                   g2_qpath(i, s, m, n) = g2_epw(wann, crys, k, kp, el_evecs_k(m, :), &
+                        el_evecs_kp(n, :), ph_evecs_path(i, s, :), ph_ens_path(i, s), &
+                        gmixed_k, 'ph')
+                end do
+             end do
+          end do
+          
+          !Average over degenerate phonon branches
+          do m = 1, wann%numwannbands
+             do n = 1, wann%numwannbands
+                do s = 1, wann%numbranches
+                   deg_count = 0
+                   aux = 0.0_dp
+                   ph_en = ph_ens_path(i, s)
+                   do sp = 1, wann%numbranches
+                      if(abs(ph_en - ph_ens_path(i, sp)) < thres) then
+                         deg_count = deg_count + 1
+                         aux = aux + g2_qpath(i, sp, m, n)
+                      end if
+                   end do
+                   g2_qpath(i, s, m, n) = aux/dble(deg_count)
+                end do
+             end do
+          end do
+
+          !Average over initial electron bands
+          do s = 1, wann%numbranches
+             do n = 1, wann%numwannbands
+                do m = 1, wann%numwannbands
+                   deg_count = 0
+                   aux = 0.0_dp
+                   el_en = el_ens_k(m)
+                   do mp = 1, wann%numwannbands
+                      if(abs(el_en - el_ens_k(mp)) < thres) then
+                         deg_count = deg_count + 1
+                         aux = aux + g2_qpath(i, s, mp, n)
+                      end if
+                   end do
+                   g2_qpath(i, s, m, n) = aux/dble(deg_count)
+                end do
+             end do
+          end do
+
+          !Average over final electron bands
+          do s = 1, wann%numbranches
+             do m = 1, wann%numwannbands
+                do n = 1, wann%numwannbands
+                   deg_count = 0
+                   aux = 0.0_dp
+                   el_en = el_ens_kp(n)
+                   do np = 1, wann%numwannbands
+                      if(abs(el_en - el_ens_kp(np)) < thres) then
+                         deg_count = deg_count + 1
+                         aux = aux + g2_qpath(i, s, m, np)
+                      end if
+                   end do
+                   g2_qpath(i, s, m, n) = aux/dble(deg_count)
+                end do
+             end do
+          end do
+       end do
+
+       !Print out |g2_qpath|
+       open(1, file = 'gk_qpath',status="replace")
+       write(1,*) '   s    m    n    |gk|[eV]'
+       do i = 1, nqpath
+          do s = 1, wann%numbranches
+             do m = 1, wann%numwannbands
+                do n = 1, wann%numwannbands
+                   write(1,"(I5, I5, I5, E20.10)") s, m, n, sqrt(g2_qpath(i, s, m, n))
+                end do
+             end do
+          end do
+       end do
+       close(1)
+    end if
+    sync all
+  end subroutine plot_along_path
 end module wannier_module

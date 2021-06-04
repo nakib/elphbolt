@@ -61,11 +61,6 @@ program elphbolt
 
   !Read EPW Wannier data
   call wann%read
-
-!!$  !Test electron bands, phonon dispersions, and g along path.
-!!$  if(this_image() == 1) then
-!!$     call wann%test_wannier(crys, num)
-!!$  end if
   
   !Calculate electrons
   call el%initialize(wann, crys, sym, num)
@@ -83,6 +78,9 @@ program elphbolt
   call calculate_dos(ph, num%tetrahedra, crys%gfactors, &
        crys%atomtypes, bt%ph_rta_rates_iso_ibz, num%phiso)
 
+  !Plot electron bands, phonon dispersions, and g along path.
+  call wann%plot_along_path(crys, num, el%kmesh)
+    
   call subtitle("Calculating interactions...")
   
   if(num%phe) then
