@@ -78,8 +78,10 @@ program elphbolt
   call calculate_dos(ph, num%tetrahedra, crys%gfactors, &
        crys%atomtypes, bt%ph_rta_rates_iso_ibz, num%phiso)
 
-  !Plot electron bands, phonon dispersions, and g along path.
-  call wann%plot_along_path(crys, num, el%kmesh)
+  if(num%plot_along_path) then
+     !Plot electron bands, phonon dispersions, and g along path.
+     call wann%plot_along_path(crys, num, el%kmesh)
+  end if
     
   call subtitle("Calculating interactions...")
   

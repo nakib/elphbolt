@@ -70,6 +70,8 @@ module numerics_module
      !! Maximum number of iterations in the BTE solver.
      real(dp) :: conv_thres
      !! BTE iteration convergence criterion.
+     logical :: plot_along_path
+     !! Plot Wannierized quantities along high symmetry wave vectors?
    contains
 
      procedure :: initialize=>read_input_and_setup
@@ -88,11 +90,11 @@ contains
     real(dp) :: fsthick, conv_thres
     character(len = 1024) :: datadumpdir
     logical :: read_gq2, read_gk2, read_V, tetrahedra, phe, phiso, phbte, &
-         ebte, elchimp, drag
+         ebte, elchimp, drag, plot_along_path
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
          read_V, tetrahedra, phe, phiso, phbte, ebte, maxiter, conv_thres, drag, &
-         elchimp
+         elchimp, plot_along_path
 
     call subtitle("Reading numerics information...")
     
@@ -114,6 +116,7 @@ contains
     ebte = .true.
     elchimp = .false.
     drag = .true.
+    plot_along_path = .false.
     maxiter = 50
     conv_thres = 0.0001_dp
     read(1, nml = numerics)
@@ -139,6 +142,7 @@ contains
     n%maxiter = maxiter
     n%conv_thres = conv_thres
     n%drag = drag
+    n%plot_along_path = plot_along_path
     
     !Create data dump directory
     if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(n%datadumpdir)))
@@ -175,6 +179,7 @@ contains
        write(*, "(A, L)") "Calculate phonon BTE: ", n%phbte
        write(*, "(A, L)") "Calculate electron BTE: ", n%ebte
        write(*, "(A, L)") "Include drag: ", n%drag
+       write(*, "(A, L)") "Plot quantities along path: ", n%plot_along_path
        write(*, "(A, I5)") "Maximum number of BTE iterations = ", n%maxiter
        write(*, "(A, 1E16.8)") "BTE convergence threshold = ", n%conv_thres
     end if
