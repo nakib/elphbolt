@@ -815,7 +815,7 @@ contains
              do m = 1, wann%numwannbands
                 do s = 1, wann%numbranches
                    !Calculate |g(k,k')|^2
-                   g2_qpath(i, s, m, n) = g2_epw(wann, crys, k, kp, el_evecs_k(m, :), &
+                   g2_qpath(i, s, m, n) = g2_epw(wann, crys, k, qpathvecs(i, :), el_evecs_k(m, :), &
                         el_evecs_kp(n, :), ph_evecs_path(i, s, :), ph_ens_path(i, s), &
                         gmixed_k, 'ph')
                 end do
