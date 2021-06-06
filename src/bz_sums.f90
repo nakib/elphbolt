@@ -271,7 +271,7 @@ contains
     
     nk = size(ens(:,1))
     nbands = size(ens(1,:))
-    
+
     !Common multiplicative factor
     fac = 1.0e21/kB/T/volume/product(mesh) 
     
@@ -294,12 +294,12 @@ contains
        else
           call exit_with_message("Unknown field type in calculate_transport_coefficient. Exiting.")
        end if
-    else if(species == 'el') then
+    else if(species == 'el') then       
        if(field == 'T') then
           A_cc = -deg*qe*fac
           pow_cc = 0
           A_hc = deg*qe*fac
-          pow_hc = 1 
+          pow_hc = 1
        else if(field == 'E') then
           A_cc = deg*fac
           pow_cc = 0

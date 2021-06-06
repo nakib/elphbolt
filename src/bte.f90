@@ -588,8 +588,9 @@ contains
 
       !Internal variables
       integer(k8) :: it, maxiter
-      real(dp) :: a, b, aux(3,3), sigmaS(size(I_drag(1,:,1)), 3, 3), thresh, sigmaS_scalar
-
+      real(dp) :: a, b, aux(3,3), sigmaS(size(I_drag(1,:,1)), 3, 3),&
+           thresh, sigmaS_scalar, dummy(size(I_drag(1,:,1)), 3, 3)
+      
       a = 0.0_dp !lower bound
       b = 2.0_dp !upper bound
       maxiter = 100
