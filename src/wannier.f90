@@ -726,14 +726,13 @@ contains
     integer(k8), intent(in) :: kmesh(3)
 
     !Local variables
-    integer(k8) :: i, nqpath, m, n, s, k_indvec(3), q_indvec(3), deg_count, &
-         mp, np, sp
-    real(dp) :: k(3), kp(3), thres, aux, el_en, ph_en
+    integer(k8) :: i, nqpath, m, n, s, deg_count, mp, np, sp, icart
+    real(dp) :: k(1, 3), kp(1, 3), thres, aux, el_en, ph_en
     real(dp), allocatable :: qpathvecs(:,:), ph_ens_path(:,:), &
-         el_ens_path(:,:), el_ens_kp(:), &
-         el_vels_kp(:,:), g2_qpath(:,:,:,:), el_ens_k(:), el_vels_k(:,:)
-    complex(dp), allocatable :: ph_evecs_path(:,:,:), el_evecs_kp(:,:), &
-         el_evecs_k(:,:), gmixed_k(:,:,:,:) 
+         el_ens_path(:,:), el_ens_kp(:,:), &
+         el_vels_kp(:,:,:), g2_qpath(:,:,:,:), el_ens_k(:,:), el_vels_k(:,:,:)
+    complex(dp), allocatable :: ph_evecs_path(:,:,:), el_evecs_kp(:,:,:), &
+         el_evecs_k(:,:,:), gmixed_k(:,:,:,:) 
     character(len = 1024) :: filename
     character(len=8) :: saux
 
@@ -777,17 +776,18 @@ contains
        end do
        close(1)
 
-       allocate(el_ens_kp(wann%numwannbands), el_vels_kp(wann%numwannbands,3),&
-            el_evecs_kp(wann%numwannbands,wann%numwannbands))
+       allocate(el_ens_k(1, wann%numwannbands), el_vels_k(1, wann%numwannbands, 3),&
+            el_evecs_k(1, wann%numwannbands, wann%numwannbands))
+       allocate(el_ens_kp(1, wann%numwannbands), el_vels_kp(1, wann%numwannbands, 3),&
+            el_evecs_kp(1, wann%numwannbands, wann%numwannbands))
        allocate(g2_qpath(nqpath, wann%numbranches, wann%numwannbands, wann%numwannbands))
 
        !Read wave vector of initial electron
        open(1, file = trim('initialk.txt'), status = 'old')
-       read(1,*) k(:)
-       k_indvec = nint(k*kmesh)
+       read(1,*) k(1, :)
 
        !Calculate g(k, Rp)
-       call wann%gkRp_epw(num, 0_k8, k)
+       call wann%gkRp_epw(num, 0_k8, k(1,:))
 
        !Load gmixed from file
        !Change to data output directory
@@ -800,13 +800,13 @@ contains
        !Change back to working directory
        call chdir(num%cwd)
 
-       allocate(el_ens_k(wann%numwannbands), el_vels_k(wann%numwannbands,3),&
-            el_evecs_k(wann%numwannbands,wann%numwannbands))
        call el_wann_epw(wann, crys, 1_k8, k, el_ens_k, el_vels_k, el_evecs_k)
 
        do i = 1, nqpath !Over phonon wave vectors path
-          q_indvec = nint(qpathvecs(i, :)*kmesh)
-          kp = (modulo(k_indvec + q_indvec, kmesh))/dble(kmesh)
+          kp(1, :) = k(1, :) + qpathvecs(i, :)
+          do icart = 1, 3
+             if(kp(1,icart) >= 1.0_dp) kp(1, icart) = kp(1, icart) - 1.0_dp
+          end do
 
           !Calculate electrons at this final wave vector
           call el_wann_epw(wann, crys, 1_k8, kp, el_ens_kp, el_vels_kp, el_evecs_kp)
@@ -815,9 +815,9 @@ contains
              do m = 1, wann%numwannbands
                 do s = 1, wann%numbranches
                    !Calculate |g(k,k')|^2
-                   g2_qpath(i, s, m, n) = g2_epw(wann, crys, k, qpathvecs(i, :), el_evecs_k(m, :), &
-                        el_evecs_kp(n, :), ph_evecs_path(i, s, :), ph_ens_path(i, s), &
-                        gmixed_k, 'ph')
+                   g2_qpath(i, s, m, n) = wann%g2_epw(crys, k, qpathvecs(i, :), &
+                        el_evecs_k(1, m, :), el_evecs_kp(1, n, :), ph_evecs_path(i, s, :), &
+                        ph_ens_path(i, s), gmixed_k, 'ph')
                 end do
              end do
           end do
@@ -846,9 +846,9 @@ contains
                 do m = 1, wann%numwannbands
                    deg_count = 0
                    aux = 0.0_dp
-                   el_en = el_ens_k(m)
+                   el_en = el_ens_k(1, m)
                    do mp = 1, wann%numwannbands
-                      if(abs(el_en - el_ens_k(mp)) < thres) then
+                      if(abs(el_en - el_ens_k(1, mp)) < thres) then
                          deg_count = deg_count + 1
                          aux = aux + g2_qpath(i, s, mp, n)
                       end if
@@ -864,9 +864,9 @@ contains
                 do n = 1, wann%numwannbands
                    deg_count = 0
                    aux = 0.0_dp
-                   el_en = el_ens_kp(n)
+                   el_en = el_ens_kp(1, n)
                    do np = 1, wann%numwannbands
-                      if(abs(el_en - el_ens_kp(np)) < thres) then
+                      if(abs(el_en - el_ens_kp(1, np)) < thres) then
                          deg_count = deg_count + 1
                          aux = aux + g2_qpath(i, s, m, np)
                       end if
@@ -879,16 +879,16 @@ contains
 
        !Print out |g2_qpath|
        open(1, file = 'gk_qpath',status="replace")
-       write(1,*) '   s    m    n    |gk|[eV]'
+       write(1,*) '   m    n    s    |gk|[eV]'
        do i = 1, nqpath
-          do s = 1, wann%numbranches
-             do m = 1, wann%numwannbands
-                do n = 1, wann%numwannbands
-                   write(1,"(I5, I5, I5, E20.10)") s, m, n, sqrt(g2_qpath(i, s, m, n))
+          do m = 1, wann%numwannbands
+             do n = 1, wann%numwannbands
+                do s = 1, wann%numbranches
+                   write(1,"(I5, I5, I5, E20.10)") m, n, s, sqrt(g2_qpath(i, s, m, n))
                 end do
              end do
           end do
-       end do
+       end do   
        close(1)
     end if
     sync all
