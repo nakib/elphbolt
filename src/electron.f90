@@ -186,6 +186,7 @@ contains
     el%enref = enref
     el%chempot = chempot
     el%Z = Z
+    if(el%metallic) el%Z = 0
     
     !Close input file
     close(1)
@@ -203,6 +204,7 @@ contains
        write(*, "(A, I5, I5)") "Lowest and highest transport active electronic bands = ", &
             el%bandlist(1), el%bandlist(el%numtransbands)
        write(*, "(A, 1E16.8)") "Reference electron energy = ", el%enref
+       write(*, "(A, L)") "System is metallic: ", el%metallic
     end if
     
     !Calculate electrons
@@ -210,7 +212,7 @@ contains
 
     !Calculate carrier concentration
     call el%calculate_carrier_conc(crys%T, crys%volume)
-    el%chimp_conc = sum(el%conc)/el%Z
+    if(.not. el%metallic) el%chimp_conc = sum(el%conc)/el%Z
 
     !Print out information.
     if(this_image() == 1) then
@@ -219,8 +221,10 @@ contains
        do ib = el%indlowband, el%indhighband
           write(*, "(A, I5, A, 1E16.8, A)") ' Band: ', ib, ', concentration: ', el%conc(ib), ' cm^-3'
        end do
-       write(*, "(A, 1E16.8)") "Charged impurity concentration = ", el%chimp_conc
-       write(*, "(A, 1E16.8)") "Ionization of impurity = ", el%Z
+       if(.not. el%metallic) then
+          write(*, "(A, 1E16.8)") "Charged impurity concentration = ", el%chimp_conc
+          write(*, "(A, 1E16.8)") "Ionization of impurity = ", el%Z
+       end if
     end if
   end subroutine read_input_and_setup
   
