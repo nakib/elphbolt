@@ -693,7 +693,7 @@ contains
           end do
        end do
        
-       call zheev("V","U",nbranches,dyn(:,:),nbranches,omega2,work,-1,rwork,i)
+       call zheev("V","U",nbranches,dyn(:,:),nbranches,omega2,work,-1_k8,rwork,i)
        if(real(work(1)).gt.nwork) then
           nwork=nint(2*real(work(1)))
           deallocate(work)

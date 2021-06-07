@@ -240,7 +240,7 @@ contains
 
        !Diagonalize H
        call zheev("V", "U", wann%numwannbands, H(:,:), wann%numwannbands, energies(ik,:), &
-            work, -1, rwork, tmp)
+            work, -1_k8, rwork, tmp)
        if(real(work(1)) > nwork) then
           nwork = nint(2*real(work(1)))
           deallocate(work)
