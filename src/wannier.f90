@@ -329,7 +329,7 @@ contains
        end do
        
        !Diagonalize dynmat
-       call zheev("V", "U", wann%numbranches, dynmat(:, :), wann%numbranches, omega2, work, -1, rwork, aux)
+       call zheev("V", "U", wann%numbranches, dynmat(:, :), wann%numbranches, omega2, work, -1_k8, rwork, aux)
        if(real(work(1)) > nwork) then
           nwork = nint(2*real(work(1)))
           deallocate(work)
