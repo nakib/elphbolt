@@ -128,9 +128,11 @@ contains
     
     !Calculate harmonic properties
     call calculate_phonons(ph, wann, crys, sym, num)
-    
-    !Read ifc3s and related quantities
-    call read_ifc3(ph, crys)
+
+    if(.not. num%onlyebte) then
+       !Read ifc3s and related quantities
+       call read_ifc3(ph, crys)
+    end if
   end subroutine initialize
 
   subroutine deallocate_phonon_quantities(ph)
@@ -139,7 +141,7 @@ contains
     class(phonon), intent(inout) :: ph
 
     deallocate(ph%evecs, ph%ifc2, ph%ifc3, ph%Index_i, ph%Index_j, ph%Index_k, &
-         ph%mm, ph%rr)    
+         ph%mm, ph%rr)
   end subroutine deallocate_phonon_quantities
   
   subroutine calculate_phonons(ph, wann, crys, sym, num)
