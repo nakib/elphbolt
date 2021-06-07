@@ -58,9 +58,9 @@ module numerics_module
      !! Choose if ph-e interaction will be included.
      logical :: phiso
      !! Use phonon-isotope scattering?
-     logical :: phbte
-     !! Choose if phonon BTE will be solved.
-     logical :: ebte
+     logical :: onlyphbte
+     !! Choose if only phonon BTE will be solved.
+     logical :: onlyebte
      !! Choose if electron BTE will be solved.
      logical :: elchimp
      !! Use electron-charged impurity scattering?
@@ -89,11 +89,11 @@ contains
     integer(k8) :: mesh_ref, qmesh(3), maxiter
     real(dp) :: fsthick, conv_thres
     character(len = 1024) :: datadumpdir
-    logical :: read_gq2, read_gk2, read_V, tetrahedra, phe, phiso, phbte, &
-         ebte, elchimp, drag, plot_along_path
+    logical :: read_gq2, read_gk2, read_V, tetrahedra, phe, phiso, onlyphbte, &
+         onlyebte, elchimp, drag, plot_along_path
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
-         read_V, tetrahedra, phe, phiso, phbte, ebte, maxiter, conv_thres, drag, &
+         read_V, tetrahedra, phe, phiso, onlyphbte, onlyebte, maxiter, conv_thres, drag, &
          elchimp, plot_along_path
 
     call subtitle("Reading numerics information...")
@@ -109,20 +109,23 @@ contains
     read_gq2 = .false.
     read_gk2 = .false.
     read_V = .false.
-    tetrahedra = .false.
-    phe = .true.
-    phiso = .true.
-    phbte = .true.
-    ebte = .true.
+    tetrahedra = .true.
+    phe = .false.
+    phiso = .false.
+    onlyphbte = .false.
+    onlyebte = .false.
     elchimp = .false.
     drag = .true.
     plot_along_path = .false.
     maxiter = 50
-    conv_thres = 0.0001_dp
+    conv_thres = 1e-4_dp
     read(1, nml = numerics)
-    if(any(qmesh <= 0) .or. mesh_ref < 1 .or. fsthick < 0 .or. .not.(phbte .or. ebte)) then
+    if(any(qmesh <= 0) .or. mesh_ref < 1 .or. fsthick < 0) then
        call exit_with_message('Bad input(s) in numerics.')
     end if
+    !if(.not. onlyphbte .or. .not. onlyebte .or. drag) then
+    !   call exit_with_message('Bad input(s) in numerics.')
+    !end if
     if(.not. tetrahedra) then
        call exit_with_message('At present only the tetrahedra method is supported.')
     end if
@@ -136,13 +139,28 @@ contains
     n%tetrahedra = tetrahedra
     n%phe = phe
     n%phiso = phiso
-    n%phbte = phbte
-    n%ebte = ebte
+    n%onlyphbte = onlyphbte
+    n%onlyebte = onlyebte
     n%elchimp = elchimp
     n%maxiter = maxiter
     n%conv_thres = conv_thres
     n%drag = drag
     n%plot_along_path = plot_along_path
+
+    !Set BTE solution type
+    if(n%onlyphbte) then
+       n%onlyebte = .false.
+       n%drag = .false.
+    end if
+    if(n%onlyebte) then
+       n%onlyphbte = .false.
+       n%drag = .false.
+       n%phe = .false.
+    end if
+    if(n%drag) then
+       n%onlyebte = .false.
+       n%onlyphbte = .false.
+    end if
     
     !Create data dump directory
     if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(n%datadumpdir)))
@@ -176,8 +194,8 @@ contains
        write(*, "(A, L)") "Include ph-e interaction: ", n%phe
        write(*, "(A, L)") "Include ph-isotope interaction: ", n%phiso
        write(*, "(A, L)") "Include electron-charged impurity interaction: ", n%elchimp
-       write(*, "(A, L)") "Calculate phonon BTE: ", n%phbte
-       write(*, "(A, L)") "Calculate electron BTE: ", n%ebte
+       if(n%onlyphbte) write(*, "(A, L)") "Calculate only phonon BTE: ", n%onlyphbte
+       if(n%onlyebte) write(*, "(A, L)") "Calculate only electron BTE: ", n%onlyebte
        write(*, "(A, L)") "Include drag: ", n%drag
        write(*, "(A, L)") "Plot quantities along path: ", n%plot_along_path
        write(*, "(A, I5)") "Maximum number of BTE iterations = ", n%maxiter

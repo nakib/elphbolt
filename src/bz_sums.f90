@@ -163,7 +163,7 @@ contains
     real(dp) :: e, delta, aux
     real(dp), allocatable :: dos_chunk(:,:)[:], W_phiso_chunk(:,:)[:]
     
-    call print_message("Calculating phonon density of states and isotope scattering...")
+    call print_message("Calculating phonon density of states and (if needed) isotope scattering...")
 
     !Number of basis atoms
     numatoms = size(atomtypes)

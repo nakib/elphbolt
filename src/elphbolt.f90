@@ -59,17 +59,21 @@ program elphbolt
   !Calculate crystal and BZ symmetries
   call sym%calculate_symmetries(crys, num%qmesh)
 
-  !Read EPW Wannier data
-  call wann%read
-  
-  !Calculate electrons
-  call el%initialize(wann, crys, sym, num)
+  if(num%onlyebte .or. num%drag .or. num%phe .or. num%plot_along_path) then
+     !Read EPW Wannier data
+     call wann%read
 
-  !Calculate electron density of states
-  call calculate_dos(el, num%tetrahedra)
+     !Calculate electrons
+     call el%initialize(wann, crys, sym, num)
+  end if
   
-  !Calculate Thomas-Fermi screening
-  call calculate_qTF(crys, el)
+  if(num%onlyebte .or. num%drag) then
+     !Calculate electron density of states
+     call calculate_dos(el, num%tetrahedra)
+
+     !Calculate Thomas-Fermi screening
+     call calculate_qTF(crys, el)
+  end if
   
   !Calculate phonons
   call ph%initialize(wann, crys, sym, num)
@@ -87,7 +91,7 @@ program elphbolt
     
   call subtitle("Calculating interactions...")
   
-  if(num%phe) then
+  if(num%onlyphbte .and. num%phe .or. num%drag) then
      if(.not. num%read_gq2) then
         !Calculate mixed Bloch-Wannier space e-ph vertex g(Re,q)
         call calculate_gReq(wann, ph, num)
@@ -100,29 +104,36 @@ program elphbolt
      call calculate_eph_interaction_ibzq(wann, crys, el, ph, num, 'Y')
   end if
 
-  if(.not. num%read_gk2) then
-     !Calculate mixed Bloch-Wannier space e-ph vertex g(k,Rp)
-     call calculate_gkRp(wann, el, num)
+  if(num%onlyebte .or. num%drag) then
+     if(.not. num%read_gk2) then
+        !Calculate mixed Bloch-Wannier space e-ph vertex g(k,Rp)
+        call calculate_gkRp(wann, el, num)
 
-     !Calculate Bloch space e-ph vertex g(k,q) for IBZ k
-     call calculate_eph_interaction_ibzk(wann, crys, el, ph, num, 'g')
+        !Calculate Bloch space e-ph vertex g(k,q) for IBZ k
+        call calculate_eph_interaction_ibzk(wann, crys, el, ph, num, 'g')
+     end if
+
+     !Calculate e-ph transition probabilities
+     call calculate_eph_interaction_ibzk(wann, crys, el, ph, num, 'X')
   end if
 
-  !Calculate e-ph transition probabilities
-  call calculate_eph_interaction_ibzk(wann, crys, el, ph, num, 'X')
+  if(num%onlyebte .or. num%drag .or. num%phe .or. num%drag &
+       .or. num%plot_along_path) then
+     !Deallocate Wannier quantities
+     call wann%deallocate_wannier
+  end if
 
-  !Deallocate Wannier quantities
-  call wann%deallocate_wannier
-  
-  !After this point the electron eigenvectors are not needed
-  call el%deallocate_eigenvecs
-  
-  !Calculate e-ch. imp. transition probabilities
-  if(num%elchimp) then
+  if(num%onlyebte .or. num%drag .or. num%phe) then
+     !After this point the electron eigenvectors are not needed
+     call el%deallocate_eigenvecs
+  end if
+
+  if(num%onlyebte .or. num%drag .and. num%elchimp) then
+     !Calculate e-ch. imp. transition probabilities
      call calculate_echimp_interaction_ibzk(crys, el, num)
   end if
 
-  if(num%phbte) then
+  if(num%onlyphbte .or. num%drag) then
      if(.not. num%read_V) then
         !Calculate ph-ph vertex
         call calculate_3ph_interaction(ph, crys, num, 'V')
@@ -132,11 +143,17 @@ program elphbolt
      call calculate_3ph_interaction(ph, crys, num, 'W')
   end if
 
-  !After this point the phonon eigenvectors and other quantities that are not needed
-  call ph%deallocate_phonon_quantities
+  if(num%onlyphbte .or. num%drag) then
+     !After this point the phonon eigenvectors and other quantities that are not needed
+     call ph%deallocate_phonon_quantities
+  end if
   
   !Solve BTEs
-  call bt%solve_bte(num, crys, sym, ph, el)
+  if(num%onlyphbte .and. .not. num%phe) then
+     call bt%solve_bte(num, crys, sym, ph)
+  else
+     call bt%solve_bte(num, crys, sym, ph, el)
+  end if
 
   call print_message('______________________Thanks for using elphbolt. Bye!______________________')
 end program elphbolt
