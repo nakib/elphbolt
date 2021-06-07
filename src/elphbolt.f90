@@ -79,8 +79,10 @@ program elphbolt
        crys%atomtypes, bt%ph_rta_rates_iso_ibz, num%phiso)
 
   if(num%plot_along_path) then
+     call subtitle("Plotting bands, phonons, and e-ph vertices along path...")
+     
      !Plot electron bands, phonon dispersions, and g along path.
-     call wann%plot_along_path(crys, num, el%kmesh)
+     call wann%plot_along_path(crys, num)
   end if
     
   call subtitle("Calculating interactions...")

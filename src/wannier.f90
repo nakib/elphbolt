@@ -716,14 +716,13 @@ contains
          wann%Hwann, wann%gwann, wann%Dphwann)
   end subroutine deallocate_wannier
   
-  subroutine plot_along_path(wann, crys, num, kmesh)
+  subroutine plot_along_path(wann, crys, num)
     !! Subroutine to plot bands, dispersions, e-ph matrix elements
     !! using the Wannier interpolation method with EPW inputs.
 
     class(epw_wannier), intent(in) :: wann
     type(crystal), intent(in) :: crys
     type(numerics), intent(in) :: num
-    integer(k8), intent(in) :: kmesh(3)
 
     !Local variables
     integer(k8) :: i, nqpath, m, n, s, deg_count, mp, np, sp, icart
