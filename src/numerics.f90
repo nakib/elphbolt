@@ -160,6 +160,7 @@ contains
     if(n%drag) then
        n%onlyebte = .false.
        n%onlyphbte = .false.
+       n%phe = .true.
     end if
     
     !Create data dump directory
