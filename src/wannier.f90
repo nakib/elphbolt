@@ -884,7 +884,7 @@ contains
           end do
        end do
 
-       !Print out |g2_qpath|
+       !Print out |gk(m,n,s,qpath)|
        open(1, file = 'gk_qpath',status="replace")
        write(1,*) '   m    n    s    |gk|[eV]'
        do i = 1, nqpath
