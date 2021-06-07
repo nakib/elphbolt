@@ -820,6 +820,14 @@ contains
                 end do
              end do
           end do
+
+          !The gauge arbitrariness of |g| due to the band and branch degeneraries
+          !are removed below. The code below is closely following the change
+          !to elphon.f90 of Quantum Espresso by C. Verdi and S. Ponce.
+          !
+          !This modified elphon.f90 was made available during EPW's 2018
+          !ICTP/Psi-k/CECAM School on Electron-Phonon Physics from First Principles.
+          !Visit for more info: https://docs.epw-code.org/doc/School2018.html
           
           !Average over degenerate phonon branches
           do m = 1, wann%numwannbands
