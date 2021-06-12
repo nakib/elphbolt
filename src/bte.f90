@@ -255,11 +255,11 @@ contains
        !Write RTA scattering rates to file
        call write2file_rank2_real('el.W_rta_eph', rates_eph)
 
-       !Change back to cwd
-       call chdir(trim(adjustl(num%cwd)))
-
        !Write e-chimp RTA scattering rates to file
        call write2file_rank2_real('el.W_rta_echimp', bt%el_rta_rates_echimp_ibz)
+       
+       !Change back to cwd
+       call chdir(trim(adjustl(num%cwd)))
 
        !Calculate and print transport scalars
        !gradT:

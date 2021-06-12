@@ -240,8 +240,6 @@ contains
     call write2file_rank2_real(ph%prefix // '.W_rta_phiso', W_phiso)
 
     sync all
-
-    call exit
   end subroutine calculate_ph_dos_iso
 
   subroutine calculate_transport_coeff(species, field, T, deg, chempot, ens, vels, &
