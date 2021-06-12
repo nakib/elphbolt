@@ -117,10 +117,12 @@ contains
                    !Evaluate delta[E(iq,ib) - E(iq',ib')]
                    delta = delta_fn_tetra(e, ikp, ibp, el%kmesh, el%tetramap, &
                         el%tetracount, el%tetra_evals)
-
-                   !Sum over delta function
-                   dos_chunk(counter, ib) = dos_chunk(counter, ib) + delta
+                else
+                   delta = delta_fn_triang(e, ikp, ibp, el%kmesh, el%triangmap, &
+                        el%triangcount, el%triang_evals)
                 end if
+                !Sum over delta function
+                dos_chunk(counter, ib) = dos_chunk(counter, ib) + delta
              end do
           end do
        end do
@@ -195,31 +197,30 @@ contains
        do ib = 1, ph%numbranches !Run over wave vectors   
           !Grab sample energy from the IBZ
           e = ph%ens(ph%indexlist_irred(iq), ib) 
-          
+
           do iqp = 1, ph%nq !Sum over FBZ wave vectors
              do ibp = 1, ph%numbranches !Sum over wave vectors
+                !Evaluate delta[E(iq,ib) - E(iq',ib')]
                 if(usetetra) then
-                   !Evaluate delta[E(iq,ib) - E(iq',ib')]
-!!$                   delta = delta_fn_tetra(e, iqp, ibp, ph%qmesh, ph%tetramap, &
-!!$                        ph%tetracount, ph%tetra_evals)
-
+                   delta = delta_fn_tetra(e, iqp, ibp, ph%qmesh, ph%tetramap, &
+                        ph%tetracount, ph%tetra_evals)
+                else
                    delta = delta_fn_triang(e, iqp, ibp, ph%qmesh, ph%triangmap, &
                         ph%triangcount, ph%triang_evals)
+                end if
+                !Sum over delta function
+                dos_chunk(counter, ib) = dos_chunk(counter, ib) + delta
 
-                   !Sum over delta function
-                   dos_chunk(counter, ib) = dos_chunk(counter, ib) + delta
-                   
-                   if(phiso) then
-                      !Calculate phonon-isotope scattering in the Tamura model
-                      do a = 1, numatoms
-                         pol = (a - 1)*3
-                         aux = (abs(dot_product(&
-                              ph%evecs(ph%indexlist_irred(iq), ib, pol + 1 : pol + 3), &
-                              ph%evecs(iqp, ibp, pol + 1 : pol + 3))))**2
-                         W_phiso_chunk(counter, ib) = W_phiso_chunk(counter, ib) + &
-                              delta*aux*gfactors(atomtypes(a))*e**2
-                      end do
-                   end if
+                if(phiso) then
+                   !Calculate phonon-isotope scattering in the Tamura model
+                   do a = 1, numatoms
+                      pol = (a - 1)*3
+                      aux = (abs(dot_product(&
+                           ph%evecs(ph%indexlist_irred(iq), ib, pol + 1 : pol + 3), &
+                           ph%evecs(iqp, ibp, pol + 1 : pol + 3))))**2
+                      W_phiso_chunk(counter, ib) = W_phiso_chunk(counter, ib) + &
+                           delta*aux*gfactors(atomtypes(a))*e**2
+                   end do
                 end if
              end do
           end do

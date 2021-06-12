@@ -71,7 +71,6 @@ module phonon_module
      !! Mapping from a wave vector to the (tetrahedron, vertex) where it belongs.
      real(dp), allocatable :: tetra_evals(:,:,:)
      !! Tetrahedra vertices filled with eigenvalues.
-
      integer(k8), allocatable :: triang(:,:)
      !! List of all the wave vector mesh triangles vertices.
      !! First axis lists triangles and the second axis lists the vertices.
@@ -81,7 +80,6 @@ module phonon_module
      !! Mapping from a wave vector to the (triangle, vertex) where it belongs.
      real(dp), allocatable :: triang_evals(:,:,:)
      !! Triangles vertices filled with eigenvalues.
-     
      real(dp), allocatable :: ens(:,:)
      !! List of phonon energies on FBZ.
      real(dp), allocatable :: vels(:,:,:)
@@ -291,11 +289,11 @@ contains
     
     !Calculate phonon tetrahedra
     if(num%tetrahedra) then
-!!$       call print_message("Calculating phonon mesh tetrahedra...")
-!!$       call form_tetrahedra_3d(ph%nq, ph%qmesh, ph%tetra, ph%tetracount, &
-!!$            ph%tetramap, .false.)
-!!$       call fill_tetrahedra_3d(ph%tetra, ph%ens, ph%tetra_evals)
-
+       call print_message("Calculating phonon mesh tetrahedra...")
+       call form_tetrahedra_3d(ph%nq, ph%qmesh, ph%tetra, ph%tetracount, &
+            ph%tetramap, .false.)
+       call fill_tetrahedra_3d(ph%tetra, ph%ens, ph%tetra_evals)
+    else
        call print_message("Calculating phonon mesh triangles...")
        call form_triangles(ph%nq, ph%qmesh, ph%triang, ph%triangcount, &
             ph%triangmap, .false.)

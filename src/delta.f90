@@ -318,7 +318,7 @@ contains
     real(dp), allocatable, intent(out) :: tetra_evals(:,:,:)
 
     !Local variables
-    integer(kind=4) :: iv, it, ib, numbands, aux, numtetra
+    integer(k8) :: iv, it, ib, numbands, aux, numtetra
 
     numtetra = size(tetra(:, 1))
     numbands = size(evals(1, :))
@@ -343,7 +343,6 @@ contains
     end do
   end subroutine fill_tetrahedra_3d
 
-  !Triangular method
   subroutine form_triangles(nk, mesh, triang, triangcount, triangmap, &
        blocks, indexlist)
     !! Form all the triangles of a 3d FBZ mesh for each z component.
@@ -457,7 +456,7 @@ contains
     real(dp), allocatable, intent(out) :: triang_evals(:,:,:)
 
     !Local variables
-    integer(kind=4) :: iv, it, ib, numbands, aux, numtriangs, numvertices
+    integer(k8) :: iv, it, ib, numbands, aux, numtriangs, numvertices
 
     numtriangs = size(triang(:, 1))
     numbands = size(evals(1, :))
@@ -483,8 +482,7 @@ contains
     end do
   end subroutine fill_triangles
 
-  !pure real(dp) function delta_fn_triang(e, ik, ib, mesh, triangmap, triangcount, triang_evals)
-  real(dp) function delta_fn_triang(e, ik, ib, mesh, triangmap, triangcount, triang_evals)
+  pure real(dp) function delta_fn_triang(e, ik, ib, mesh, triangmap, triangcount, triang_evals)
     !! Calculate delta function using the triangle method a la
     !! Kurganskii et al. Phys. Stat. Sol.(b) 129, 293 (1985)
     !!

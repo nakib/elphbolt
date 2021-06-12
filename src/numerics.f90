@@ -53,7 +53,7 @@ module numerics_module
      logical :: read_V
      !! Choose if earlier ph-ph vertices are to be used.
      logical :: tetrahedra
-     !! Choose if the tetrahedron method for delta function evaluation will be used.
+     !! Choose if the tetrahedron method for 3d delta function evaluation will be used.
      logical :: phe
      !! Choose if ph-e interaction will be included.
      logical :: phiso
@@ -110,7 +110,7 @@ contains
     read_gq2 = .false.
     read_gk2 = .false.
     read_V = .false.
-    tetrahedra = .true.
+    tetrahedra = .false.
     phe = .false.
     phiso = .false.
     onlyphbte = .false.
@@ -127,8 +127,8 @@ contains
     !if(.not. onlyphbte .or. .not. onlyebte .or. drag) then
     !   call exit_with_message('Bad input(s) in numerics.')
     !end if
-    if(.not. tetrahedra) then
-       call exit_with_message('At present only the tetrahedra method is supported.')
+    if(twod .and. tetrahedra) then
+       call exit_with_message('The tetrahedra method only works for 3d. Exiting.')
     end if
     n%qmesh = qmesh
     n%mesh_ref = mesh_ref

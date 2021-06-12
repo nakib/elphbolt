@@ -24,7 +24,8 @@ module electron_module
   use wannier_module, only: epw_wannier
   use crystal_module, only: crystal, calculate_wavevectors_full
   use symmetry_module, only: symmetry, find_irred_wedge, create_fbz2ibz_map
-  use delta, only: form_tetrahedra_3d, fill_tetrahedra_3d
+  use delta, only: form_tetrahedra_3d, fill_tetrahedra_3d, form_triangles, &
+       fill_triangles
   
   implicit none
 
@@ -105,6 +106,15 @@ module electron_module
      !! Mapping from a wave vector to the (tetrahedron, vertex) where it belongs.
      real(dp), allocatable :: tetra_evals(:,:,:)
      !! Tetrahedra vertices filled with eigenvalues.
+     integer(k8), allocatable :: triang(:,:)
+     !! List of all the wave vector mesh triangles vertices.
+     !! First axis lists triangles and the second axis lists the vertices.
+     integer(k8), allocatable :: triangcount(:)
+     !! The number of triangles in which a wave vector belongs.
+     integer(k8), allocatable :: triangmap(:,:,:)
+     !! Mapping from a wave vector to the (triangle, vertex) where it belongs.
+     real(dp), allocatable :: triang_evals(:,:,:)
+     !! Triangles vertices filled with eigenvalues.
      real(dp), allocatable :: ens(:,:)
      !! List of electron energies on FBZ.
      real(dp), allocatable :: ens_irred(:,:)
@@ -461,6 +471,11 @@ contains
        call form_tetrahedra_3d(el%nk, el%kmesh, el%tetra, el%tetracount, &
             el%tetramap, .true., el%indexlist)
        call fill_tetrahedra_3d(el%tetra, el%ens, el%tetra_evals)
+    else
+       call print_message("Calculating electron mesh triangles...")
+       call form_triangles(el%nk, el%kmesh, el%triang, el%triangcount, &
+            el%triangmap, .true., el%indexlist)
+       call fill_triangles(el%triang, el%ens, el%triang_evals)
     end if
   end subroutine calculate_electrons
 
