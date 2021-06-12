@@ -73,6 +73,10 @@ module crystal_module
      !! Use isotopic mix for masses?
      real(dp), allocatable :: gfactors(:)
      !! g-factors.
+     logical :: twod
+     !! Is the system 2d?
+     real(dp) :: thickness
+     !! Layer thickness for 2d systems
      
    contains
 
@@ -91,15 +95,15 @@ contains
     integer(k8), allocatable :: atomtypes(:)
     real(dp), allocatable :: masses(:), gfactors(:), born(:,:,:), basis(:,:), basis_cart(:,:)
     real(dp) :: epsilon(3,3), lattvecs(3,3), volume, reclattvecs(3,3), volume_bz, T, &
-         epsilon0, epsiloninf
+         epsilon0, epsiloninf, thickness
     character(len=3), allocatable :: elements(:)
     character(len=100) :: name
-    logical :: polar, autoisotopes, phiso, read_epsilon0
+    logical :: polar, autoisotopes, phiso, read_epsilon0, twod
     
     namelist /allocations/ numelements, numatoms
     namelist /crystal_info/ name, elements, atomtypes, basis, lattvecs, &
          polar, born, epsilon, read_epsilon0, epsilon0, epsiloninf, &
-         masses, T, autoisotopes, phiso
+         masses, T, autoisotopes, phiso, twod, thickness
 
     call subtitle("Setting up crystal...")
 
@@ -131,6 +135,8 @@ contains
     epsiloninf = 0.0_dp
     born = 0.0_dp
     T = -1.0_dp
+    twod = .false.
+    thickness = 0.0_dp
     read(1, nml = crystal_info)
     if(any(atomtypes < 1) .or. any(masses < 0) .or. T < 0.0_dp) then
        call exit_with_message('Bad input(s) in crystal_info.')
@@ -153,7 +159,13 @@ contains
     c%autoisotopes = autoisotopes
     c%masses = masses
     c%gfactors = 0.0_dp
+    c%twod = twod
+    c%thickness = thickness
 
+    if(c%twod .and. thickness == 0.0_dp) then
+       call exit_with_message('For 2d systems, must provide layer thickness in nm.')
+    end if
+    
     !Set static dielectric constant
     if(c%read_epsilon0) then
        c%epsilon0 = epsilon0
@@ -169,6 +181,8 @@ contains
     !Calculate atomic basis in Cartesian coordinates
     c%basis_cart(:,:) = matmul(c%lattvecs,c%basis)
 
+    !TODO Calculate volume = area*thickness for 2d systems.
+    
     !Calculate reciprocal lattice vectors and real and reciprocal cell volumes
     do i = 1,3
        j = mod(i,3) + 1
@@ -198,7 +212,8 @@ contains
        write(*,"(3(1E16.8,x))") c%reclattvecs(:,2)
        write(*,"(3(1E16.8,x))") c%reclattvecs(:,3)
        write(*,"(A,(1E16.8,x),A)") 'Brillouin zone volume =', c%volume_bz, '1/nm^3'
-
+       if(c%twod) write(*,"(A)") 'System is 2d.'
+       
        if(c%polar) then
           write(*,"(A)") 'System is polar.'
           write(*,"(A)") 'Dielectric tensor:'

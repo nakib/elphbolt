@@ -80,10 +80,11 @@ module numerics_module
 
 contains
 
-  subroutine read_input_and_setup(n)
+  subroutine read_input_and_setup(n, twod)
     !! Read input file for information related to the numerics.
 
     class(numerics), intent(out) :: n
+    logical, intent(in) :: twod
 
     !Local variables
     integer(k8) :: mesh_ref, qmesh(3), maxiter
@@ -147,6 +148,10 @@ contains
     n%drag = drag
     n%plot_along_path = plot_along_path
 
+    if(twod .and. n%qmesh(3) /= 1) then
+       call exit_with_message('For 2d systems, qmesh(3) must be equal to 1.')
+    end if
+    
     !Set BTE solution type
     if(n%onlyphbte) then
        n%onlyebte = .false.

@@ -54,7 +54,7 @@ program elphbolt
   call crys%initialize
   
   !Set up numerics data
-  call num%initialize
+  call num%initialize(crys%twod)
   
   !Calculate crystal and BZ symmetries
   call sym%calculate_symmetries(crys, num%qmesh)

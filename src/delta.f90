@@ -54,7 +54,7 @@ contains
     delta_fn_tetra = 0.0_dp
 
     !Total number of tetrahedra in the system
-    numtetra = product(mesh)*6.0_k8
+    numtetra = product(mesh)*6
     
     !Grab number of tetrahedra in which wave vector belongs
     num = tetracount(ik)
@@ -212,8 +212,8 @@ contains
     !Local variables
     integer(k8) :: ik, i, j, k, ijk(3), ii, jj, kk, tk, tl, aux, count
     integer(k8) :: ip1, jp1, kp1, n1, n2, n3, tmp
-    integer(k8), dimension(6,4) :: tetra_vertices_labels
-    integer(k8), dimension(8,3) :: scvol_vertices ! subcell volume vertices
+    integer(k8) :: tetra_vertices_labels(6, 4)
+    integer(k8) :: scvol_vertices(8, 3) ! subcell volume vertices
 
     n1 = mesh(1)
     n2 = mesh(2)
@@ -341,4 +341,224 @@ contains
        end do
     end do
   end subroutine fill_tetrahedra_3d
+
+  !Triangular method
+  subroutine form_triangles(nk, mesh, triang, triangcount, triangmap, &
+       blocks, indexlist)
+    !! Form all the triangles of a 3d FBZ mesh for each z component.
+    !!
+    !! nk Number of points in the list of FBZ wave vectors
+    !! mesh Wave vector grid
+    !! triang List of the triangle vertices
+    !! triangcount Number of triangles in which a wave vector belongs
+    !! triangmap Wave vector to (triangle, vertex) mapping
+    !! blocks Is the FBZ wave vector list full or energy restricted?
+    !! indexlist List of muxed indices of the FBZ wave vectors
+
+    integer(k8), intent(in) :: nk, mesh(3)
+    integer(k8), intent(out), allocatable :: triang(:,:), triangcount(:), triangmap(:,:,:)
+    logical, intent(in) :: blocks
+    integer(k8), optional, intent(in) :: indexlist(:)
+
+    !Local variables
+    integer(k8) :: ik, i, j, k, ijk(3), ii, jj, kk, tk, tl, aux, count
+    integer(k8) :: ip1, jp1, kp1, n1, n2, n3, tmp
+    integer(k8) :: triang_vertices_labels(2, 3)
+    integer(k8) :: scvol_vertices(3, 2) !subcell vertices
+
+    n1 = mesh(1)
+    n2 = mesh(2)
+    n3 = mesh(3)
+
+    !Label of the vertices of the triangles for a given subcell
+    triang_vertices_labels = reshape((/ &
+         1, 2, 3,&
+         1, 3, 4 /), &
+         shape(triang_vertices_labels), order = (/2, 1/))
+
+    !Allocate triangles related variables
+    allocate(triang(2*nk, 3), triangcount(nk), triangmap(2, nk, 6))
+
+    triang(:,:) = 0
+    triangcount(:) = 0
+    triangmap(:,:,:) = 0
+    count = 1 !tetrahedron counter
+
+    do ik = 1, nk !Run over all wave vectors in FBZ
+       if(blocks) then !For energy window restricted FBZ
+          call demux_vector(indexlist(ik), ijk, mesh, 1_k8)
+       else !For unrestristed FBZ
+          call demux_vector(ik, ijk, mesh, 1_k8)
+       end if
+       i = ijk(1)
+       j = ijk(2)
+       k = ijk(3)
+
+       !Apply periodic boundary condition
+       if (i == n1) then
+          ip1 = 1
+       else
+          ip1 = i + 1
+       end if
+
+       if (j == n2) then
+          jp1 = 1
+       else
+          jp1 = j + 1
+       end if
+
+       !For each subcell save the vertices
+       scvol_vertices = reshape((/ &
+            i,   j,   &
+            ip1, j,   &
+            i,   jp1, &
+            ip1, jp1 /), &
+            shape(scvol_vertices), order = (/2, 1/))
+
+       !Run over the 2 triangles
+       do tk = 1, 2
+          !Run over the labels of the vertices that
+          !make up each triangle
+          do tl = 1, 3 
+             aux = triang_vertices_labels(tk, tl)
+             ii = scvol_vertices(aux,1)
+             jj = scvol_vertices(aux,2)
+             !kk = scvol_vertices(aux,3)
+             aux = mux_vector((/ii, jj, k/), mesh, 1_k8)
+             tmp = aux !Guaranteed to be > 0
+             if(blocks) then
+                !Which point in indexlist does aux correspond to?
+                call binsearch(indexlist, aux, tmp) !tmp < 0 if search fails.
+             end if
+             triang(count, tl) = tmp
+
+             if(tmp > 0) then
+                !Save the mapping of a wave vector index to a (triangle, vertex)
+                triangcount(tmp) = triangcount(tmp) + 1
+                triangmap(1, tmp, triangcount(tmp)) = count
+                triangmap(2, tmp, triangcount(tmp)) = tl
+             end if
+          end do
+          count = count + 1
+       end do
+    end do
+  end subroutine form_triangles
+
+  subroutine fill_triangles(triang, evals, triang_evals)
+    !! Populate the (sorted along the vertices) eigenvalues on all the vertices of the triangles
+    !!
+    !! triang List of the triangle vertices
+    !! evals List of eigenvalues 
+    !! triang_evals Triangles populated with the eigenvalues
+
+    integer(k8), intent(in) :: triang(:,:)
+    real(dp), intent(in) :: evals(:,:)
+    real(dp), allocatable, intent(out) :: triang_evals(:,:,:)
+
+    !Local variables
+    integer(kind=4) :: iv, it, ib, numbands, aux, numtriangs, numvertices
+
+    numtriangs = size(triang(:, 1))
+    numbands = size(evals(1, :))
+    numvertices = 3
+
+    allocate(triang_evals(numtriangs, numbands, numvertices))
+
+    !Note: Eigenvalues outside the transport active window is taken to be zero.
+    !      As such, close to the transport window boundary, this method is inaccurate.
+    !      A large enough transport window must be chosen to obtain accurate transport coefficients.
+    triang_evals(:,:,:) = 0.0_dp
+    
+    do it = 1, numtriangs !Run over triangles
+       do ib = 1, numbands !Run over bands
+          do iv = 1, numvertices !Run over vertices
+             aux = triang(it, iv)
+             if(aux > 0) then !Only eigenvalues inside transport active region
+                triang_evals(it, ib, iv) = evals(aux, ib)
+             end if
+          end do
+          call sort(triang_evals(it, ib, :))
+       end do
+    end do
+  end subroutine fill_triangles
+
+  pure real(dp) function delta_fn_triang(e, ik, ib, mesh, triangmap, triangcount, triang_evals)
+    !! Calculate delta function using the triangle method a la
+    !! Kurganskii et al. Phys. Stat. Sol.(b) 129, 293 (1985)
+    !!
+    !! e Sample energy
+    !! ik Wave vector index
+    !! ib Band index
+    !! mesh Wave vector grid
+    !! triangmap Wave vector to (triangle, vertex) mapping
+    !! triangcount Number of triangles in which a wave vector belongs
+    !! triang_evals Triangles populated with the eigenvalues
+
+    real(dp), intent(in) :: e
+    integer(k8), intent(in) :: ik, ib
+    integer(k8), intent(in) :: mesh(3), triangmap(:,:,:), triangcount(:)
+    real(dp), intent(in) :: triang_evals(:,:,:)
+
+    !Local variables
+    integer(k8) :: iv, it, itk, num, numtriangs
+    logical :: c1, c2, c3, c4
+    real(dp) :: e1, e2, e3, E12, E21, E13, E31, E23, E32, tmp
+
+    tmp = 0.0_dp
+    delta_fn_triang = 0.0_dp
+
+    !Total number of triangles in the system
+    numtriangs = product(mesh)*2
+    
+    !Grab number of triangles in which wave vector belongs
+    num = triangcount(ik)
+    
+    do itk = 1, num !Run over triangles
+       it = triangmap(1, ik, itk) !Grab triangle
+       iv = triangmap(2, ik, itk) !Grab vertex
+
+       !Grab vertex energies
+       e1 = triang_evals(it, ib, 1)
+       e2 = triang_evals(it, ib, 2)
+       e3 = triang_evals(it, ib, 3)
+
+       !Define Eij
+       ! Note that at this stage the quantities below might
+       ! be ill defined due to degeneracies. But the conditionals
+       ! that will follow will take this into account.
+       E12 = (e - e1)/(e1 - e2)
+       E21 = (e - e2)/(e2 - e1)
+       E13 = (e - e1)/(e1 - e3)
+       E31 = (e - e3)/(e3 - e1)
+       E23 = (e - e2)/(e2 - e3)
+       E32 = (e - e3)/(e3 - e2)
+
+       !Evaluate the four possible cases
+       c1 = e < e1
+       c2 = e1 < e .and. e <= e2
+       c3 = e2 < e .and. e <= e3
+       c4 = e3 < e
+
+       if ((e1 == e2) .and. (e2 == e3) .and. (e == e1)) then
+          tmp = 0.0_dp
+       else
+          !Evaluate the expressions for the four cases
+          select case(iv)
+          case(1)
+             tmp = 0.0_dp
+          case(2)
+             tmp = E21*E31/(e - e1)*(E12 + E13 + E21 + E31)
+          case(3)
+             tmp = E13*E23/(e3 - e)*(E13 + E23 + E31 + E32)
+          case(4)
+             tmp = 0.0_dp
+          end select
+       end if
+    end do !itk
+
+    if(delta_fn_triang < 1.0e-12_dp) delta_fn_triang = 0.0_dp
+    
+    !Normalize with the total number of triangles
+    delta_fn_triang = delta_fn_triang/numtriangs
+  end function delta_fn_triang
 end module delta
