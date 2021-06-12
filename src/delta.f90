@@ -24,7 +24,8 @@ module delta
   implicit none
 
   private
-  public form_tetrahedra_3d, fill_tetrahedra_3d, delta_fn_tetra
+  public form_tetrahedra_3d, fill_tetrahedra_3d, delta_fn_tetra, &
+       form_triangles, fill_triangles, delta_fn_triang
   
 contains
 
@@ -364,7 +365,7 @@ contains
     integer(k8) :: ik, i, j, k, ijk(3), ii, jj, kk, tk, tl, aux, count
     integer(k8) :: ip1, jp1, kp1, n1, n2, n3, tmp
     integer(k8) :: triang_vertices_labels(2, 3)
-    integer(k8) :: scvol_vertices(3, 2) !subcell vertices
+    integer(k8) :: scvol_vertices(4, 3) !subcell vertices
 
     n1 = mesh(1)
     n2 = mesh(2)
@@ -382,7 +383,7 @@ contains
     triang(:,:) = 0
     triangcount(:) = 0
     triangmap(:,:,:) = 0
-    count = 1 !tetrahedron counter
+    count = 1 !triangles counter
 
     do ik = 1, nk !Run over all wave vectors in FBZ
        if(blocks) then !For energy window restricted FBZ
@@ -409,10 +410,10 @@ contains
 
        !For each subcell save the vertices
        scvol_vertices = reshape((/ &
-            i,   j,   &
-            ip1, j,   &
-            i,   jp1, &
-            ip1, jp1 /), &
+            i,   j,   k,    &
+            ip1, j,   k,    &
+            i,   jp1, k,    &
+            ip1, jp1, k /), &
             shape(scvol_vertices), order = (/2, 1/))
 
        !Run over the 2 triangles
@@ -421,10 +422,10 @@ contains
           !make up each triangle
           do tl = 1, 3 
              aux = triang_vertices_labels(tk, tl)
-             ii = scvol_vertices(aux,1)
-             jj = scvol_vertices(aux,2)
-             !kk = scvol_vertices(aux,3)
-             aux = mux_vector((/ii, jj, k/), mesh, 1_k8)
+             ii = scvol_vertices(aux, 1)
+             jj = scvol_vertices(aux, 2)
+             kk = scvol_vertices(aux, 3)
+             aux = mux_vector((/ii, jj, kk/), mesh, 1_k8)
              tmp = aux !Guaranteed to be > 0
              if(blocks) then
                 !Which point in indexlist does aux correspond to?
@@ -482,7 +483,8 @@ contains
     end do
   end subroutine fill_triangles
 
-  pure real(dp) function delta_fn_triang(e, ik, ib, mesh, triangmap, triangcount, triang_evals)
+  !pure real(dp) function delta_fn_triang(e, ik, ib, mesh, triangmap, triangcount, triang_evals)
+  real(dp) function delta_fn_triang(e, ik, ib, mesh, triangmap, triangcount, triang_evals)
     !! Calculate delta function using the triangle method a la
     !! Kurganskii et al. Phys. Stat. Sol.(b) 129, 293 (1985)
     !!
@@ -522,40 +524,51 @@ contains
        e2 = triang_evals(it, ib, 2)
        e3 = triang_evals(it, ib, 3)
 
-       !Define Eij
-       ! Note that at this stage the quantities below might
-       ! be ill defined due to degeneracies. But the conditionals
-       ! that will follow will take this into account.
-       E12 = (e - e1)/(e1 - e2)
-       E21 = (e - e2)/(e2 - e1)
-       E13 = (e - e1)/(e1 - e3)
-       E31 = (e - e3)/(e3 - e1)
-       E23 = (e - e2)/(e2 - e3)
-       E32 = (e - e3)/(e3 - e2)
-
        !Evaluate the four possible cases
-       c1 = e < e1
+       c1 = e <= e1
        c2 = e1 < e .and. e <= e2
        c3 = e2 < e .and. e <= e3
        c4 = e3 < e
 
-       if ((e1 == e2) .and. (e2 == e3) .and. (e == e1)) then
-          tmp = 0.0_dp
-       else
-          !Evaluate the expressions for the four cases
-          select case(iv)
-          case(1)
-             tmp = 0.0_dp
-          case(2)
-             tmp = E21*E31/(e - e1)*(E12 + E13 + E21 + E31)
-          case(3)
-             tmp = E13*E23/(e3 - e)*(E13 + E23 + E31 + E32)
-          case(4)
-             tmp = 0.0_dp
-          end select
-       end if
-    end do !itk
+       tmp = 0.0_dp
 
+       if(c1 .or. c4) cycle
+       
+       !Define Eij
+       ! Note that at this stage the quantities below might
+       ! be ill defined due to degeneracies. But the conditionals
+       ! that will follow will take this into account.
+       E12 = (e - e2)/(e1 - e2)
+       E21 = (e - e1)/(e2 - e1)
+       E13 = (e - e3)/(e1 - e3)
+       E31 = (e - e1)/(e3 - e1)
+       E23 = (e - e3)/(e2 - e3)
+       E32 = (e - e2)/(e3 - e2)
+              
+       select case(iv)
+       case(1)
+          if(c2) then
+             tmp = E21*(E12 + E13)/(e3 - e1)
+          else if(c3) then
+             tmp = E23*E13/(e3 - e1)
+          end if
+       case(2)
+          if(c2) then
+             tmp = E21*E21/(e3 - e1)
+          else if(c3) then
+             tmp = E23*E23/(e3 - e1)
+          end if
+       case(3)
+          if(c2) then
+             tmp = E21*E31/(e3 - e1)
+          else if(c3) then
+             tmp = E23*(E31 + E32)/(e3 - e1)
+          end if
+       end select
+
+       delta_fn_triang = delta_fn_triang + tmp
+    end do !itk
+    
     if(delta_fn_triang < 1.0e-12_dp) delta_fn_triang = 0.0_dp
     
     !Normalize with the total number of triangles

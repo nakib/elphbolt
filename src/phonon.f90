@@ -24,7 +24,8 @@ module phonon_module
   use wannier_module, only: epw_wannier
   use crystal_module, only: crystal, calculate_wavevectors_full
   use symmetry_module, only: symmetry, find_irred_wedge, create_fbz2ibz_map
-  use delta, only: form_tetrahedra_3d, fill_tetrahedra_3d
+  use delta, only: form_tetrahedra_3d, fill_tetrahedra_3d, form_triangles, &
+       fill_triangles
   
   implicit none
 
@@ -63,13 +64,24 @@ module phonon_module
      !! Symmetrizers of wave vector dependent vectors.
      integer(k8), allocatable :: tetra(:,:)
      !! List of all the wave vector mesh tetrahedra vertices.
-     !! First axis list tetraheda and the second axis list the vertices.
+     !! First axis lists tetraheda and the second axis lists the vertices.
      integer(k8), allocatable :: tetracount(:)
      !! The number of tetrahedra in which a wave vector belongs.
      integer(k8), allocatable :: tetramap(:,:,:)
      !! Mapping from a wave vector to the (tetrahedron, vertex) where it belongs.
      real(dp), allocatable :: tetra_evals(:,:,:)
      !! Tetrahedra vertices filled with eigenvalues.
+
+     integer(k8), allocatable :: triang(:,:)
+     !! List of all the wave vector mesh triangles vertices.
+     !! First axis lists triangles and the second axis lists the vertices.
+     integer(k8), allocatable :: triangcount(:)
+     !! The number of triangles in which a wave vector belongs.
+     integer(k8), allocatable :: triangmap(:,:,:)
+     !! Mapping from a wave vector to the (triangle, vertex) where it belongs.
+     real(dp), allocatable :: triang_evals(:,:,:)
+     !! Triangles vertices filled with eigenvalues.
+     
      real(dp), allocatable :: ens(:,:)
      !! List of phonon energies on FBZ.
      real(dp), allocatable :: vels(:,:,:)
@@ -279,10 +291,15 @@ contains
     
     !Calculate phonon tetrahedra
     if(num%tetrahedra) then
-       call print_message("Calculating phonon mesh tetrahedra...")
-       call form_tetrahedra_3d(ph%nq, ph%qmesh, ph%tetra, ph%tetracount, &
-            ph%tetramap, .false.)
-       call fill_tetrahedra_3d(ph%tetra, ph%ens, ph%tetra_evals)
+!!$       call print_message("Calculating phonon mesh tetrahedra...")
+!!$       call form_tetrahedra_3d(ph%nq, ph%qmesh, ph%tetra, ph%tetracount, &
+!!$            ph%tetramap, .false.)
+!!$       call fill_tetrahedra_3d(ph%tetra, ph%ens, ph%tetra_evals)
+
+       call print_message("Calculating phonon mesh triangles...")
+       call form_triangles(ph%nq, ph%qmesh, ph%triang, ph%triangcount, &
+            ph%triangmap, .false.)
+       call fill_triangles(ph%triang, ph%ens, ph%triang_evals)
     end if
   end subroutine calculate_phonons
   

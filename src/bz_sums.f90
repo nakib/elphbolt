@@ -23,7 +23,7 @@ module bz_sums
   use phonon_module, only: phonon
   use electron_module, only: electron
   use crystal_module, only: crystal
-  use delta, only: delta_fn_tetra
+  use delta, only: delta_fn_tetra, delta_fn_triang
   use symmetry_module, only: symmetry, symmetrize_3x3_tensor
 
   implicit none
@@ -200,8 +200,11 @@ contains
              do ibp = 1, ph%numbranches !Sum over wave vectors
                 if(usetetra) then
                    !Evaluate delta[E(iq,ib) - E(iq',ib')]
-                   delta = delta_fn_tetra(e, iqp, ibp, ph%qmesh, ph%tetramap, &
-                        ph%tetracount, ph%tetra_evals)
+!!$                   delta = delta_fn_tetra(e, iqp, ibp, ph%qmesh, ph%tetramap, &
+!!$                        ph%tetracount, ph%tetra_evals)
+
+                   delta = delta_fn_triang(e, iqp, ibp, ph%qmesh, ph%triangmap, &
+                        ph%triangcount, ph%triang_evals)
 
                    !Sum over delta function
                    dos_chunk(counter, ib) = dos_chunk(counter, ib) + delta
@@ -237,6 +240,8 @@ contains
     call write2file_rank2_real(ph%prefix // '.W_rta_phiso', W_phiso)
 
     sync all
+
+    call exit
   end subroutine calculate_ph_dos_iso
 
   subroutine calculate_transport_coeff(species, field, T, deg, chempot, ens, vels, &
