@@ -43,7 +43,7 @@ module crystal_module
      !! Masses of the basis atoms.
      logical :: polar
      !! Is the system polar?
-     real(dp) :: epsilon(3,3)
+     real(dp) :: epsilon(3, 3)
      !! Dielectric tensor.
      real(dp), allocatable :: born(:,:,:)
      !! Born effective charge.
@@ -59,7 +59,7 @@ module crystal_module
      !! Basis vectors (crystal coordinates).
      real(dp), allocatable :: basis_cart(:,:)
      !! Basis vectors (Cartesian coordinates).
-     real(dp) :: lattvecs(3,3)
+     real(dp) :: lattvecs(3, 3)
      !! Lattice vectors (nm).
      real(dp) :: volume
      !! Volume of primitive cell (nm^3).
@@ -75,8 +75,10 @@ module crystal_module
      !! g-factors.
      logical :: twod
      !! Is the system 2d?
+     real(dp) :: dim
+     !! Dimension of the system
      real(dp) :: thickness
-     !! Layer thickness for 2d systems
+     !! Thickness of the system
      
    contains
 
@@ -95,7 +97,7 @@ contains
     integer(k8), allocatable :: atomtypes(:)
     real(dp), allocatable :: masses(:), gfactors(:), born(:,:,:), basis(:,:), basis_cart(:,:)
     real(dp) :: epsilon(3,3), lattvecs(3,3), volume, reclattvecs(3,3), volume_bz, T, &
-         epsilon0, epsiloninf, thickness
+         epsilon0, epsiloninf
     character(len=3), allocatable :: elements(:)
     character(len=100) :: name
     logical :: polar, autoisotopes, phiso, read_epsilon0, twod
@@ -103,7 +105,7 @@ contains
     namelist /allocations/ numelements, numatoms
     namelist /crystal_info/ name, elements, atomtypes, basis, lattvecs, &
          polar, born, epsilon, read_epsilon0, epsilon0, epsiloninf, &
-         masses, T, autoisotopes, phiso, twod, thickness
+         masses, T, autoisotopes, phiso, twod
 
     call subtitle("Setting up crystal...")
 
@@ -136,7 +138,6 @@ contains
     born = 0.0_dp
     T = -1.0_dp
     twod = .false.
-    thickness = 0.0_dp
     read(1, nml = crystal_info)
     if(any(atomtypes < 1) .or. any(masses < 0) .or. T < 0.0_dp) then
        call exit_with_message('Bad input(s) in crystal_info.')
@@ -160,10 +161,16 @@ contains
     c%masses = masses
     c%gfactors = 0.0_dp
     c%twod = twod
-    c%thickness = thickness
-
-    if(c%twod .and. thickness == 0.0_dp) then
-       call exit_with_message('For 2d systems, must provide layer thickness in nm.')
+    
+    if(c%twod) then
+       if(lattvecs(1,3) /= 0 .or. lattvecs(2,3) /= 0 .or. lattvecs(3,3) == 0) then
+          call exit_with_message('For 2d systems, cross plane lattice vector must be &
+               of the for (0 0 h).')
+       end if
+       c%thickness = lattvecs(3,3)
+       c%dim = 2.0_dp
+    else
+       c%dim = 3.0_dp
     end if
     
     !Set static dielectric constant
@@ -180,8 +187,6 @@ contains
 
     !Calculate atomic basis in Cartesian coordinates
     c%basis_cart(:,:) = matmul(c%lattvecs,c%basis)
-
-    !TODO Calculate volume = area*thickness for 2d systems.
     
     !Calculate reciprocal lattice vectors and real and reciprocal cell volumes
     do i = 1,3

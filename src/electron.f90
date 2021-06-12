@@ -51,6 +51,8 @@ module electron_module
      !! List of transport active band indices.
      integer(k8) :: mesh_ref
      !! Electron mesh refinement factor compared to the phonon mesh.
+     integer(k8) :: mesh_ref_array(3)
+     !! The same as above, but in array form. This is useful for 3d vs 2d cases.
      integer(k8) :: kmesh(3)
      !! Electron wave vector mesh.
      integer(k8) :: nk
@@ -203,9 +205,14 @@ contains
 
     !Set some electronic properties from the numerics object
     el%mesh_ref = num%mesh_ref
-    el%kmesh = el%mesh_ref*num%qmesh
+    el%mesh_ref_array = (/num%mesh_ref, num%mesh_ref, num%mesh_ref/)
+    if(crys%twod) then
+       el%kmesh(3) = 1_k8
+       el%mesh_ref_array(3) = 1_k8
+    end if
+    el%kmesh = el%mesh_ref_array*num%qmesh
     el%fsthick = num%fsthick
-
+    
     !Print out information.
     if(this_image() == 1) then
        write(*, "(A, I1)") "Spin degeneracy = ", el%spindeg
@@ -213,7 +220,7 @@ contains
        write(*, "(A, I5)") "Number of transport active electronic bands = ", el%numtransbands
        write(*, "(A, I5, I5)") "Lowest and highest transport active electronic bands = ", &
             el%bandlist(1), el%bandlist(el%numtransbands)
-       write(*, "(A, 1E16.8)") "Reference electron energy = ", el%enref
+       write(*, "(A, 1E16.8, A)") "Reference electron energy = ", el%enref, ' eV'
        write(*, "(A, L)") "System is metallic: ", el%metallic
     end if
     
@@ -226,13 +233,13 @@ contains
 
     !Print out information.
     if(this_image() == 1) then
-       write(*, "(A, 1E16.8)") "Chemical potential = ", el%chempot
+       write(*, "(A, 1E16.8, A)") "Chemical potential = ", el%chempot, ' eV'
        write(*, "(A, 1E16.8)") 'Calculated carrier concentration:'
        do ib = el%indlowband, el%indhighband
           write(*, "(A, I5, A, 1E16.8, A)") ' Band: ', ib, ', concentration: ', el%conc(ib), ' cm^-3'
        end do
        if(.not. el%metallic) then
-          write(*, "(A, 1E16.8)") "Charged impurity concentration = ", el%chimp_conc
+          write(*, "(A, 1E16.8, A)") "Charged impurity concentration = ", el%chimp_conc, ' cm^-3'
           write(*, "(A, 1E16.8)") "Ionization of impurity = ", el%Z
        end if
     end if

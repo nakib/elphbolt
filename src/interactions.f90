@@ -648,7 +648,7 @@ contains
           k_indvec = nint(k*el%kmesh)
           
           !Find final electron wave vector
-          kp_indvec = modulo(k_indvec + el%mesh_ref*q_indvec, el%kmesh) !0-based index vector
+          kp_indvec = modulo(k_indvec + el%mesh_ref_array*q_indvec, el%kmesh) !0-based index vector
 
           !Muxed index of kp
           ikp = mux_vector(kp_indvec, el%kmesh, 0_k8)
@@ -916,7 +916,7 @@ contains
           !Note that q, k, and k' are all on the same mesh
           q_indvec = kp_indvec - k_indvec
           needfinephon = .false.
-          if(any(mod(q_indvec(:), el%mesh_ref) /= 0_k8)) then
+          if(any(mod(q_indvec(:), el%mesh_ref_array) /= 0_k8)) then
              needfinephon = .true.
              q_indvec = modulo(q_indvec, el%kmesh) !0-based index vector
              q = q_indvec/dble(el%kmesh) !crystal coords.
@@ -930,7 +930,7 @@ contains
              !This is much faster:
              call wann%ph_wann_epw(crys, 1_k8, qlist, ph_ens_iq, ph_evecs_iq)
           else !Original (coarser) mesh phonon
-             q_indvec = modulo(q_indvec/el%mesh_ref, ph%qmesh) !0-based index vector
+             q_indvec = modulo(q_indvec/el%mesh_ref_array, ph%qmesh) !0-based index vector
              q = q_indvec/dble(ph%qmesh) !crystal coords.
              !Muxed index of q
              iq = mux_vector(q_indvec, ph%qmesh, 0_k8)
