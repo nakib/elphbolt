@@ -495,17 +495,17 @@ contains
        allocate(pivot(8), T(8, 8), c(8))
 
        !Fine mesh point
-       x =  q(1)/dble(refinement*coarsemesh(1))
-       y =  q(2)/dble(refinement*coarsemesh(2))
-       z =  q(3)/dble(refinement*coarsemesh(3))
+       x =  q(1)/dble(refinement(1)*coarsemesh(1))
+       y =  q(2)/dble(refinement(2)*coarsemesh(2))
+       z =  q(3)/dble(refinement(3)*coarsemesh(3))
 
        !Coarse mesh walls
-       x0 = floor(q(1)/dble(refinement))/dble(coarsemesh(1))
-       y0 = floor(q(2)/dble(refinement))/dble(coarsemesh(2))
-       z0 = floor(q(3)/dble(refinement))/dble(coarsemesh(3))
-       x1 = ceiling(q(1)/dble(refinement))/dble(coarsemesh(1))
-       y1 = ceiling(q(2)/dble(refinement))/dble(coarsemesh(2))
-       z1 = ceiling(q(3)/dble(refinement))/dble(coarsemesh(3))
+       x0 = floor(q(1)/dble(refinement(1)))/dble(coarsemesh(1))
+       y0 = floor(q(2)/dble(refinement(2)))/dble(coarsemesh(2))
+       z0 = floor(q(3)/dble(refinement(3)))/dble(coarsemesh(3))
+       x1 = ceiling(q(1)/dble(refinement(1)))/dble(coarsemesh(1))
+       y1 = ceiling(q(2)/dble(refinement(2)))/dble(coarsemesh(2))
+       z1 = ceiling(q(3)/dble(refinement(3)))/dble(coarsemesh(3))
 
        !Coarse mesh corners
        i000 = (r0(3)*coarsemesh(2)+r0(2))*coarsemesh(1)+r0(1)+1
@@ -546,9 +546,9 @@ contains
           if(r1(ipol) .eq. r0(ipol)) then
              equalpol = ipol
           else
-             v(count) = q(ipol)/dble(refinement*coarsemesh(ipol))
-             v0(count) = floor(q(ipol)/dble(refinement))/dble(coarsemesh(ipol))
-             v1(count) = ceiling(q(ipol)/dble(refinement))/dble(coarsemesh(ipol))
+             v(count) = q(ipol)/dble(refinement(ipol)*coarsemesh(ipol))
+             v0(count) = floor(q(ipol)/dble(refinement(ipol)))/dble(coarsemesh(ipol))
+             v1(count) = ceiling(q(ipol)/dble(refinement(ipol)))/dble(coarsemesh(ipol))
              count = count+1 
           end if
        end do
@@ -581,9 +581,9 @@ contains
     else !1d
        do ipol = 1, 3
           if(r1(ipol) /= r0(ipol)) then
-             x =  q(ipol)/dble(refinement*coarsemesh(ipol))
-             x0 = floor(q(ipol)/dble(refinement))/dble(coarsemesh(ipol))
-             x1 = ceiling(q(ipol)/dble(refinement))/dble(coarsemesh(ipol))
+             x =  q(ipol)/dble(refinement(ipol)*coarsemesh(ipol))
+             x0 = floor(q(ipol)/dble(refinement(ipol)))/dble(coarsemesh(ipol))
+             x1 = ceiling(q(ipol)/dble(refinement(ipol)))/dble(coarsemesh(ipol))
 
              i000 = (r0(3)*coarsemesh(2)+r0(2))*coarsemesh(1)+r0(1)+1
              if(ipol .eq. 1) then

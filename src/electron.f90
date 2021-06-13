@@ -155,6 +155,7 @@ contains
     real(dp) :: enref, chempot, Z !, conc, chimp_conc
     integer(k8) :: ib, spindeg, numbands, indlowband, indhighband
     logical :: metallic
+    character(len = 6) :: concunits
 
     namelist /electrons/ enref, spindeg, numbands, &
          indlowband, indhighband, metallic, chempot, Z
@@ -228,18 +229,27 @@ contains
     call calculate_electrons(el, wann, crys, sym, num)
 
     !Calculate carrier concentration
-    call el%calculate_carrier_conc(crys%T, crys%volume)
+    if(crys%twod) then
+       call el%calculate_carrier_conc(crys%T, crys%volume, crys%thickness)
+    else
+       call el%calculate_carrier_conc(crys%T, crys%volume)
+    end if
     if(.not. el%metallic) el%chimp_conc = sum(el%conc)/el%Z
 
     !Print out information.
     if(this_image() == 1) then
+       if(crys%twod) then
+          concunits = ' cm^-2'
+       else
+          concunits = ' cm^-3'
+       end if
        write(*, "(A, 1E16.8, A)") "Chemical potential = ", el%chempot, ' eV'
        write(*, "(A, 1E16.8)") 'Calculated carrier concentration:'
        do ib = el%indlowband, el%indhighband
-          write(*, "(A, I5, A, 1E16.8, A)") ' Band: ', ib, ', concentration: ', el%conc(ib), ' cm^-3'
+          write(*, "(A, I5, A, 1E16.8, A)") ' Band: ', ib, ', concentration: ', el%conc(ib), concunits
        end do
        if(.not. el%metallic) then
-          write(*, "(A, 1E16.8, A)") "Charged impurity concentration = ", el%chimp_conc, ' cm^-3'
+          write(*, "(A, 1E16.8, A)") "Charged impurity concentration = ", el%chimp_conc, concunits
           write(*, "(A, 1E16.8)") "Ionization of impurity = ", el%Z
        end if
     end if
@@ -552,12 +562,13 @@ contains
     velocities(1:nk, :, :) = velocities_tmp(1:nk, :, :)
   end subroutine fbz_blocks_quantities
 
-  subroutine calculate_carrier_conc(el, T, vol)
+  subroutine calculate_carrier_conc(el, T, vol, h)
     !! Subroutine to calculate the band resolved carrier concentration
     !! for a given chemical potential and temperature.
 
     class(electron), intent(inout) :: el
     real(dp), intent(in) :: T, vol
+    real(dp), intent(in), optional :: h
 
     !Local variables
     real(dp) :: const
@@ -576,6 +587,11 @@ contains
        end do
     end do
     el%conc = el%conc*const !cm^-3
+
+    !If h is present that means the system is 2d
+    if(present(h)) then
+       el%conc = el%conc*h*1.0e-7_dp !cm^-2
+    end if
   end subroutine calculate_carrier_conc
 
   subroutine deallocate_eigenvecs(el)
