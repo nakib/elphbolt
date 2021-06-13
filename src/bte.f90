@@ -171,9 +171,9 @@ contains
 
        !Calculate and print transport scalars
        !gradT:
-       ph_kappa_scalar = trace(sum(ph_kappa, dim = 1))/3.0_dp
+       ph_kappa_scalar = trace(sum(ph_kappa, dim = 1))/crys%dim
        !E:
-       ph_alphabyT_scalar = trace(sum(ph_alphabyT, dim = 1))/3.0_dp
+       ph_alphabyT_scalar = trace(sum(ph_alphabyT, dim = 1))/crys%dim
 
        if(.not. num%drag .and. this_image() == 1) then
           write(*,*) "iter    k_ph[W/m/K]"
@@ -263,12 +263,12 @@ contains
 
        !Calculate and print transport scalars
        !gradT:
-       el_kappa0_scalar = trace(sum(el_kappa0, dim = 1))/3.0_dp
-       el_sigmaS_scalar = trace(sum(el_sigmaS, dim = 1))/3.0_dp
+       el_kappa0_scalar = trace(sum(el_kappa0, dim = 1))/crys%dim
+       el_sigmaS_scalar = trace(sum(el_sigmaS, dim = 1))/crys%dim
        
        !E:
-       el_sigma_scalar = trace(sum(el_sigma, dim = 1))/3.0_dp
-       el_alphabyT_scalar = trace(sum(el_alphabyT, dim = 1))/3.0_dp
+       el_sigma_scalar = trace(sum(el_sigma, dim = 1))/crys%dim
+       el_alphabyT_scalar = trace(sum(el_alphabyT, dim = 1))/crys%dim
 
        if(.not. num%drag .and. this_image() == 1) then
           write(*,*) "iter    k0_el[W/m/K]        sigmaS[A/m/K]", &
@@ -386,7 +386,7 @@ contains
              end do
              !Correct "drag" part
              I_drag = bt%el_response_T - I_diff
-             call correct_I_drag(I_drag, trace(sum(ph_alphabyT, dim = 1))/3.0_dp, lambda)
+             call correct_I_drag(I_drag, trace(sum(ph_alphabyT, dim = 1))/crys%dim, lambda)
              bt%el_response_T = I_diff + lambda*I_drag
 
              !Calculate electron transport coefficients
@@ -395,10 +395,10 @@ contains
                   el_kappa0, el_sigmaS)
 
              !Calculate electron transport scalars
-             el_kappa0_scalar = trace(sum(el_kappa0, dim = 1))/3.0_dp
-             el_sigmaS_scalar = trace(sum(el_sigmaS, dim = 1))/3.0_dp
-             el_sigma_scalar = trace(sum(el_sigma, dim = 1))/3.0_dp
-             el_alphabyT_scalar = trace(sum(el_alphabyT, dim = 1))/3.0_dp
+             el_kappa0_scalar = trace(sum(el_kappa0, dim = 1))/crys%dim
+             el_sigmaS_scalar = trace(sum(el_sigmaS, dim = 1))/crys%dim
+             el_sigma_scalar = trace(sum(el_sigma, dim = 1))/crys%dim
+             el_alphabyT_scalar = trace(sum(el_alphabyT, dim = 1))/crys%dim
 
              !Check convergence
              if(converged(el_kappa0_scalar_old, el_kappa0_scalar, num%conv_thres) .and. &
@@ -415,8 +415,8 @@ contains
           end do
 
           !Calculate phonon transport scalar
-          ph_kappa_scalar = trace(sum(ph_kappa, dim = 1))/3.0_dp
-          ph_alphabyT_scalar = trace(sum(ph_alphabyT, dim = 1))/3.0_dp
+          ph_kappa_scalar = trace(sum(ph_kappa, dim = 1))/crys%dim
+          ph_alphabyT_scalar = trace(sum(ph_alphabyT, dim = 1))/crys%dim
 
           if(it_ph == 1) then
              !Print RTA band/branch resolved response functions
@@ -489,7 +489,7 @@ contains
                crys%volume, ph%qmesh, bt%ph_response_T, sym, ph_kappa, dummy)
 
           !Calculate and print phonon transport scalar
-          ph_kappa_scalar = trace(sum(ph_kappa, dim = 1))/3.0_dp
+          ph_kappa_scalar = trace(sum(ph_kappa, dim = 1))/crys%dim
           if(this_image() == 1) then
              write(*,"(I3, A, 1E16.8)") it_ph, "    ", ph_kappa_scalar
           end if
@@ -557,10 +557,10 @@ contains
                el_kappa0, el_sigmaS)
 
           !Calculate and print electron transport scalars
-          el_kappa0_scalar = trace(sum(el_kappa0, dim = 1))/3.0_dp
-          el_sigmaS_scalar = trace(sum(el_sigmaS, dim = 1))/3.0_dp
-          el_sigma_scalar = trace(sum(el_sigma, dim = 1))/3.0_dp
-          el_alphabyT_scalar = trace(sum(el_alphabyT, dim = 1))/3.0_dp
+          el_kappa0_scalar = trace(sum(el_kappa0, dim = 1))/crys%dim
+          el_sigmaS_scalar = trace(sum(el_sigmaS, dim = 1))/crys%dim
+          el_sigma_scalar = trace(sum(el_sigma, dim = 1))/crys%dim
+          el_alphabyT_scalar = trace(sum(el_alphabyT, dim = 1))/crys%dim
           if(this_image() == 1) then
              write(*,"(I3, A, 1E16.8, A, 1E16.8, A, 1E16.8, A, 1E16.8)") it_el, &
                   "    ", el_kappa0_scalar, "     ", el_sigmaS_scalar, &
@@ -625,7 +625,7 @@ contains
          call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
               el%ens, el%vels, crys%volume, el%kmesh, lambda*I_drag, sym, &
               dummy, sigmaS)         
-         sigmaS_scalar = trace(sum(sigmaS, dim = 1))/3.0_dp
+         sigmaS_scalar = trace(sum(sigmaS, dim = 1))/crys%dim
 
          if(abs(sigmaS_scalar - constraint) < thresh) then
             exit
