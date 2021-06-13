@@ -128,9 +128,11 @@ program elphbolt
      call el%deallocate_eigenvecs
   end if
 
-  if(num%onlyebte .or. num%drag .and. num%elchimp) then
-     !Calculate e-ch. imp. transition probabilities
-     call calculate_echimp_interaction_ibzk(crys, el, num)
+  if(num%onlyebte .or. num%drag) then
+     if(num%elchimp) then
+        !Calculate e-ch. imp. transition probabilities
+        call calculate_echimp_interaction_ibzk(crys, el, num)
+     end if
   end if
 
   if(num%onlyphbte .or. num%drag) then

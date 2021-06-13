@@ -104,17 +104,6 @@ contains
     end if
     sync all
 
-    !Calculate RTA scattering rates
-    if(present(el)) then
-       call calculate_ph_rta_rates(rates_3ph, rates_phe, num, crys, ph, el)
-
-       !Allocate electron transport coefficients
-       allocate(el_sigma(el%numbands, 3, 3), el_sigmaS(el%numbands, 3, 3), &
-            el_alphabyT(el%numbands, 3, 3), el_kappa0(el%numbands, 3, 3))
-    else
-       call calculate_ph_rta_rates(rates_3ph, rates_phe, num, crys, ph)
-    end if
-
     if(num%onlyphbte .or. num%drag) then
        !Allocate phonon transport coefficients
        allocate(ph_kappa(ph%numbranches, 3, 3), ph_alphabyT(ph%numbranches, 3, 3), &
@@ -123,6 +112,13 @@ contains
        !Allocate total RTA scattering rates
        allocate(bt%ph_rta_rates_ibz(ph%nq_irred, ph%numbranches))
 
+       !Calculate RTA scattering rates
+       if(num%phe) then
+          call calculate_ph_rta_rates(rates_3ph, rates_phe, num, crys, ph, el)
+       else
+          call calculate_ph_rta_rates(rates_3ph, rates_phe, num, crys, ph)
+       end if
+       
        !Matthiessen's rule
        bt%ph_rta_rates_ibz = rates_3ph + rates_phe + &
             bt%ph_rta_rates_iso_ibz(:,:)
@@ -200,6 +196,10 @@ contains
     end if
 
     if(num%onlyebte .or. num%drag) then
+       !Allocate electron transport coefficients
+       allocate(el_sigma(el%numbands, 3, 3), el_sigmaS(el%numbands, 3, 3), &
+            el_alphabyT(el%numbands, 3, 3), el_kappa0(el%numbands, 3, 3))
+       
        !Calculate RTA scattering rates
        call calculate_el_rta_rates(rates_eph, bt%el_rta_rates_echimp_ibz, num, crys, el)
 
