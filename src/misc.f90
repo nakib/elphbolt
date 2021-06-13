@@ -464,7 +464,7 @@ contains
     !! q The 0-based index vector where to evaluate f.
     !! interpolation The result
     
-    integer(k8), intent(in) :: coarsemesh(3), q(3), refinement
+    integer(k8), intent(in) :: coarsemesh(3), q(3), refinement(3)
     real(dp), intent(in) :: f(:)
     real(dp), intent(out) :: interpolation
     

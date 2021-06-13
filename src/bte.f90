@@ -1051,7 +1051,7 @@ contains
 
                    !Interpolate response function on this wave vector
                    do ipol = 1, 3
-                      call interpolate(ph%qmesh, el%mesh_ref, response_ph(:, s, ipol), &
+                      call interpolate(ph%qmesh, el%mesh_ref_array, response_ph(:, s, ipol), &
                            fineq_indvec, ForG(ipol))
                    end do
                 else
