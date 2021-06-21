@@ -82,8 +82,10 @@ module electron_module
      !! Total electron carrier concentration.
      real(dp) :: conc_hole
      !! Total hole carrier concentration.
-     real(dp) :: chimp_conc
-     !! Concentration of charged impurities.
+     real(dp) :: chimp_conc_n
+     !! Concentration of donor impurities.
+     real(dp) :: chimp_conc_p
+     !! Concentration of acceptor impurities.
      real(dp) :: Zn
      !! Ionization number of donor dopant.
      real(dp) :: Zp
@@ -262,9 +264,10 @@ contains
     
     !Set total number of charged impurities
     if(.not. el%metallic) then
-       el%chimp_conc = 0.0_dp
-       if(el%Zn > 0) el%chimp_conc = el%chimp_conc + el%conc_el/el%Zn
-       if(el%Zp > 0) el%chimp_conc = el%chimp_conc + el%conc_hole/el%Zp
+       el%chimp_conc_n = 0.0_dp
+       el%chimp_conc_p = 0.0_dp
+       if(el%Zn > 0) el%chimp_conc_n = el%chimp_conc_n + el%conc_el/el%Zn
+       if(el%Zp > 0) el%chimp_conc_p = el%chimp_conc_p + el%conc_hole/el%Zp
     end if
 
     !Print out information.
@@ -287,7 +290,8 @@ contains
           write(*, "(A, 1E16.8, A)") "Absolute total hole concentration = ", el%conc_hole, concunits
           write(*, "(A, 1E16.8)") "Ionization of donor impurity = ", el%Zn
           write(*, "(A, 1E16.8)") "Ionization of acceptor impurity = ", el%Zp
-          write(*, "(A, 1E16.8, A)") "Charged impurity concentration = ", el%chimp_conc, concunits
+          write(*, "(A, 1E16.8, A)") "Donor impurity concentration = ", el%chimp_conc_n, concunits
+          write(*, "(A, 1E16.8, A)") "Acceptor impurity concentration = ", el%chimp_conc_p, concunits
        end if
     end if
   end subroutine read_input_and_setup
