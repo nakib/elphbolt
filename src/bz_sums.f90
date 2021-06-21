@@ -257,7 +257,6 @@ contains
     !! volume Primitive cell volume in nm^3
     !! mesh Wave vector grid
     !! response FBZ response function
-    !! conc Carrier concentration in cm^-3
     !! trans_coeff_hc Heat current coefficient
     !! trans_coeff_cc Charge current coefficient
 

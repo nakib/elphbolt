@@ -85,7 +85,8 @@ contains
     type(electron), intent(in) :: el
     real(dp), intent(in) :: q
 
-    gchimp2 = 1.0e-3_dp*el%chimp_conc/crys%volume*(qe*el%Z**2/(perm0*crys%epsilon0)/&
+    gchimp2 = 1.0e-3_dp*el%chimp_conc/crys%volume*(qe*(el%Zn**2 + el%Zp**2)/&
+         (perm0*crys%epsilon0)/&
          (q**2 + crys%qTF**2))**2 !ev^2
   end function gchimp2
 

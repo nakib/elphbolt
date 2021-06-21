@@ -47,6 +47,10 @@ module electron_module
      !! Lowest transport band index.
      integer(k8) :: indhighband
      !! Highest transport band index.
+     integer(k8) :: indlowconduction
+     !! Lowest conduction band index.
+     integer(k8) :: indhighvalence
+     !! Highest valence band index.
      integer(k8), allocatable :: bandlist(:)
      !! List of transport active band indices.
      integer(k8) :: mesh_ref
@@ -74,10 +78,16 @@ module electron_module
      !! Chemical potential.
      real(dp), allocatable :: conc(:)
      !! Band resolved carrier concentration.
+     real(dp) :: conc_el
+     !! Total electron carrier concentration.
+     real(dp) :: conc_hole
+     !! Total hole carrier concentration.
      real(dp) :: chimp_conc
      !! Concentration of charged impurities.
-     real(dp) :: Z
-     !! Ionization number of dopant.
+     real(dp) :: Zn
+     !! Ionization number of donor dopant.
+     real(dp) :: Zp
+     !! Ionization number of acceptor dopant.
      real(dp), allocatable :: wavevecs(:,:)
      !! List of all electron wave vectors (crystal coordinates).
      real(dp), allocatable :: wavevecs_irred(:,:)
@@ -136,8 +146,7 @@ module electron_module
      
    contains
 
-     procedure :: initialize=>read_input_and_setup, deallocate_eigenvecs, &
-          calculate_carrier_conc
+     procedure :: initialize=>read_input_and_setup, deallocate_eigenvecs
   end type electron
 
 contains
@@ -152,13 +161,15 @@ contains
     type(numerics), intent(in) :: num
 
     !Local variables
-    real(dp) :: enref, chempot, Z !, conc, chimp_conc
-    integer(k8) :: ib, spindeg, numbands, indlowband, indhighband
+    real(dp) :: enref, chempot, Zn, Zp
+    integer(k8) :: ib, spindeg, numbands, indlowband, indhighband, &
+         indlowconduction, indhighvalence 
     logical :: metallic
     character(len = 6) :: concunits
 
     namelist /electrons/ enref, spindeg, numbands, &
-         indlowband, indhighband, metallic, chempot, Z
+         indlowband, indhighband, metallic, chempot, Zn, Zp, &
+         indlowconduction, indhighvalence
          
     call subtitle("Setting up electrons...")
     
@@ -167,11 +178,14 @@ contains
 
     !Read electrons information
     spindeg = 2 !Default calculation is non-spin polarized
-    numbands = -1
-    indlowband = -1
-    indhighband = -1
+    numbands = 0
+    indlowband = 0
+    indhighband = 0
+    indlowconduction = 0
+    indhighvalence = 0
     metallic = .false.
-    Z = 0
+    Zn = 0
+    Zp = 0
     read(1, nml = electrons)
     if(spindeg < 1 .or. spindeg > 2) then
        call exit_with_message('spindeg can be 1 or 2.')
@@ -185,6 +199,12 @@ contains
     if(indhighband < 1) then
        call exit_with_message('indhighband should be > 0.')
     end if
+    if(.not. metallic) then
+       if(indlowconduction < 1 .and. indhighvalence < 1) then
+          call exit_with_message(&
+               'For non-metals, must provide lowest conduction or highest valence band.')
+       end if
+    end if
     
     el%spindeg = spindeg
     el%numbands = numbands
@@ -196,10 +216,16 @@ contains
        el%bandlist(ib) = indlowband + ib - 1
     end do
     el%metallic = metallic
+    el%indlowconduction = indlowconduction
+    el%indhighvalence = indhighvalence
     el%enref = enref
     el%chempot = chempot
-    el%Z = Z
-    if(el%metallic) el%Z = 0
+    el%Zn = Zn
+    el%Zp = Zp
+    if(el%metallic) then
+       el%Zn = 0
+       el%Zp = 0
+    end if
     
     !Close input file
     close(1)
@@ -223,20 +249,27 @@ contains
             el%bandlist(1), el%bandlist(el%numtransbands)
        write(*, "(A, 1E16.8, A)") "Reference electron energy = ", el%enref, ' eV'
        write(*, "(A, L)") "System is metallic: ", el%metallic
+       if(indlowconduction > 0) then
+          write(*, "(A, I5)") "Lowest conduction band index = ", el%indlowconduction
+       end if
+       if(indhighvalence > 0) then
+          write(*, "(A, I5)") "Highest valence band index = ", el%indhighvalence
+       end if
     end if
     
     !Calculate electrons
     call calculate_electrons(el, wann, crys, sym, num)
-
-    !Calculate carrier concentration
-    if(crys%twod) then
-       call el%calculate_carrier_conc(crys%T, crys%volume, crys%thickness)
-    else
-       call el%calculate_carrier_conc(crys%T, crys%volume)
+    
+    !Set total number of charged impurities
+    if(.not. el%metallic) then
+       el%chimp_conc = 0.0_dp
+       if(el%Zn > 0) el%chimp_conc = el%chimp_conc + el%conc_el/el%Zn
+       if(el%Zp > 0) el%chimp_conc = el%chimp_conc + el%conc_hole/el%Zp
     end if
-    if(.not. el%metallic) el%chimp_conc = sum(el%conc)/el%Z
 
     !Print out information.
+    call print_message("Electron calculations summary:")
+    call print_message("------------------------------")
     if(this_image() == 1) then
        if(crys%twod) then
           concunits = ' cm^-2'
@@ -244,13 +277,17 @@ contains
           concunits = ' cm^-3'
        end if
        write(*, "(A, 1E16.8, A)") "Chemical potential = ", el%chempot, ' eV'
-       write(*, "(A, 1E16.8)") 'Calculated carrier concentration:'
-       do ib = el%indlowband, el%indhighband
-          write(*, "(A, I5, A, 1E16.8, A)") ' Band: ', ib, ', concentration: ', el%conc(ib), concunits
-       end do
        if(.not. el%metallic) then
+          write(*, "(A, 1E16.8)") 'Band resolved carrier concentration (+/- = hole/electron):'
+          do ib = el%indlowband, el%indhighband
+             write(*, "(A, I5, A, 1E16.8, A)") ' Band: ', ib, ', concentration: ', &
+                  el%conc(ib), concunits
+          end do
+          write(*, "(A, 1E16.8, A)") "Absolute total electron concentration = ", el%conc_el, concunits
+          write(*, "(A, 1E16.8, A)") "Absolute total hole concentration = ", el%conc_hole, concunits
+          write(*, "(A, 1E16.8)") "Ionization of donor impurity = ", el%Zn
+          write(*, "(A, 1E16.8)") "Ionization of acceptor impurity = ", el%Zp
           write(*, "(A, 1E16.8, A)") "Charged impurity concentration = ", el%chimp_conc, concunits
-          write(*, "(A, 1E16.8)") "Ionization of impurity = ", el%Z
        end if
     end if
   end subroutine read_input_and_setup
@@ -323,6 +360,16 @@ contains
           end do
        end do
     end do
+
+    !Calculate carrier concentration for non-metals
+    if(.not. el%metallic) then
+       call print_message("Calculating carrier concentrations...")
+       if(crys%twod) then
+          call calculate_carrier_conc(el, crys%T, crys%volume, crys%thickness)
+       else
+          call calculate_carrier_conc(el, crys%T, crys%volume)
+       end if
+    end if
     
     call print_message("Transport energy window restricted calculation:")
     call print_message("-----------------------------------------------")
@@ -577,21 +624,44 @@ contains
     !Allocate conc
     allocate(el%conc(el%numbands))
     el%conc = 0.0_dp
+
+    el%conc_el = 0.0_dp
+    el%conc_hole = 0.0_dp
     
     !Normalization and units factor
     const = el%spindeg/dble(product(el%kmesh))/vol/(1.0e-21_dp)
 
     do ik = 1, el%nk
-       do ib = el%indlowband, el%indhighband
-          el%conc(ib) = el%conc(ib) + Fermi(el%ens(ik, ib), el%chempot, T)
-       end do
+       !Electron concentration
+       !By convention, the electron carrier concentration will have a negative sign.
+       if(el%indlowconduction > 0) then !Calculation includes conduction bands
+          do ib = el%indlowconduction, el%indhighband !Conduction bands manifold
+             el%conc(ib) = el%conc(ib) - Fermi(el%ens(ik, ib), el%chempot, T)
+          end do
+          !Total electron concentration
+          el%conc_el = abs(sum(el%conc(el%indlowconduction:el%indhighband)))
+       end if
+
+       !Hole concentration
+       !By convention, the electron carrier concentration will have a positive sign.
+       if(el%indhighvalence > 0) then !Calculation includes valence bands
+          do ib = el%indlowband, el%indhighvalence !Valence bands manifold
+             el%conc(ib) = el%conc(ib) + (1.0_dp - Fermi(el%ens(ik, ib), el%chempot, T))
+          end do
+          !Total hole concentration
+          el%conc_hole = sum(el%conc(el%indlowband:el%indhighvalence))
+       end if
     end do
     el%conc = el%conc*const !cm^-3
+    el%conc_el = el%conc_el*const !cm^-3
+    el%conc_hole = el%conc_hole*const !cm^-3
 
     !If h is present that means the system is 2d
     if(present(h)) then
        el%conc = el%conc*h*1.0e-7_dp !cm^-2
-    end if
+       el%conc_el = el%conc_el*h*1.0e-7_dp !cm^-2
+       el%conc_hole = el%conc_hole*h*1.0e-7_dp !cm^-2
+    end if    
   end subroutine calculate_carrier_conc
 
   subroutine deallocate_eigenvecs(el)
