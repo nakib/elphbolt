@@ -73,9 +73,9 @@ module electron_module
      !! Electron reference energy (eV).
      !! This is the center of the transport energy window.
      real(dp) :: fsthick
-     !! Fermi surface thickness in (eV).
+     !! Fermi surface thickness (eV).
      real(dp) :: chempot
-     !! Chemical potential.
+     !! Chemical potential in (eV).
      real(dp), allocatable :: conc(:)
      !! Band resolved carrier concentration.
      real(dp) :: conc_el
@@ -163,9 +163,9 @@ contains
     type(numerics), intent(in) :: num
 
     !Local variables
-    real(dp) :: enref, chempot, Zn, Zp
+    real(dp) :: enref, Zn, Zp, chempot
     integer(k8) :: ib, spindeg, numbands, indlowband, indhighband, &
-         indlowconduction, indhighvalence 
+         indlowconduction, indhighvalence
     logical :: metallic
     character(len = 6) :: concunits
 
@@ -188,6 +188,7 @@ contains
     metallic = .false.
     Zn = 0
     Zp = 0
+    chempot = -999999.99999_dp !Something crazy
     read(1, nml = electrons)
     if(spindeg < 1 .or. spindeg > 2) then
        call exit_with_message('spindeg can be 1 or 2.')

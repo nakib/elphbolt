@@ -90,8 +90,6 @@ program elphbolt
   end if
     
   call subtitle("Calculating interactions...")
-
-  !TODO here need to loop over all the provided chemical potentials
   
   !Set chemical potential dependent directory
   call num%create_chempot_dirs(el%chempot)
