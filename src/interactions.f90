@@ -145,7 +145,7 @@ contains
     real(dp), allocatable :: Vm2_1(:), Vm2_2(:), Wm(:), Wp(:)
     integer(k8), allocatable :: istate2_plus(:), istate3_plus(:), istate2_minus(:), istate3_minus(:)
     complex(dp) :: phases_q2q3(ph%numtriplets)
-    character(len = 1024) :: filename, filename_Wm, filename_Wp, Wdir, tag
+    character(len = 1024) :: filename, filename_Wm, filename_Wp
 
     if(key /= 'V' .and. key /= 'W') then
        call exit_with_message("Invalid value of key in call to calculate_3ph_interaction. Exiting.")
@@ -156,15 +156,6 @@ contains
     else
        call print_message("Calculating 3-ph transition probabilities for all IBZ phonons...")
     end if
-
-    !Set output directory of transition probilities
-    write(tag, "(E9.3)") crys%T
-    Wdir = trim(adjustl(num%datadumpdir))//'W_T'//trim(adjustl(tag))
-    if(this_image() == 1 .and. key == 'W') then
-       !Create directory
-       call system('mkdir -p '//trim(adjustl(Wdir)))
-    end if
-    sync all
    
     !Conversion factor in transition probability expression
     const = pi/4.0_dp*hbar_eVps**5*(qe/amu)**3*1.0d-12
@@ -421,7 +412,7 @@ contains
 
           !Write W+ and W- to disk
           !Change to data output directory
-          call chdir(trim(adjustl(Wdir)))
+          call chdir(trim(adjustl(num%Wdir)))
 
           !Write data in binary format
           !Note: this will overwrite existing data!
@@ -532,7 +523,7 @@ contains
          invboseplus1, fermi1, fermi2, occup_fac
     real(dp), allocatable :: g2_istate(:), Y_istate(:)
     complex(dp) :: gReq_iq(wann%numwannbands, wann%numwannbands, wann%numbranches, wann%nwsk)
-    character(len = 1024) :: filename, filename_Y, Ydir, tag
+    character(len = 1024) :: filename, filename_Y
 
     if(key /= 'g' .and. key /= 'Y') then
        call exit_with_message(&
@@ -544,16 +535,7 @@ contains
     else
        call print_message("Calculating ph-e transition probabilities for all IBZ phonons...")
     end if
-    
-    !Set output directory of transition probilities
-    write(tag, "(E9.3)") crys%T
-    Ydir = trim(adjustl(num%datadumpdir))//'Y_T'//trim(adjustl(tag))
-    if(this_image() == 1 .and. key == 'Y') then
-       !Create directory
-       call system('mkdir -p '//trim(adjustl(Ydir)))
-    end if
-    sync all
-    
+        
     !Allocate and initialize g2_istate
     if(key == 'g') then
        !Maximum length of g2_istate
@@ -737,7 +719,7 @@ contains
           Y_istate(1:count) = const*Y_istate(1:count) !THz
 
           !Change to data output directory
-          call chdir(trim(adjustl(Ydir)))
+          call chdir(trim(adjustl(num%Ydir)))
 
           !Write data in binary format
           !Note: this will overwrite existing data!
@@ -800,7 +782,7 @@ contains
     integer(k8), allocatable :: istate_el(:), istate_ph(:)
     complex(dp) :: gkRp_ik(wann%numwannbands,wann%numwannbands,wann%numbranches,wann%nwsq), &
          ph_evecs_iq(1, ph%numbranches,ph%numbranches)
-    character(len = 1024) :: filename, filename_X, Xdir, tag
+    character(len = 1024) :: filename, filename_X
     logical :: needfinephon
 
     if(key /= 'g' .and. key /= 'X') then
@@ -813,15 +795,6 @@ contains
     else
        call print_message("Calculating e-ph transition probabilities for all IBZ electrons...")
     end if
-
-    !Set output directory of transition probilities
-    write(tag, "(E9.3)") crys%T
-    Xdir = trim(adjustl(num%datadumpdir))//'X_T'//trim(adjustl(tag))
-    if(this_image() == 1 .and. key == 'X') then
-       !Create directory
-       call system('mkdir -p '//trim(adjustl(Xdir)))
-    end if
-    sync all
     
     !Allocate and initialize g2_istate
     if(key == 'g') then
@@ -1049,7 +1022,7 @@ contains
           Xminus_istate(1:count) = const*Xminus_istate(1:count) !THz
 
           !Change to data output directory
-          call chdir(trim(adjustl(Xdir)))
+          call chdir(trim(adjustl(num%Xdir)))
 
           !Write data in binary format
           !Note: this will overwrite existing data!
@@ -1110,17 +1083,9 @@ contains
     real(dp) :: k(3), kp(3), q_mag, const, en_el, delta, g2, vk(3), vkp(3)
     real(dp), allocatable :: Xchimp_istate(:)
     integer(k8), allocatable :: istate_el(:)
-    character(len = 1024) :: filename, Xdir
+    character(len = 1024) :: filename
 
     call print_message("Calculating e-ch. imp. transition probabilities for all IBZ electrons...")
-
-    !Set output directory of transition probilities
-    Xdir = trim(adjustl(num%datadumpdir))//'Xchimp'
-    if(this_image() == 1) then
-       !Create directory
-       call system('mkdir -p '//trim(adjustl(Xdir)))
-    end if
-    sync all
     
     !Conversion factor in transition probability expression
     const = twopi/hbar_eVps
@@ -1213,7 +1178,7 @@ contains
        Xchimp_istate(1:count) = const*Xchimp_istate(1:count) !THz
        
        !Change to data output directory
-       call chdir(trim(adjustl(Xdir)))
+       call chdir(trim(adjustl(num%Xdir)))
 
        !Write data in binary format
        !Note: this will overwrite existing data!
@@ -1249,14 +1214,10 @@ contains
     integer(k8), allocatable :: start[:], end[:]
     real(dp), allocatable :: rta_rates_3ph_psum(:,:)[:], rta_rates_phe_psum(:,:)[:], &
          W(:), Y(:)
-    character(len = 1024) :: filepath_Wm, filepath_Wp, filepath_Y, Wdir, Ydir, tag
+    character(len = 1024) :: filepath_Wm, filepath_Wp, filepath_Y, tag
     
     !Set output directory of transition probilities
     write(tag, "(E9.3)") crys%T
-    Wdir = trim(adjustl(num%datadumpdir))//'W_T'//trim(adjustl(tag))
-    if(present(el)) then
-       Ydir = trim(adjustl(num%datadumpdir))//'Y_T'//trim(adjustl(tag))
-    end if
     
     !Total number of IBZ blocks states
     nstates_irred = ph%nq_irred*ph%numbranches
@@ -1290,7 +1251,7 @@ contains
 
        !Set W+ filename
        write(tag, '(I9)') istate
-       filepath_Wp = trim(adjustl(Wdir))//'/Wp.istate'//trim(adjustl(tag))
+       filepath_Wp = trim(adjustl(num%Wdir))//'/Wp.istate'//trim(adjustl(tag))
        
        !Read W+ from file
        !call read_transition_probs_3ph(trim(adjustl(filepath_Wp)), W)
@@ -1302,7 +1263,7 @@ contains
        end do
 
        !Set W- filename
-       filepath_Wm = trim(adjustl(Wdir))//'/Wm.istate'//trim(adjustl(tag))
+       filepath_Wm = trim(adjustl(num%Wdir))//'/Wm.istate'//trim(adjustl(tag))
        
        !Read W- from file
        !call read_transition_probs_3ph(trim(adjustl(filepath_Wm)), W)
@@ -1315,7 +1276,7 @@ contains
 
        if(present(el)) then
           !Set Y filename
-          filepath_Y = trim(adjustl(Ydir))//'/Y.istate'//trim(adjustl(tag))
+          filepath_Y = trim(adjustl(num%Ydir))//'/Y.istate'//trim(adjustl(tag))
 
           !Read Y from file
           if(allocated(Y)) deallocate(Y)
@@ -1352,13 +1313,10 @@ contains
     integer(k8), allocatable :: start[:], end[:]
     real(dp), allocatable :: rta_rates_eph_psum(:,:)[:], &
          rta_rates_echimp_psum(:,:)[:], X(:)
-    character(len = 1024) :: filepath_Xp, filepath_Xm, Xeph_dir, &
-         Xechimp_dir, tag
+    character(len = 1024) :: filepath_Xp, filepath_Xm, tag
 
     !Set output directory of transition probilities
     write(tag, "(E9.3)") crys%T
-    Xeph_dir = trim(adjustl(num%datadumpdir))//'X_T'//trim(adjustl(tag))
-    Xechimp_dir = trim(adjustl(num%datadumpdir))//'Xchimp'
 
     !Total number of IBZ blocks states
     nstates_irred = el%nk_irred*el%numbands
@@ -1392,7 +1350,7 @@ contains
        
        !Set X+ filename
        write(tag, '(I9)') istate
-       filepath_Xp = trim(adjustl(Xeph_dir))//'/Xplus.istate'//trim(adjustl(tag))
+       filepath_Xp = trim(adjustl(num%Xdir))//'/Xplus.istate'//trim(adjustl(tag))
        
        !Read X+ from file
        if(allocated(X)) deallocate(X)
@@ -1404,7 +1362,7 @@ contains
 
        !Set X- filename
        write(tag, '(I9)') istate
-       filepath_Xm = trim(adjustl(Xeph_dir))//'/Xminus.istate'//trim(adjustl(tag))
+       filepath_Xm = trim(adjustl(num%Xdir))//'/Xminus.istate'//trim(adjustl(tag))
 
        !Read X- from file
        if(allocated(X)) deallocate(X)
@@ -1417,7 +1375,7 @@ contains
        if(num%elchimp) then
           !Set Xchimp filename
           write(tag, '(I9)') istate
-          filepath_Xm = trim(adjustl(Xechimp_dir))//'/Xchimp.istate'//trim(adjustl(tag))
+          filepath_Xm = trim(adjustl(num%Xdir))//'/Xchimp.istate'//trim(adjustl(tag))
 
           !Read Xchimp from file
           if(allocated(X)) deallocate(X)

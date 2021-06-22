@@ -351,9 +351,9 @@ contains
           !Scheme: for each step of phonon response, fully iterate the electron response.
 
           !Iterate phonon response once
-          call iterate_bte_ph(crys%T, num%datadumpdir, .True., ph, el, bt%ph_rta_rates_ibz, &
+          call iterate_bte_ph(crys%T, .True., num, ph, el, bt%ph_rta_rates_ibz, &
                bt%ph_field_term_T, bt%ph_response_T, bt%el_response_T)
-          call iterate_bte_ph(crys%T, num%datadumpdir, .True., ph, el, bt%ph_rta_rates_ibz, &
+          call iterate_bte_ph(crys%T, .True., num, ph, el, bt%ph_rta_rates_ibz, &
                bt%ph_field_term_E, bt%ph_response_E, bt%el_response_E)
 
           !Calculate phonon transport coefficients
@@ -366,7 +366,7 @@ contains
           !Iterate electron response all the way
           do it_el = 1, num%maxiter
              !E field:
-             call iterate_bte_el(crys%T, num%datadumpdir, .True., el, ph, sym,&
+             call iterate_bte_el(crys%T, .True., num, el, ph, sym,&
                   bt%el_rta_rates_ibz, bt%el_field_term_E, bt%el_response_E, bt%ph_response_E)        
 
              !Calculate electron transport coefficients
@@ -376,7 +376,7 @@ contains
              el_alphabyT = el_alphabyT/crys%T
 
              !delT field:
-             call iterate_bte_el(crys%T, num%datadumpdir, .True., el, ph, sym,&
+             call iterate_bte_el(crys%T, .True., num, el, ph, sym,&
                   bt%el_rta_rates_ibz, bt%el_field_term_T, bt%el_response_T, bt%ph_response_T)
              !Enforce Kelvin-Onsager relation:
              !Fix "diffusion" part
@@ -481,7 +481,7 @@ contains
        bt%ph_response_T = bt%ph_field_term_T
 
        do it_ph = 1, num%maxiter
-          call iterate_bte_ph(crys%T, num%datadumpdir, .False., ph, el, bt%ph_rta_rates_ibz, &
+          call iterate_bte_ph(crys%T, .False., num, ph, el, bt%ph_rta_rates_ibz, &
                bt%ph_field_term_T, bt%ph_response_T)
 
           !Calculate phonon transport coefficients
@@ -533,7 +533,7 @@ contains
 
        do it_el = 1, num%maxiter
           !E field:
-          call iterate_bte_el(crys%T, num%datadumpdir, .False., el, ph, sym,&
+          call iterate_bte_el(crys%T, .False., num, el, ph, sym,&
                bt%el_rta_rates_ibz, bt%el_field_term_E, bt%el_response_E)
 
           !Calculate electron transport coefficients
@@ -544,7 +544,7 @@ contains
 
           !delT field:
 
-          call iterate_bte_el(crys%T, num%datadumpdir, .False., el, ph, sym,&
+          call iterate_bte_el(crys%T, .False., num, el, ph, sym,&
                bt%el_rta_rates_ibz, bt%el_field_term_T, bt%el_response_T, bt%ph_response_T)
           !Enforce Kelvin-Onsager relation
           do icart = 1, 3
@@ -745,12 +745,11 @@ contains
     end if
   end subroutine calculate_field_term
 
-  subroutine iterate_bte_ph(T, datadumpdir, drag, ph, el, rta_rates_ibz, &
+  subroutine iterate_bte_ph(T, drag, num, ph, el, rta_rates_ibz, &
        field_term, response_ph, response_el)
     !! Subroutine to iterate the phonon BTE one step.
     !! 
     !! T Temperature in K
-    !! datadumpdir Output directory
     !! drag Is drag included?
     !! ph Phonon object
     !! rta_rates_ibz Phonon RTA scattering rates
@@ -760,11 +759,11 @@ contains
 
     type(phonon), intent(in) :: ph
     type(electron), intent(in) :: el
+    type(numerics), intent(in) :: num
     logical, intent(in) :: drag
     real(dp), intent(in) :: T, rta_rates_ibz(:,:), field_term(:,:,:)
     real(dp), intent(in), optional :: response_el(:,:,:)
     real(dp), intent(inout) :: response_ph(:,:,:)
-    character(len = *), intent(in) :: datadumpdir
 
     !Local variables
     integer(k8) :: nstates_irred, chunk, istate1, numbranches, s1, &
@@ -776,13 +775,10 @@ contains
          start[:], end[:]
     real(dp) :: tau_ibz
     real(dp), allocatable :: Wp(:), Wm(:), Y(:), response_ph_reduce(:,:,:)[:]
-    character(len = 1024) :: filepath_Wm, filepath_Wp, filepath_Y, &
-         Wdir, Ydir, tag
+    character(len = 1024) :: filepath_Wm, filepath_Wp, filepath_Y, tag
 
     !Set output directory of transition probilities
     write(tag, "(E9.3)") T
-    Wdir = trim(adjustl(datadumpdir))//'W_T'//trim(adjustl(tag))
-    Ydir = trim(adjustl(datadumpdir))//'Y_T'//trim(adjustl(tag))
 
     if(drag .and. .not. present(response_el)) then
        call exit_with_message("For drag in phonon BTE, must provide electron response. Exiting.")
@@ -825,7 +821,7 @@ contains
 
        !Set W+ filename
        write(tag, '(I9)') istate1
-       filepath_Wp = trim(adjustl(Wdir))//'/Wp.istate'//trim(adjustl(tag))
+       filepath_Wp = trim(adjustl(num%Wdir))//'/Wp.istate'//trim(adjustl(tag))
 
        !Read W+ from file
        if(allocated(Wp)) deallocate(Wp)
@@ -835,7 +831,7 @@ contains
             istate2_plus, istate3_plus)
 
        !Set W- filename
-       filepath_Wm = trim(adjustl(Wdir))//'/Wm.istate'//trim(adjustl(tag))
+       filepath_Wm = trim(adjustl(num%Wdir))//'/Wm.istate'//trim(adjustl(tag))
 
        !Read W- from file
        if(allocated(Wm)) deallocate(Wm)
@@ -846,7 +842,7 @@ contains
 
        if(drag) then
           !Set Y filename
-          filepath_Y = trim(adjustl(Ydir))//'/Y.istate'//trim(adjustl(tag))
+          filepath_Y = trim(adjustl(num%Ydir))//'/Y.istate'//trim(adjustl(tag))
 
           !Read Y from file
           if(allocated(Y)) deallocate(Y)
@@ -918,12 +914,11 @@ contains
     end do
   end subroutine iterate_bte_ph
 
-  subroutine iterate_bte_el(T, datadumpdir, drag, el, ph, sym, rta_rates_ibz, field_term, &
+  subroutine iterate_bte_el(T, drag, num, el, ph, sym, rta_rates_ibz, field_term, &
        response_el, response_ph)
     !! Subroutine to iterate the electron BTE one step.
     !! 
     !! T Temperature in K
-    !! datadumpdir Output directory
     !! drag Is drag included?
     !! el Electron object
     !! ph Phonons object
@@ -935,12 +930,12 @@ contains
     
     type(electron), intent(in) :: el
     type(phonon), intent(in) :: ph
+    type(numerics), intent(in) :: num
     type(symmetry), intent(in) :: sym
     logical, intent(in) :: drag
     real(dp), intent(in) :: T, rta_rates_ibz(:,:), field_term(:,:,:)
     real(dp), intent(in), optional :: response_ph(:,:,:)
     real(dp), intent(inout) :: response_el(:,:,:)
-    character(len = *), intent(in) :: datadumpdir
 
     !Local variables
     integer(k8) :: nstates_irred, nprocs, chunk, istate, numbands, numbranches, &
@@ -949,11 +944,10 @@ contains
     integer(k8), allocatable :: istate_el(:), istate_ph(:), start[:], end[:]
     real(dp) :: tau_ibz, ForG(3)
     real(dp), allocatable :: Xplus(:), Xminus(:), response_el_reduce(:,:,:)[:]
-    character(1024) :: filepath_Xminus, filepath_Xplus, Xdir, tag
+    character(1024) :: filepath_Xminus, filepath_Xplus, tag
 
     !Set output directory of transition probilities
     write(tag, "(E9.3)") T
-    Xdir = trim(adjustl(datadumpdir))//'X_T'//trim(adjustl(tag))
 
     if(drag .and. .not. present(response_ph)) then
        call exit_with_message("For drag in electron BTE, must provide phonon response. Exiting.")
@@ -999,7 +993,7 @@ contains
 
        !Set X+ filename
        write(tag, '(I9)') istate
-       filepath_Xplus = trim(adjustl(Xdir))//'/Xplus.istate'//trim(adjustl(tag))
+       filepath_Xplus = trim(adjustl(num%Xdir))//'/Xplus.istate'//trim(adjustl(tag))
 
        !Read X+ from file
        call read_transition_probs_e(trim(adjustl(filepath_Xplus)), nprocs, Xplus, &
@@ -1007,7 +1001,7 @@ contains
 
        !Set X- filename
        write(tag, '(I9)') istate
-       filepath_Xminus = trim(adjustl(Xdir))//'/Xminus.istate'//trim(adjustl(tag))
+       filepath_Xminus = trim(adjustl(num%Xdir))//'/Xminus.istate'//trim(adjustl(tag))
 
        !Read X- from file
        call read_transition_probs_e(trim(adjustl(filepath_Xminus)), nprocs, Xminus)

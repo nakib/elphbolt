@@ -54,7 +54,7 @@ program elphbolt
   call crys%initialize
   
   !Set up numerics data
-  call num%initialize(crys%twod)
+  call num%initialize(crys%twod, crys%T)
   
   !Calculate crystal and BZ symmetries
   call sym%calculate_symmetries(crys, num%qmesh)
@@ -90,6 +90,11 @@ program elphbolt
   end if
     
   call subtitle("Calculating interactions...")
+
+  !TODO here need to loop over all the provided chemical potentials
+  
+  !Set chemical potential dependent directory
+  call num%create_chempot_dirs(el%chempot)
   
   if(num%onlyphbte .and. num%phe .or. num%drag) then
      if(.not. num%read_gq2) then

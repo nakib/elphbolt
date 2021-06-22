@@ -35,17 +35,23 @@ module numerics_module
      real(dp) :: fsthick
      !! Fermi surface thickness in (eV).
      character(len = 1024) :: cwd
-     !character, allocatable :: cwd(:)
      !! Current working directory.
      character(len = 1024) ::datadumpdir
-     !character, allocatable ::datadumpdir(:)
      !! Runtime data dump repository.
+     character(len = 1024) ::datadumpdir_T
+     !! Runtime temperature dependent data dump repository.
+     character(len = 1024) ::datadumpdir_T_chempot
+     !! Runtime temperature and chemical potential dependent data dump repository.
      character(len = 1024) :: g2dir
-     !character, allocatable :: g2dir(:)
      !! Directory for e-ph vertex.
      character(len = 1024) :: Vdir
-     !character, allocatable :: Vdir(:)
      !! Directory for ph-ph vertex.
+     character(len = 1024) :: Wdir
+     !! Directory for ph-ph transition rates.
+     character(len = 1024) :: Xdir
+     !! Directory for e-ph transition rates.
+     character(len = 1024) :: Ydir
+     !! Directory for ph-e transition rates.
      logical :: read_gq2
      !! Choose if earlier e-ph (IBZ q) vertices are to be used.
      logical :: read_gk2
@@ -74,22 +80,27 @@ module numerics_module
      !! Plot Wannierized quantities along high symmetry wave vectors?
    contains
 
-     procedure :: initialize=>read_input_and_setup
+     procedure :: initialize=>read_input_and_setup, create_chempot_dirs
      
   end type numerics
 
 contains
 
-  subroutine read_input_and_setup(n, twod)
+  subroutine read_input_and_setup(n, twod, T)
     !! Read input file for information related to the numerics.
+    !!
+    !! n Numerics object
+    !! twod Is the system 2d?
+    !! T Crystal temperature
 
     class(numerics), intent(out) :: n
     logical, intent(in) :: twod
+    real(dp), intent(in) :: T
 
     !Local variables
     integer(k8) :: mesh_ref, qmesh(3), maxiter
     real(dp) :: fsthick, conv_thres
-    character(len = 1024) :: datadumpdir
+    character(len = 1024) :: datadumpdir, tag
     logical :: read_gq2, read_gk2, read_V, tetrahedra, phe, phiso, onlyphbte, &
          onlyebte, elchimp, drag, plot_along_path
 
@@ -124,9 +135,6 @@ contains
     if(any(qmesh <= 0) .or. mesh_ref < 1 .or. fsthick < 0) then
        call exit_with_message('Bad input(s) in numerics.')
     end if
-    !if(.not. onlyphbte .or. .not. onlyebte .or. drag) then
-    !   call exit_with_message('Bad input(s) in numerics.')
-    !end if
     if(twod .and. tetrahedra) then
        call exit_with_message('The tetrahedra method only works for 3d. Exiting.')
     end if
@@ -176,6 +184,15 @@ contains
     if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(n%g2dir)))
     n%Vdir = trim(adjustl(n%datadumpdir))//'V'
     if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(n%Vdir)))
+
+    !Create T dependent subdirectory
+    write(tag, "(E9.3)") T
+    n%datadumpdir_T = trim(adjustl(n%datadumpdir))//'T'//trim(adjustl(tag))
+    if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(n%datadumpdir_T)))
+
+    !Create T-dependent ph-ph transition probability directory
+    n%Wdir = trim(adjustl(n%datadumpdir_T))//'/W'
+    if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(n%Wdir)))
     
     !Close input file
     close(1)
@@ -188,9 +205,10 @@ contains
     if(this_image() == 1) then
        write(*, "(A, (3I5,x))") "q-mesh = ", n%qmesh
        write(*, "(A, (3I5,x))") "k-mesh = ", n%mesh_ref*n%qmesh(1), n%mesh_ref*n%qmesh(2), 1 
-       write(*, "(A, 1E16.8, A)") "Fermi window thickness = ", n%fsthick, " eV"
+       write(*, "(A, 1E16.8, A)") "Fermi window thickness (each side of reference energy) = ", n%fsthick, " eV"
        write(*, "(A, A)") "Working directory = ", trim(n%cwd)
        write(*, "(A, A)") "Data dump directory = ", trim(n%datadumpdir)
+       write(*, "(A, A)") "T-dependent data dump directory = ", trim(n%datadumpdir_T)
        write(*, "(A, A)") "e-ph directory = ", trim(n%g2dir)
        write(*, "(A, A)") "ph-ph directory = ", trim(n%Vdir)
        write(*, "(A, L)") "Reuse e-ph matrix elements: ", n%read_gk2
@@ -207,5 +225,32 @@ contains
        write(*, "(A, I5)") "Maximum number of BTE iterations = ", n%maxiter
        write(*, "(A, 1E16.8)") "BTE convergence threshold = ", n%conv_thres
     end if
+    sync all
   end subroutine read_input_and_setup
+
+  subroutine create_chempot_dirs(n, chempot)
+    !! Subroutine to create data dump directory tagged by the chemical potential
+    !! and subdirectories within.
+    
+    class(numerics), intent(inout) :: n
+    real(dp), intent(in) :: chempot
+
+    !Local variables
+    character(len = 1024) :: datadumpdir, tag
+
+    !Create chemical potential dependent data dump directory
+    write(tag, "(E14.8)") chempot
+    n%datadumpdir_T_chempot = trim(adjustl(n%datadumpdir_T)) // '/mu' // trim(adjustl(tag))
+
+    !Create e-ph and ph-e transition probability data directories
+    n%Xdir = trim(adjustl(n%datadumpdir_T_chempot)) // '/X'
+    n%Ydir = trim(adjustl(n%datadumpdir_T_chempot)) // '/Y'
+    
+    if(this_image() == 1) then
+       call system('mkdir -p ' // trim(adjustl(n%datadumpdir_T_chempot)))
+       call system('mkdir -p ' // trim(adjustl(n%Xdir)))
+       call system('mkdir -p ' // trim(adjustl(n%Ydir)))
+    end if
+    sync all
+  end subroutine create_chempot_dirs
 end module numerics_module
