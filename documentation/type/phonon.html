@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+   
+   <meta name="description" content="A Fortran 2018 code for solving the coupled electron and phonon Boltzmann transport equations.">
+    
+    <meta name="author" content="Nakib Haider Protik" >
+    <link rel="icon" href="../favicon.png">
+
+    <title>phonon &ndash; elphbolt </title>
+
+    <link href="../css/bootstrap.min.css" rel="stylesheet">
+    <link href="../css/pygments.css" rel="stylesheet">
+    <link href="../css/font-awesome.min.css" rel="stylesheet">
+    <link href="../css/local.css" rel="stylesheet">
+    
+    
+
+    <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
+    <!--[if lt IE 9]>
+      <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+      <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+    <![endif]-->
+    
+    <script src="../js/jquery-2.1.3.min.js"></script>
+    <script src="../js/svg-pan-zoom.min.js"></script>
+
+  </head>
+
+  <body>
+
+    <!-- Fixed navbar -->
+    <nav class="navbar navbar-inverse navbar-fixed-top">
+      <div class="container">
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a class="navbar-brand" href="../index.html">elphbolt </a>
+        </div>
+        <div id="navbar" class="navbar-collapse collapse">
+          <ul class="nav navbar-nav">
+        
+            <li class="dropdown hidden-xs visible-sm visible-md hidden-lg">
+              <a href="#" class="dropdown-toggle"
+              data-toggle="dropdown" role="button"
+              aria-haspopup="true"
+     aria-expanded="false">Contents <span class="caret"></span></a>
+        <ul class="dropdown-menu">
+          
+              
+            <li><a href="../lists/files.html">Source Files</a></li>
+        
+        
+        
+            <li><a href="../lists/modules.html">Modules</a></li>
+        
+            
+                                
+            <li><a href="../lists/procedures.html">Procedures</a></li>
+        
+               
+            <li><a href="../lists/types.html">Derived Types</a></li>
+        
+        
+            <li><a href="../program/elphbolt.html">Program</a></li>
+      
+            </ul>
+            </li>
+
+
+<li class="visible-xs hidden-sm visible-lg"><a href="../lists/files.html">Source Files</a></li>
+
+
+
+<li class="visible-xs hidden-sm visible-lg"><a href="../lists/modules.html">Modules</a></li>
+
+
+
+<li class="visible-xs hidden-sm visible-lg"><a href="../lists/procedures.html">Procedures</a></li>
+
+                             
+<li class="visible-xs hidden-sm visible-lg"><a href="../lists/types.html">Derived Types</a></li>
+
+
+<li class="visible-xs hidden-sm visible-lg"><a href="../program/elphbolt.html">Program</a></li>
+
+          </ul>
+        
+        </div><!--/.nav-collapse -->
+      </div>
+    </nav>
+
+    <div class="container">
+    
+  
+  <div class="row">
+    <h1>phonon
+    <small>Derived Type</small>
+    
+    </h1>
+    
+<div class="row">
+  <div class="col-lg-12">
+<div class="well well-sm">
+  <ul class="list-inline" style="margin-bottom:0px;display:inline">
+     
+     
+     
+     
+    
+    
+     <li><i class="fa fa-list-ol"></i>
+       <a data-toggle="tooltip"
+    data-placement="bottom" data-html="true"
+    title="<p>18.7% of total for derived types.</p>Including implementation: 56 statements,  4.2% of total for derived types.">36 statements</a>
+     </li> 
+     
+     
+     
+    <li><i class="fa fa-code"></i><a href="../src/phonon.f90"> Source File</a></li>
+     
+     
+  </ul>
+  <ol class="breadcrumb in-well text-right">
+  
+    
+     <li><a href='../sourcefile/phonon.f90.html'>phonon.f90</a></li>
+    
+     <li><a href='../module/phonon_module.html'>phonon_module</a></li>
+    
+  
+     <li class="active">phonon</li>
+  </ol>
+</div>
+</div>
+</div>
+<script>
+  $(function () {
+  $('[data-toggle="tooltip"]').tooltip()
+  })
+</script>
+
+  </div>
+  
+  <div class="row">
+    <div class="col-md-3 hidden-xs hidden-sm visible-md visible-lg">
+    
+<div id="sidebar">
+  
+<h3>Contents</h3>
+ 
+
+
+
+<div class="panel panel-primary">
+  <div class="panel-heading text-left"><h3 class="panel-title"><a data-toggle="collapse" href="#vars-0">Variables</a></h3></div>
+  <div id="vars-0" class="panel-collapse collapse">
+    <div class="list-group">
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-prefix">prefix</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-numbranches">numbranches</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-nq">nq</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-nq_irred">nq_irred</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-qmesh">qmesh</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-wavevecs">wavevecs</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-wavevecs_irred">wavevecs_irred</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-indexlist_irred">indexlist_irred</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-nequiv">nequiv</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-ibz2fbz_map">ibz2fbz_map</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-equiv_map">equiv_map</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-symmetrizers">symmetrizers</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-tetra">tetra</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-tetracount">tetracount</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-tetramap">tetramap</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-tetra_evals">tetra_evals</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-triang">triang</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-triangcount">triangcount</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-triangmap">triangmap</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-triang_evals">triang_evals</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-ens">ens</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-vels">vels</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-evecs">evecs</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-scell">scell</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-ifc2">ifc2</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-ifc3">ifc3</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-numtriplets">numtriplets</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-r_j">R_j</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-r_k">R_k</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-index_i">Index_i</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-index_j">Index_j</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-index_k">Index_k</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-dos">dos</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-rws">rws</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-cell_r">cell_r</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-cell_g">cell_g</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-mm">mm</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-rr">rr</a>
+      
+    </div>
+  </div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="panel panel-primary">
+  <div class="panel-heading text-left"><h3 class="panel-title"><a data-toggle="collapse" href="#boundprocs-0">Type-Bound Procedures</a></h3></div>
+  <div id="boundprocs-0" class="panel-collapse collapse">
+    <div class="list-group">
+      
+      <a class="list-group-item" href="../type/phonon.html#boundprocedure-deallocate_phonon_quantities">deallocate_phonon_quantities</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#boundprocedure-initialize">initialize</a>
+      
+    </div>
+  </div>
+</div>
+
+
+
+
+
+</div>
+
+    </div>
+    
+    <div class="col-md-9" id='text'>
+      <h2>type, public :: phonon</h2>
+    <p>Data and procedures related to phonons.</p>
+    
+    
+    
+    <br>
+
+    <section class="visible-xs visible-sm hidden-md">
+      
+<h3>Contents</h3>
+ 
+
+
+
+<div class="panel panel-primary">
+  <div class="panel-heading text-left"><h3 class="panel-title"><a data-toggle="collapse" href="#vars-1">Variables</a></h3></div>
+  <div id="vars-1" class="panel-collapse collapse">
+    <div class="list-group">
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-prefix">prefix</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-numbranches">numbranches</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-nq">nq</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-nq_irred">nq_irred</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-qmesh">qmesh</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-wavevecs">wavevecs</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-wavevecs_irred">wavevecs_irred</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-indexlist_irred">indexlist_irred</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-nequiv">nequiv</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-ibz2fbz_map">ibz2fbz_map</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-equiv_map">equiv_map</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-symmetrizers">symmetrizers</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-tetra">tetra</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-tetracount">tetracount</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-tetramap">tetramap</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-tetra_evals">tetra_evals</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-triang">triang</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-triangcount">triangcount</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-triangmap">triangmap</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-triang_evals">triang_evals</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-ens">ens</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-vels">vels</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-evecs">evecs</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-scell">scell</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-ifc2">ifc2</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-ifc3">ifc3</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-numtriplets">numtriplets</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-r_j">R_j</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-r_k">R_k</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-index_i">Index_i</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-index_j">Index_j</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-index_k">Index_k</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-dos">dos</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-rws">rws</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-cell_r">cell_r</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-cell_g">cell_g</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-mm">mm</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#variable-rr">rr</a>
+      
+    </div>
+  </div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="panel panel-primary">
+  <div class="panel-heading text-left"><h3 class="panel-title"><a data-toggle="collapse" href="#boundprocs-1">Type-Bound Procedures</a></h3></div>
+  <div id="boundprocs-1" class="panel-collapse collapse">
+    <div class="list-group">
+      
+      <a class="list-group-item" href="../type/phonon.html#boundprocedure-deallocate_phonon_quantities">deallocate_phonon_quantities</a>
+      
+      <a class="list-group-item" href="../type/phonon.html#boundprocedure-initialize">initialize</a>
+      
+    </div>
+  </div>
+</div>
+
+
+
+
+
+    </section>
+    <br class="visible-xs visible-sm hidden-md">
+
+    
+    <section>
+    <h2>Components</h2>
+    
+<table class="table table-striped varlist">
+<thead><tr><th>Type</th><th>Visibility</th>
+
+<th>Attributes</th><th></th><th>Name</th><th></th><th>Initial</th><th></th></thead>
+
+
+
+<tbody>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-prefix"></span>character(len=2),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>prefix</strong></td><td> =</td><td>'ph'</td><td><p>Prefix idenitfying particle type.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-numbranches"></span>integer(kind=k8),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>numbranches</strong></td><td></td><td></td><td><p>Total number of phonon branches.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-nq"></span>integer(kind=k8),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>nq</strong></td><td></td><td></td><td><p>Number of phonon wave vectors in the full Brillouin zone (FBZ).</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-nq_irred"></span>integer(kind=k8),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>nq_irred</strong></td><td></td><td></td><td><p>Number of phonon wave vectors in the irreducible wedge of Brillouin zone (IBZ).</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-qmesh"></span>integer(kind=k8),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>qmesh</strong>(3)</td><td></td><td></td><td><p>Phonon wave vector mesh.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-wavevecs"></span>real(kind=dp),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>wavevecs</strong>(:,:)</td><td></td><td></td><td><p>List of all phonon wave vectors (crystal coordinates).</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-wavevecs_irred"></span>real(kind=dp),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>wavevecs_irred</strong>(:,:)</td><td></td><td></td><td><p>List of irreducible phonon wave vectors (crystal coordinates).</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-indexlist_irred"></span>integer(kind=k8),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>indexlist_irred</strong>(:)</td><td></td><td></td><td><p>List of muxed indices of the IBZ wedge.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-nequiv"></span>integer(kind=k8),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>nequiv</strong>(:)</td><td></td><td></td><td><p>List of the number of equivalent points for each IBZ point.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-ibz2fbz_map"></span>integer(kind=k8),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>ibz2fbz_map</strong>(:,:,:)</td><td></td><td></td><td><p>Map from an IBZ phonon point to its images.
+ The third axis contains the pair (symmetry index, image).</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-equiv_map"></span>integer(kind=k8),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>equiv_map</strong>(:,:)</td><td></td><td></td><td><p>Map of equivalent points under rotations.
+ Axis 1 runs over rotations.
+ Axis 2 runs over wave vectors (full Brillouin zone).</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-symmetrizers"></span>real(kind=dp),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>symmetrizers</strong>(:,:,:)</td><td></td><td></td><td><p>Symmetrizers of wave vector dependent vectors.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-tetra"></span>integer(kind=k8),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>tetra</strong>(:,:)</td><td></td><td></td><td><p>List of all the wave vector mesh tetrahedra vertices.
+ First axis lists tetraheda and the second axis lists the vertices.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-tetracount"></span>integer(kind=k8),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>tetracount</strong>(:)</td><td></td><td></td><td><p>The number of tetrahedra in which a wave vector belongs.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-tetramap"></span>integer(kind=k8),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>tetramap</strong>(:,:,:)</td><td></td><td></td><td><p>Mapping from a wave vector to the (tetrahedron, vertex) where it belongs.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-tetra_evals"></span>real(kind=dp),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>tetra_evals</strong>(:,:,:)</td><td></td><td></td><td><p>Tetrahedra vertices filled with eigenvalues.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-triang"></span>integer(kind=k8),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>triang</strong>(:,:)</td><td></td><td></td><td><p>List of all the wave vector mesh triangles vertices.
+ First axis lists triangles and the second axis lists the vertices.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-triangcount"></span>integer(kind=k8),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>triangcount</strong>(:)</td><td></td><td></td><td><p>The number of triangles in which a wave vector belongs.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-triangmap"></span>integer(kind=k8),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>triangmap</strong>(:,:,:)</td><td></td><td></td><td><p>Mapping from a wave vector to the (triangle, vertex) where it belongs.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-triang_evals"></span>real(kind=dp),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>triang_evals</strong>(:,:,:)</td><td></td><td></td><td><p>Triangles vertices filled with eigenvalues.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-ens"></span>real(kind=dp),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>ens</strong>(:,:)</td><td></td><td></td><td><p>List of phonon energies on FBZ.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-vels"></span>real(kind=dp),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>vels</strong>(:,:,:)</td><td></td><td></td><td><p>List of phonon velocities on IBZ.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-evecs"></span>complex(kind=dp),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>evecs</strong>(:,:,:)</td><td></td><td></td><td><p>List of all phonon eigenvectors on IBZ.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-scell"></span>integer(kind=k8),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>scell</strong>(3)</td><td></td><td></td><td><p>q-mesh used in DFPT or, equivalently, supercell used in finite displencement
+ method for calculating the 2nd order force constants.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-ifc2"></span>real(kind=dp),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>ifc2</strong>(:,:,:,:,:,:,:)</td><td></td><td></td><td><p>Second order force constants (ifc2) tensor.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-ifc3"></span>real(kind=dp),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>ifc3</strong>(:,:,:,:)</td><td></td><td></td><td><p>Third order force constants (ifc3) tensor.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-numtriplets"></span>integer(kind=k8),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>numtriplets</strong></td><td></td><td></td><td><p>Number of triplets in the ifc3 file.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-r_j"></span>real(kind=dp),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>R_j</strong>(:,:)</td><td></td><td></td><td><p>Position of the 2nd and 3rd atoms in supercell for an ifc3 triplet.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-r_k"></span>real(kind=dp),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>R_k</strong>(:,:)</td><td></td><td></td><td><p>Position of the 2nd and 3rd atoms in supercell for an ifc3 triplet.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-index_i"></span>integer(kind=k8),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>Index_i</strong>(:)</td><td></td><td></td><td><p>Label of primitive cell atoms in the ifc3 triplet.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-index_j"></span>integer(kind=k8),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>Index_j</strong>(:)</td><td></td><td></td><td><p>Label of primitive cell atoms in the ifc3 triplet.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-index_k"></span>integer(kind=k8),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>Index_k</strong>(:)</td><td></td><td></td><td><p>Label of primitive cell atoms in the ifc3 triplet.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-dos"></span>real(kind=dp),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>dos</strong>(:,:)</td><td></td><td></td><td><p>Branch resolved density of states.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-rws"></span>real(kind=dp),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>rws</strong>(124,0:3)</td><td></td><td></td><td></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-cell_r"></span>real(kind=dp),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>cell_r</strong>(1:3,0:3)</td><td></td><td></td><td></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-cell_g"></span>real(kind=dp),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>cell_g</strong>(1:3,0:3)</td><td></td><td></td><td></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-mm"></span>real(kind=dp),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>mm</strong>(:,:)</td><td></td><td></td><td></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-rr"></span>real(kind=dp),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>rr</strong>(:,:,:)</td><td></td><td></td><td></td>
+  
+</tr>
+
+</tbody>
+</table>
+
+    </section>
+    <br>
+    
+    
+    
+    
+    
+    
+     
+    <section>
+    <h2>Type-Bound Procedures</h2>
+    
+     
+<div class="panel panel-default">
+  <div class="panel-heading codesum"><span class="anchor" id="boundprocedure-deallocate_phonon_quantities"></span><h3>procedure, public :: <strong>deallocate_phonon_quantities</strong>  
+    
+  </h3></div>
+  
+  <ul class="list-group">
+    
+      <li class="list-group-item">
+      
+        
+          
+    
+    <h3>
+private subroutine deallocate_phonon_quantities(ph)
+    
+    
+   
+</h3>
+    
+
+
+
+<p>Deallocate the electron eigenvectors</p>
+    
+    <h4>Arguments</h4>
+    
+      
+      
+<table class="table table-striped varlist">
+<thead><tr><th>Type</th>
+<th>Intent</th><th>Optional</th>
+<th>Attributes</th><th></th><th>Name</th><th></th></thead>
+
+
+
+<tbody>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" ></span>class(<a href='../type/phonon.html'>phonon</a>),</td>
+  <td>intent(inout)</td>
+  <td></td>
+  
+  <td></td><td>::</td>
+  <td><strong>ph</strong></td><td></td>
+  
+</tr>
+
+</tbody>
+</table>
+
+      
+    
+    
+
+        
+      
+      </li>
+    
+  </ul>
+</div>
+
+    
+     
+<div class="panel panel-default">
+  <div class="panel-heading codesum"><span class="anchor" id="boundprocedure-initialize"></span><h3>procedure, public :: <strong>initialize</strong>  
+    
+  </h3></div>
+  
+  <ul class="list-group">
+    
+      <li class="list-group-item">
+      
+        
+          
+    
+    <h3>
+private subroutine initialize(ph, wann, crys, sym, num)
+    
+    
+   
+</h3>
+    
+
+
+
+<p>Initialize the phonon data type, calculate ground state phonon properties,
+ and read 3rd order force constants data. </p>
+    
+    <h4>Arguments</h4>
+    
+      
+      
+<table class="table table-striped varlist">
+<thead><tr><th>Type</th>
+<th>Intent</th><th>Optional</th>
+<th>Attributes</th><th></th><th>Name</th><th></th></thead>
+
+
+
+<tbody>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" ></span>class(<a href='../type/phonon.html'>phonon</a>),</td>
+  <td>intent(out)</td>
+  <td></td>
+  
+  <td></td><td>::</td>
+  <td><strong>ph</strong></td><td></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" ></span>type(<a href='../type/epw_wannier.html'>epw_wannier</a>),</td>
+  <td>intent(in)</td>
+  <td></td>
+  
+  <td></td><td>::</td>
+  <td><strong>wann</strong></td><td></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" ></span>type(<a href='../type/crystal.html'>crystal</a>),</td>
+  <td>intent(in)</td>
+  <td></td>
+  
+  <td></td><td>::</td>
+  <td><strong>crys</strong></td><td></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" ></span>type(<a href='../type/symmetry.html'>symmetry</a>),</td>
+  <td>intent(in)</td>
+  <td></td>
+  
+  <td></td><td>::</td>
+  <td><strong>sym</strong></td><td></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" ></span>type(<a href='../type/numerics.html'>numerics</a>),</td>
+  <td>intent(in)</td>
+  <td></td>
+  
+  <td></td><td>::</td>
+  <td><strong>num</strong></td><td></td>
+  
+</tr>
+
+</tbody>
+</table>
+
+      
+    
+    
+
+        
+      
+      </li>
+    
+  </ul>
+</div>
+
+    
+    </section>
+    
+    
+    
+    
+    </div>
+  </div>
+
+
+    <hr>    
+    </div> <!-- /container -->
+    <footer>
+      <div class="container">
+      <div class="row">
+        <div class="col-xs-6 col-md-4"><p>&copy; 2021 
+                                          </p></div>
+        <div class="col-xs-6 col-md-4 col-md-push-4">
+          <p class="text-right">
+            Documentation generated by 
+            <a href="https://github.com/cmacmackin/ford">FORD</a>
+            
+          </p>
+        </div>
+        <div class="col-xs-12 col-md-4 col-md-pull-4"><p class="text-center"> elphbolt was developed by Nakib Haider Protik</p></div>
+      </div>
+      <br>
+      </div> <!-- /container -->    
+    </footer>
+
+    <!-- Bootstrap core JavaScript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+<!--
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+-->
+    <script src="../js/bootstrap.min.js"></script>
+    <!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
+    <script src="../js/ie10-viewport-bug-workaround.js"></script>
+
+    <!-- MathJax JavaScript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script type="text/x-mathjax-config">
+      MathJax.Hub.Config({
+        TeX: { extensions: ['AMSmath.js','AMSsymbols.js','noErrors.js','noUndefined.js'], equationNumbers: { autoNumber: 'AMS' } },
+        jax: ['input/TeX','input/MathML','output/HTML-CSS'],
+        extensions: ['tex2jax.js','mml2jax.js','MathMenu.js','MathZoom.js']
+      });
+    </script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    
+    
+  </body>
+</html>

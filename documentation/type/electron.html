@@ -1,0 +1,1491 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+   
+   <meta name="description" content="A Fortran 2018 code for solving the coupled electron and phonon Boltzmann transport equations.">
+    
+    <meta name="author" content="Nakib Haider Protik" >
+    <link rel="icon" href="../favicon.png">
+
+    <title>electron &ndash; elphbolt </title>
+
+    <link href="../css/bootstrap.min.css" rel="stylesheet">
+    <link href="../css/pygments.css" rel="stylesheet">
+    <link href="../css/font-awesome.min.css" rel="stylesheet">
+    <link href="../css/local.css" rel="stylesheet">
+    
+    
+
+    <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
+    <!--[if lt IE 9]>
+      <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
+      <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
+    <![endif]-->
+    
+    <script src="../js/jquery-2.1.3.min.js"></script>
+    <script src="../js/svg-pan-zoom.min.js"></script>
+
+  </head>
+
+  <body>
+
+    <!-- Fixed navbar -->
+    <nav class="navbar navbar-inverse navbar-fixed-top">
+      <div class="container">
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+            <span class="sr-only">Toggle navigation</span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+            <span class="icon-bar"></span>
+          </button>
+          <a class="navbar-brand" href="../index.html">elphbolt </a>
+        </div>
+        <div id="navbar" class="navbar-collapse collapse">
+          <ul class="nav navbar-nav">
+        
+            <li class="dropdown hidden-xs visible-sm visible-md hidden-lg">
+              <a href="#" class="dropdown-toggle"
+              data-toggle="dropdown" role="button"
+              aria-haspopup="true"
+     aria-expanded="false">Contents <span class="caret"></span></a>
+        <ul class="dropdown-menu">
+          
+              
+            <li><a href="../lists/files.html">Source Files</a></li>
+        
+        
+        
+            <li><a href="../lists/modules.html">Modules</a></li>
+        
+            
+                                
+            <li><a href="../lists/procedures.html">Procedures</a></li>
+        
+               
+            <li><a href="../lists/types.html">Derived Types</a></li>
+        
+        
+            <li><a href="../program/elphbolt.html">Program</a></li>
+      
+            </ul>
+            </li>
+
+
+<li class="visible-xs hidden-sm visible-lg"><a href="../lists/files.html">Source Files</a></li>
+
+
+
+<li class="visible-xs hidden-sm visible-lg"><a href="../lists/modules.html">Modules</a></li>
+
+
+
+<li class="visible-xs hidden-sm visible-lg"><a href="../lists/procedures.html">Procedures</a></li>
+
+                             
+<li class="visible-xs hidden-sm visible-lg"><a href="../lists/types.html">Derived Types</a></li>
+
+
+<li class="visible-xs hidden-sm visible-lg"><a href="../program/elphbolt.html">Program</a></li>
+
+          </ul>
+        
+        </div><!--/.nav-collapse -->
+      </div>
+    </nav>
+
+    <div class="container">
+    
+  
+  <div class="row">
+    <h1>electron
+    <small>Derived Type</small>
+    
+    </h1>
+    
+<div class="row">
+  <div class="col-lg-12">
+<div class="well well-sm">
+  <ul class="list-inline" style="margin-bottom:0px;display:inline">
+     
+     
+     
+     
+    
+    
+     <li><i class="fa fa-list-ol"></i>
+       <a data-toggle="tooltip"
+    data-placement="bottom" data-html="true"
+    title="<p>29.0% of total for derived types.</p>Including implementation: 173 statements, 12.8% of total for derived types.">56 statements</a>
+     </li> 
+     
+     
+     
+    <li><i class="fa fa-code"></i><a href="../src/electron.f90"> Source File</a></li>
+     
+     
+  </ul>
+  <ol class="breadcrumb in-well text-right">
+  
+    
+     <li><a href='../sourcefile/electron.f90.html'>electron.f90</a></li>
+    
+     <li><a href='../module/electron_module.html'>electron_module</a></li>
+    
+  
+     <li class="active">electron</li>
+  </ol>
+</div>
+</div>
+</div>
+<script>
+  $(function () {
+  $('[data-toggle="tooltip"]').tooltip()
+  })
+</script>
+
+  </div>
+  
+  <div class="row">
+    <div class="col-md-3 hidden-xs hidden-sm visible-md visible-lg">
+    
+<div id="sidebar">
+  
+<h3>Contents</h3>
+ 
+
+
+
+<div class="panel panel-primary">
+  <div class="panel-heading text-left"><h3 class="panel-title"><a data-toggle="collapse" href="#vars-0">Variables</a></h3></div>
+  <div id="vars-0" class="panel-collapse collapse">
+    <div class="list-group">
+      
+      <a class="list-group-item" href="../type/electron.html#variable-prefix~2">prefix</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-spindeg">spindeg</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-numbands">numbands</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-numtransbands">numtransbands</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-indlowband">indlowband</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-indhighband">indhighband</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-indlowconduction">indlowconduction</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-indhighvalence">indhighvalence</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-bandlist">bandlist</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-mesh_ref~2">mesh_ref</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-mesh_ref_array">mesh_ref_array</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-kmesh">kmesh</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-nk">nk</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-nk_irred">nk_irred</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-nstates_inwindow">nstates_inwindow</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-nstates_irred_inwindow">nstates_irred_inwindow</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-ibz_inwindow_states">IBZ_inwindow_states</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-enref">enref</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-fsthick~2">fsthick</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-chempot">chempot</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-conc">conc</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-conc_el">conc_el</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-conc_hole">conc_hole</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-chimp_conc_n">chimp_conc_n</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-chimp_conc_p">chimp_conc_p</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-zn">Zn</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-zp">Zp</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-wavevecs~2">wavevecs</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-wavevecs_irred~2">wavevecs_irred</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-indexlist">indexlist</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-indexlist_irred~2">indexlist_irred</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-nequiv~2">nequiv</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-ibz2fbz_map~2">ibz2fbz_map</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-fbz2ibz_map">fbz2ibz_map</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-equiv_map~2">equiv_map</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-symmetrizers~2">symmetrizers</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-tetra~2">tetra</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-tetracount~2">tetracount</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-tetramap~2">tetramap</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-tetra_evals~2">tetra_evals</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-triang~2">triang</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-triangcount~2">triangcount</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-triangmap~2">triangmap</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-triang_evals~2">triang_evals</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-ens~2">ens</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-ens_irred">ens_irred</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-vels~2">vels</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-vels_irred">vels_irred</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-evecs~2">evecs</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-evecs_irred">evecs_irred</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-metallic">metallic</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-dos~2">dos</a>
+      
+    </div>
+  </div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="panel panel-primary">
+  <div class="panel-heading text-left"><h3 class="panel-title"><a data-toggle="collapse" href="#boundprocs-0">Type-Bound Procedures</a></h3></div>
+  <div id="boundprocs-0" class="panel-collapse collapse">
+    <div class="list-group">
+      
+      <a class="list-group-item" href="../type/electron.html#boundprocedure-deallocate_eigenvecs">deallocate_eigenvecs</a>
+      
+      <a class="list-group-item" href="../type/electron.html#boundprocedure-initialize~4">initialize</a>
+      
+    </div>
+  </div>
+</div>
+
+
+
+
+
+</div>
+
+    </div>
+    
+    <div class="col-md-9" id='text'>
+      <h2>type, public :: electron</h2>
+    <p>Data and procedures related to the electronic properties.</p>
+    
+    
+    
+    <br>
+
+    <section class="visible-xs visible-sm hidden-md">
+      
+<h3>Contents</h3>
+ 
+
+
+
+<div class="panel panel-primary">
+  <div class="panel-heading text-left"><h3 class="panel-title"><a data-toggle="collapse" href="#vars-1">Variables</a></h3></div>
+  <div id="vars-1" class="panel-collapse collapse">
+    <div class="list-group">
+      
+      <a class="list-group-item" href="../type/electron.html#variable-prefix~2">prefix</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-spindeg">spindeg</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-numbands">numbands</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-numtransbands">numtransbands</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-indlowband">indlowband</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-indhighband">indhighband</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-indlowconduction">indlowconduction</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-indhighvalence">indhighvalence</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-bandlist">bandlist</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-mesh_ref~2">mesh_ref</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-mesh_ref_array">mesh_ref_array</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-kmesh">kmesh</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-nk">nk</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-nk_irred">nk_irred</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-nstates_inwindow">nstates_inwindow</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-nstates_irred_inwindow">nstates_irred_inwindow</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-ibz_inwindow_states">IBZ_inwindow_states</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-enref">enref</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-fsthick~2">fsthick</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-chempot">chempot</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-conc">conc</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-conc_el">conc_el</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-conc_hole">conc_hole</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-chimp_conc_n">chimp_conc_n</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-chimp_conc_p">chimp_conc_p</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-zn">Zn</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-zp">Zp</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-wavevecs~2">wavevecs</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-wavevecs_irred~2">wavevecs_irred</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-indexlist">indexlist</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-indexlist_irred~2">indexlist_irred</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-nequiv~2">nequiv</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-ibz2fbz_map~2">ibz2fbz_map</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-fbz2ibz_map">fbz2ibz_map</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-equiv_map~2">equiv_map</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-symmetrizers~2">symmetrizers</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-tetra~2">tetra</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-tetracount~2">tetracount</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-tetramap~2">tetramap</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-tetra_evals~2">tetra_evals</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-triang~2">triang</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-triangcount~2">triangcount</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-triangmap~2">triangmap</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-triang_evals~2">triang_evals</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-ens~2">ens</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-ens_irred">ens_irred</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-vels~2">vels</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-vels_irred">vels_irred</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-evecs~2">evecs</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-evecs_irred">evecs_irred</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-metallic">metallic</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-dos~2">dos</a>
+      
+    </div>
+  </div>
+</div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="panel panel-primary">
+  <div class="panel-heading text-left"><h3 class="panel-title"><a data-toggle="collapse" href="#boundprocs-1">Type-Bound Procedures</a></h3></div>
+  <div id="boundprocs-1" class="panel-collapse collapse">
+    <div class="list-group">
+      
+      <a class="list-group-item" href="../type/electron.html#boundprocedure-deallocate_eigenvecs">deallocate_eigenvecs</a>
+      
+      <a class="list-group-item" href="../type/electron.html#boundprocedure-initialize~4">initialize</a>
+      
+    </div>
+  </div>
+</div>
+
+
+
+
+
+    </section>
+    <br class="visible-xs visible-sm hidden-md">
+
+    
+    <section>
+    <h2>Components</h2>
+    
+<table class="table table-striped varlist">
+<thead><tr><th>Type</th><th>Visibility</th>
+
+<th>Attributes</th><th></th><th>Name</th><th></th><th>Initial</th><th></th></thead>
+
+
+
+<tbody>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-prefix~2"></span>character(len=2),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>prefix</strong></td><td> =</td><td>'el'</td><td><p>Prefix idenitfying particle type.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-spindeg"></span>integer(kind=k8),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>spindeg</strong></td><td></td><td></td><td><p>Spin degeneracy.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-numbands"></span>integer(kind=k8),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>numbands</strong></td><td></td><td></td><td><p>Total number of electronic bands (from DFT/Wannier).</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-numtransbands"></span>integer(kind=k8),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>numtransbands</strong></td><td></td><td></td><td><p>Total number of transport active bands.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-indlowband"></span>integer(kind=k8),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>indlowband</strong></td><td></td><td></td><td><p>Lowest transport band index.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-indhighband"></span>integer(kind=k8),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>indhighband</strong></td><td></td><td></td><td><p>Highest transport band index.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-indlowconduction"></span>integer(kind=k8),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>indlowconduction</strong></td><td></td><td></td><td><p>Lowest conduction band index.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-indhighvalence"></span>integer(kind=k8),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>indhighvalence</strong></td><td></td><td></td><td><p>Highest valence band index.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-bandlist"></span>integer(kind=k8),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>bandlist</strong>(:)</td><td></td><td></td><td><p>List of transport active band indices.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-mesh_ref~2"></span>integer(kind=k8),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>mesh_ref</strong></td><td></td><td></td><td><p>Electron mesh refinement factor compared to the phonon mesh.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-mesh_ref_array"></span>integer(kind=k8),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>mesh_ref_array</strong>(3)</td><td></td><td></td><td><p>The same as above, but in array form. This is useful for 3d vs 2d cases.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-kmesh"></span>integer(kind=k8),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>kmesh</strong>(3)</td><td></td><td></td><td><p>Electron wave vector mesh.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-nk"></span>integer(kind=k8),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>nk</strong></td><td></td><td></td><td><p>Number of fine electron wave vectors in the full Brillouin zone (FBZ).</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-nk_irred"></span>integer(kind=k8),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>nk_irred</strong></td><td></td><td></td><td><p>Number of fine electron wave vectors in the irreducible wedge of Brillouin zone (IBZ).</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-nstates_inwindow"></span>integer(kind=k8),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>nstates_inwindow</strong></td><td></td><td></td><td><p>Number of electron wave vectors within transport window.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-nstates_irred_inwindow"></span>integer(kind=k8),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>nstates_irred_inwindow</strong></td><td></td><td></td><td><p>Number of IBZ wedge electron wave vectors within transport window.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-ibz_inwindow_states"></span>integer(kind=k8),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>IBZ_inwindow_states</strong>(:,:)</td><td></td><td></td><td><p>List of irreducible wedge states within transport window.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-enref"></span>real(kind=dp),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>enref</strong></td><td></td><td></td><td><p>Electron reference energy (eV).
+ This is the center of the transport energy window.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-fsthick~2"></span>real(kind=dp),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>fsthick</strong></td><td></td><td></td><td><p>Fermi surface thickness in (eV).</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-chempot"></span>real(kind=dp),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>chempot</strong></td><td></td><td></td><td><p>Chemical potential.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-conc"></span>real(kind=dp),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>conc</strong>(:)</td><td></td><td></td><td><p>Band resolved carrier concentration.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-conc_el"></span>real(kind=dp),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>conc_el</strong></td><td></td><td></td><td><p>Total electron carrier concentration.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-conc_hole"></span>real(kind=dp),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>conc_hole</strong></td><td></td><td></td><td><p>Total hole carrier concentration.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-chimp_conc_n"></span>real(kind=dp),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>chimp_conc_n</strong></td><td></td><td></td><td><p>Concentration of donor impurities.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-chimp_conc_p"></span>real(kind=dp),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>chimp_conc_p</strong></td><td></td><td></td><td><p>Concentration of acceptor impurities.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-zn"></span>real(kind=dp),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>Zn</strong></td><td></td><td></td><td><p>Ionization number of donor dopant.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-zp"></span>real(kind=dp),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>Zp</strong></td><td></td><td></td><td><p>Ionization number of acceptor dopant.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-wavevecs~2"></span>real(kind=dp),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>wavevecs</strong>(:,:)</td><td></td><td></td><td><p>List of all electron wave vectors (crystal coordinates).</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-wavevecs_irred~2"></span>real(kind=dp),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>wavevecs_irred</strong>(:,:)</td><td></td><td></td><td><p>List of irreducible electron wave vectors (crystal coordinates).</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-indexlist"></span>integer(kind=k8),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>indexlist</strong>(:)</td><td></td><td></td><td><p>List of muxed indices of the FBZ wave vectors.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-indexlist_irred~2"></span>integer(kind=k8),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>indexlist_irred</strong>(:)</td><td></td><td></td><td><p>List of muxed indices of the IBZ wedge.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-nequiv~2"></span>integer(kind=k8),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>nequiv</strong>(:)</td><td></td><td></td><td><p>List of the number of equivalent points for each IBZ point.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-ibz2fbz_map~2"></span>integer(kind=k8),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>ibz2fbz_map</strong>(:,:,:)</td><td></td><td></td><td><p>Map from an IBZ electron point to its images.
+ The third axis contains the pair (symmetry index, image).</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-fbz2ibz_map"></span>integer(kind=k8),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>fbz2ibz_map</strong>(:)</td><td></td><td></td><td><p>Map from an FBZ electron point to its IBZ wedge image.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-equiv_map~2"></span>integer(kind=k8),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>equiv_map</strong>(:,:)</td><td></td><td></td><td><p>Map of equivalent points under rotations.
+ Axis 1 runs over rotations.
+ Axis 2 runs over wave vectors.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-symmetrizers~2"></span>real(kind=dp),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>symmetrizers</strong>(:,:,:)</td><td></td><td></td><td><p>Symmetrizers of wave vector dependent vectors.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-tetra~2"></span>integer(kind=k8),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>tetra</strong>(:,:)</td><td></td><td></td><td><p>List of all the wave vector mesh tetrahedra vertices.
+ First axis list tetraheda and the second axis list the vertices.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-tetracount~2"></span>integer(kind=k8),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>tetracount</strong>(:)</td><td></td><td></td><td><p>The number of tetrahedra in which a wave vector belongs.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-tetramap~2"></span>integer(kind=k8),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>tetramap</strong>(:,:,:)</td><td></td><td></td><td><p>Mapping from a wave vector to the (tetrahedron, vertex) where it belongs.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-tetra_evals~2"></span>real(kind=dp),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>tetra_evals</strong>(:,:,:)</td><td></td><td></td><td><p>Tetrahedra vertices filled with eigenvalues.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-triang~2"></span>integer(kind=k8),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>triang</strong>(:,:)</td><td></td><td></td><td><p>List of all the wave vector mesh triangles vertices.
+ First axis lists triangles and the second axis lists the vertices.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-triangcount~2"></span>integer(kind=k8),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>triangcount</strong>(:)</td><td></td><td></td><td><p>The number of triangles in which a wave vector belongs.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-triangmap~2"></span>integer(kind=k8),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>triangmap</strong>(:,:,:)</td><td></td><td></td><td><p>Mapping from a wave vector to the (triangle, vertex) where it belongs.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-triang_evals~2"></span>real(kind=dp),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>triang_evals</strong>(:,:,:)</td><td></td><td></td><td><p>Triangles vertices filled with eigenvalues.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-ens~2"></span>real(kind=dp),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>ens</strong>(:,:)</td><td></td><td></td><td><p>List of electron energies on FBZ.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-ens_irred"></span>real(kind=dp),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>ens_irred</strong>(:,:)</td><td></td><td></td><td><p>List of electron energies on IBZ.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-vels~2"></span>real(kind=dp),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>vels</strong>(:,:,:)</td><td></td><td></td><td><p>List of electron velocities on FBZ.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-vels_irred"></span>real(kind=dp),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>vels_irred</strong>(:,:,:)</td><td></td><td></td><td><p>List of electron velocites on IBZ.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-evecs~2"></span>complex(kind=dp),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>evecs</strong>(:,:,:)</td><td></td><td></td><td><p>List of all electron eigenvectors.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-evecs_irred"></span>complex(kind=dp),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>evecs_irred</strong>(:,:,:)</td><td></td><td></td><td><p>List of IBZ wedge electron eigenvectors.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-metallic"></span>logical,</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>metallic</strong></td><td></td><td></td><td><p>Is the system metallic?</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-dos~2"></span>real(kind=dp),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>dos</strong>(:,:)</td><td></td><td></td><td><p>Band resolved density of states.</p></td>
+  
+</tr>
+
+</tbody>
+</table>
+
+    </section>
+    <br>
+    
+    
+    
+    
+    
+    
+     
+    <section>
+    <h2>Type-Bound Procedures</h2>
+    
+     
+<div class="panel panel-default">
+  <div class="panel-heading codesum"><span class="anchor" id="boundprocedure-deallocate_eigenvecs"></span><h3>procedure, public :: <strong>deallocate_eigenvecs</strong>  
+    
+  </h3></div>
+  
+  <ul class="list-group">
+    
+      <li class="list-group-item">
+      
+        
+          
+    
+    <h3>
+private subroutine deallocate_eigenvecs(el)
+    
+    
+   
+</h3>
+    
+
+
+
+<p>Deallocate the electron eigenvectors</p>
+    
+    <h4>Arguments</h4>
+    
+      
+      
+<table class="table table-striped varlist">
+<thead><tr><th>Type</th>
+<th>Intent</th><th>Optional</th>
+<th>Attributes</th><th></th><th>Name</th><th></th></thead>
+
+
+
+<tbody>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" ></span>class(<a href='../type/electron.html'>electron</a>),</td>
+  <td>intent(inout)</td>
+  <td></td>
+  
+  <td></td><td>::</td>
+  <td><strong>el</strong></td><td></td>
+  
+</tr>
+
+</tbody>
+</table>
+
+      
+    
+    
+
+        
+      
+      </li>
+    
+  </ul>
+</div>
+
+    
+     
+<div class="panel panel-default">
+  <div class="panel-heading codesum"><span class="anchor" id="boundprocedure-initialize~4"></span><h3>procedure, public :: <strong>initialize</strong>  => read_input_and_setup 
+    
+  </h3></div>
+  
+  <ul class="list-group">
+    
+      <li class="list-group-item">
+      
+        
+          
+    
+    <h3>
+private subroutine read_input_and_setup(el, wann, crys, sym, num)
+    
+    
+   
+</h3>
+    
+
+
+
+<p>Read input file and setup groundstate electronic system.</p>
+    
+    <h4>Arguments</h4>
+    
+      
+      
+<table class="table table-striped varlist">
+<thead><tr><th>Type</th>
+<th>Intent</th><th>Optional</th>
+<th>Attributes</th><th></th><th>Name</th><th></th></thead>
+
+
+
+<tbody>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" ></span>class(<a href='../type/electron.html'>electron</a>),</td>
+  <td>intent(out)</td>
+  <td></td>
+  
+  <td></td><td>::</td>
+  <td><strong>el</strong></td><td></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" ></span>type(<a href='../type/epw_wannier.html'>epw_wannier</a>),</td>
+  <td>intent(in)</td>
+  <td></td>
+  
+  <td></td><td>::</td>
+  <td><strong>wann</strong></td><td></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" ></span>type(<a href='../type/crystal.html'>crystal</a>),</td>
+  <td>intent(in)</td>
+  <td></td>
+  
+  <td></td><td>::</td>
+  <td><strong>crys</strong></td><td></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" ></span>type(<a href='../type/symmetry.html'>symmetry</a>),</td>
+  <td>intent(in)</td>
+  <td></td>
+  
+  <td></td><td>::</td>
+  <td><strong>sym</strong></td><td></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" ></span>type(<a href='../type/numerics.html'>numerics</a>),</td>
+  <td>intent(in)</td>
+  <td></td>
+  
+  <td></td><td>::</td>
+  <td><strong>num</strong></td><td></td>
+  
+</tr>
+
+</tbody>
+</table>
+
+      
+    
+    
+
+        
+      
+      </li>
+    
+  </ul>
+</div>
+
+    
+    </section>
+    
+    
+    
+    
+    </div>
+  </div>
+
+
+    <hr>    
+    </div> <!-- /container -->
+    <footer>
+      <div class="container">
+      <div class="row">
+        <div class="col-xs-6 col-md-4"><p>&copy; 2021 
+                                          </p></div>
+        <div class="col-xs-6 col-md-4 col-md-push-4">
+          <p class="text-right">
+            Documentation generated by 
+            <a href="https://github.com/cmacmackin/ford">FORD</a>
+            
+          </p>
+        </div>
+        <div class="col-xs-12 col-md-4 col-md-pull-4"><p class="text-center"> elphbolt was developed by Nakib Haider Protik</p></div>
+      </div>
+      <br>
+      </div> <!-- /container -->    
+    </footer>
+
+    <!-- Bootstrap core JavaScript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+<!--
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+-->
+    <script src="../js/bootstrap.min.js"></script>
+    <!-- IE10 viewport hack for Surface/desktop Windows 8 bug -->
+    <script src="../js/ie10-viewport-bug-workaround.js"></script>
+
+    <!-- MathJax JavaScript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script type="text/x-mathjax-config">
+      MathJax.Hub.Config({
+        TeX: { extensions: ['AMSmath.js','AMSsymbols.js','noErrors.js','noUndefined.js'], equationNumbers: { autoNumber: 'AMS' } },
+        jax: ['input/TeX','input/MathML','output/HTML-CSS'],
+        extensions: ['tex2jax.js','mml2jax.js','MathMenu.js','MathZoom.js']
+      });
+    </script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    
+    
+    
+  </body>
+</html>
