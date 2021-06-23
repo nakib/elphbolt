@@ -61,7 +61,7 @@ contains
           end do
        end do
        crys%qTF = sqrt(1.0e9_dp*crys%qTF*el%spindeg*beta*qe**2/product(el%kmesh)&
-            /crys%volume/perm0/crys%epsiloninf) !nm^-1
+            /crys%volume/perm0/crys%epsilon0) !nm^-1
 
        if(this_image() == 1) then
           write(*, "(A, 1E16.8, A)") ' Thomas-Fermi screening wave length = ', crys%qTF, ' 1/nm'

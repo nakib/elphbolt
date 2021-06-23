@@ -47,10 +47,10 @@ module crystal_module
      !! Dielectric tensor.
      real(dp), allocatable :: born(:,:,:)
      !! Born effective charge.
-     logical :: read_epsilon0
-     !! Read static dielectric constant?
      real(dp) :: epsilon0
      !! Static dielectric constant.
+     logical :: read_epsiloninf
+     !! Read high-frequency dielectric constant?
      real(dp) :: epsiloninf
      !! High frequency dielectric constant.
      real(dp) :: qTF
@@ -100,11 +100,11 @@ contains
          epsilon0, epsiloninf
     character(len=3), allocatable :: elements(:)
     character(len=100) :: name
-    logical :: polar, autoisotopes, phiso, read_epsilon0, twod
+    logical :: polar, autoisotopes, phiso, read_epsiloninf, twod
     
     namelist /allocations/ numelements, numatoms
     namelist /crystal_info/ name, elements, atomtypes, basis, lattvecs, &
-         polar, born, epsilon, read_epsilon0, epsilon0, epsiloninf, &
+         polar, born, epsilon, read_epsiloninf, epsilon0, epsiloninf, &
          masses, T, autoisotopes, phiso, twod
 
     call subtitle("Setting up crystal...")
@@ -131,7 +131,7 @@ contains
     !Read crystal_info
     autoisotopes = .true.
     polar = .false.
-    read_epsilon0 = .false.
+    read_epsiloninf = .false.
     epsilon = 0.0_dp
     epsilon0 = 0.0_dp
     epsiloninf = 0.0_dp
@@ -153,8 +153,9 @@ contains
     c%epsilon = epsilon
     c%basis = basis
     c%polar = polar
-    c%read_epsilon0 = read_epsilon0
+    c%read_epsiloninf = read_epsiloninf
     c%epsiloninf = epsiloninf
+    c%epsilon0 = epsilon0
     c%lattvecs = lattvecs
     c%T = T
     c%autoisotopes = autoisotopes
@@ -174,10 +175,10 @@ contains
     end if
     
     !Set static dielectric constant
-    if(c%read_epsilon0) then
-       c%epsilon0 = epsilon0
+    if(c%read_epsiloninf) then
+       c%epsiloninf = epsiloninf
     else
-       c%epsilon0 = trace(c%epsilon)/3.0_dp
+       c%epsiloninf = trace(c%epsilon)/3.0_dp
     end if
 
     !If required, calculate isotopic average masses and g-factors
@@ -232,8 +233,8 @@ contains
                 write(*,"(3(1E16.8,x))") c%born(:,j,i)
              end do
           end do
-          write(*,"(A,1E16.8)") 'Static dielectric to be used for screening = ', c%epsilon0
-          write(*,"(A,1E16.8)") 'High-frequency dielectric to be used for screening = ', c%epsiloninf
+          write(*,"(A,1E16.8)") 'Static dielectric (used for screening e-ch. imp. interactions) = ', c%epsilon0
+          write(*,"(A,1E16.8)") 'High-frequency dielectric = ', c%epsiloninf
        end if
        write(*,"(A, F7.2, A)") 'Crystal temperature = ', c%T, ' K'
     end if
