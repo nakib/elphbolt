@@ -204,7 +204,12 @@ contains
     !Print out information.
     if(this_image() == 1) then
        write(*, "(A, (3I5,x))") "q-mesh = ", n%qmesh
-       write(*, "(A, (3I5,x))") "k-mesh = ", n%mesh_ref*n%qmesh(1), n%mesh_ref*n%qmesh(2), 1 
+       if(twod) then
+          write(*, "(A, (3I5,x))") "k-mesh = ", n%mesh_ref*n%qmesh(1), n%mesh_ref*n%qmesh(2), 1
+       else
+          write(*, "(A, (3I5,x))") "k-mesh = ", n%mesh_ref*n%qmesh(1), n%mesh_ref*n%qmesh(2), &
+               n%mesh_ref*n%qmesh(3)
+       end if
        write(*, "(A, 1E16.8, A)") "Fermi window thickness (each side of reference energy) = ", n%fsthick, " eV"
        write(*, "(A, A)") "Working directory = ", trim(n%cwd)
        write(*, "(A, A)") "Data dump directory = ", trim(n%datadumpdir)
