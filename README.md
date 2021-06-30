@@ -5,8 +5,8 @@ Using *ab initio* electron-phonon and phonon-phonon interactions and a fully wav
 
 - phonon and electronic thermal conductivities;
 - electronic conductivity;
-- phonon and electronic contribution to the thermopower;
-- and the effect of the mutual electron-phonon drag effect on the transport coefficients listed above.
+- phonon and electronic contributions to the thermopower;
+- and the effect of the mutual electron-phonon drag on the transport coefficients listed above.
 
 Stylistically, it is designed to be simple, fast, and extensible. The symmetries of the crystal are fully exploited and the transport active Fermi window is used to allow the sampling of extremely fine wave vector meshes needed for an accurate solution of the BTEs. Parallelism is achieved through modern Fortran's intrinsic `coarrays` feature that is fully supported by recent versions of both the `gcc` and `intel` compilers.
 

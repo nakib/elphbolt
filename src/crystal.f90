@@ -73,6 +73,12 @@ module crystal_module
      !! Use isotopic mix for masses?
      real(dp), allocatable :: gfactors(:)
      !! g-factors.
+     real(dp), allocatable :: subs_masses(:)
+     !! Masses of the substitutional atoms
+     real(dp), allocatable :: subs_conc(:)
+     !! Concentration of the substitutional atoms in cm^-3
+     real(dp), allocatable :: subs_gfactors(:)
+     !! g-factors for the substitutional defects.
      logical :: twod
      !! Is the system 2d?
      real(dp) :: dim
@@ -94,10 +100,11 @@ contains
 
     !Local variables
     integer(k8) :: i, j, k, numelements, numatoms
-    integer(k8), allocatable :: atomtypes(:)
-    real(dp), allocatable :: masses(:), gfactors(:), born(:,:,:), basis(:,:), basis_cart(:,:)
+    integer(k8), allocatable :: atomtypes(:), num_atomtypes(:)
+    real(dp), allocatable :: masses(:), gfactors(:), born(:,:,:), basis(:,:), &
+         basis_cart(:,:), subs_perc(:), subs_masses(:), subs_conc(:)
     real(dp) :: epsilon(3,3), lattvecs(3,3), volume, reclattvecs(3,3), volume_bz, T, &
-         epsilon0, epsiloninf
+         epsilon0, epsiloninf, subs_mavg
     character(len=3), allocatable :: elements(:)
     character(len=100) :: name
     logical :: polar, autoisotopes, phiso, read_epsiloninf, twod
@@ -105,7 +112,7 @@ contains
     namelist /allocations/ numelements, numatoms
     namelist /crystal_info/ name, elements, atomtypes, basis, lattvecs, &
          polar, born, epsilon, read_epsiloninf, epsilon0, epsiloninf, &
-         masses, T, autoisotopes, phiso, twod
+         masses, T, autoisotopes, phiso, twod, subs_masses, subs_conc
 
     call subtitle("Setting up crystal...")
 
@@ -123,10 +130,13 @@ contains
 
     !Allocate variables
     allocate(elements(numelements), atomtypes(numatoms), born(3,3,numatoms), &
-         basis(3,numatoms), masses(numelements), basis_cart(3,numatoms))
+         basis(3,numatoms), masses(numelements), basis_cart(3,numatoms), &
+         subs_masses(numelements), subs_conc(numelements), subs_perc(numelements), &
+         num_atomtypes(numelements))
     allocate(c%elements(c%numelements), c%atomtypes(c%numatoms), c%born(3,3,c%numatoms), &
          c%masses(c%numatoms), c%gfactors(c%numelements), c%basis(3,c%numatoms), &
-         c%basis_cart(3,c%numatoms))
+         c%basis_cart(3,c%numatoms), c%subs_masses(c%numelements), c%subs_conc(c%numelements), &
+         c%subs_gfactors(c%numelements))
     
     !Read crystal_info
     autoisotopes = .true.
@@ -138,6 +148,8 @@ contains
     born = 0.0_dp
     T = -1.0_dp
     twod = .false.
+    subs_masses = 0.0_dp
+    subs_conc = 0.0_dp
     read(1, nml = crystal_info)
     if(any(atomtypes < 1) .or. any(masses < 0) .or. T < 0.0_dp) then
        call exit_with_message('Bad input(s) in crystal_info.')
@@ -162,6 +174,8 @@ contains
     c%masses = masses
     c%gfactors = 0.0_dp
     c%twod = twod
+    c%subs_masses = subs_masses
+    c%subs_conc = subs_conc
     
     if(c%twod) then
        if(lattvecs(1,3) /= 0 .or. lattvecs(2,3) /= 0 .or. lattvecs(3,3) == 0) then
@@ -174,7 +188,7 @@ contains
        c%dim = 3.0_dp
     end if
     
-    !Set static dielectric constant
+    !Set high-frequency dielectric constant
     if(c%read_epsiloninf) then
        c%epsiloninf = epsiloninf
     else
@@ -190,16 +204,44 @@ contains
     c%basis_cart(:,:) = matmul(c%lattvecs,c%basis)
     
     !Calculate reciprocal lattice vectors and real and reciprocal cell volumes
-    do i = 1,3
-       j = mod(i,3) + 1
-       k = mod(j,3) + 1
+    do i = 1, 3
+       j = mod(i, 3) + 1
+       k = mod(j, 3) + 1
        c%reclattvecs(:,i) = &
-            cross_product(c%lattvecs(:,j), c%lattvecs(:,k))
+            cross_product(c%lattvecs(:, j), c%lattvecs(:, k))
     end do
-    c%volume = abs(dot_product(c%lattvecs(:,1),c%reclattvecs(:,1)))
+    c%volume = abs(dot_product(c%lattvecs(:, 1),c%reclattvecs(:, 1)))
     c%volume_bz = twopi/c%volume
     c%reclattvecs(:,:) = c%volume_bz*c%reclattvecs(:,:)
 
+    !Calculate the number of atoms of each type
+    num_atomtypes(:) = 0_k8
+    do i = 1, c%numelements
+       do j = 1, c%numatoms
+          if(c%atomtypes(j) == i) num_atomtypes(i) = num_atomtypes(i) + 1 
+       end do
+    end do
+    
+    !Convert number concentration of substitutions to percentage
+    !of replaced host atoms.
+    if(twod) then
+       subs_perc = c%subs_conc*(1.0e-14_dp*c%volume/c%thickness)/num_atomtypes*100.0_dp
+    else
+       subs_perc = c%subs_conc*(1.0e-21_dp*c%volume)/num_atomtypes*100.0_dp
+    end if
+    
+    !Calculate the mass variance parameters for the substitutions
+    do i = 1, c%numelements
+       !Impurity and host mixed mass
+       subs_mavg = (subs_perc(i)*c%subs_masses(i) + &
+            (100.0_dp - subs_perc(i))*c%masses(i))/100.0_dp
+
+       !g-factor
+       c%subs_gfactors(i) = subs_perc(i)*(1.0_dp - c%subs_masses(i)/subs_mavg)**2 + &
+            (100.0_dp - subs_perc(i))*(1.0_dp - c%masses(i)/subs_mavg)**2
+    end do
+    c%subs_gfactors = c%subs_gfactors/100.0_dp    
+    
     !Print out crystal and reciprocal lattice information.
     if(this_image() == 1) then
        write(*, "(A, A)") 'Material: ', c%name
@@ -207,6 +249,16 @@ contains
        do i = 1, c%numelements
           write(*,"(A, A, 1E16.8, A)") trim(c%elements(i)), " mass = ", c%masses(i), " u"
        end do
+       if(any(c%subs_conc /= 0.0_dp)) then
+          do i = 1, c%numelements
+             write(*,"(A, A, 1E16.8, A)") &
+                  trim(c%elements(i)), " substitution mass = ", c%subs_masses(i), " u"
+          end do
+          do i = 1, c%numelements
+             write(*,"(A, A, 1E16.8, A)") &
+                  trim(c%elements(i)), " substitution amount = ", subs_perc(i), " %"
+          end do
+       end if
        write(*,"(A)") 'Lattice vectors [nm]:'
        write(*,"(3(1E16.8,x))") c%lattvecs(:,1)
        write(*,"(3(1E16.8,x))") c%lattvecs(:,2)
