@@ -144,8 +144,10 @@ program elphbolt
         call calculate_3ph_interaction(ph, crys, num, 'V')
      end if
 
-     !Calculate ph-ph transition probabilities
-     call calculate_3ph_interaction(ph, crys, num, 'W')
+     if(.not. num%read_W) then
+        !Calculate ph-ph transition probabilities
+        call calculate_3ph_interaction(ph, crys, num, 'W')
+     end if
   end if
 
   if(num%onlyphbte .or. num%drag) then

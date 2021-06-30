@@ -57,7 +57,9 @@ module numerics_module
      logical :: read_gk2
      !! Choose if earlier e-ph (IBZ k) vertices are to be used.
      logical :: read_V
-     !! Choose if earlier ph-ph vertices are to be used.
+     !! Choose if earlier ph-ph (IBZ q) vertices are to be used.
+     logical :: read_W
+     !! Choose if earlier ph-ph (IBZ q) transition probabilities are to be used.
      logical :: tetrahedra
      !! Choose if the tetrahedron method for 3d delta function evaluation will be used.
      logical :: phe
@@ -101,12 +103,12 @@ contains
     integer(k8) :: mesh_ref, qmesh(3), maxiter
     real(dp) :: fsthick, conv_thres
     character(len = 1024) :: datadumpdir, tag
-    logical :: read_gq2, read_gk2, read_V, tetrahedra, phe, phiso, onlyphbte, &
+    logical :: read_gq2, read_gk2, read_V, read_W, tetrahedra, phe, phiso, onlyphbte, &
          onlyebte, elchimp, drag, plot_along_path
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
-         read_V, tetrahedra, phe, phiso, onlyphbte, onlyebte, maxiter, conv_thres, drag, &
-         elchimp, plot_along_path
+         read_V, read_W, tetrahedra, phe, phiso, onlyphbte, onlyebte, maxiter, conv_thres, &
+         drag, elchimp, plot_along_path
 
     call subtitle("Reading numerics information...")
     
@@ -121,6 +123,7 @@ contains
     read_gq2 = .false.
     read_gk2 = .false.
     read_V = .false.
+    read_W = .false.
     tetrahedra = .false.
     phe = .false.
     phiso = .false.
@@ -145,6 +148,7 @@ contains
     n%read_gq2 = read_gq2
     n%read_gk2 = read_gk2
     n%read_V = read_V
+    n%read_W = read_W
     n%tetrahedra = tetrahedra
     n%phe = phe
     n%phiso = phiso
@@ -219,6 +223,7 @@ contains
        write(*, "(A, L)") "Reuse e-ph matrix elements: ", n%read_gk2
        write(*, "(A, L)") "Reuse ph-e matrix elements: ", n%read_gq2
        write(*, "(A, L)") "Reuse ph-ph matrix elements: ", n%read_V
+       write(*, "(A, L)") "Reuse ph-ph transition probabilities: ", n%read_W
        write(*, "(A, L)") "Use tetrahedron method: ", n%tetrahedra
        write(*, "(A, L)") "Include ph-e interaction: ", n%phe
        write(*, "(A, L)") "Include ph-isotope interaction: ", n%phiso
