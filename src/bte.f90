@@ -123,7 +123,7 @@ contains
        
        !Matthiessen's rule
        bt%ph_rta_rates_ibz = rates_3ph + rates_phe + &
-            bt%ph_rta_rates_iso_ibz(:,:)
+            bt%ph_rta_rates_iso_ibz + bt%ph_rta_rates_subs_ibz
 
        !gradT field:
        ! Calculate field term (gradT=>F0)
@@ -207,6 +207,8 @@ contains
 
        !Allocate total RTA scattering rates
        allocate(bt%el_rta_rates_ibz(el%nk_irred, el%numbands))
+
+       !Matthiessen's rule
        bt%el_rta_rates_ibz = rates_eph + bt%el_rta_rates_echimp_ibz
 
        !gradT field:
