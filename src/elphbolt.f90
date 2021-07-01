@@ -78,9 +78,11 @@ program elphbolt
   !Calculate phonons
   call ph%initialize(wann, crys, sym, num)
 
-  !Calculate phonon density of states
-  call calculate_dos(ph, num%tetrahedra, crys%gfactors, &
-       crys%atomtypes, bt%ph_rta_rates_iso_ibz, num%phiso)
+  !Calculate phonon density of states and, if needed, phonon-isotope
+  !and/or phonon-substitution scattering rates.
+  call calculate_dos(ph, num%tetrahedra, crys%gfactors, crys%subs_gfactors, &
+       crys%atomtypes, bt%ph_rta_rates_iso_ibz, bt%ph_rta_rates_subs_ibz, &
+       num%phiso, num%phsubs)
 
   if(num%plot_along_path) then
      call subtitle("Plotting along high-symmetry path...")

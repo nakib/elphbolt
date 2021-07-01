@@ -143,7 +143,8 @@ contains
     sync all
   end subroutine calculate_el_dos
 
-  subroutine calculate_ph_dos_iso(ph, usetetra, gfactors, atomtypes, W_phiso, phiso)
+  subroutine calculate_ph_dos_iso(ph, usetetra, gfactors, subs_gfactors, &
+       atomtypes, W_phiso, W_phsubs, phiso, phsubs)
     !! Calculate the phonon density of states (DOS) in units of 1/energy and,
     !! optionally, the phonon-isotope scattering rates.
     !!
@@ -153,17 +154,18 @@ contains
     !! usetetra Use the tetrahedron method for delta functions?
 
     type(phonon), intent(inout) :: ph
-    logical, intent(in) :: usetetra, phiso
-    real(dp), intent(in) :: gfactors(:)
+    logical, intent(in) :: usetetra, phiso, phsubs
+    real(dp), intent(in) :: gfactors(:), subs_gfactors(:)
     integer(k8), intent(in) :: atomtypes(:)
-    real(dp), intent(out), allocatable :: W_phiso(:,:)
+    real(dp), intent(out), allocatable :: W_phiso(:,:), W_phsubs(:,:)
     
     !Local variables
     integer(k8) :: iq, ib, iqp, ibp, im, chunk, counter, num_active_images, &
          pol, a, numatoms
     integer(k8), allocatable :: start[:], end[:]
     real(dp) :: e, delta, aux
-    real(dp), allocatable :: dos_chunk(:,:)[:], W_phiso_chunk(:,:)[:]
+    real(dp), allocatable :: dos_chunk(:,:)[:], W_phiso_chunk(:,:)[:], &
+         W_phsubs_chunk(:,:)[:]
     
     call print_message("Calculating phonon density of states and (if needed) isotope scattering...")
 
@@ -179,16 +181,20 @@ contains
     !Allocate small work variable chunk for each image
     allocate(dos_chunk(chunk, ph%numbranches)[*])
     if(phiso) allocate(W_phiso_chunk(chunk, ph%numbranches)[*])
+    if(phsubs) allocate(W_phsubs_chunk(chunk, ph%numbranches)[*])
     
     !Allocate dos and W_phiso
     allocate(ph%dos(ph%nq_irred, ph%numbranches))
     allocate(W_phiso(ph%nq_irred, ph%numbranches))
+    allocate(W_phsubs(ph%nq_irred, ph%numbranches))
 
     !Initialize arrays and coarrays
     ph%dos(:,:) = 0.0_dp
     dos_chunk(:,:) = 0.0_dp
     W_phiso(:,:) = 0.0_dp
+    W_phsubs(:,:) = 0.0_dp
     if(phiso) W_phiso_chunk(:,:) = 0.0_dp
+    if(phsubs) W_phsubs_chunk(:,:) = 0.0_dp
 
     counter = 0
     do iq = start, end !Run over IBZ wave vectors
@@ -211,15 +217,24 @@ contains
                 !Sum over delta function
                 dos_chunk(counter, ib) = dos_chunk(counter, ib) + delta
 
-                if(phiso) then
-                   !Calculate phonon-isotope scattering in the Tamura model
+                if(phiso .or. phiso) then
                    do a = 1, numatoms
                       pol = (a - 1)*3
                       aux = (abs(dot_product(&
                            ph%evecs(ph%indexlist_irred(iq), ib, pol + 1 : pol + 3), &
                            ph%evecs(iqp, ibp, pol + 1 : pol + 3))))**2
-                      W_phiso_chunk(counter, ib) = W_phiso_chunk(counter, ib) + &
-                           delta*aux*gfactors(atomtypes(a))*e**2
+                      
+                      !Calculate phonon-isotope scattering in the Tamura model                   
+                      if(phiso) then
+                         W_phiso_chunk(counter, ib) = W_phiso_chunk(counter, ib) + &
+                              delta*aux*gfactors(atomtypes(a))*e**2
+                      end if
+                      
+                      !Calculate phonon-substitution scattering in the Tamura model
+                      if(phsubs) then
+                         W_phsubs_chunk(counter, ib) = W_phsubs_chunk(counter, ib) + &
+                           delta*aux*subs_gfactors(atomtypes(a))*e**2
+                      end if
                    end do
                 end if
              end do
@@ -227,18 +242,21 @@ contains
        end do
     end do
     if(phiso) W_phiso_chunk = W_phiso_chunk*0.5_dp*pi/hbar_eVps !THz
+    if(phsubs) W_phsubs_chunk = W_phsubs_chunk*0.5_dp*pi/hbar_eVps !THz
     sync all
     
     !Collect chunks into full array
     do im = 1, num_active_images
        ph%dos(start[im]:end[im], :) = dos_chunk(:,:)[im]
        if(phiso) W_phiso(start[im]:end[im], :) = W_phiso_chunk(:,:)[im]
+       if(phsubs) W_phsubs(start[im]:end[im], :) = W_phsubs_chunk(:,:)[im]
     end do
     sync all
 
     !Write to file
     call write2file_rank2_real(ph%prefix // '.dos', ph%dos)
     call write2file_rank2_real(ph%prefix // '.W_rta_phiso', W_phiso)
+    call write2file_rank2_real(ph%prefix // '.W_rta_phsubs', W_phsubs)
 
     sync all
   end subroutine calculate_ph_dos_iso

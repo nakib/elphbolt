@@ -194,7 +194,7 @@ contains
     else
        c%epsiloninf = trace(c%epsilon)/3.0_dp
     end if
-
+    
     !If required, calculate isotopic average masses and g-factors
     if(autoisotopes) then
        call calculate_mavg_and_g(c%elements, c%masses, c%gfactors)
@@ -229,7 +229,7 @@ contains
     else
        subs_perc = c%subs_conc*(1.0e-21_dp*c%volume)/num_atomtypes*100.0_dp
     end if
-    
+        
     !Calculate the mass variance parameters for the substitutions
     do i = 1, c%numelements
        !Impurity and host mixed mass
@@ -240,7 +240,7 @@ contains
        c%subs_gfactors(i) = subs_perc(i)*(1.0_dp - c%subs_masses(i)/subs_mavg)**2 + &
             (100.0_dp - subs_perc(i))*(1.0_dp - c%masses(i)/subs_mavg)**2
     end do
-    c%subs_gfactors = c%subs_gfactors/100.0_dp    
+    c%subs_gfactors = c%subs_gfactors/100.0_dp
     
     !Print out crystal and reciprocal lattice information.
     if(this_image() == 1) then

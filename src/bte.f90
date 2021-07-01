@@ -41,6 +41,8 @@ module bte_module
 
      real(dp), allocatable :: ph_rta_rates_iso_ibz(:,:)
      !! Phonon RTA scattering rates on the IBZ due to isotope scattering.
+     real(dp), allocatable :: ph_rta_rates_subs_ibz(:,:)
+     !! Phonon RTA scattering rates on the IBZ due to substitution scattering.
      real(dp), allocatable :: ph_rta_rates_ibz(:,:)
      !! Phonon RTA scattering rates on the IBZ.
      real(dp), allocatable :: ph_field_term_T(:,:,:)

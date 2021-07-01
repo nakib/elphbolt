@@ -66,6 +66,8 @@ module numerics_module
      !! Choose if ph-e interaction will be included.
      logical :: phiso
      !! Use phonon-isotope scattering?
+     logical :: phsubs
+     !! Use phonon-substitution scattering?
      logical :: onlyphbte
      !! Choose if only phonon BTE will be solved.
      logical :: onlyebte
@@ -103,12 +105,12 @@ contains
     integer(k8) :: mesh_ref, qmesh(3), maxiter
     real(dp) :: fsthick, conv_thres
     character(len = 1024) :: datadumpdir, tag
-    logical :: read_gq2, read_gk2, read_V, read_W, tetrahedra, phe, phiso, onlyphbte, &
-         onlyebte, elchimp, drag, plot_along_path
+    logical :: read_gq2, read_gk2, read_V, read_W, tetrahedra, phe, phiso, phsubs, &
+         onlyphbte, onlyebte, elchimp, drag, plot_along_path
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
-         read_V, read_W, tetrahedra, phe, phiso, onlyphbte, onlyebte, maxiter, conv_thres, &
-         drag, elchimp, plot_along_path
+         read_V, read_W, tetrahedra, phe, phiso, phsubs, onlyphbte, onlyebte, maxiter, &
+         conv_thres, drag, elchimp, plot_along_path
 
     call subtitle("Reading numerics information...")
     
@@ -127,6 +129,7 @@ contains
     tetrahedra = .false.
     phe = .false.
     phiso = .false.
+    phsubs = .false.
     onlyphbte = .false.
     onlyebte = .false.
     elchimp = .false.
@@ -152,6 +155,7 @@ contains
     n%tetrahedra = tetrahedra
     n%phe = phe
     n%phiso = phiso
+    n%phsubs = phsubs
     n%onlyphbte = onlyphbte
     n%onlyebte = onlyebte
     n%elchimp = elchimp
@@ -171,6 +175,8 @@ contains
     end if
     if(n%onlyebte) then
        n%onlyphbte = .false.
+       n%phiso = .false.
+       n%phsubs = .false.
        n%drag = .false.
        n%phe = .false.
     end if
@@ -227,6 +233,7 @@ contains
        write(*, "(A, L)") "Use tetrahedron method: ", n%tetrahedra
        write(*, "(A, L)") "Include ph-e interaction: ", n%phe
        write(*, "(A, L)") "Include ph-isotope interaction: ", n%phiso
+       write(*, "(A, L)") "Include ph-substitution interaction: ", n%phsubs
        write(*, "(A, L)") "Include electron-charged impurity interaction: ", n%elchimp
        if(n%onlyphbte) write(*, "(A, L)") "Calculate only phonon BTE: ", n%onlyphbte
        if(n%onlyebte) write(*, "(A, L)") "Calculate only electron BTE: ", n%onlyebte
