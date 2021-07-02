@@ -85,9 +85,8 @@ contains
     type(electron), intent(in) :: el
     real(dp), intent(in) :: q
 
-    gchimp2 = 1.0e-3_dp/crys%volume*(qe*(el%chimp_conc_n*el%Zn**2 + el%chimp_conc_p*el%Zp**2)/&
-         (perm0*crys%epsilon0)/&
-         (q**2 + crys%qTF**2))**2 !ev^2
+    gchimp2 = 1.0e-3_dp/crys%volume/((perm0*crys%epsilon0)*(q**2 + crys%qTF**2))**2*&
+         (el%chimp_conc_n*(qe*el%Zn**2)**2 + el%chimp_conc_p*(qe*el%Zp**2)**2) !ev^2
   end function gchimp2
 
   pure real(dp) function Vm2_3ph(ev1_s1, conjg_ev2_s2, conjg_ev3_s3, &

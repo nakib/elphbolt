@@ -167,7 +167,7 @@ contains
     real(dp), allocatable :: dos_chunk(:,:)[:], W_phiso_chunk(:,:)[:], &
          W_phsubs_chunk(:,:)[:]
     
-    call print_message("Calculating phonon density of states and (if needed) isotope scattering...")
+    call print_message("Calculating phonon density of states and (if needed) isotope/substitution scattering...")
 
     !Number of basis atoms
     numatoms = size(atomtypes)
@@ -217,7 +217,7 @@ contains
                 !Sum over delta function
                 dos_chunk(counter, ib) = dos_chunk(counter, ib) + delta
 
-                if(phiso .or. phiso) then
+                if(phiso .or. phsubs) then
                    do a = 1, numatoms
                       pol = (a - 1)*3
                       aux = (abs(dot_product(&
