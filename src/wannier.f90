@@ -740,7 +740,7 @@ contains
     if(this_image() == 1) then
 
        !Threshold used to measure degeneracy
-       thres = 1.0e-4_dp
+       thres = 1.0e-6_dp !0.001 meV
 
        !Read list of wavevectors in crystal coordinates
        open(1, file = trim('highsympath.txt'), status = 'old')
