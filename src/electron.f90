@@ -145,6 +145,16 @@ module electron_module
      !! Is the system metallic?
      real(dp), allocatable :: dos(:,:)
      !! Band resolved density of states.
+     character(len = 1) :: dopingtype
+     !! Type of doping. This is needed for runlevel 0 only.
+     integer(k8) :: numconc
+     !! Number of concentration points. This is needed for runlevel 0 only.
+     real(dp), allocatable :: conclist(:)
+     !! List of concentrations. This is needed for runlevel 0 only.
+     integer(k8) :: numT
+     !! Number of temperature points. This is needed for runlevel 0 only.
+     real(dp), allocatable :: Tlist(:)
+     !! List of temperatures. This is needed for runlevel 0 only.
      
    contains
 
@@ -164,14 +174,17 @@ contains
 
     !Local variables
     real(dp) :: enref, Zn, Zp, chempot
+    real(dp), allocatable :: Tlist(:), conclist(:)
     integer(k8) :: ib, spindeg, numbands, indlowband, indhighband, &
-         indlowconduction, indhighvalence
+         indlowconduction, indhighvalence, numT, numconc
     logical :: metallic
     character(len = 6) :: concunits
+    character(len = 1) :: dopingtype
 
     namelist /electrons/ enref, spindeg, numbands, &
          indlowband, indhighband, metallic, chempot, Zn, Zp, &
-         indlowconduction, indhighvalence
+         indlowconduction, indhighvalence, dopingtype, numT, numconc, &
+         Tlist, conclist
          
     call subtitle("Setting up electrons...")
     
@@ -189,6 +202,12 @@ contains
     Zn = 0
     Zp = 0
     chempot = -999999.99999_dp !Something crazy
+    numT = 100 !Something crazy big
+    numconc = 100 !Something crazy big
+    dopingtype = 'x'
+    allocate(Tlist(nuMT), conclist(numconc))
+    Tlist = -1.0_dp !Something crazy
+    conclist = 0.0_dp
     read(1, nml = electrons)
     if(spindeg < 1 .or. spindeg > 2) then
        call exit_with_message('spindeg can be 1 or 2.')
@@ -206,6 +225,21 @@ contains
        if(indlowconduction < 1 .and. indhighvalence < 1) then
           call exit_with_message(&
                'For non-metals, must provide lowest conduction or highest valence band.')
+       end if
+    end if
+    if(numT <= 0 .or. numconc <= 0) then
+       call exit_with_message('numT or numconc should be > 0.')
+    end if
+    if(numT > 100 .or. numconc > 100) then
+       call exit_with_message('numT or numconc > 1000 is not supported.')
+    end if
+    if(any(Tlist(1:numT) <= 0.0_dp)) then
+       call exit_with_message('Unphysical Tlist provided.')
+    end if
+    if(num%runlevel == 0) then
+       if(dopingtype /= 'n' .and. dopingtype /= 'p') then
+          print*, dopingtype, len(dopingtype)
+          call exit_with_message("dopingtype must be 'n' or 'p'.")
        end if
     end if
     
@@ -228,6 +262,14 @@ contains
     if(el%metallic) then
        el%Zn = 0
        el%Zp = 0
+    end if
+    if(num%runlevel == 0) then
+       el%numT = numT
+       el%numconc = numconc
+       allocate(el%Tlist(el%numT), el%conclist(el%numconc))
+       el%Tlist(:) = Tlist(1:numT)
+       el%conclist(:) = conclist(1:numconc)
+       el%dopingtype = dopingtype
     end if
     
     !Close input file
@@ -366,13 +408,18 @@ contains
        end do
     end do
 
-    !Calculate carrier concentration for non-metals
     if(.not. el%metallic) then
-       call print_message("Calculating carrier concentrations...")
-       if(crys%twod) then
-          call calculate_carrier_conc(el, crys%T, crys%volume, crys%thickness)
-       else
-          call calculate_carrier_conc(el, crys%T, crys%volume)
+       if(num%runlevel == 0) then !Calculate chemical potentials for
+          !the given temperatures and concentrations
+          call calculate_chempot(el, crys%volume, el%dopingtype, el%Tlist, el%conclist)
+          call exit_with_message("Chemical potentials calculated. Runlevel 0 finished. Exiting.")
+       else !Calculate carrier concentration for non-metals
+          call print_message("Calculating carrier concentrations...")
+          if(crys%twod) then
+             call calculate_carrier_conc(el, crys%T, crys%volume, crys%thickness)
+          else
+             call calculate_carrier_conc(el, crys%T, crys%volume)
+          end if
        end if
     end if
     
@@ -668,6 +715,94 @@ contains
        el%conc_hole = el%conc_hole*h*1.0e-7_dp !cm^-2
     end if    
   end subroutine calculate_carrier_conc
+
+  subroutine calculate_chempot(el, vol, dopingtype, Tlist, conclist)
+    !! Subroutine to calculate the chemical potential for a
+    !! given carrier concentration.
+
+    class(electron), intent(in) :: el
+    real(dp), intent(in) :: vol, Tlist(:), conclist(:)
+    character(len = 1), intent(in) :: dopingtype
+
+    !Local variables
+    integer(k8) :: ib, ik, it, ngrid, maxiter, itemp, iconc, &
+         high, low, numtemp, numconc
+    real(dp) :: a, b, aux, const, mu, thresh
+    real(dp), allocatable :: chempot(:,:)
+
+    call print_message("Calculating chemical potential...")
+
+    !Number of temperature points
+    numtemp = size(Tlist)
+
+    !Number of cocentration points
+    numconc = size(conclist)
+
+    !Allocate chemical potential array
+    allocate(chempot(numtemp, numconc))
+    chempot = -99.99_dp
+    
+    !Total number of points in full mesh
+    ngrid = product(el%kmesh)
+
+    !Normalization and units factor
+    const = el%spindeg/dble(ngrid)/vol/(1.0e-21_dp)
+
+    !Maximum number of iterations
+    maxiter = 1000
+
+    !Convergence threshold
+    thresh = 1.0e-12_dp
+
+    !Check doping type
+    if(dopingtype == 'n') then
+       low = el%indlowconduction
+       high = el%indhighband
+    else
+       low =  el%indlowband
+       high = el%indhighvalence
+    end if
+
+    !Loop over tempratures
+    do itemp = 1, numtemp
+       if(this_image() == 1) then
+          write(*,"(A, F7.2, A)") 'Crystal temperature = ', Tlist(itemp), ' K:'
+          write(*, "(A)") 'Carrier conc. [cm^-3]    Chemical potential [eV]'
+       end if
+       !Loop over concentrations
+       do iconc = 1, numconc
+          a = el%enref - 5.0_dp !guess lower bound
+          b = el%enref + 5.0_dp !guess upper bound
+          do it = 1, maxiter
+             mu = 0.5_dp*(a + b)
+             aux = 0.0_dp
+             do ib = low, high
+                do ik = 1, el%nk
+                   aux = aux + Fermi(el%ens(ik, ib), mu, Tlist(itemp))
+                end do
+             end do
+             aux = aux*const !cm^-3
+             if(abs(aux - conclist(iconc))/conclist(iconc) < thresh) then
+                exit
+             else if(aux < conclist(iconc)) then
+                a = mu
+             else
+                b = mu
+             end if
+          end do
+          chempot(itemp,iconc) = mu
+
+          if(abs(aux - conclist(iconc))/conclist(iconc) > thresh) then
+             call exit_with_message(&
+                  "Could not converge to correct chemical potential. Exiting.")
+          end if
+
+          if(this_image() == 1) then
+             write(*, "(1E16.8, A, 1E16.8)") conclist(iconc), '         ', chempot(itemp,iconc)
+          end if
+       end do
+    end do
+  end subroutine calculate_chempot
 
   subroutine deallocate_eigenvecs(el)
     !! Deallocate the electron eigenvectors

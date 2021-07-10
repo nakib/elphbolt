@@ -82,6 +82,8 @@ module numerics_module
      !! BTE iteration convergence criterion.
      logical :: plot_along_path
      !! Plot Wannierized quantities along high symmetry wave vectors?
+     integer(k8) :: runlevel
+     !! Control for the type of calculation.
    contains
 
      procedure :: initialize=>read_input_and_setup, create_chempot_dirs
@@ -102,7 +104,7 @@ contains
     real(dp), intent(in) :: T
 
     !Local variables
-    integer(k8) :: mesh_ref, qmesh(3), maxiter
+    integer(k8) :: mesh_ref, qmesh(3), maxiter, runlevel
     real(dp) :: fsthick, conv_thres
     character(len = 1024) :: datadumpdir, tag
     logical :: read_gq2, read_gk2, read_V, read_W, tetrahedra, phe, phiso, phsubs, &
@@ -110,7 +112,7 @@ contains
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
          read_V, read_W, tetrahedra, phe, phiso, phsubs, onlyphbte, onlyebte, maxiter, &
-         conv_thres, drag, elchimp, plot_along_path
+         conv_thres, drag, elchimp, plot_along_path, runlevel
 
     call subtitle("Reading numerics information...")
     
@@ -137,6 +139,7 @@ contains
     plot_along_path = .false.
     maxiter = 50
     conv_thres = 1e-4_dp
+    runlevel = 1
     read(1, nml = numerics)
     if(any(qmesh <= 0) .or. mesh_ref < 1 .or. fsthick < 0) then
        call exit_with_message('Bad input(s) in numerics.')
@@ -163,7 +166,8 @@ contains
     n%conv_thres = conv_thres
     n%drag = drag
     n%plot_along_path = plot_along_path
-
+    n%runlevel = runlevel
+    
     if(twod .and. n%qmesh(3) /= 1) then
        call exit_with_message('For 2d systems, qmesh(3) must be equal to 1.')
     end if
