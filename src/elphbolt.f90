@@ -47,7 +47,7 @@ program elphbolt
   type(phonon) :: ph
   type(bte) :: bt
 
-  !Print banner and other info.
+  !Print banner and other information
   call welcome
   
   !Set up crystal
@@ -66,6 +66,22 @@ program elphbolt
      !Calculate electrons
      call el%initialize(wann, crys, sym, num)
   end if
+
+!!$  select case(num%runlevel)
+!!$  case(1) !BTE solving case
+!!$  case(2) !Post-processing case
+!!$     !Read response functions from finished calculation
+!!$     ! TODO
+!!$
+!!$     !Calculate electron and/or phonon sampling energy mesh
+!!$     ! TODO
+!!$
+!!$     !Calculate spectral coefficients
+!!$     ! TODO
+!!$     
+!!$     !Calculate cumulative coefficients wrt mean free path
+!!$     ! TODO
+!!$  end select
   
   if(num%onlyebte .or. num%drag) then
      !Calculate electron density of states

@@ -227,16 +227,16 @@ contains
                'For non-metals, must provide lowest conduction or highest valence band.')
        end if
     end if
-    if(numT <= 0 .or. numconc <= 0) then
-       call exit_with_message('numT or numconc should be > 0.')
-    end if
-    if(numT > 100 .or. numconc > 100) then
-       call exit_with_message('numT or numconc > 1000 is not supported.')
-    end if
-    if(any(Tlist(1:numT) <= 0.0_dp)) then
-       call exit_with_message('Unphysical Tlist provided.')
-    end if
     if(num%runlevel == 0) then
+       if(numT <= 0 .or. numconc <= 0) then
+          call exit_with_message('numT or numconc should be > 0.')
+       end if
+       if(numT > 100 .or. numconc > 100) then
+          call exit_with_message('numT or numconc > 1000 is not supported.')
+       end if
+       if(any(Tlist(1:numT) <= 0.0_dp)) then
+          call exit_with_message('Unphysical Tlist provided.')
+       end if
        if(dopingtype /= 'n' .and. dopingtype /= 'p') then
           print*, dopingtype, len(dopingtype)
           call exit_with_message("dopingtype must be 'n' or 'p'.")

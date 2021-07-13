@@ -39,7 +39,8 @@ contains
   
   subroutine calculate_qTF(crys, el)
     !! Calculate Thomas-Fermi screening wavevector in the simple electron-gas model.
-    ! qTF**2 = spindeg*e^2*beta/nptq/vol_pcell/perm0/kappainf*Sum_{BZ}f0_{k}(1-f0_{k})
+    !
+    ! qTF**2 = spindeg*e^2*beta/nptq/vol_pcell/perm0/epsilon0*Sum_{BZ}f0_{k}(1-f0_{k})
 
     type(crystal), intent(inout) :: crys
     type(electron), intent(in) :: el
