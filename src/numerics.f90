@@ -84,6 +84,18 @@ module numerics_module
      !! Plot Wannierized quantities along high symmetry wave vectors?
      integer(k8) :: runlevel
      !! Control for the type of calculation.
+     real(dp), allocatable :: ph_en_grid(:)
+     !! Equidistant phonon energy mesh for spectral quantities.
+     real(dp) :: ph_en_min, ph_en_max
+     !! Bounds of equidistant phonon energy mesh.
+     integer(k8) :: ph_en_num
+     !! Number of equidistant phonon energy mesh points.
+     real(dp), allocatable :: el_en_grid(:)
+     !! Equidistant phonon energy mesh for spectral quantities.
+     real(dp) :: el_en_min, el_en_max
+     !! Bounds of equidistant phonon energy mesh.
+     integer(k8) :: el_en_num
+     !! Number of equidistant phonon energy mesh points.
    contains
 
      procedure :: initialize=>read_input_and_setup, create_chempot_dirs
@@ -104,15 +116,16 @@ contains
     real(dp), intent(in) :: T
 
     !Local variables
-    integer(k8) :: mesh_ref, qmesh(3), maxiter, runlevel
-    real(dp) :: fsthick, conv_thres
+    integer(k8) :: mesh_ref, qmesh(3), maxiter, runlevel, el_en_num, ph_en_num
+    real(dp) :: fsthick, conv_thres, ph_en_min, ph_en_max, el_en_min, el_en_max
     character(len = 1024) :: datadumpdir, tag
     logical :: read_gq2, read_gk2, read_V, read_W, tetrahedra, phe, phiso, phsubs, &
          onlyphbte, onlyebte, elchimp, drag, plot_along_path
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
          read_V, read_W, tetrahedra, phe, phiso, phsubs, onlyphbte, onlyebte, maxiter, &
-         conv_thres, drag, elchimp, plot_along_path, runlevel
+         conv_thres, drag, elchimp, plot_along_path, runlevel, ph_en_min, ph_en_max, &
+         ph_en_num, el_en_min, el_en_max, el_en_num
 
     call subtitle("Reading numerics information...")
     
@@ -140,6 +153,12 @@ contains
     maxiter = 50
     conv_thres = 1e-4_dp
     runlevel = 1
+    ph_en_min = 0.0_dp
+    ph_en_max = 1.0_dp
+    ph_en_num = 100
+    el_en_min = -10.0_dp
+    el_en_max = 10.0_dp
+    el_en_num = 100
     read(1, nml = numerics)
     if(any(qmesh <= 0) .or. mesh_ref < 1 .or. fsthick < 0) then
        call exit_with_message('Bad input(s) in numerics.')
@@ -167,6 +186,15 @@ contains
     n%drag = drag
     n%plot_along_path = plot_along_path
     n%runlevel = runlevel
+
+    if(runlevel == 2) then
+       n%ph_en_min = ph_en_min
+       n%ph_en_max = ph_en_max
+       n%ph_en_num = ph_en_num
+       n%el_en_min = el_en_min
+       n%el_en_max = el_en_max
+       n%el_en_num = el_en_num
+    end if
     
     if(twod .and. n%qmesh(3) /= 1) then
        call exit_with_message('For 2d systems, qmesh(3) must be equal to 1.')

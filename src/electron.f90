@@ -411,7 +411,12 @@ contains
     if(.not. el%metallic) then
        if(num%runlevel == 0) then !Calculate chemical potentials for
           !the given temperatures and concentrations
-          call calculate_chempot(el, crys%volume, el%dopingtype, el%Tlist, el%conclist)
+          if(crys%twod) then
+             call calculate_chempot(el, crys%volume, el%dopingtype, el%Tlist, el%conclist, &
+                  crys%thickness)
+          else
+             call calculate_chempot(el, crys%volume, el%dopingtype, el%Tlist, el%conclist)
+          end if
           call exit_with_message("Chemical potentials calculated. Runlevel 0 finished. Exiting.")
        else !Calculate carrier concentration for non-metals
           call print_message("Calculating carrier concentrations...")
@@ -716,13 +721,14 @@ contains
     end if    
   end subroutine calculate_carrier_conc
 
-  subroutine calculate_chempot(el, vol, dopingtype, Tlist, conclist)
+  subroutine calculate_chempot(el, vol, dopingtype, Tlist, conclist, h)
     !! Subroutine to calculate the chemical potential for a
     !! given carrier concentration.
 
     class(electron), intent(in) :: el
     real(dp), intent(in) :: vol, Tlist(:), conclist(:)
     character(len = 1), intent(in) :: dopingtype
+    real(dp), intent(in), optional :: h
 
     !Local variables
     integer(k8) :: ib, ik, it, ngrid, maxiter, itemp, iconc, &
@@ -747,6 +753,9 @@ contains
 
     !Normalization and units factor
     const = el%spindeg/dble(ngrid)/vol/(1.0e-21_dp)
+    if(present(h)) then !2d system
+       const = const*h*1.0e-7_dp
+    end if
 
     !Maximum number of iterations
     maxiter = 1000
@@ -763,25 +772,38 @@ contains
        high = el%indhighvalence
     end if
 
-    !Loop over tempratures
+    !Loop over temperatures
     do itemp = 1, numtemp
        if(this_image() == 1) then
           write(*,"(A, F7.2, A)") 'Crystal temperature = ', Tlist(itemp), ' K:'
-          write(*, "(A)") 'Carrier conc. [cm^-3]    Chemical potential [eV]'
+          if(present(h)) then !2d system
+             write(*, "(A)") 'Carrier conc. [cm^-2]    Chemical potential [eV]'
+          else
+             write(*, "(A)") 'Carrier conc. [cm^-3]    Chemical potential [eV]'
+          end if
        end if
        !Loop over concentrations
        do iconc = 1, numconc
-          a = el%enref - 5.0_dp !guess lower bound
-          b = el%enref + 5.0_dp !guess upper bound
+          if(dopingtype == 'n') then
+             a = el%enref - 10.0_dp !guess lower bound
+             b = el%enref + 10.0_dp !guess upper bound
+          else
+             a = el%enref + 10.0_dp !guess lower bound
+             b = el%enref - 10.0_dp !guess upper bound
+          end if
           do it = 1, maxiter
              mu = 0.5_dp*(a + b)
              aux = 0.0_dp
              do ib = low, high
                 do ik = 1, el%nk
-                   aux = aux + Fermi(el%ens(ik, ib), mu, Tlist(itemp))
+                   if(dopingtype == 'n') then
+                      aux = aux + Fermi(el%ens(ik, ib), mu, Tlist(itemp))
+                   else
+                      aux = aux + 1.0_dp - Fermi(el%ens(ik, ib), mu, Tlist(itemp))
+                   end if
                 end do
              end do
-             aux = aux*const !cm^-3
+             aux = aux*const !cm^-3 for 3d, cm^-2 for 2d
              if(abs(aux - conclist(iconc))/conclist(iconc) < thresh) then
                 exit
              else if(aux < conclist(iconc)) then
@@ -791,7 +813,7 @@ contains
              end if
           end do
           chempot(itemp,iconc) = mu
-
+          
           if(abs(aux - conclist(iconc))/conclist(iconc) > thresh) then
              call exit_with_message(&
                   "Could not converge to correct chemical potential. Exiting.")

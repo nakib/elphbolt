@@ -30,6 +30,29 @@ module misc
   
 contains
 
+  subroutine linspace(grid, min, max, num)
+    !! Create equidistant grid.
+
+    real(dp), allocatable, intent(out) :: grid(:)
+    real(dp), intent(in) :: min, max
+    integer(k8), intent(in) :: num
+
+    !Local variables
+    integer(k8) :: i
+    real(dp) :: spacing
+
+    !Allocate grid array
+    allocate(grid(num))
+
+    !Calculate grid spacing
+    spacing = (max - min)/dble(num - 1)
+
+    !Calculate grid
+    do i = 1, num
+       grid(i) = min + (i - 1)*spacing
+    end do
+  end subroutine linspace
+  
   subroutine exit_with_message(message)
     !! Exit with error message.
 
