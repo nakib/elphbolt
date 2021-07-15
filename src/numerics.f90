@@ -84,14 +84,10 @@ module numerics_module
      !! Plot Wannierized quantities along high symmetry wave vectors?
      integer(k8) :: runlevel
      !! Control for the type of calculation.
-     real(dp), allocatable :: ph_en_grid(:)
-     !! Equidistant phonon energy mesh for spectral quantities.
      real(dp) :: ph_en_min, ph_en_max
      !! Bounds of equidistant phonon energy mesh.
      integer(k8) :: ph_en_num
      !! Number of equidistant phonon energy mesh points.
-     real(dp), allocatable :: el_en_grid(:)
-     !! Equidistant phonon energy mesh for spectral quantities.
      real(dp) :: el_en_min, el_en_max
      !! Bounds of equidistant phonon energy mesh.
      integer(k8) :: el_en_num

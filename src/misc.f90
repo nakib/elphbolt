@@ -166,6 +166,45 @@ contains
     end if
     sync all
   end subroutine write2file_response
+
+  subroutine readfile_response(filename, data, bandlist)
+    !! Read list of vectors to band/branch resolved files.
+
+    character(len = *), intent(in) :: filename
+    real(dp), intent(out) :: data(:,:,:)
+    integer(k8), intent(in), optional :: bandlist(:)
+
+    !Local variables
+    integer(k8) :: ib, ibstart, ibend, nb, ik, nk, dim
+    character(len = 1) :: numcols
+    character(len = 1024) :: bandtag
+
+    if(this_image() == 1) then
+       nk = size(data(:, 1, 1))
+       if(present(bandlist)) then
+          nb = size(bandlist)
+          ibstart = bandlist(1)
+          ibend = bandlist(nb)
+       else
+          nb = size(data(1, :, 1))
+          ibstart = 1
+          ibend = nb
+       end if
+       dim = size(data(1, 1, :))
+       write(numcols, "(I0)") dim
+
+       !Band/branch resolved
+       do ib = ibstart, ibend
+          write(bandtag, "(I0)") ib
+          open(1, file = trim(filename//bandtag), status = "old")
+          do ik = 1, nk
+             read(1, *) data(ik, ib, :)
+          end do
+          close(1)
+       end do
+    end if
+    sync all
+  end subroutine readfile_response
   
   subroutine append2file_transport_tensor(filename, it, data, bandlist)
     !! Append 3x3 tensor to band/branch resolved files.

@@ -262,11 +262,11 @@ contains
     sync all
   end subroutine calculate_ph_dos_iso
 
-  subroutine calculate_transport_coeff(species, field, T, deg, chempot, ens, vels, &
+  subroutine calculate_transport_coeff(species_prefix, field, T, deg, chempot, ens, vels, &
        volume, mesh, response, sym, trans_coeff_hc, trans_coeff_cc)
     !! Subroutine to calculate transport coefficients.
     !!
-    !! species Type of particle
+    !! species_prefix Prefix of particle type
     !! field Type of field
     !! T Temperature in K
     !! deg Degeneracy
@@ -276,10 +276,11 @@ contains
     !! volume Primitive cell volume in nm^3
     !! mesh Wave vector grid
     !! response FBZ response function
+    !! sym Symmery object
     !! trans_coeff_hc Heat current coefficient
     !! trans_coeff_cc Charge current coefficient
 
-    character(len = 2), intent(in) :: species
+    character(len = 2), intent(in) :: species_prefix
     character(len = 1), intent(in) :: field
     integer(k8), intent(in) :: mesh(3), deg
     real(dp), intent(in) :: T, chempot, ens(:,:), vels(:,:,:), volume, response(:,:,:)
@@ -298,7 +299,7 @@ contains
     fac = 1.0e21/kB/T/volume/product(mesh) 
     
     !Do checks related to particle and field type
-    if(species == 'ph') then
+    if(species_prefix == 'ph') then
        if(chempot /= 0.0_dp) then
           call exit_with_message(&
                "Phonon chemical potential non-zero in calculate_transport_coefficient. Exiting.")
@@ -316,7 +317,7 @@ contains
        else
           call exit_with_message("Unknown field type in calculate_transport_coefficient. Exiting.")
        end if
-    else if(species == 'el') then       
+    else if(species_prefix == 'el') then       
        if(field == 'T') then
           A_cc = -deg*qe*fac
           pow_cc = 0
@@ -339,7 +340,7 @@ contains
     do ik = 1, nk
        do ib = 1, nbands
           e = ens(ik, ib)
-          if(species == 'ph') then
+          if(species_prefix == 'ph') then
              if(e == 0.0_dp) cycle !Ignore zero energies phonons
              dist_factor = Bose(e, T)
              dist_factor = dist_factor*(1.0_dp + dist_factor)
@@ -351,8 +352,10 @@ contains
              v = vels(ik, ib, icart)
              trans_coeff_hc(ib, icart, :) = trans_coeff_hc(ib, icart, :) + &
                   (e - chempot)**pow_hc*dist_factor*v*response(ik, ib, :)
-             trans_coeff_cc(ib, icart, :) = trans_coeff_cc(ib, icart, :) + &
-                  (e - chempot)**pow_cc*dist_factor*v*response(ik, ib, :)
+             if(A_cc /= 0.0_dp) then
+                trans_coeff_cc(ib, icart, :) = trans_coeff_cc(ib, icart, :) + &
+                     (e - chempot)**pow_cc*dist_factor*v*response(ik, ib, :)
+             end if
           end do
        end do
     end do
@@ -362,12 +365,158 @@ contains
     ! V/K for thermopower
     ! A/m/K for alpha/T
     trans_coeff_hc = A_hc*trans_coeff_hc
-    trans_coeff_cc = A_cc*trans_coeff_cc
+    if(A_cc /= 0.0_dp) trans_coeff_cc = A_cc*trans_coeff_cc
 
     !Symmetrize transport tensor
     do ib = 1, nbands
        call symmetrize_3x3_tensor(trans_coeff_hc(ib, :, :), sym%crotations)
-       call symmetrize_3x3_tensor(trans_coeff_cc(ib, :, :), sym%crotations)
+       if(A_cc /= 0.0_dp) call symmetrize_3x3_tensor(trans_coeff_cc(ib, :, :), sym%crotations)
     end do
   end subroutine calculate_transport_coeff
+  
+  subroutine calculate_spectral_transport_coeff(species, field, T, deg, chempot, &
+       ens, vels, volume, response, en_grid, usetetra, trans_coeff_hc, trans_coeff_cc)
+    !! Subroutine to calculate the spectral transport coefficients.
+    !!
+    !! species Object of species type
+    !! field Type of field
+    !! T Temperature in K
+    !! deg Degeneracy
+    !! chempot Chemical potential in eV
+    !! ens FBZ energies in eV
+    !! vels FBZ velocities in Km/s
+    !! volume Primitive cell volume in nm^3
+    !! usetetra Use tetrahedron method?
+    !! trans_coeff_hc Heat current coefficient
+    !! trans_coeff_cc Charge current coefficient
+
+    class(*), intent(in) :: species
+    character(len = 1), intent(in) :: field
+    integer(k8), intent(in) :: deg
+    real(dp), intent(in) :: T, chempot, ens(:,:), vels(:,:,:), volume, &
+         response(:,:,:), en_grid(:)
+    logical, intent(in) :: usetetra
+    real(dp), intent(out) :: trans_coeff_hc(:,:,:,:), trans_coeff_cc(:,:,:,:)
+
+    !Local variables
+    character(len = 2) :: species_prefix
+    ! Above, h(c)c = heat(charge) current
+    integer(k8) :: ik, ib, ie, icart, nk, nbands, ne, pow_hc, pow_cc
+    real(dp) :: dist_factor, e, v, fac, A_hc, A_cc, delta
+
+    nk = size(ens(:,1)) !Number of (transport active) wave vectors
+    nbands = size(ens(1,:)) !Number of bands/branches
+    ne = size(en_grid(:)) !Number of sampling energy mesh points    
+
+    !Common multiplicative factor
+    fac = 1.0e21/kB/T/volume
+
+    !Grab species prefix
+    select type(species)
+    class is(phonon)
+       species_prefix = species%prefix
+    class is(electron)
+       species_prefix = species%prefix
+    class default
+       species_prefix = 'xx' !Unknown species
+    end select
+    
+    !Do checks related to particle and field type
+    if(species_prefix == 'ph') then
+       if(chempot /= 0.0_dp) then
+          call exit_with_message(&
+               "Phonon chemical potential non-zero in calculate_transport_coefficient. Exiting.")
+       end if
+       if(field == 'T') then
+          A_hc = qe*fac
+          pow_hc = 1
+          A_cc = 0.0_dp
+          pow_cc = 0
+       else if(field == 'E') then
+          A_hc = -fac
+          pow_hc = 1
+          A_cc = 0.0_dp
+          pow_cc = 0
+       else
+          call exit_with_message("Unknown field type in calculate_transport_coefficient. Exiting.")
+       end if
+    else if(species_prefix == 'el') then       
+       if(field == 'T') then
+          A_cc = -deg*qe*fac
+          pow_cc = 0
+          A_hc = deg*qe*fac
+          pow_hc = 1
+       else if(field == 'E') then
+          A_cc = deg*fac
+          pow_cc = 0
+          A_hc = -A_cc
+          pow_hc = 1
+       else
+          call exit_with_message(&
+               "Unknown field type in calculate_spectral_transport_coefficient. Exiting.")
+       end if
+    else
+       call exit_with_message(&
+            "Unknown particle species in calculate_spectral_transport_coefficient. Exiting.")
+    end if
+
+    !Initialize transport coefficients
+    trans_coeff_hc = 0.0_dp
+    trans_coeff_cc = 0.0_dp
+    
+    do ik = 1, nk !Sum over wave vectors
+       do ib = 1, nbands !Sum over bands/branches
+          e = ens(ik, ib) !Grab energy
+
+          !Evaluate delta function
+          if(usetetra) then
+             select type(species)
+             class is(phonon)
+                delta = delta_fn_tetra(e, ik, ib, species%qmesh, species%tetramap, &
+                     species%tetracount, species%tetra_evals)
+             class is(electron)
+                delta = delta_fn_tetra(e, ik, ib, species%kmesh, species%tetramap, &
+                     species%tetracount, species%tetra_evals)
+             end select
+          else
+             select type(species)
+             class is(phonon)
+                delta = delta_fn_triang(e, ik, ib, species%qmesh, species%triangmap, &
+                     species%triangcount, species%triang_evals)
+             class is(electron)
+                delta = delta_fn_triang(e, ik, ib, species%kmesh, species%triangmap, &
+                     species%triangcount, species%triang_evals)
+             end select
+          end if
+
+          !Run over sampling energies
+          do ie = 1, ne
+             if(species_prefix == 'ph') then
+                if(e == 0.0_dp) cycle !Ignore zero energies phonons
+                dist_factor = Bose(e, T)
+                dist_factor = dist_factor*(1.0_dp + dist_factor)
+             else
+                dist_factor = Fermi(e, chempot, T)
+                dist_factor = dist_factor*(1.0_dp - dist_factor)
+             end if
+             do icart = 1, 3 !Run over Cartesian directions
+                v = vels(ik, ib, icart) !Grab velocity
+                trans_coeff_hc(ib, icart, :, ie) = trans_coeff_hc(ib, icart, :, ie) + &
+                     (e - chempot)**pow_hc*dist_factor*v*response(ik, ib, :)*delta
+                if(A_cc /= 0.0_dp) then
+                   trans_coeff_cc(ib, icart, :, ie) = trans_coeff_cc(ib, icart, :, ie) + &
+                        (e - chempot)**pow_cc*dist_factor*v*response(ik, ib, :)*delta
+                end if
+             end do
+          end do !ie
+       end do !ib
+    end do !ik
+    !Units:
+    ! W/m/K/eV for thermal conductivity
+    ! 1/Omega/m/eV for charge conductivity
+    ! V/K/eV for thermopower
+    ! A/m/K/eV for alpha/T
+    trans_coeff_hc = A_hc*trans_coeff_hc
+    if(A_cc /= 0.0_dp) trans_coeff_cc = A_cc*trans_coeff_cc
+  end subroutine calculate_spectral_transport_coeff
 end module bz_sums

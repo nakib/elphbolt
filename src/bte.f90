@@ -21,7 +21,8 @@ module bte_module
   use params, only: dp, k8, qe, kB
   use misc, only: print_message, exit_with_message, write2file_rank2_real, &
        distribute_points, demux_state, binsearch, interpolate, demux_vector, &
-       trace, subtitle, append2file_transport_tensor, write2file_response
+       trace, subtitle, append2file_transport_tensor, write2file_response, &
+       linspace, readfile_response
   use numerics_module, only: numerics
   use crystal_module, only: crystal
   use symmetry_module, only: symmetry
@@ -29,7 +30,7 @@ module bte_module
   use electron_module, only: electron
   use interactions, only: calculate_ph_rta_rates, read_transition_probs_e, &
        calculate_el_rta_rates
-  use bz_sums, only: calculate_transport_coeff
+  use bz_sums, only: calculate_transport_coeff, calculate_spectral_transport_coeff
 
   implicit none
 
@@ -68,7 +69,7 @@ module bte_module
      !! electron response function for E field on the FBZ.
    contains
 
-     procedure :: solve_bte
+     procedure :: solve_bte, post_process
      
   end type bte
 
@@ -98,7 +99,7 @@ contains
 
     call subtitle("Calculating transport...")
 
-    !Create output folder tagged by temperature and change into it
+    !Create output folder tagged by temperature and create it
     write(tag, "(E9.3)") crys%T
     Tdir = trim(adjustl(num%cwd))//'/T'//trim(adjustl(tag))
     if(this_image() == 1) then
@@ -106,7 +107,7 @@ contains
     end if
     sync all
 
-    if(num%onlyphbte .or. num%drag) then
+    if(.not. num%onlyebte) then
        !Allocate phonon transport coefficients
        allocate(ph_kappa(ph%numbranches, 3, 3), ph_alphabyT(ph%numbranches, 3, 3), &
             dummy(ph%numbranches, 3, 3))
@@ -197,7 +198,7 @@ contains
        call chdir(trim(adjustl(num%cwd)))
     end if
 
-    if(num%onlyebte .or. num%drag) then
+    if(.not. num%onlyphbte) then
        !Allocate electron transport coefficients
        allocate(el_sigma(el%numbands, 3, 3), el_sigmaS(el%numbands, 3, 3), &
             el_alphabyT(el%numbands, 3, 3), el_kappa0(el%numbands, 3, 3))
@@ -426,8 +427,8 @@ contains
              !Print RTA band/branch resolved response functions
              ! Change to data output directory
              call chdir(trim(adjustl(Tdir)))
-             call write2file_response('partdclp_I0_', bt%el_response_T, el%bandlist) !gradT, el
-             call write2file_response('partdclp_J0_', bt%el_response_E, el%bandlist) !E, el
+             call write2file_response('partdcpl_I0_', bt%el_response_T, el%bandlist) !gradT, el
+             call write2file_response('partdcpl_J0_', bt%el_response_E, el%bandlist) !E, el
              ! Change back to cwd
              call chdir(trim(adjustl(num%cwd)))
           end if
@@ -641,6 +642,78 @@ contains
       end do
     end subroutine correct_I_drag
   end subroutine solve_bte
+
+  subroutine post_process(bt, num, crys, sym, ph, el)
+    !! Subroutine to post-process results of the BTEs.
+
+    class(bte), intent(inout) :: bt
+    type(numerics), intent(in) :: num
+    type(crystal), intent(in) :: crys
+    type(symmetry), intent(in) :: sym
+    type(phonon), intent(in) :: ph
+    type(electron), intent(in), optional :: el
+
+    !Local variables
+    real(dp), allocatable :: ph_en_grid(:), el_en_grid(:), ph_kappa(:,:,:,:), dummy(:,:,:,:)
+    character(len = 1024) :: tag, Tdir
+
+    !Change to T-dependent directory
+    write(tag, "(E9.3)") crys%T
+    Tdir = trim(adjustl(num%cwd))//'/T'//trim(adjustl(tag))
+    call chdir(trim(adjustl(Tdir)))
+
+    !Calculate electron and/or phonon sampling energy grid
+    call linspace(ph_en_grid, num%ph_en_min, num%ph_en_max, num%ph_en_num)
+    call linspace(el_en_grid, num%el_en_min, num%el_en_max, num%el_en_num)
+
+    !Write energy grids to file
+    ! ...
+    
+    !Electron RTA
+    if(.not. num%onlyebte) then
+
+       !Calculate spectral coefficients
+    end if
+
+    !Decoupled phonon BTE
+    if(.not. num%onlyphbte) then
+       !gradT:
+       ! RTA:
+       !  Allocate response function
+       allocate(bt%ph_response_T(ph%nq, ph%numbranches, 3))
+
+       !  Read response function
+       call readfile_response('RTA_F0_', bt%ph_response_T)
+
+       !  Allocate spectral transport coefficients
+       allocate(ph_kappa(ph%numbranches, 3, 3, num%ph_en_num), &
+            dummy(ph%numbranches, 3, 3, num%ph_en_num))
+       
+       !  Calculate spectral function
+       call calculate_spectral_transport_coeff(ph, 'T', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
+            crys%volume, bt%ph_response_T, ph_en_grid, num%tetrahedra, ph_kappa, dummy)
+
+       !  Write spectral phonon kappa
+       ! call write2file_spectral_coeffs(RTA_ph_kappa_spectral_')
+       
+       ! Iterated:
+       !  Read response function
+       call readfile_response('nodrag_F0_', bt%ph_response_T)
+
+       !  Calculate spectral function
+       call calculate_spectral_transport_coeff(ph, 'T', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
+            crys%volume, bt%ph_response_T, ph_en_grid, num%tetrahedra, ph_kappa, dummy)
+
+       !  Write spectral phonon kappa
+       ! call write2file_spectral_coeffs(nodrag_iterated_ph_kappa_spectral_')
+              
+       ! Release memory
+       deallocate(bt%ph_response_T, ph_kappa, dummy)
+    end if
+
+    !Return to working directory
+    call chdir(trim(adjustl(num%cwd)))
+  end subroutine post_process
 
   subroutine calculate_field_term(species, field, nequiv, ibz2fbz_map, &
        T, chempot, ens, vels, rta_rates_ibz, field_term, el_indexlist)

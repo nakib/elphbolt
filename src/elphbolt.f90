@@ -23,7 +23,7 @@ program elphbolt
   !! and Phys. Rev. B 102, 245202 (2020) with both the electron-phonon and phonon-phonon
   !! interactions computed ab initio.
 
-  use misc, only: welcome, print_message, subtitle, linspace
+  use misc, only: welcome, print_message, subtitle
   use params, only: k8, dp
   use numerics_module, only: numerics
   use crystal_module, only: crystal
@@ -165,49 +165,16 @@ program elphbolt
      else
         call bt%solve_bte(num, crys, sym, ph, el)
      end if
-
-     call print_message('______________________Thanks for using elphbolt. Bye!______________________')
   case(2) !Post-processing case
      call subtitle("Post-processing...")
      
-     !Calculate electron and/or phonon sampling energy grid
-     call linspace(num%ph_en_grid, num%ph_en_min, num%ph_en_max, num%ph_en_num)
-     call linspace(num%el_en_grid, num%el_en_min, num%el_en_max, num%el_en_num)
-     
-!!$     !Read RTA response functions from finished calculation
-!!$     ! TODO
-!!$     call read_responses('rta', bt)
-!!$
-!!$     !Calculate RTA spectral coefficients
-!!$     ! TODO
-!!$     call calculate_spectral_coeffs('rta', ph, el)
-!!$     
-!!$     !Calculate RTA cumulative coefficients wrt mean free path
-!!$     ! TODO
-!!$     !call calculate_cumulative_coeffs('rta', ph, el)
-!!$
-!!$     !Read partially decoupled response functions from finished calculation
-!!$     ! TODO
-!!$     call read_responses('pdcpld', ph, el)
-!!$
-!!$     !Calculate RTA spectral coefficients
-!!$     ! TODO
-!!$     call calculate_spectral_coeffs('pdcpld', ph, el)
-!!$     
-!!$     !Calculate RTA cumulative coefficients wrt mean free path
-!!$     ! TODO
-!!$     !call calculate_cumulative_coeffs('pdcpld', ph, el)
-!!$
-!!$     !Read final response functions from finished calculation
-!!$     ! TODO
-!!$     call read_responses('final', ph, el)
-!!$
-!!$     !Calculate final spectral coefficients
-!!$     ! TODO
-!!$     call calculate_spectral_coeffs('final', ph, el)
-!!$     
-!!$     !Calculate final cumulative coefficients wrt mean free path
-!!$     ! TODO
-!!$     !call calculate_cumulative_coeffs('final', ph, el)
+     !Read RTA response functions from finished calculation
+     if(num%onlyphbte .and. .not. num%phe) then
+        call bt%post_process(num, crys, sym, ph)
+     else
+        call bt%post_process(num, crys, sym, ph, el)
+     end if
   end select
+
+  call print_message('______________________Thanks for using elphbolt. Bye!______________________')
 end program elphbolt
