@@ -1158,10 +1158,10 @@ contains
             el_kappa0, el_sigmaS)
 
        !  Write spectral electron kappa
-       call write2file_spectral_tensor('RTA_el_kappa0_spectral_', el_kappa0)
+       call write2file_spectral_tensor('RTA_el_kappa0_spectral_', el_kappa0, el%bandlist)
 
        !  Write spectral electron sigmaS
-       call write2file_spectral_tensor('RTA_el_sigmaS_spectral_', el_sigmaS)
+       call write2file_spectral_tensor('RTA_el_sigmaS_spectral_', el_sigmaS, el%bandlist)
        !------------------------------------------------------------------!
 
        ! Iterated:
@@ -1176,10 +1176,10 @@ contains
             el_kappa0, el_sigmaS)
 
        !  Write spectral electron kappa
-       call write2file_spectral_tensor('nodrag_iterated_el_kappa0_spectral_', el_kappa0)
+       call write2file_spectral_tensor('nodrag_iterated_el_kappa0_spectral_', el_kappa0, el%bandlist)
 
        !  Write spectral electron sigmaS
-       call write2file_spectral_tensor('nodrag_iterated_el_sigmaS_spectral_', el_sigmaS)
+       call write2file_spectral_tensor('nodrag_iterated_el_sigmaS_spectral_', el_sigmaS, el%bandlist)
 
        !  Release memory
        deallocate(bt%el_response_T, el_kappa0, el_sigmaS)
@@ -1207,10 +1207,10 @@ contains
             el_alphabyT, el_sigma)
 
        !  Write spectral electron alpha/T
-       call write2file_spectral_tensor('RTA_el_alphabyT_spectral_', el_alphabyT)
+       call write2file_spectral_tensor('RTA_el_alphabyT_spectral_', el_alphabyT, el%bandlist)
 
        !  Write spectral electron sigma
-       call write2file_spectral_tensor('RTA_el_sigma_spectral_', el_sigma)
+       call write2file_spectral_tensor('RTA_el_sigma_spectral_', el_sigma, el%bandlist)
        !------------------------------------------------------------------!
 
        ! Iterated:
@@ -1225,10 +1225,10 @@ contains
             el_alphabyT, el_sigma)
 
        !  Write spectral electron alpha/T
-       call write2file_spectral_tensor('nodrag_iterated_el_alphabyT_spectral_', el_alphabyT)
+       call write2file_spectral_tensor('nodrag_iterated_el_alphabyT_spectral_', el_alphabyT, el%bandlist)
 
        !  Write spectral electron sigma
-       call write2file_spectral_tensor('nodrag_iterated_el_sigma_spectral_', el_sigma)
+       call write2file_spectral_tensor('nodrag_iterated_el_sigma_spectral_', el_sigma, el%bandlist)
 
        !  Release memory
        deallocate(bt%el_response_E, el_alphabyT, el_sigma)
@@ -1307,10 +1307,10 @@ contains
             el_kappa0, el_sigmaS)
 
        !  Write spectral electron kappa
-       call write2file_spectral_tensor('partdcpl_iterated_el_kappa0_spectral_', el_kappa0)
+       call write2file_spectral_tensor('partdcpl_iterated_el_kappa0_spectral_', el_kappa0, el%bandlist)
 
        !  Write spectral electron sigmaS
-       call write2file_spectral_tensor('partdcpl_iterated_el_sigmaS_spectral_', el_sigmaS)
+       call write2file_spectral_tensor('partdcpl_iterated_el_sigmaS_spectral_', el_sigmaS, el%bandlist)
 
        !  Release memory
        deallocate(bt%el_response_T, el_kappa0, el_sigmaS)
@@ -1338,10 +1338,10 @@ contains
             el_alphabyT, el_sigma)
 
        !  Write spectral electron alpha/T
-       call write2file_spectral_tensor('partdcpl_iterated_el_alphabyT_spectral_', el_alphabyT)
+       call write2file_spectral_tensor('partdcpl_iterated_el_alphabyT_spectral_', el_alphabyT, el%bandlist)
 
        !  Write spectral electron sigma
-       call write2file_spectral_tensor('partdcpl_iterated_el_sigma_spectral_', el_sigma)
+       call write2file_spectral_tensor('partdcpl_iterated_el_sigma_spectral_', el_sigma, el%bandlist)
 
        !  Release memory
        deallocate(bt%el_response_E, el_alphabyT, el_sigma)
@@ -1374,10 +1374,10 @@ contains
             el_kappa0, el_sigmaS)
 
        !  Write spectral electron kappa
-       call write2file_spectral_tensor('drag_iterated_el_kappa0_spectral_', el_kappa0)
+       call write2file_spectral_tensor('drag_iterated_el_kappa0_spectral_', el_kappa0, el%bandlist)
 
        !  Write spectral electron sigmaS
-       call write2file_spectral_tensor('drag_iterated_el_sigmaS_spectral_', el_sigmaS)
+       call write2file_spectral_tensor('drag_iterated_el_sigmaS_spectral_', el_sigmaS, el%bandlist)
 
        !  Release memory
        deallocate(bt%el_response_T, el_kappa0, el_sigmaS)
@@ -1405,10 +1405,10 @@ contains
             el_alphabyT, el_sigma)
 
        !  Write spectral electron alpha/T
-       call write2file_spectral_tensor('drag_iterated_el_alphabyT_spectral_', el_alphabyT)
+       call write2file_spectral_tensor('drag_iterated_el_alphabyT_spectral_', el_alphabyT, el%bandlist)
 
        !  Write spectral electron sigma
-       call write2file_spectral_tensor('drag_iterated_el_sigma_spectral_', el_sigma)
+       call write2file_spectral_tensor('drag_iterated_el_sigma_spectral_', el_sigma, el%bandlist)
 
        !  Release memory
        deallocate(bt%el_response_E, el_alphabyT, el_sigma)

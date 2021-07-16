@@ -267,7 +267,8 @@ contains
     integer(k8) :: ie, ne, ib, nb, ibstart, ibend
     character(len = 1) :: numcols
     character(len = 1024) :: bandtag
-
+    real(dp) :: aux(3,3)
+    
     if(this_image() == 1) then
        !Number of energy points on grid
        ne = size(data(1, 1, 1, :))
@@ -288,8 +289,11 @@ contains
        !Band/branch summed
        open(1, file = trim(filename//"tot"), status = "replace")
        do ie = 1, ne
-          write(1, "("//trim(adjustl(numcols))//"E20.10)") &
-               sum(data(:, :, :, ie), dim = 1)
+          aux = 0.0_dp
+          do ib = ibstart, ibend
+             aux(:,:) = aux(:,:) + data(ib, :, :, ie)
+          end do
+          write(1, "("//trim(adjustl(numcols))//"E20.10)") aux
        end do
        close(1)
 
