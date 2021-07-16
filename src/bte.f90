@@ -22,7 +22,7 @@ module bte_module
   use misc, only: print_message, exit_with_message, write2file_rank2_real, &
        distribute_points, demux_state, binsearch, interpolate, demux_vector, &
        trace, subtitle, append2file_transport_tensor, write2file_response, &
-       linspace, readfile_response
+       linspace, readfile_response, write2file_spectral_tensor, subtitle
   use numerics_module, only: numerics
   use crystal_module, only: crystal
   use symmetry_module, only: symmetry
@@ -98,6 +98,8 @@ contains
          KO_dev, tot_alphabyT_scalar, lambda
 
     call subtitle("Calculating transport...")
+
+    call print_message("Only the trace-averaged transport coefficients are printed below:")
 
     !Create output folder tagged by temperature and create it
     write(tag, "(E9.3)") crys%T
@@ -643,78 +645,6 @@ contains
     end subroutine correct_I_drag
   end subroutine solve_bte
 
-  subroutine post_process(bt, num, crys, sym, ph, el)
-    !! Subroutine to post-process results of the BTEs.
-
-    class(bte), intent(inout) :: bt
-    type(numerics), intent(in) :: num
-    type(crystal), intent(in) :: crys
-    type(symmetry), intent(in) :: sym
-    type(phonon), intent(in) :: ph
-    type(electron), intent(in), optional :: el
-
-    !Local variables
-    real(dp), allocatable :: ph_en_grid(:), el_en_grid(:), ph_kappa(:,:,:,:), dummy(:,:,:,:)
-    character(len = 1024) :: tag, Tdir
-
-    !Change to T-dependent directory
-    write(tag, "(E9.3)") crys%T
-    Tdir = trim(adjustl(num%cwd))//'/T'//trim(adjustl(tag))
-    call chdir(trim(adjustl(Tdir)))
-
-    !Calculate electron and/or phonon sampling energy grid
-    call linspace(ph_en_grid, num%ph_en_min, num%ph_en_max, num%ph_en_num)
-    call linspace(el_en_grid, num%el_en_min, num%el_en_max, num%el_en_num)
-
-    !Write energy grids to file
-    ! ...
-    
-    !Electron RTA
-    if(.not. num%onlyebte) then
-
-       !Calculate spectral coefficients
-    end if
-
-    !Decoupled phonon BTE
-    if(.not. num%onlyphbte) then
-       !gradT:
-       ! RTA:
-       !  Allocate response function
-       allocate(bt%ph_response_T(ph%nq, ph%numbranches, 3))
-
-       !  Read response function
-       call readfile_response('RTA_F0_', bt%ph_response_T)
-
-       !  Allocate spectral transport coefficients
-       allocate(ph_kappa(ph%numbranches, 3, 3, num%ph_en_num), &
-            dummy(ph%numbranches, 3, 3, num%ph_en_num))
-       
-       !  Calculate spectral function
-       call calculate_spectral_transport_coeff(ph, 'T', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
-            crys%volume, bt%ph_response_T, ph_en_grid, num%tetrahedra, ph_kappa, dummy)
-
-       !  Write spectral phonon kappa
-       ! call write2file_spectral_coeffs(RTA_ph_kappa_spectral_')
-       
-       ! Iterated:
-       !  Read response function
-       call readfile_response('nodrag_F0_', bt%ph_response_T)
-
-       !  Calculate spectral function
-       call calculate_spectral_transport_coeff(ph, 'T', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
-            crys%volume, bt%ph_response_T, ph_en_grid, num%tetrahedra, ph_kappa, dummy)
-
-       !  Write spectral phonon kappa
-       ! call write2file_spectral_coeffs(nodrag_iterated_ph_kappa_spectral_')
-              
-       ! Release memory
-       deallocate(bt%ph_response_T, ph_kappa, dummy)
-    end if
-
-    !Return to working directory
-    call chdir(trim(adjustl(num%cwd)))
-  end subroutine post_process
-
   subroutine calculate_field_term(species, field, nequiv, ibz2fbz_map, &
        T, chempot, ens, vels, rta_rates_ibz, field_term, el_indexlist)
     !! Subroutine to calculate the field coupling term of the BTE.
@@ -1160,4 +1090,391 @@ contains
     converged = .False.
     if(abs(newval - oldval) < thres) converged = .True. 
   end function converged
+
+  subroutine post_process(bt, num, crys, sym, ph, el)
+    !! Subroutine to post-process results of the BTEs.
+
+    class(bte), intent(inout) :: bt
+    type(numerics), intent(in) :: num
+    type(crystal), intent(in) :: crys
+    type(symmetry), intent(in) :: sym
+    type(phonon), intent(in) :: ph
+    type(electron), intent(in), optional :: el
+
+    !Local variables
+    real(dp), allocatable :: ph_en_grid(:), el_en_grid(:), ph_kappa(:,:,:,:), dummy(:,:,:,:), &
+         el_kappa0(:,:,:,:), el_sigmaS(:,:,:,:), el_sigma(:,:,:,:), el_alphabyT(:,:,:,:), &
+         ph_alphabyT(:,:,:,:)
+    character(len = 1024) :: tag, Tdir
+    integer(k8) :: ie
+
+    !Calculate electron and/or phonon sampling energy grid
+    call linspace(ph_en_grid, num%ph_en_min, num%ph_en_max, num%ph_en_num)
+    call linspace(el_en_grid, num%el_en_min, num%el_en_max, num%el_en_num)
+
+    !Write energy grids to file
+    if(this_image() == 1) then
+       open(1, file = "ph.en_grid", status = "replace")
+       do ie = 1, num%ph_en_num
+          write(1, "(E20.10)") ph_en_grid(ie)
+       end do
+       close(1)
+       open(1, file = "el.en_grid", status = "replace")
+       do ie = 1, num%el_en_num
+          write(1, "(E20.10)") el_en_grid(ie)
+       end do
+       close(1)
+    end if
+
+    !Change to T-dependent directory
+    write(tag, "(E9.3)") crys%T
+    Tdir = trim(adjustl(num%cwd))//'/T'//trim(adjustl(tag))
+    call chdir(trim(adjustl(Tdir)))
+
+    !Decoupled electron BTE
+    if(.not. num%onlyphbte) then
+       call print_message("Decoupled electron BTE:")
+       call print_message("---------------------")
+
+       !gradT:
+       call print_message("gradT field:")
+
+       ! RTA:
+       call print_message(" Calculating RTA electron kappa0 and sigmaS...")
+
+       !  Allocate response function
+       allocate(bt%el_response_T(el%nk, el%numbands, 3))
+
+       !  Read response function
+       call readfile_response('RTA_I0_', bt%el_response_T, el%bandlist)
+
+       !  Allocate spectral transport coefficients
+       allocate(el_kappa0(el%numbands, 3, 3, num%el_en_num), &
+            el_sigmaS(el%numbands, 3, 3, num%el_en_num))
+
+       !  Calculate spectral function
+       call calculate_spectral_transport_coeff(el, 'T', crys%T, el%spindeg, el%chempot, el%ens, &
+            el%vels, crys%volume, bt%el_response_T, el_en_grid, num%tetrahedra, sym, &
+            el_kappa0, el_sigmaS)
+
+       !  Write spectral electron kappa
+       call write2file_spectral_tensor('RTA_el_kappa0_spectral_', el_kappa0)
+
+       !  Write spectral electron sigmaS
+       call write2file_spectral_tensor('RTA_el_sigmaS_spectral_', el_sigmaS)
+       !------------------------------------------------------------------!
+
+       ! Iterated:
+       call print_message(" Calculating iterated electron kappa0 and sigmaS...")
+
+       !  Read response function
+       call readfile_response('nodrag_I0_', bt%el_response_T, el%bandlist)
+
+       !  Calculate spectral function
+       call calculate_spectral_transport_coeff(el, 'T', crys%T, el%spindeg, el%chempot, el%ens, &
+            el%vels, crys%volume, bt%el_response_T, el_en_grid, num%tetrahedra, sym, &
+            el_kappa0, el_sigmaS)
+
+       !  Write spectral electron kappa
+       call write2file_spectral_tensor('nodrag_iterated_el_kappa0_spectral_', el_kappa0)
+
+       !  Write spectral electron sigmaS
+       call write2file_spectral_tensor('nodrag_iterated_el_sigmaS_spectral_', el_sigmaS)
+
+       !  Release memory
+       deallocate(bt%el_response_T, el_kappa0, el_sigmaS)
+       !------------------------------------------------------------------!
+
+       !E:
+       call print_message("E field:")
+
+       ! RTA:
+       call print_message(" Calculating RTA electron sigma and alpha/T...")
+
+       !  Allocate response function
+       allocate(bt%el_response_E(el%nk, el%numbands, 3))
+
+       !  Read response function
+       call readfile_response('RTA_J0_', bt%el_response_E, el%bandlist)
+
+       !  Allocate spectral transport coefficients
+       allocate(el_sigma(el%numbands, 3, 3, num%el_en_num), &
+            el_alphabyT(el%numbands, 3, 3, num%el_en_num))
+
+       !  Calculate spectral function
+       call calculate_spectral_transport_coeff(el, 'E', crys%T, el%spindeg, el%chempot, el%ens, &
+            el%vels, crys%volume, bt%el_response_E, el_en_grid, num%tetrahedra, sym, &
+            el_alphabyT, el_sigma)
+
+       !  Write spectral electron alpha/T
+       call write2file_spectral_tensor('RTA_el_alphabyT_spectral_', el_alphabyT)
+
+       !  Write spectral electron sigma
+       call write2file_spectral_tensor('RTA_el_sigma_spectral_', el_sigma)
+       !------------------------------------------------------------------!
+
+       ! Iterated:
+       call print_message(" Calculating iterated electron sigma and alpha/T...")
+
+       !  Read response function
+       call readfile_response('nodrag_J0_', bt%el_response_E, el%bandlist)
+
+       !  Calculate spectral function
+       call calculate_spectral_transport_coeff(el, 'E', crys%T, el%spindeg, el%chempot, el%ens, &
+            el%vels, crys%volume, bt%el_response_E, el_en_grid, num%tetrahedra, sym, &
+            el_alphabyT, el_sigma)
+
+       !  Write spectral electron alpha/T
+       call write2file_spectral_tensor('nodrag_iterated_el_alphabyT_spectral_', el_alphabyT)
+
+       !  Write spectral electron sigma
+       call write2file_spectral_tensor('nodrag_iterated_el_sigma_spectral_', el_sigma)
+
+       !  Release memory
+       deallocate(bt%el_response_E, el_alphabyT, el_sigma)
+    end if
+
+    !Decoupled phonon BTE
+    if(.not. num%onlyebte) then
+       call print_message("Decoupled phonon BTE:")
+       call print_message("---------------------")
+
+       !gradT:
+       call print_message("gradT field:")
+
+       ! RTA:
+       call print_message(" Calculating RTA phonon kappa...")
+
+       !  Allocate response function
+       allocate(bt%ph_response_T(ph%nq, ph%numbranches, 3))
+
+       !  Read response function
+       call readfile_response('RTA_F0_', bt%ph_response_T)
+
+       !  Allocate spectral transport coefficients
+       allocate(ph_kappa(ph%numbranches, 3, 3, num%ph_en_num), &
+            dummy(ph%numbranches, 3, 3, num%ph_en_num))
+
+       !  Calculate spectral function
+       call calculate_spectral_transport_coeff(ph, 'T', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
+            crys%volume, bt%ph_response_T, ph_en_grid, num%tetrahedra, sym, ph_kappa, dummy)
+
+       !  Write spectral phonon kappa
+       call write2file_spectral_tensor('RTA_ph_kappa_spectral_', ph_kappa)
+       !------------------------------------------------------------------!
+
+       ! Iterated:
+       call print_message(" Calculating iterated phonon kappa...")
+
+       !  Read response function
+       call readfile_response('nodrag_F0_', bt%ph_response_T)
+
+       !  Calculate spectral function
+       call calculate_spectral_transport_coeff(ph, 'T', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
+            crys%volume, bt%ph_response_T, ph_en_grid, num%tetrahedra, sym, ph_kappa, dummy)
+
+       !  Write spectral phonon kappa
+       call write2file_spectral_tensor('nodrag_iterated_ph_kappa_spectral_', ph_kappa)
+
+       !  Release memory
+       deallocate(bt%ph_response_T, ph_kappa, dummy)
+    end if
+
+    !Partially decoupled electron BTE
+    if(num%drag) then
+       call print_message("Partially decoupled electron BTE:")
+       call print_message("---------------------")
+
+       !gradT:
+       call print_message("gradT field:")
+
+       ! Iterated:
+       call print_message(" Calculating iterated electron kappa0 and sigmaS...")
+
+       !  Allocate response function
+       allocate(bt%el_response_T(el%nk, el%numbands, 3))
+
+       !  Read response function
+       call readfile_response('partdcpl_I0_', bt%el_response_T, el%bandlist)
+
+       !  Allocate spectral transport coefficients
+       allocate(el_kappa0(el%numbands, 3, 3, num%el_en_num), &
+            el_sigmaS(el%numbands, 3, 3, num%el_en_num))
+
+       !  Calculate spectral function
+       call calculate_spectral_transport_coeff(el, 'T', crys%T, el%spindeg, el%chempot, el%ens, &
+            el%vels, crys%volume, bt%el_response_T, el_en_grid, num%tetrahedra, sym, &
+            el_kappa0, el_sigmaS)
+
+       !  Write spectral electron kappa
+       call write2file_spectral_tensor('partdcpl_iterated_el_kappa0_spectral_', el_kappa0)
+
+       !  Write spectral electron sigmaS
+       call write2file_spectral_tensor('partdcpl_iterated_el_sigmaS_spectral_', el_sigmaS)
+
+       !  Release memory
+       deallocate(bt%el_response_T, el_kappa0, el_sigmaS)
+       !------------------------------------------------------------------!
+
+       !E:
+       call print_message("E field:")
+
+       ! Iterated:
+       call print_message(" Calculating iterated electron sigma and alpha/T...")
+
+       !  Allocate response function
+       allocate(bt%el_response_E(el%nk, el%numbands, 3))
+
+       !  Read response function
+       call readfile_response('partdcpl_J0_', bt%el_response_E, el%bandlist)
+
+       !  Allocate spectral transport coefficients
+       allocate(el_sigma(el%numbands, 3, 3, num%el_en_num), &
+            el_alphabyT(el%numbands, 3, 3, num%el_en_num))
+
+       !  Calculate spectral function
+       call calculate_spectral_transport_coeff(el, 'E', crys%T, el%spindeg, el%chempot, el%ens, &
+            el%vels, crys%volume, bt%el_response_E, el_en_grid, num%tetrahedra, sym, &
+            el_alphabyT, el_sigma)
+
+       !  Write spectral electron alpha/T
+       call write2file_spectral_tensor('partdcpl_iterated_el_alphabyT_spectral_', el_alphabyT)
+
+       !  Write spectral electron sigma
+       call write2file_spectral_tensor('partdcpl_iterated_el_sigma_spectral_', el_sigma)
+
+       !  Release memory
+       deallocate(bt%el_response_E, el_alphabyT, el_sigma)
+    end if
+
+    !Coupled electron BTE
+    if(num%drag) then
+       call print_message("Coupled electron BTE:")
+       call print_message("---------------------")
+
+       !gradT:
+       call print_message("gradT field:")
+
+       ! Iterated:
+       call print_message(" Calculating iterated electron kappa0 and sigmaS...")
+
+       !  Allocate response function
+       allocate(bt%el_response_T(el%nk, el%numbands, 3))
+
+       !  Read response function
+       call readfile_response('drag_I0_', bt%el_response_T, el%bandlist)
+
+       !  Allocate spectral transport coefficients
+       allocate(el_kappa0(el%numbands, 3, 3, num%el_en_num), &
+            el_sigmaS(el%numbands, 3, 3, num%el_en_num))
+
+       !  Calculate spectral function
+       call calculate_spectral_transport_coeff(el, 'T', crys%T, el%spindeg, el%chempot, el%ens, &
+            el%vels, crys%volume, bt%el_response_T, el_en_grid, num%tetrahedra, sym, &
+            el_kappa0, el_sigmaS)
+
+       !  Write spectral electron kappa
+       call write2file_spectral_tensor('drag_iterated_el_kappa0_spectral_', el_kappa0)
+
+       !  Write spectral electron sigmaS
+       call write2file_spectral_tensor('drag_iterated_el_sigmaS_spectral_', el_sigmaS)
+
+       !  Release memory
+       deallocate(bt%el_response_T, el_kappa0, el_sigmaS)
+       !------------------------------------------------------------------!
+
+       !E:
+       call print_message("E field:")
+
+       ! Iterated:
+       call print_message(" Calculating iterated electron sigma and alpha/T...")
+
+       !  Allocate response function
+       allocate(bt%el_response_E(el%nk, el%numbands, 3))
+
+       !  Read response function
+       call readfile_response('drag_J0_', bt%el_response_E, el%bandlist)
+
+       !  Allocate spectral transport coefficients
+       allocate(el_sigma(el%numbands, 3, 3, num%el_en_num), &
+            el_alphabyT(el%numbands, 3, 3, num%el_en_num))
+
+       !  Calculate spectral function
+       call calculate_spectral_transport_coeff(el, 'E', crys%T, el%spindeg, el%chempot, el%ens, &
+            el%vels, crys%volume, bt%el_response_E, el_en_grid, num%tetrahedra, sym, &
+            el_alphabyT, el_sigma)
+
+       !  Write spectral electron alpha/T
+       call write2file_spectral_tensor('drag_iterated_el_alphabyT_spectral_', el_alphabyT)
+
+       !  Write spectral electron sigma
+       call write2file_spectral_tensor('drag_iterated_el_sigma_spectral_', el_sigma)
+
+       !  Release memory
+       deallocate(bt%el_response_E, el_alphabyT, el_sigma)
+    end if
+
+    !Coupled phonon BTE
+    if(num%drag) then
+       call print_message("Coupled phonon BTE:")
+       call print_message("---------------------")
+
+       !gradT:
+       call print_message("gradT field:")
+
+       ! Iterated:
+       call print_message(" Calculating iterated phonon kappa...")
+
+       !  Allocate response function
+       allocate(bt%ph_response_T(ph%nq, ph%numbranches, 3))
+
+       !  Read response function
+       call readfile_response('drag_F0_', bt%ph_response_T)
+
+       !  Allocate spectral transport coefficients
+       allocate(ph_kappa(ph%numbranches, 3, 3, num%ph_en_num), &
+            dummy(ph%numbranches, 3, 3, num%ph_en_num))
+
+       !  Calculate spectral function
+       call calculate_spectral_transport_coeff(ph, 'T', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
+            crys%volume, bt%ph_response_T, ph_en_grid, num%tetrahedra, sym, ph_kappa, dummy)
+
+       !  Write spectral phonon kappa
+       call write2file_spectral_tensor('drag_iterated_ph_kappa_spectral_', ph_kappa)
+
+       !  Release memory
+       deallocate(bt%ph_response_T, ph_kappa)
+
+       !E:
+       call print_message("E field:")
+
+       ! Iterated:
+       call print_message(" Calculating iterated phonon alpha/T...")
+
+       !  Allocate response function
+       allocate(bt%ph_response_E(ph%nq, ph%numbranches, 3))
+
+       !  Read response function
+       call readfile_response('drag_G0_', bt%ph_response_E)
+
+       !  Allocate spectral transport coefficients
+       allocate(ph_alphabyT(ph%numbranches, 3, 3, num%ph_en_num))
+
+       !  Calculate spectral function
+       call calculate_spectral_transport_coeff(ph, 'E', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
+            crys%volume, bt%ph_response_E, ph_en_grid, num%tetrahedra, sym, ph_alphabyT, dummy)
+
+       !  Write spectral phonon kappa
+       call write2file_spectral_tensor('drag_iterated_ph_alphabyT_spectral_', ph_alphabyT)
+
+       !  Release memory
+       deallocate(bt%ph_response_E, ph_alphabyT, dummy)
+       !------------------------------------------------------------------!
+    end if
+
+    !Return to working directory
+    call chdir(trim(adjustl(num%cwd)))
+
+    sync all
+  end subroutine post_process
 end module bte_module

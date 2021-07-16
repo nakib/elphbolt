@@ -375,7 +375,7 @@ contains
   end subroutine calculate_transport_coeff
   
   subroutine calculate_spectral_transport_coeff(species, field, T, deg, chempot, &
-       ens, vels, volume, response, en_grid, usetetra, trans_coeff_hc, trans_coeff_cc)
+       ens, vels, volume, response, en_grid, usetetra, sym, trans_coeff_hc, trans_coeff_cc)
     !! Subroutine to calculate the spectral transport coefficients.
     !!
     !! species Object of species type
@@ -387,6 +387,7 @@ contains
     !! vels FBZ velocities in Km/s
     !! volume Primitive cell volume in nm^3
     !! usetetra Use tetrahedron method?
+    !! sym Symmery object
     !! trans_coeff_hc Heat current coefficient
     !! trans_coeff_cc Charge current coefficient
 
@@ -396,6 +397,7 @@ contains
     real(dp), intent(in) :: T, chempot, ens(:,:), vels(:,:,:), volume, &
          response(:,:,:), en_grid(:)
     logical, intent(in) :: usetetra
+    type(symmetry), intent(in) :: sym
     real(dp), intent(out) :: trans_coeff_hc(:,:,:,:), trans_coeff_cc(:,:,:,:)
 
     !Local variables
@@ -468,44 +470,46 @@ contains
        do ib = 1, nbands !Sum over bands/branches
           e = ens(ik, ib) !Grab energy
 
-          !Evaluate delta function
-          if(usetetra) then
-             select type(species)
-             class is(phonon)
-                delta = delta_fn_tetra(e, ik, ib, species%qmesh, species%tetramap, &
-                     species%tetracount, species%tetra_evals)
-             class is(electron)
-                delta = delta_fn_tetra(e, ik, ib, species%kmesh, species%tetramap, &
-                     species%tetracount, species%tetra_evals)
-             end select
+          !Calculate distribution function factor
+          if(species_prefix == 'ph') then
+             if(e == 0.0_dp) cycle !Ignore zero energies phonons
+             dist_factor = Bose(e, T)
+             dist_factor = dist_factor*(1.0_dp + dist_factor)
           else
-             select type(species)
-             class is(phonon)
-                delta = delta_fn_triang(e, ik, ib, species%qmesh, species%triangmap, &
-                     species%triangcount, species%triang_evals)
-             class is(electron)
-                delta = delta_fn_triang(e, ik, ib, species%kmesh, species%triangmap, &
-                     species%triangcount, species%triang_evals)
-             end select
+             dist_factor = Fermi(e, chempot, T)
+             dist_factor = dist_factor*(1.0_dp - dist_factor)
           end if
-
+          
           !Run over sampling energies
           do ie = 1, ne
-             if(species_prefix == 'ph') then
-                if(e == 0.0_dp) cycle !Ignore zero energies phonons
-                dist_factor = Bose(e, T)
-                dist_factor = dist_factor*(1.0_dp + dist_factor)
+             !Evaluate delta function
+             if(usetetra) then
+                select type(species)
+                class is(phonon)
+                   delta = delta_fn_tetra(en_grid(ie), ik, ib, species%qmesh, species%tetramap, &
+                        species%tetracount, species%tetra_evals)
+                class is(electron)
+                   delta = delta_fn_tetra(en_grid(ie), ik, ib, species%kmesh, species%tetramap, &
+                        species%tetracount, species%tetra_evals)
+                end select
              else
-                dist_factor = Fermi(e, chempot, T)
-                dist_factor = dist_factor*(1.0_dp - dist_factor)
+                select type(species)
+                class is(phonon)
+                   delta = delta_fn_triang(en_grid(ie), ik, ib, species%qmesh, species%triangmap, &
+                        species%triangcount, species%triang_evals)
+                class is(electron)
+                   delta = delta_fn_triang(en_grid(ie), ik, ib, species%kmesh, species%triangmap, &
+                        species%triangcount, species%triang_evals)
+                end select
              end if
+
              do icart = 1, 3 !Run over Cartesian directions
                 v = vels(ik, ib, icart) !Grab velocity
                 trans_coeff_hc(ib, icart, :, ie) = trans_coeff_hc(ib, icart, :, ie) + &
-                     (e - chempot)**pow_hc*dist_factor*v*response(ik, ib, :)*delta
+                     (en_grid(ie) - chempot)**pow_hc*dist_factor*v*response(ik, ib, :)*delta
                 if(A_cc /= 0.0_dp) then
                    trans_coeff_cc(ib, icart, :, ie) = trans_coeff_cc(ib, icart, :, ie) + &
-                        (e - chempot)**pow_cc*dist_factor*v*response(ik, ib, :)*delta
+                        (en_grid(ie) - chempot)**pow_cc*dist_factor*v*response(ik, ib, :)*delta
                 end if
              end do
           end do !ie
@@ -518,5 +522,13 @@ contains
     ! A/m/K/eV for alpha/T
     trans_coeff_hc = A_hc*trans_coeff_hc
     if(A_cc /= 0.0_dp) trans_coeff_cc = A_cc*trans_coeff_cc
+
+    !Symmetrize transport tensor
+    do ie = 1, ne
+       do ib = 1, nbands
+          call symmetrize_3x3_tensor(trans_coeff_hc(ib, :, :, ie), sym%crotations)
+          if(A_cc /= 0.0_dp) call symmetrize_3x3_tensor(trans_coeff_cc(ib, :, :, ie), sym%crotations)
+       end do
+    end do
   end subroutine calculate_spectral_transport_coeff
 end module bz_sums

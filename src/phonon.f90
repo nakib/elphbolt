@@ -739,9 +739,8 @@ contains
        end if
     end do
 
-    ! Return the result to the units used in the rest of ShengBTE.
-    !omegas=omegas*toTHz !THz
+    !Units conversion
     omegas=omegas*Ryd2eV !eV
-    if(present(velocities)) velocities=velocities*toTHz*bohr2nm
+    if(present(velocities)) velocities=velocities*toTHz*bohr2nm !Km/s
   end subroutine phonon_espresso
 end module phonon_module

@@ -178,31 +178,29 @@ contains
     integer(k8) :: ib, ibstart, ibend, nb, ik, nk, dim
     character(len = 1) :: numcols
     character(len = 1024) :: bandtag
-
-    if(this_image() == 1) then
-       nk = size(data(:, 1, 1))
-       if(present(bandlist)) then
-          nb = size(bandlist)
-          ibstart = bandlist(1)
-          ibend = bandlist(nb)
-       else
-          nb = size(data(1, :, 1))
-          ibstart = 1
-          ibend = nb
-       end if
-       dim = size(data(1, 1, :))
-       write(numcols, "(I0)") dim
-
-       !Band/branch resolved
-       do ib = ibstart, ibend
-          write(bandtag, "(I0)") ib
-          open(1, file = trim(filename//bandtag), status = "old")
-          do ik = 1, nk
-             read(1, *) data(ik, ib, :)
-          end do
-          close(1)
-       end do
+    
+    nk = size(data(:, 1, 1))
+    if(present(bandlist)) then
+       nb = size(bandlist)
+       ibstart = bandlist(1)
+       ibend = bandlist(nb)
+    else
+       nb = size(data(1, :, 1))
+       ibstart = 1
+       ibend = nb
     end if
+    dim = size(data(1, 1, :))
+    write(numcols, "(I0)") dim
+
+    !Band/branch resolved
+    do ib = ibstart, ibend
+       write(bandtag, "(I0)") ib
+       open(1, file = trim(filename//bandtag), status = "old")
+       do ik = 1, nk
+          read(1, *) data(ik, ib, :)
+       end do
+       close(1)
+    end do
     sync all
   end subroutine readfile_response
   
@@ -257,6 +255,57 @@ contains
     end if
     sync all
   end subroutine append2file_transport_tensor
+
+  subroutine write2file_spectral_tensor(filename, data, bandlist)
+    !! Append 3x3 spectral transport tensor to band/branch resolved files.
+
+    character(len = *), intent(in) :: filename
+    real(dp), intent(in) :: data(:,:,:,:)
+    integer(k8), intent(in), optional :: bandlist(:)
+
+    !Local variables
+    integer(k8) :: ie, ne, ib, nb, ibstart, ibend
+    character(len = 1) :: numcols
+    character(len = 1024) :: bandtag
+
+    if(this_image() == 1) then
+       !Number of energy points on grid
+       ne = size(data(1, 1, 1, :))
+       
+       !Number of bands/branches and bounds
+       if(present(bandlist)) then
+          nb = size(bandlist)
+          ibstart = bandlist(1)
+          ibend = bandlist(nb)
+       else
+          nb = size(data(:, 1, 1, 1))
+          ibstart = 1
+          ibend = nb
+       end if
+
+       write(numcols, "(I0)") 9
+
+       !Band/branch summed
+       open(1, file = trim(filename//"tot"), status = "replace")
+       do ie = 1, ne
+          write(1, "("//trim(adjustl(numcols))//"E20.10)") &
+               sum(data(:, :, :, ie), dim = 1)
+       end do
+       close(1)
+
+       !Band/branch resolved
+       do ib = ibstart, ibend
+          write(bandtag, "(I0)") ib
+          open(2, file = trim(filename//bandtag), status = "replace")
+          do ie = 1, ne
+             write(2, "("//trim(adjustl(numcols))//"E20.10)") &
+                  data(ib, :, :, ie)
+          end do
+          close(2)
+       end do
+    end if
+    sync all
+  end subroutine write2file_spectral_tensor
 
   subroutine int_div(num, denom, q, r)
     !! Quotient(q) and remainder(r) of the integer division num/denom.
