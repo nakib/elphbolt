@@ -1,3 +1,4 @@
+![elphbolt logo](./logo/elphbolt_logo.png)
 # elphbolt
 `elphbolt` (short for **el**ectron-**ph**onon **Bol**tzmann **t**ransport) is a modern Fortran (2018 standard) code for solving the coupled electron and phonon Boltzmann transport equations (BTEs). It is a "free as in freedom" code distributed under the GNU Public License (GPL) version 3. You can read more about the philosophy of software freedom [here](https://www.gnu.org/philosophy/free-sw.en.html).
 
@@ -5,16 +6,14 @@ Using *ab initio* electron-phonon and phonon-phonon interactions and a fully wav
 
 - phonon and electronic thermal conductivities;
 - electronic conductivity;
-- phonon and electronic contributions to the thermopower;
-- and the effect of the mutual electron-phonon drag on the transport coefficients listed above.
+- phonon and electronic contributions to the thermopower; and
+- effect of the mutual electron-phonon drag on the transport coefficients listed above.
 
 Stylistically, it is designed to be simple, small, fast, and extensible. Object oriented programming concepts are combined with the procedural style, which allows fast development, while resulting in a rather compact code. The symmetries of the crystal are fully exploited and the transport active Fermi window is used to allow the sampling of extremely fine wave vector meshes needed for an accurate solution of the BTEs. Parallelism is achieved through modern Fortran's intrinsic `coarrays` feature that is fully supported by recent versions of both the `gcc` and `intel` compilers.
 
 `elphbolt` currently interfaces with the `Quantum Espresso` suite for the phonon quantities and the `EPW` code for the Wannier space information.
 
 The project is currently in the beta phase and being used to do publication level calculations.
-
-The project is lacking a logo. I was thinking of an elf throwing a lightning bolt, but my artistic skills do not include logo designing. Anyone wants to contribute a magnificent piece of art to this noble project?
 
 ## Installation on HPC systems with `gcc`
 
