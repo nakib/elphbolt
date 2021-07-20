@@ -430,7 +430,7 @@ contains
          mass(crys%numelements), zeff(crys%numatoms, 3, 3), eps(3, 3)
     real(dp), allocatable :: fc(:,:,:,:)
     integer(k8) :: ii, jj, ll, mm, nn, ltem, mtem, ntem, info, P(3), &
-         na1, na2, na3, j1, j2, j3, na1_, na2_, na3_, j1_, j2_, j3_, sc_nat, &
+         na1, na2, na3, j1, j2, j3, na1_, na2_, na3_, j1_, j2_, j3_, &
          triplet_counter, nR, nR_, qscell(3), tipo(crys%numatoms), t1, t2, t3, i, j, &
          iat, jat, ibrav, m1, m2, m3, ntype, nat, jn1, jn2, jn3
     integer(k8), allocatable :: R2(:,:), R3(:,:)
@@ -510,14 +510,11 @@ contains
           end do
        end if
        read(1,*) qscell(1:3)
-
-       !Number of atoms in the supercell
-       sc_nat = product(qscell)*crys%numatoms
-
+       
        save_nR = .true.
-       do na1 = 1, sc_nat
-          do na2 = 1, sc_nat
-             do na3 = 1, sc_nat
+       do na1 = 1, crys%numatoms
+          do na2 = 1, crys%numatoms
+             do na3 = 1, crys%numatoms
                 do j1 =1, 3
                    jn1 = j1 + (na1 - 1)*3
                    do j2 =1, 3
@@ -538,7 +535,8 @@ contains
                          !Also, allocate the various quantities.
                          if(save_nR) then
                             nR = nR_
-                            allocate(R2(3, nR), R3(3, nR), fc(3*sc_nat, 3*sc_nat, 3*sc_nat, nR))
+                            allocate(R2(3, nR), R3(3, nR), &
+                                 fc(ph%numbranches, ph%numbranches, ph%numbranches, nR))
                             save_nR = .false.
                          end if
 
@@ -558,13 +556,19 @@ contains
           end do
        end do
 
+       !Number of triplets
+       ph%numtriplets = nR*crys%numatoms**3
+
+       !Allocate quantities
+       allocate(ph%Index_i(ph%numtriplets), ph%Index_j(ph%numtriplets), ph%Index_k(ph%numtriplets))
+       allocate(ph%ifc3(3, 3, 3, ph%numtriplets), ph%R_j(3, ph%numtriplets), ph%R_k(3,ph%numtriplets))
+       
        !Convert to the standard format.
-       ph%numtriplets = nR*sc_nat**3 !Number of triplets
        triplet_counter = 0
        do ii = 1, nR
-          do na1 = 1, sc_nat
-             do na2 = 1, sc_nat
-                do na3 = 1, sc_nat
+          do na1 = 1, crys%numatoms
+             do na2 = 1, crys%numatoms
+                do na3 = 1, crys%numatoms
                    triplet_counter = triplet_counter + 1
 
                    !Triplet
@@ -574,8 +578,10 @@ contains
 
                    !Positions of the 2nd and 3rd atom in the triplet
                    !converted to Cartesian coordinates (Ang).
-                   ph%R_j(:, triplet_counter) = matmul(crys%lattvecs, R2(:, ii)/dble(ph%qmesh))*10.0_dp
-                   ph%R_k(:, triplet_counter) = matmul(crys%lattvecs, R3(:, ii)/dble(ph%qmesh))*10.0_dp
+                   ph%R_j(:, triplet_counter) = &
+                        matmul(crys%lattvecs, R2(:, ii)/dble(ph%qmesh))*10.0_dp
+                   ph%R_k(:, triplet_counter) = &
+                        matmul(crys%lattvecs, R3(:, ii)/dble(ph%qmesh))*10.0_dp
                    
                    do j1 =1, 3
                       jn1 = j1 + (na1 - 1)*3
