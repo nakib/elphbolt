@@ -19,7 +19,7 @@ module phonon_module
 
   use params, only: dp, k8, bohr2nm, pi, twopi, Ryd2eV, oneI
   use misc, only: print_message, subtitle, expi, distribute_points, &
-       write2file_rank2_real
+       write2file_rank2_real, exit_with_message
   use numerics_module, only: numerics
   use wannier_module, only: epw_wannier
   use crystal_module, only: crystal, calculate_wavevectors_full
@@ -426,30 +426,173 @@ contains
     type(crystal), intent(in) :: crys
     
     !Local variables
-    real(dp) :: tmp(3,3)
-    integer(k8) :: ii, jj, ll, mm, nn, ltem, mtem, ntem, info, P(3)
-    
-    !The file is in a simple sparse format, described in detail in
-    !the user documentation. See Doc/ShengBTE.pdf.
-    open(1, file = 'FORCE_CONSTANTS_3RD', status = "old")
-    read(1, *) ph%numtriplets
-    allocate(ph%Index_i(ph%numtriplets), ph%Index_j(ph%numtriplets), ph%Index_k(ph%numtriplets))
-    allocate(ph%ifc3(3, 3, 3, ph%numtriplets), ph%R_j(3, ph%numtriplets), ph%R_k(3,ph%numtriplets))
-    do ii = 1, ph%numtriplets
-       read(1, *) jj
-       read(1, *) ph%R_j(:, ii) !Ang
-       read(1, *) ph%R_k(:, ii) !Ang
-       read(1, *) ph%Index_i(ii), ph%Index_j(ii), ph%Index_k(ii)
-       do ll = 1, 3
-          do mm = 1, 3
-             do nn = 1, 3
-                read(1, *) ltem, mtem, ntem, ph%ifc3(ll, mm, nn, ii)
+    real(dp) :: tmp(3,3), r(crys%numatoms, 3), wscell(3,0:3), celldm(6), at(3,3), &
+         mass(crys%numelements), zeff(crys%numatoms, 3, 3), eps(3, 3)
+    real(dp), allocatable :: fc(:,:,:,:)
+    integer(k8) :: ii, jj, ll, mm, nn, ltem, mtem, ntem, info, P(3), &
+         na1, na2, na3, j1, j2, j3, na1_, na2_, na3_, j1_, j2_, j3_, sc_nat, &
+         triplet_counter, nR, nR_, qscell(3), tipo(crys%numatoms), t1, t2, t3, i, j, &
+         iat, jat, ibrav, m1, m2, m3, ntype, nat, jn1, jn2, jn3
+    integer(k8), allocatable :: R2(:,:), R3(:,:)
+    character(len = 1) :: polar_key
+    character(len = 6) :: label(crys%numelements)
+    logical :: sheng_file_exists, d3q_file_exists, save_nR
+
+    !Check what force constants files have been provided
+    sheng_file_exists = .False.
+    d3q_file_exists = .False.
+    inquire(file = 'FORCE_CONSTANTS_3RD', exist = sheng_file_exists)
+    inquire(file = 'mat3R', exist = d3q_file_exists)
+
+    if(sheng_file_exists .and. .not. d3q_file_exists) then
+       call print_message('ShengBTE format third order force constants provided.')
+    else if(d3q_file_exists .and. .not. sheng_file_exists) then
+       call print_message('d3q format third order force constants provided.')
+    else if(d3q_file_exists .and. sheng_file_exists) then
+       call print_message(&
+            'Both ShengBTE and d3q format third order force constants provided. Defaulting to ShengBTE format.')
+       d3q_file_exists = .False.
+    else
+       call exit_with_message('Third order force constant file not provided. Exiting.')
+    end if
+
+    if(sheng_file_exists) then
+       !The file is in a simple sparse format, described in detail in
+       !the user documentation. See Doc/ShengBTE.pdf.
+       open(1, file = 'FORCE_CONSTANTS_3RD', status = "old")
+       read(1, *) ph%numtriplets
+       allocate(ph%Index_i(ph%numtriplets), ph%Index_j(ph%numtriplets), ph%Index_k(ph%numtriplets))
+       allocate(ph%ifc3(3, 3, 3, ph%numtriplets), ph%R_j(3, ph%numtriplets), ph%R_k(3,ph%numtriplets))
+       do ii = 1, ph%numtriplets
+          read(1, *) jj
+          read(1, *) ph%R_j(:, ii) !Ang
+          read(1, *) ph%R_k(:, ii) !Ang
+          read(1, *) ph%Index_i(ii), ph%Index_j(ii), ph%Index_k(ii)
+          do ll = 1, 3
+             do mm = 1, 3
+                do nn = 1, 3
+                   read(1, *) ltem, mtem, ntem, ph%ifc3(ll, mm, nn, ii)
+                end do
              end do
           end do
        end do
-    end do
-    close(1)
-    !IFC3 units are eV/Ang^3
+       close(1)
+       !IFC3 units are eV/Ang^3
+    else
+       !See SUBROUTINE read_fc3_grid of fc3_interp.f90 of the d3q code
+       !for more information about the format.
+       open(1, file = 'mat3R', status = "old")
+       
+       !Read some stuff that will not be used in the code.
+       read(1,*) ntype, nat, ibrav, celldm(1:6)
+       if (ibrav==0) then
+          read(1,*) ((at(i,j),i=1,3),j=1,3)
+       end if
+
+       do i = 1, ntype
+          read(1, *) j, label(i), mass(i)
+       end do
+
+       do i = 1, nat
+          read(1, *) j, tipo(i), r(i, 1:3)
+       end do
+
+       read(1, *) polar_key
+       if(polar_key == "T") then
+          do i = 1, 3
+             read(1, *) eps(i, 1:3)
+          end do
+          do i = 1, nat
+             read(1, *)
+             do j = 1, 3
+                read(1, *) zeff(i, j, 1:3)
+             end do
+          end do
+       end if
+       read(1,*) qscell(1:3)
+
+       !Number of atoms in the supercell
+       sc_nat = product(qscell)*crys%numatoms
+
+       save_nR = .true.
+       do na1 = 1, sc_nat
+          do na2 = 1, sc_nat
+             do na3 = 1, sc_nat
+                do j1 =1, 3
+                   jn1 = j1 + (na1 - 1)*3
+                   do j2 =1, 3
+                      jn2 = j2 + (na2 - 1)*3
+                      do j3 =1, 3
+                         jn3 = j3 + (na3 - 1)*3
+                         !Read tensor elements location and triplet atoms.
+                         read(1, *) j1_, j2_, j3_, na1_, na2_, na3_
+                         if(any((/na1, na2, na3, j1, j2, j3/) /= &
+                              (/na1_, na2_, na3_, j1_, j2_, j3_/))) then
+                            call exit_with_message(&
+                                 "Wrong Triplet indices and/or tensor element location in mat3R file. Exiting.")
+                         end if
+
+                         !Read number of unit cells in file.
+                         read(1, *) nR_
+                         !Save this number only the first time it is read.
+                         !Also, allocate the various quantities.
+                         if(save_nR) then
+                            nR = nR_
+                            allocate(R2(3, nR), R3(3, nR), fc(3*sc_nat, 3*sc_nat, 3*sc_nat, nR))
+                            save_nR = .false.
+                         end if
+
+                         if(nR_ /= nR) call exit_with_message(&
+                              "Wrong number of unit cells in mat3R file. Exiting.")
+
+                         do ii = 1, nR
+                            !R2 and R3 seem to be the same for every nR chunk. Not
+                            !sure why the file is written in this format.
+                            read(1, *) R2(:, ii), R3(:, ii), fc(jn1, jn2, jn3, ii)
+                            !At this point the fc units are Ry/Bohr^3
+                         end do
+                      end do
+                   end do
+                end do
+             end do
+          end do
+       end do
+
+       !Convert to the standard format.
+       ph%numtriplets = nR*sc_nat**3 !Number of triplets
+       triplet_counter = 0
+       do ii = 1, nR
+          do na1 = 1, sc_nat
+             do na2 = 1, sc_nat
+                do na3 = 1, sc_nat
+                   triplet_counter = triplet_counter + 1
+
+                   !Triplet
+                   ph%Index_i(triplet_counter) = na1
+                   ph%Index_j(triplet_counter) = na2
+                   ph%Index_k(triplet_counter) = na3
+
+                   !Positions of the 2nd and 3rd atom in the triplet
+                   !converted to Cartesian coordinates (Ang).
+                   ph%R_j(:, triplet_counter) = matmul(crys%lattvecs, R2(:, ii)/dble(ph%qmesh))*10.0_dp
+                   ph%R_k(:, triplet_counter) = matmul(crys%lattvecs, R3(:, ii)/dble(ph%qmesh))*10.0_dp
+                   
+                   do j1 =1, 3
+                      jn1 = j1 + (na1 - 1)*3
+                      do j2 =1, 3
+                         jn2 = j2 + (na2 - 1)*3
+                         do j3 =1, 3
+                            jn3 = j3 + (na3 - 1)*3
+                            ph%ifc3(j1, j2, j3, triplet_counter) = fc(jn1, jn2, jn3, ii)
+                         end do
+                      end do
+                   end do
+                end do
+             end do
+          end do
+       end do
+       ph%ifc3 = ph%ifc3*Ryd2eV/(bohr2nm*10.0_dp)**3 !eV/Ang^3
+    end if
 
     !Each vector is rounded to the nearest lattice vector.
     tmp = crys%lattvecs
