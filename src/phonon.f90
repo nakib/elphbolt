@@ -445,9 +445,9 @@ contains
     inquire(file = 'mat3R', exist = d3q_file_exists)
 
     if(sheng_file_exists .and. .not. d3q_file_exists) then
-       call print_message('ShengBTE format third order force constants provided.')
+       call print_message('Reading ShengBTE format third order force constants...')
     else if(d3q_file_exists .and. .not. sheng_file_exists) then
-       call print_message('d3q format third order force constants provided.')
+       call print_message('Reading d3q format third order force constants...')
     else if(d3q_file_exists .and. sheng_file_exists) then
        call print_message(&
             'Both ShengBTE and d3q format third order force constants provided. Defaulting to ShengBTE format.')
@@ -478,7 +478,7 @@ contains
        end do
        close(1)
        !IFC3 units are eV/Ang^3
-    else
+    else       
        !See SUBROUTINE read_fc3_grid of fc3_interp.f90 of the d3q code
        !for more information about the format.
        open(1, file = 'mat3R', status = "old")
@@ -544,8 +544,7 @@ contains
                               "Wrong number of unit cells in mat3R file. Exiting.")
 
                          do ii = 1, nR
-                            !R2 and R3 seem to be the same for every nR chunk. Not
-                            !sure why the file is written in this format.
+                            !R2 and R3 are the same for every nR chunk.
                             read(1, *) R2(:, ii), R3(:, ii), fc(jn1, jn2, jn3, ii)
                             !At this point the fc units are Ry/Bohr^3
                          end do
@@ -555,10 +554,10 @@ contains
              end do
           end do
        end do
-
+       
        !Number of triplets
        ph%numtriplets = nR*crys%numatoms**3
-
+       
        !Allocate quantities
        allocate(ph%Index_i(ph%numtriplets), ph%Index_j(ph%numtriplets), ph%Index_k(ph%numtriplets))
        allocate(ph%ifc3(3, 3, 3, ph%numtriplets), ph%R_j(3, ph%numtriplets), ph%R_k(3,ph%numtriplets))
@@ -579,9 +578,9 @@ contains
                    !Positions of the 2nd and 3rd atom in the triplet
                    !converted to Cartesian coordinates (Ang).
                    ph%R_j(:, triplet_counter) = &
-                        matmul(crys%lattvecs, R2(:, ii)/dble(ph%qmesh))*10.0_dp
+                        matmul(crys%lattvecs, R2(:, ii)*10.0_dp) !Ang
                    ph%R_k(:, triplet_counter) = &
-                        matmul(crys%lattvecs, R3(:, ii)/dble(ph%qmesh))*10.0_dp
+                        matmul(crys%lattvecs, R3(:, ii)*10.0_dp) !Ang
                    
                    do j1 =1, 3
                       jn1 = j1 + (na1 - 1)*3

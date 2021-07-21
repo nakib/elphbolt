@@ -112,7 +112,9 @@ contains
           do b = 1, 3
              aux3 = aux2*conjg_ev2_s2(b + bind)
              do c = 1, 3
-                V0 = V0 + ifc3(c, b, a, it)*ev1_s1(c + cind)*aux3
+                if(ifc3(c, b, a, it) /= 0.0_dp) then
+                   V0 = V0 + ifc3(c, b, a, it)*ev1_s1(c + cind)*aux3
+                end if
              end do
           end do
        end do
