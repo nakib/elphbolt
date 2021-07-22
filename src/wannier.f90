@@ -94,6 +94,8 @@ contains
     !Local variables
     integer(k8) :: iuc, ib, jb
     integer(k8) :: coarse_qmesh(3)
+    real(dp) :: ef
+    real(dp), allocatable :: dummy(:)
 
     namelist /wannier/ coarse_qmesh
 
@@ -113,9 +115,10 @@ contains
     close(1)
     
     open(1,file=filename_epwdata,status='old')
-    read(1,*) !ef
+    read(1,*) ef !Fermi energy. Read but ignored here.
     read(1,*) wann%numwannbands, wann%nwsk, wann%numbranches, wann%nwsq, wann%nwsg
-    read(1,*) !zstar, epsil: non-zero only for polar materials
+    allocate(dummy((wann%numbranches/3 + 1)*9)) !numatoms*9 Born, 9 epsilon elements.
+    read(1,*) dummy !zstar, epsil. Read but ignored here.
 
     !Read real space hamiltonian
     call print_message("Reading Wannier rep. Hamiltonian...")
