@@ -36,7 +36,7 @@ module crystal_module
      character(len=100) :: name
      !! Name of material.
      character(len=3), allocatable :: elements(:)
-     !! Elements in the in the basis.
+     !! Elements in the basis.
      integer(k8), allocatable :: atomtypes(:)
      !! Integer tagging unique elements in the basis.
      real(dp), allocatable :: masses(:)
@@ -68,7 +68,7 @@ module crystal_module
      real(dp) :: volume_bz
      !! Brillouin zone volume (nm^-3).
      real(dp) :: T
-     !! Crystal temperature (T).
+     !! Crystal temperature (K).
      logical :: autoisotopes
      !! Use isotopic mix for masses?
      real(dp), allocatable :: gfactors(:)
@@ -107,12 +107,12 @@ contains
          epsilon0, epsiloninf, subs_mavg
     character(len=3), allocatable :: elements(:)
     character(len=100) :: name
-    logical :: polar, autoisotopes, phiso, read_epsiloninf, twod
+    logical :: polar, autoisotopes, read_epsiloninf, twod
     
     namelist /allocations/ numelements, numatoms
     namelist /crystal_info/ name, elements, atomtypes, basis, lattvecs, &
          polar, born, epsilon, read_epsiloninf, epsilon0, epsiloninf, &
-         masses, T, autoisotopes, phiso, twod, subs_masses, subs_conc
+         masses, T, autoisotopes, twod, subs_masses, subs_conc
 
     call subtitle("Setting up crystal...")
 
@@ -120,7 +120,10 @@ contains
     open(1, file = 'input.nml', status = 'old')
 
     !Set values from input:
-    ! Read allocations
+    
+    !Read allocations
+    numelements = 0
+    numatoms = 0
     read(1, nml = allocations)
     if(numelements < 1 .or. numatoms < 1 .or. numatoms < numelements) then
        call exit_with_message('Bad input(s) in allocations.')
@@ -139,7 +142,13 @@ contains
          c%subs_gfactors(c%numelements))
     
     !Read crystal_info
+    name = trim(adjustl('Crystal'))
+    elements = 'X'
+    atomtypes = 0
+    masses = -1.0_dp
     autoisotopes = .true.
+    lattvecs = 0.0_dp
+    basis = 0.0_dp
     polar = .false.
     read_epsiloninf = .false.
     epsilon = 0.0_dp
@@ -151,7 +160,10 @@ contains
     subs_masses = 0.0_dp
     subs_conc = 0.0_dp
     read(1, nml = crystal_info)
-    if(any(atomtypes < 1) .or. any(masses < 0) .or. T < 0.0_dp) then
+    if(any(atomtypes < 1) .or. T < 0.0_dp) then
+       call exit_with_message('Bad input(s) in crystal_info.')
+    end if
+    if(.not. autoisotopes .and. any(masses < 0)) then
        call exit_with_message('Bad input(s) in crystal_info.')
     end if
 
@@ -166,7 +178,6 @@ contains
     c%basis = basis
     c%polar = polar
     c%read_epsiloninf = read_epsiloninf
-    c%epsiloninf = epsiloninf
     c%epsilon0 = epsilon0
     c%lattvecs = lattvecs
     c%T = T

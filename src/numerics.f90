@@ -33,7 +33,7 @@ module numerics_module
      integer(k8) :: mesh_ref
      !! Electron mesh refinement factor compared to the phonon mesh.
      real(dp) :: fsthick
-     !! Fermi surface thickness in (eV).
+     !! Fermi surface thickness in eV.
      character(len = 1024) :: cwd
      !! Current working directory.
      character(len = 1024) ::datadumpdir

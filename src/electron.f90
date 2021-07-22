@@ -40,7 +40,7 @@ module electron_module
      integer(k8) :: spindeg
      !! Spin degeneracy.
      integer(k8) :: numbands
-     !! Total number of electronic bands (from DFT/Wannier).
+     !! Total number of electronic Wannier bands.
      integer(k8) :: numtransbands
      !! Total number of transport active bands.
      integer(k8) :: indlowband
@@ -199,9 +199,10 @@ contains
     indlowconduction = 0
     indhighvalence = 0
     metallic = .false.
-    Zn = 0
-    Zp = 0
+    Zn = 0.0_dp
+    Zp = 0.0_dp
     chempot = -999999.99999_dp !Something crazy
+    enref = -999999.99999_dp !Something crazy
     numT = 100 !Something crazy big
     numconc = 100 !Something crazy big
     dopingtype = 'x'

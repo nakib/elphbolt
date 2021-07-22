@@ -155,7 +155,7 @@ program elphbolt
      end if
 
      if(num%onlyphbte .or. num%drag) then
-        !After this point the phonon eigenvectors and other quantities that are not needed
+        !After this point the phonon eigenvectors and other quantities are not needed
         call ph%deallocate_phonon_quantities
      end if
 
