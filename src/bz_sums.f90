@@ -52,21 +52,19 @@ contains
     beta = 1.0_dp/kB/crys%T/qe !1/J
     crys%qTF=0.d0
 
-    if(crys%polar) then
-       call print_message("Calculating Thomas-Fermi screening...")
-       
-       do ib = 1, el%numbands
-          do ik = 1, el%nk
-             fFD = Fermi(el%ens(ik, ib), el%chempot, crys%T)
-             crys%qTF = crys%qTF + fFD*(1.0_dp - fFD)
-          end do
-       end do
-       crys%qTF = sqrt(1.0e9_dp*crys%qTF*el%spindeg*beta*qe**2/product(el%kmesh)&
-            /crys%volume/perm0/crys%epsilon0) !nm^-1
+    call print_message("Calculating Thomas-Fermi screening...")
 
-       if(this_image() == 1) then
-          write(*, "(A, 1E16.8, A)") ' Thomas-Fermi screening wave length = ', crys%qTF, ' 1/nm'
-       end if
+    do ib = 1, el%numbands
+       do ik = 1, el%nk
+          fFD = Fermi(el%ens(ik, ib), el%chempot, crys%T)
+          crys%qTF = crys%qTF + fFD*(1.0_dp - fFD)
+       end do
+    end do
+    crys%qTF = sqrt(1.0e9_dp*crys%qTF*el%spindeg*beta*qe**2/product(el%kmesh)&
+         /crys%volume/perm0/crys%epsilon0) !nm^-1
+
+    if(this_image() == 1) then
+       write(*, "(A, 1E16.8, A)") ' Thomas-Fermi screening wave length = ', crys%qTF, ' 1/nm'
     end if
   end subroutine calculate_qTF
   

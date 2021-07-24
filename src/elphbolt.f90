@@ -72,6 +72,7 @@ program elphbolt
 
   select case(num%runlevel)
   case(1) !BTE solving case
+     call subtitle("Calculating density of states...")
      if(num%onlyebte .or. num%drag) then
         !Calculate electron density of states
         call calculate_dos(el, num%tetrahedra)
