@@ -84,14 +84,14 @@ There are 5 Namelists in the ~input.nml~ file: ~allocations~, ~crystal_info~, ~e
 
 *** ~allocations~
 
-| ~key~         | Type    | Default | Description                     |
+| key         | Type    | Default | Description                     |
 |---------------+---------+---------+---------------------------------|
 | ~numelements~ | Integer |       0 | Number of types of basis atoms. |
 | ~numatoms~    | Integer |       0 | Number of basis atoms.          |
 
 *** ~crystal_info~
 
-| ~key~             | Type                               |   Default | Description                                                                                                                                                                                                                                |
+| key             | Type                               |   Default | Description                                                                                                                                                                                                                                |
 |-------------------+------------------------------------+-----------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | ~name~            | String                             | "Crystal" | Name of material.                                                                                                                                                                                                                          |
 | ~elements~        | String array of size ~numelements~ |       'X' | Elements in the basis.                                                                                                                                                                                                                     |
@@ -112,7 +112,7 @@ There are 5 Namelists in the ~input.nml~ file: ~allocations~, ~crystal_info~, ~e
 | ~subs_conc~       | Real array of size ~numelements~   |       0.0 | Concentration of the substitutional atoms in cm^{-3} (or cm^{-2} if ~twod~ is .True.). This is needed if ~phsubs~ is .True. See table of keys for Namelist ~numerics~.                                                                     |
 
 *** ~electrons~
-| ~key~              | Type                         |       Default | Description                                                                                                                                                               |
+| key              | Type                         |       Default | Description                                                                                                                                                               |
 |--------------------+------------------------------+---------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | ~spindeg~          | Integer                      |             2 | Spin degeneracy of the bands.                                                                                                                                             |
 | ~enref~            | Real                         | -999999.99999 | Electron referenc energy in eV. This is the center of the transport active window. Also see description for ~fsthick~. See table of keys for Namelist 'numerics'.         |
@@ -132,7 +132,7 @@ There are 5 Namelists in the ~input.nml~ file: ~allocations~, ~crystal_info~, ~e
 | ~Zp~               | Real                         |           0.0 | Ionization number if acceptor impurities. This is needed only when ~elchimp~ is .True. and ~metallic~ is .False. See table of keys for Namelist 'numerics'.               |
 
 *** ~numerics~
-    | ~key~             | Type                    | Default | Description                                                                                                                                                                                                                                                                                                                                                   |
+    | key             | Type                    | Default | Description                                                                                                                                                                                                                                                                                                                                                   |
     |-------------------+-------------------------+---------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
     | ~qmesh~           | Integer array of size 3 | 1 1 1   | Phonon wave vector mesh (q).                                                                                                                                                                                                                                                                                                                                  |
     | ~mesh_ref~        | Integer                 | 1       | Electron wave vector mesh (k) refinement factor with respect to the phonon mesh.                                                                                                                                                                                                                                                                              |
@@ -163,7 +163,7 @@ There are 5 Namelists in the ~input.nml~ file: ~allocations~, ~crystal_info~, ~e
 
 *** ~wannier~
 
-| ~key~          | Type                    | Default | Description                                                                                                                                               |
+| key          | Type                    | Default | Description                                                                                                                                               |
 |----------------+-------------------------+---------+-----------------------------------------------------------------------------------------------------------------------------------------------------------|
 | ~coarse_qmesh~ | Integer array of size 3 | 0 0 0   | Coarse phonon wave vector mesh employed in the Wannier calculation. This must match the q-mesh in the Quantum Espresso second order force constants file. |
 ** Description of output files

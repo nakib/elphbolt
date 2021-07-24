@@ -162,14 +162,14 @@ keys for each Namelist are described.
 
 ### `allocations`
 
-| `key`         | Type    | Default | Description                     |
+| key           | Type    | Default | Description                     |
 | ------------- | ------- | ------- | ------------------------------- |
 | `numelements` | Integer | 0       | Number of types of basis atoms. |
 | `numatoms`    | Integer | 0       | Number of basis atoms.          |
 
 ### `crystal_info`
 
-| `key`             | Type                                  | Default   | Description                                                                                                                                                                                                                                |
+| key               | Type                                  | Default   | Description                                                                                                                                                                                                                                |
 | ----------------- | ------------------------------------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `name`            | String                                | "Crystal" | Name of material.                                                                                                                                                                                                                          |
 | `elements`        | String array of size `numelements`    | 'X'       | Elements in the basis.                                                                                                                                                                                                                     |
@@ -191,7 +191,7 @@ keys for each Namelist are described.
 
 ### `electrons`
 
-| `key`              | Type                         | Default        | Description                                                                                                                                                               |
+| key                | Type                         | Default        | Description                                                                                                                                                               |
 | ------------------ | ---------------------------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `spindeg`          | Integer                      | 2              | Spin degeneracy of the bands.                                                                                                                                             |
 | `enref`            | Real                         | \-999999.99999 | Electron referenc energy in eV. This is the center of the transport active window. Also see description for `fsthick`. See table of keys for Namelist 'numerics'.         |
@@ -212,7 +212,7 @@ keys for each Namelist are described.
 
 ### `numerics`
 
-| `key`             | Type                    | Default | Description                                                                                                                                                                                                                                                                                                                                                   |
+| key               | Type                    | Default | Description                                                                                                                                                                                                                                                                                                                                                   |
 | ----------------- | ----------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `qmesh`           | Integer array of size 3 | 1 1 1   | Phonon wave vector mesh (q).                                                                                                                                                                                                                                                                                                                                  |
 | `mesh_ref`        | Integer                 | 1       | Electron wave vector mesh (k) refinement factor with respect to the phonon mesh.                                                                                                                                                                                                                                                                              |
@@ -243,7 +243,7 @@ keys for each Namelist are described.
 
 ### `wannier`
 
-| `key`          | Type                    | Default | Description                                                                                                                                               |
+| key            | Type                    | Default | Description                                                                                                                                               |
 | -------------- | ----------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `coarse_qmesh` | Integer array of size 3 | 0 0 0   | Coarse phonon wave vector mesh employed in the Wannier calculation. This must match the q-mesh in the Quantum Espresso second order force constants file. |
 

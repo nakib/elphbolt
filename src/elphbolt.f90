@@ -61,7 +61,7 @@ program elphbolt
 
   if(num%onlyebte .or. num%drag .or. num%phe .or. num%plot_along_path) then
      !Read EPW Wannier data
-     call wann%read
+     call wann%read(num)
 
      !Calculate electrons
      call el%initialize(wann, crys, sym, num)
@@ -127,7 +127,7 @@ program elphbolt
      if(num%onlyebte .or. num%drag .or. num%phe .or. num%drag &
           .or. num%plot_along_path) then
         !Deallocate Wannier quantities
-        call wann%deallocate_wannier
+        call wann%deallocate_wannier(num)
      end if
 
      if(num%onlyebte .or. num%drag .or. num%phe) then

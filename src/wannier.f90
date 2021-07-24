@@ -85,12 +85,14 @@ module wannier_module
 
 contains
 
-  subroutine read_EPW_Wannier(wann)
+  !subroutine read_EPW_Wannier(wann)
+  subroutine read_EPW_Wannier(wann, num)
     !! Read Wannier representation of the hamiltonian, dynamical matrix, and the
     !! e-ph matrix elements from file epwdata.fmt.
 
     class(epw_wannier), intent(out) :: wann
-
+    type(numerics), intent(in) :: num
+    
     !Local variables
     integer(k8) :: iuc, ib, jb
     integer(k8) :: coarse_qmesh(3)
@@ -118,7 +120,7 @@ contains
     read(1,*) ef !Fermi energy. Read but ignored here.
     read(1,*) wann%numwannbands, wann%nwsk, wann%numbranches, wann%nwsq, wann%nwsg
     allocate(dummy((wann%numbranches/3 + 1)*9)) !numatoms*9 Born, 9 epsilon elements.
-    read(1,*) dummy !zstar, epsil. Read but ignored here.
+    read(1,*) dummy !Born, epsilon. Read but ignored here.
 
     !Read real space hamiltonian
     call print_message("Reading Wannier rep. Hamiltonian...")
@@ -143,12 +145,16 @@ contains
     end do
     close(1)
 
-    !Read real space matrix elements
-    call print_message("Reading Wannier rep. e-ph vertex...")
-    open(1, file = filename_epwgwann, status = 'old', access = 'stream')
-    allocate(wann%gwann(wann%numwannbands,wann%numwannbands,wann%nwsk,wann%numbranches,wann%nwsg))
-    wann%gwann = 0.0_dp
-    read(1) wann%gwann
+    if(.not. num%read_gk2 .and. .not. num%read_gq2 .or. &
+         num%plot_along_path) then
+       !Read real space matrix elements
+       call print_message("Reading Wannier rep. e-ph vertex...")
+       open(1, file = filename_epwgwann, status = 'old', access = 'stream')
+       allocate(wann%gwann(wann%numwannbands,wann%numwannbands,wann%nwsk,&
+            wann%numbranches,wann%nwsg))
+       wann%gwann = 0.0_dp
+       read(1) wann%gwann
+    end if
     close(1)
 
     !Read cell maps of q, k, g meshes.
@@ -709,14 +715,20 @@ contains
     call chdir(num%cwd)
   end subroutine gReq_epw
 
-  subroutine deallocate_wannier(wann)
+  subroutine deallocate_wannier(wann, num)
     !! Deallocates some Wannier quantities
 
     class(epw_wannier), intent(inout) :: wann
+    type(numerics), intent(in) :: num
     
     deallocate(wann%rcells_k, wann%rcells_q, wann%rcells_g, &
          wann%elwsdeg, wann%phwsdeg, wann%gwsdeg, &
-         wann%Hwann, wann%gwann, wann%Dphwann)
+         wann%Hwann, wann%Dphwann)
+
+    if(.not. num%read_gk2 .and. .not. num%read_gq2 .or. &
+         num%plot_along_path) then
+       deallocate(wann%gwann)
+    end if
   end subroutine deallocate_wannier
   
   subroutine plot_along_path(wann, crys, num)
