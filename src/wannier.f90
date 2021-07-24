@@ -85,7 +85,6 @@ module wannier_module
 
 contains
 
-  !subroutine read_EPW_Wannier(wann)
   subroutine read_EPW_Wannier(wann, num)
     !! Read Wannier representation of the hamiltonian, dynamical matrix, and the
     !! e-ph matrix elements from file epwdata.fmt.
@@ -145,7 +144,7 @@ contains
     end do
     close(1)
 
-    if(.not. num%read_gk2 .and. .not. num%read_gq2 .or. &
+    if(.not. num%read_gk2 .or. .not. num%read_gq2 .or. &
          num%plot_along_path) then
        !Read real space matrix elements
        call print_message("Reading Wannier rep. e-ph vertex...")

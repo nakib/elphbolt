@@ -19,6 +19,7 @@ module numerics_module
 
   use params, only: dp, k8, twopi
   use misc, only: exit_with_message, subtitle
+  use crystal_module, only: crystal
 
   implicit none
 
@@ -100,17 +101,15 @@ module numerics_module
 
 contains
 
-  subroutine read_input_and_setup(n, twod, T)
+  subroutine read_input_and_setup(n, crys)
     !! Read input file for information related to the numerics.
     !!
     !! n Numerics object
-    !! twod Is the system 2d?
-    !! T Crystal temperature
+    !! crys Crytal object
 
     class(numerics), intent(out) :: n
-    logical, intent(in) :: twod
-    real(dp), intent(in) :: T
-
+    type(crystal), intent(in) :: crys
+    
     !Local variables
     integer(k8) :: mesh_ref, qmesh(3), maxiter, runlevel, el_en_num, ph_en_num
     real(dp) :: fsthick, conv_thres, ph_en_min, ph_en_max, el_en_min, el_en_max
@@ -159,8 +158,12 @@ contains
     if(any(qmesh <= 0) .or. mesh_ref < 1 .or. fsthick < 0) then
        call exit_with_message('Bad input(s) in numerics.')
     end if
-    if(twod .and. tetrahedra) then
+    if(crys%twod .and. tetrahedra) then
        call exit_with_message('The tetrahedra method only works for 3d. Exiting.')
+    end if
+    if(crys%epsilon0 == 0.0 .and. elchimp) then
+       call exit_with_message(&
+            'Need to provide non-zero epsilon0 for e-ch. imp. interaction. Exiting.')
     end if
     n%qmesh = qmesh
     n%mesh_ref = mesh_ref
@@ -192,7 +195,7 @@ contains
        n%el_en_num = el_en_num
     end if
     
-    if(twod .and. n%qmesh(3) /= 1) then
+    if(crys%twod .and. n%qmesh(3) /= 1) then
        call exit_with_message('For 2d systems, qmesh(3) must be equal to 1.')
     end if
     
@@ -224,7 +227,7 @@ contains
     if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(n%Vdir)))
 
     !Create T dependent subdirectory
-    write(tag, "(E9.3)") T
+    write(tag, "(E9.3)") crys%T
     n%datadumpdir_T = trim(adjustl(n%datadumpdir))//'T'//trim(adjustl(tag))
     if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(n%datadumpdir_T)))
 
@@ -242,7 +245,7 @@ contains
     !Print out information.
     if(this_image() == 1) then
        write(*, "(A, (3I5,x))") "q-mesh = ", n%qmesh
-       if(twod) then
+       if(crys%twod) then
           write(*, "(A, (3I5,x))") "k-mesh = ", n%mesh_ref*n%qmesh(1), n%mesh_ref*n%qmesh(2), 1
        else
           write(*, "(A, (3I5,x))") "k-mesh = ", n%mesh_ref*n%qmesh(1), n%mesh_ref*n%qmesh(2), &
