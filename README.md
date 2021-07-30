@@ -249,4 +249,15 @@ keys for each Namelist are described.
 
 ## Description of output files
 
-\[Working on it.\]
+The code produces a large amount of data. Here, we provide a description
+of the various types output files.
+
+### Zero temperature data
+
+Below I(F)BZ = irreducible (full) Brillouin zone.
+
+| File name     | Directory        | Units          | Description                                                         |
+| ------------- | ---------------- | -------------- | ------------------------------------------------------------------- |
+| `gk2.istate*` | `datadumpdir/g2` | eV<sup>2</sup> | E-ph vertices for every IBZ electron state. This is a binary file . |
+| `gq2.istate*` | `datadumpdir/g2` | eV<sup>2</sup> | E-ph vertices for every IBZ electron state. This is a binary file . |
+|               |                  |                |                                                                     |

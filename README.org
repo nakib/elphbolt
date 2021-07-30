@@ -168,4 +168,15 @@ There are 5 Namelists in the ~input.nml~ file: ~allocations~, ~crystal_info~, ~e
 | ~coarse_qmesh~ | Integer array of size 3 | 0 0 0   | Coarse phonon wave vector mesh employed in the Wannier calculation. This must match the q-mesh in the Quantum Espresso second order force constants file. |
 ** Description of output files
 
-[Working on it.]
+The code produces a large amount of data. Here, we provide a description of the various types output files.
+
+Below I(F)BZ = irreducible (full) Brillouin zone.
+
+*** Zero temperature data
+
+| File name     | Directory        | Units  | Description                                                                 |
+|---------------+------------------+--------+-----------------------------------------------------------------------------|
+| ~gk2.istate*~ | ~datadumpdir/g2~ | eV^{2} | Squared e-ph vertices for every IBZ electron state. This is a binary file . |
+| ~gq2.istate*~ | ~datadumpdir/g2~ | eV^{2} | Squared e-ph vertices for every IBZ electron state. This is a binary file . |
+|               |                  |        |                                                                             |
+
