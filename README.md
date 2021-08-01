@@ -88,13 +88,9 @@ executable `elphbolt.x` one directory above.
 
 \[Working on it.\]
 
-## Singularity image
-
-\[Considering it.\]
-
 ## Tests
 
-\[Working on it.\]
+A full example for cubic silicon is provided.
 
 ## Workflow
 
@@ -102,7 +98,7 @@ This is a transport code. And it comes after doing some DFT, DFPT, and
 Wannier calculations. The following quantities are the inputs for a
 calculation with `elphbolt`:
 
-### Input file \[required\]
+### Input file
 
 The input file - `input.nml` - contains the information about the
 crystal and the various parameters of the calculation. A full
@@ -110,13 +106,13 @@ description of all the input parameters will be provided soon in the
 documentation. I will also provide example input files for the test
 materials.
 
-### Second order interatomic force constants \[required\]
+### Second order interatomic force constants
 
 This comes out of the usual `ph.x` and `q2r.x` calculation from `Quantum
 Espresso`. This file is needed to calculate phonon quantities and must
 be named `espresso.ifc2`.
 
-### Third order interatomic force constants \[optional\]
+### Third order interatomic force constants
 
 This file, which must be named `FORCE_CONSTANTS_3RD`, is needed to
 calculate the 3-ph scattering rates. This is a required file if you seek
@@ -128,7 +124,7 @@ electron-phonon BTEs. See documentation for the code `thirdorder.py`
 (<https://bitbucket.org/sousaw/thirdorder/src/master>) for how to
 generate this file.
 
-### Wannier space information \[optional\]
+### Wannier space information
 
 These are required if you want to solve a decoupled electron BTE,
 include phonon-electron interaction in the decoupled phonon BTE, or
@@ -145,7 +141,7 @@ are outputted by `EPW` after the Bloch -\> Wannier calculation step. The
 first contains the Wannier space electron-phonon matrix elements and the
 second contains the Wannier space dynamical matrix and Hamiltonian.
 
-### High symmetry electron and phonon wave vector path and initial electron wave vector \[optional\]
+### High symmetry electron and phonon wave vector path and initial electron wave vector
 
 You need to provide a wave vector path file named `highsympath.txt` (to
 be used as both the electron and phonon wave vectors) and an initial
@@ -290,9 +286,9 @@ phonon branches.
 | `RTA{nodrag}(partdcpl)[drag]_J0_*`                                  | `./T*/`              | nmC                                           | Band resolved (`_<integer>`) and total (`_tot`) electronic response function to E-field in the RTA {dragless} (partially decoupled) \[drag\] theory.                                         |
 | `RTA{nodrag}[drag]_F0_*`                                            | `./T*/`              | nmeVK<sup>-1</sup>                            | Branch resolved (`_<integer>`) and total (`_tot`) phononic response function to ∇ T-field in the RTA {dragless} \[fully coupled\] theory.                                                    |
 | `drag_G0_*`                                                         | `./T*/`              | nmC                                           | Branch resolved (`_<integer>`) and total (`_tot`) phononic response function to E-field in fully coupled theory.                                                                             |
-| `RTA{nodrag}(partdcpt)[drag]_{([iterated_el])}_sigma_spectral_*`    | `./T*/`              | *Ω*<sup>-1</sup>m<sup>-1</sup>eV<sup>-1</sup> | Band resolved (`_<integer>`) and total (`_tot`) spectral charge conductivity tensor in the RTA {(\[iterated\])} {dragless} (partially decoupled) \[drag\] theory.                            |
-| `RTA{nodrag}(partdcpt)[drag]_{([iterated_el])}_alphabyT_spectral_*` | `./T*/`              | Am<sup>-1</sup>K<sup>-1</sup>eV<sup>-1</sup>  | Band resolved (`_<integer>`) and total (`_tot`) spectral electronic Peltier(-ish) coefficient tensor in the RTA {(\[iterated\])} {dragless} (partially decoupled) \[drag\] theory.           |
-| `RTA{nodrag}(partdcpt)[drag]_{([iterated_el])}_kappa0_spectral_*`   | `./T*/`              | Wm<sup>-1</sup>K<sup>-1</sup>eV<sup>-1</sup>  | Band resolved (`_<integer>`) and total (`_tot`) spectral electronic thermal conductivity (zero E-field) tensor in the RTA {(\[iterated\])} {dragless} (partially decoupled) \[drag\] theory. |
-| `RTA{nodrag}(partdcpt)[drag]_{([iterated_el])}_sigmaS_spectral_*`   | `./T*/`              | Am<sup>-1</sup>K<sup>-1</sup>eV<sup>-1</sup>  | Band resolved (`_<integer>`) and total (`_tot`) spectral electronic thermopower times conductivity tensor in the RTA {(\[iterated\])} {dragless} (partially decoupled) \[drag\] theory.      |
+| `RTA{nodrag}(partdcpl)[drag]_{([iterated_el])}_sigma_spectral_*`    | `./T*/`              | *Ω*<sup>-1</sup>m<sup>-1</sup>eV<sup>-1</sup> | Band resolved (`_<integer>`) and total (`_tot`) spectral charge conductivity tensor in the RTA {(\[iterated\])} {dragless} (partially decoupled) \[drag\] theory.                            |
+| `RTA{nodrag}(partdcpl)[drag]_{([iterated_el])}_alphabyT_spectral_*` | `./T*/`              | Am<sup>-1</sup>K<sup>-1</sup>eV<sup>-1</sup>  | Band resolved (`_<integer>`) and total (`_tot`) spectral electronic Peltier(-ish) coefficient tensor in the RTA {(\[iterated\])} {dragless} (partially decoupled) \[drag\] theory.           |
+| `RTA{nodrag}(partdcpl)[drag]_{([iterated_el])}_kappa0_spectral_*`   | `./T*/`              | Wm<sup>-1</sup>K<sup>-1</sup>eV<sup>-1</sup>  | Band resolved (`_<integer>`) and total (`_tot`) spectral electronic thermal conductivity (zero E-field) tensor in the RTA {(\[iterated\])} {dragless} (partially decoupled) \[drag\] theory. |
+| `RTA{nodrag}(partdcpl)[drag]_{([iterated_el])}_sigmaS_spectral_*`   | `./T*/`              | Am<sup>-1</sup>K<sup>-1</sup>eV<sup>-1</sup>  | Band resolved (`_<integer>`) and total (`_tot`) spectral electronic thermopower times conductivity tensor in the RTA {(\[iterated\])} {dragless} (partially decoupled) \[drag\] theory.      |
 | `drag_iterated_ph_alphabyT_spectral_*`                              | `./T*/`              | Am<sup>-1</sup>K<sup>-1</sup>eV<sup>-1</sup>  | Branch resolved (`_<integer>`) and total (`_tot`) spectral phonon Peltier(-ish) coefficient tensor in the iterated drag theory.                                                              |
 | `RTA{nodrag}[drag]_{[iterated_ph]}_kappa_spectral_*`                | `./T*/`              | Wm<sup>-1</sup>K<sup>-1</sup>eV<sup>-1</sup>  | Branch resolved (`_<integer>`) and total (`_tot`) spectral phonon thermal conductivity tensor in the RTA {\[iterated\]} {dragless} \[drag\] theory.                                          |
