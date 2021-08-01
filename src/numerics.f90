@@ -223,7 +223,7 @@ contains
     !Create matrix elements data directories
     n%g2dir = trim(adjustl(n%datadumpdir))//'g2'
     if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(n%g2dir)))
-    n%Vdir = trim(adjustl(n%datadumpdir))//'V'
+    n%Vdir = trim(adjustl(n%datadumpdir))//'V2'
     if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(n%Vdir)))
 
     !Create T dependent subdirectory
