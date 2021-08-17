@@ -386,7 +386,7 @@ contains
 
     complex(dp) :: dyn_l(wann%numbranches,wann%numbranches)
     real(dp) :: qeq,     &! <q+g| epsilon |q+g>
-         arg, zig(3), zjg(3), g(3), gmax, alph, geg, &
+         arg, zig(3), zjg(3), g(3), gmax, alph, &
          tpiba, dgeg(3), fnat(3), rr(crys%numatoms,crys%numatoms,3)
     integer(k8) :: iat,jat,i,idim,jdim,ipol,jpol,m1,m2,m3,nq1,nq2,nq3
     complex(dp) :: fac, facqd, facq
@@ -401,7 +401,6 @@ contains
 
     gmax= 14.0_dp !dimensionless
     alph= tpiba**2 !bohr^-2
-    geg = gmax*alph*4.0_dp
     !In Ry units, qe = sqrt(2.0)
     fac = 8.0_dp*pi/(crys%volume/bohr2nm**3)
 
@@ -580,10 +579,10 @@ contains
     
     real(dp), intent(in) :: q(3) !Cartesian
     complex(dp), intent(in) :: uqs(wann%numbranches)
-    complex(dp), intent(inout) :: glprefac
+    complex(dp), intent(out) :: glprefac
 
     real(dp) :: qeq,     &! <q+g| epsilon |q+g>
-         arg, zaq, g(3), gmax, alph, geg,tpiba
+         arg, zaq, g(3), gmax, alph, tpiba
     integer(k8) :: na,ipol, m1,m2,m3,nq1,nq2,nq3
     complex(dp) :: fac, facqd, facq
 
@@ -597,8 +596,7 @@ contains
 
     gmax= 14.d0 !dimensionless
     alph= tpiba**2 !bohr^-2
-    geg = gmax*alph*4.0d0
-    !In Ry units, qe = sqrt(2.0)
+    !In Ry units, qe = sqrt(2.0) and epsilon_0 = 1/(4\pi)
     fac = 8.d0*pi/(crys%volume/bohr2nm**3)*oneI
     glprefac = (0.d0,0.d0)
 
