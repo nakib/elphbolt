@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
    
-   <meta name="description" content="A Fortran 2018 code for solving the coupled electron and phonon Boltzmann transport equations.">
+   <meta name="description" content="A solver for the coupled and decoupled electron and phonon Boltzmann transport equations.">
     
     <meta name="author" content="Nakib Haider Protik" >
     <link rel="icon" href="../favicon.png">
@@ -16,6 +16,8 @@
     <link href="../css/pygments.css" rel="stylesheet">
     <link href="../css/font-awesome.min.css" rel="stylesheet">
     <link href="../css/local.css" rel="stylesheet">
+    
+    <link  href="../tipuesearch/tipuesearch.css" rel="stylesheet">
     
     
 
@@ -93,6 +95,15 @@
 
           </ul>
         
+        <form action="../search.html" class="navbar-form navbar-right" role="search">
+        <div class="form-group">
+          <input type="text" class="form-control" placeholder="Search" name="q" id="tipue_search_input" autocomplete="off" required>
+        </div>
+<!--
+        <button type="submit" class="btn btn-default">Submit</button>
+-->
+        </form>
+        
         </div><!--/.nav-collapse -->
       </div>
     </nav>
@@ -119,7 +130,7 @@
      <li><i class="fa fa-list-ol"></i>
        <a data-toggle="tooltip"
     data-placement="bottom" data-html="true"
-    title="<p>15.0% of total for derived types.</p>Including implementation: 141 statements, 10.5% of total for derived types.">29 statements</a>
+    title="<p>15.0% of total for derived types.</p>Including implementation: 183 statements, 11.1% of total for derived types.">32 statements</a>
      </li> 
      
      
@@ -182,9 +193,9 @@
       
       <a class="list-group-item" href="../type/crystal.html#variable-born">born</a>
       
-      <a class="list-group-item" href="../type/crystal.html#variable-read_epsilon0">read_epsilon0</a>
-      
       <a class="list-group-item" href="../type/crystal.html#variable-epsilon0">epsilon0</a>
+      
+      <a class="list-group-item" href="../type/crystal.html#variable-read_epsiloninf">read_epsiloninf</a>
       
       <a class="list-group-item" href="../type/crystal.html#variable-epsiloninf">epsiloninf</a>
       
@@ -207,6 +218,12 @@
       <a class="list-group-item" href="../type/crystal.html#variable-autoisotopes">autoisotopes</a>
       
       <a class="list-group-item" href="../type/crystal.html#variable-gfactors">gfactors</a>
+      
+      <a class="list-group-item" href="../type/crystal.html#variable-subs_masses">subs_masses</a>
+      
+      <a class="list-group-item" href="../type/crystal.html#variable-subs_conc">subs_conc</a>
+      
+      <a class="list-group-item" href="../type/crystal.html#variable-subs_gfactors">subs_gfactors</a>
       
       <a class="list-group-item" href="../type/crystal.html#variable-twod">twod</a>
       
@@ -292,9 +309,9 @@
       
       <a class="list-group-item" href="../type/crystal.html#variable-born">born</a>
       
-      <a class="list-group-item" href="../type/crystal.html#variable-read_epsilon0">read_epsilon0</a>
-      
       <a class="list-group-item" href="../type/crystal.html#variable-epsilon0">epsilon0</a>
+      
+      <a class="list-group-item" href="../type/crystal.html#variable-read_epsiloninf">read_epsiloninf</a>
       
       <a class="list-group-item" href="../type/crystal.html#variable-epsiloninf">epsiloninf</a>
       
@@ -317,6 +334,12 @@
       <a class="list-group-item" href="../type/crystal.html#variable-autoisotopes">autoisotopes</a>
       
       <a class="list-group-item" href="../type/crystal.html#variable-gfactors">gfactors</a>
+      
+      <a class="list-group-item" href="../type/crystal.html#variable-subs_masses">subs_masses</a>
+      
+      <a class="list-group-item" href="../type/crystal.html#variable-subs_conc">subs_conc</a>
+      
+      <a class="list-group-item" href="../type/crystal.html#variable-subs_gfactors">subs_gfactors</a>
       
       <a class="list-group-item" href="../type/crystal.html#variable-twod">twod</a>
       
@@ -428,7 +451,7 @@
   
   <td>public,</td>
   <td>allocatable</td><td>::</td>
-  <td><strong>elements</strong>(:)</td><td></td><td></td><td><p>Elements in the in the basis.</p></td>
+  <td><strong>elements</strong>(:)</td><td></td><td></td><td><p>Elements in the basis.</p></td>
   
 </tr>
 
@@ -508,11 +531,11 @@
   
 <tr>
   
-  <td><span class="anchor" id="variable-read_epsilon0"></span>logical,</td>
+  <td><span class="anchor" id="variable-epsilon0"></span>real(kind=dp),</td>
   
   <td>public</td>
   <td></td><td>::</td>
-  <td><strong>read_epsilon0</strong></td><td></td><td></td><td><p>Read static dielectric constant?</p></td>
+  <td><strong>epsilon0</strong></td><td></td><td></td><td><p>Static dielectric constant.</p></td>
   
 </tr>
 
@@ -522,11 +545,11 @@
   
 <tr>
   
-  <td><span class="anchor" id="variable-epsilon0"></span>real(kind=dp),</td>
+  <td><span class="anchor" id="variable-read_epsiloninf"></span>logical,</td>
   
   <td>public</td>
   <td></td><td>::</td>
-  <td><strong>epsilon0</strong></td><td></td><td></td><td><p>Static dielectric constant.</p></td>
+  <td><strong>read_epsiloninf</strong></td><td></td><td></td><td><p>Read high-frequency dielectric constant?</p></td>
   
 </tr>
 
@@ -652,7 +675,7 @@
   
   <td>public</td>
   <td></td><td>::</td>
-  <td><strong>T</strong></td><td></td><td></td><td><p>Crystal temperature (T).</p></td>
+  <td><strong>T</strong></td><td></td><td></td><td><p>Crystal temperature (K).</p></td>
   
 </tr>
 
@@ -681,6 +704,48 @@
   <td>public,</td>
   <td>allocatable</td><td>::</td>
   <td><strong>gfactors</strong>(:)</td><td></td><td></td><td><p>g-factors.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-subs_masses"></span>real(kind=dp),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>subs_masses</strong>(:)</td><td></td><td></td><td><p>Masses of the substitutional atoms</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-subs_conc"></span>real(kind=dp),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>subs_conc</strong>(:)</td><td></td><td></td><td><p>Concentration of the substitutional atoms in cm^-3</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-subs_gfactors"></span>real(kind=dp),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>subs_gfactors</strong>(:)</td><td></td><td></td><td><p>g-factors for the substitutional defects.</p></td>
   
 </tr>
 
@@ -861,6 +926,10 @@ private subroutine read_input_and_setup_crystal(c)
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
     
+    
+    <script src="../tipuesearch/tipuesearch_content.js"></script>
+    <script src="../tipuesearch/tipuesearch_set.js"></script>
+    <script src="../tipuesearch/tipuesearch.js"></script>
     
     
   </body>

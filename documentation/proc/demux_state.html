@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
    
-   <meta name="description" content="A Fortran 2018 code for solving the coupled electron and phonon Boltzmann transport equations.">
+   <meta name="description" content="A solver for the coupled and decoupled electron and phonon Boltzmann transport equations.">
     
     <meta name="author" content="Nakib Haider Protik" >
     <link rel="icon" href="../favicon.png">
@@ -16,6 +16,8 @@
     <link href="../css/pygments.css" rel="stylesheet">
     <link href="../css/font-awesome.min.css" rel="stylesheet">
     <link href="../css/local.css" rel="stylesheet">
+    
+    <link  href="../tipuesearch/tipuesearch.css" rel="stylesheet">
     
     
 
@@ -92,6 +94,15 @@
 <li class="visible-xs hidden-sm visible-lg"><a href="../program/elphbolt.html">Program</a></li>
 
           </ul>
+        
+        <form action="../search.html" class="navbar-form navbar-right" role="search">
+        <div class="form-group">
+          <input type="text" class="form-control" placeholder="Search" name="q" id="tipue_search_input" autocomplete="off" required>
+        </div>
+<!--
+        <button type="submit" class="btn btn-default">Submit</button>
+-->
+        </form>
         
         </div><!--/.nav-collapse -->
       </div>
@@ -307,65 +318,65 @@ public subroutine demux_state(m, nbands, iband, ik)
 <polygon fill="none" stroke="black" points="375,-129 301,-129 301,-105 375,-105 375,-129"/>
 <text text-anchor="middle" x="338" y="-114.6" font-family="Helvetica,sans-Serif" font-size="10.50">demux_state</text>
 </g>
-<!-- proc~calculate_el_rta_rates -->
+<!-- proc~calculate_eph_interaction_ibzk -->
 <g id="proc~~demux_state~~CalledByGraph_node2" class="node">
+<title>proc~calculate_eph_interaction_ibzk</title>
+<g id="a_proc~~demux_state~~CalledByGraph_node2"><a xlink:href=".././proc/calculate_eph_interaction_ibzk.html" xlink:title="calculate_eph_interaction_ibzk">
+<polygon fill="#d9534f" stroke="#d9534f" points="257,-234 98,-234 98,-210 257,-210 257,-234"/>
+<text text-anchor="middle" x="177.5" y="-219.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">calculate_eph_interaction_ibzk</text>
+</a>
+</g>
+</g>
+<!-- proc~calculate_eph_interaction_ibzk&#45;&gt;proc~demux_state -->
+<g id="proc~~demux_state~~CalledByGraph_edge1" class="edge">
+<title>proc~calculate_eph_interaction_ibzk&#45;&gt;proc~demux_state</title>
+<path fill="none" stroke="#000000" d="M246.29,-209.96C252.84,-207.51 259.2,-204.56 265,-201 290.75,-185.21 312.03,-157.12 324.62,-137.8"/>
+<polygon fill="#000000" stroke="#000000" points="327.72,-139.44 330.08,-129.11 321.8,-135.71 327.72,-139.44"/>
+</g>
+<!-- proc~calculate_el_rta_rates -->
+<g id="proc~~demux_state~~CalledByGraph_node3" class="node">
 <title>proc~calculate_el_rta_rates</title>
-<g id="a_proc~~demux_state~~CalledByGraph_node2"><a xlink:href=".././proc/calculate_el_rta_rates.html" xlink:title="calculate_el_rta_rates">
-<polygon fill="#d9534f" stroke="#d9534f" points="236.5,-234 118.5,-234 118.5,-210 236.5,-210 236.5,-234"/>
-<text text-anchor="middle" x="177.5" y="-219.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">calculate_el_rta_rates</text>
+<g id="a_proc~~demux_state~~CalledByGraph_node3"><a xlink:href=".././proc/calculate_el_rta_rates.html" xlink:title="calculate_el_rta_rates">
+<polygon fill="#d9534f" stroke="#d9534f" points="236.5,-66 118.5,-66 118.5,-42 236.5,-42 236.5,-66"/>
+<text text-anchor="middle" x="177.5" y="-51.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">calculate_el_rta_rates</text>
 </a>
 </g>
 </g>
 <!-- proc~calculate_el_rta_rates&#45;&gt;proc~demux_state -->
-<g id="proc~~demux_state~~CalledByGraph_edge1" class="edge">
+<g id="proc~~demux_state~~CalledByGraph_edge2" class="edge">
 <title>proc~calculate_el_rta_rates&#45;&gt;proc~demux_state</title>
-<path fill="none" stroke="#000000" d="M236.8,-213.14C246.65,-210.19 256.44,-206.25 265,-201 290.75,-185.21 312.03,-157.12 324.62,-137.8"/>
-<polygon fill="#000000" stroke="#000000" points="327.72,-139.44 330.08,-129.11 321.8,-135.71 327.72,-139.44"/>
+<path fill="none" stroke="#000000" d="M236.93,-65.73C246.46,-68.34 256.11,-71.42 265,-75 281.03,-81.46 297.78,-91.04 311.08,-99.41"/>
+<polygon fill="#000000" stroke="#000000" points="309.39,-102.49 319.69,-104.97 313.18,-96.6 309.39,-102.49"/>
 </g>
-<!-- proc~calculate_echimp_interaction_ibzk -->
-<g id="proc~~demux_state~~CalledByGraph_node3" class="node">
-<title>proc~calculate_echimp_interaction_ibzk</title>
-<g id="a_proc~~demux_state~~CalledByGraph_node3"><a xlink:href=".././proc/calculate_echimp_interaction_ibzk.html" xlink:title="calculate_echimp_interaction_ibzk">
-<polygon fill="#d9534f" stroke="#d9534f" points="265,-192 90,-192 90,-168 265,-168 265,-192"/>
-<text text-anchor="middle" x="177.5" y="-177.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">calculate_echimp_interaction_ibzk</text>
+<!-- proc~calculate_3ph_interaction -->
+<g id="proc~~demux_state~~CalledByGraph_node4" class="node">
+<title>proc~calculate_3ph_interaction</title>
+<g id="a_proc~~demux_state~~CalledByGraph_node4"><a xlink:href=".././proc/calculate_3ph_interaction.html" xlink:title="calculate_3ph_interaction">
+<polygon fill="#d9534f" stroke="#d9534f" points="244.5,-192 110.5,-192 110.5,-168 244.5,-168 244.5,-192"/>
+<text text-anchor="middle" x="177.5" y="-177.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">calculate_3ph_interaction</text>
 </a>
 </g>
 </g>
-<!-- proc~calculate_echimp_interaction_ibzk&#45;&gt;proc~demux_state -->
-<g id="proc~~demux_state~~CalledByGraph_edge2" class="edge">
-<title>proc~calculate_echimp_interaction_ibzk&#45;&gt;proc~demux_state</title>
+<!-- proc~calculate_3ph_interaction&#45;&gt;proc~demux_state -->
+<g id="proc~~demux_state~~CalledByGraph_edge3" class="edge">
+<title>proc~calculate_3ph_interaction&#45;&gt;proc~demux_state</title>
 <path fill="none" stroke="#000000" d="M238.31,-167.89C247.39,-165.36 256.54,-162.41 265,-159 281.03,-152.54 297.78,-142.96 311.08,-134.59"/>
 <polygon fill="#000000" stroke="#000000" points="313.18,-137.4 319.69,-129.03 309.39,-131.51 313.18,-137.4"/>
 </g>
 <!-- proc~calculate_eph_interaction_ibzq -->
-<g id="proc~~demux_state~~CalledByGraph_node4" class="node">
+<g id="proc~~demux_state~~CalledByGraph_node5" class="node">
 <title>proc~calculate_eph_interaction_ibzq</title>
-<g id="a_proc~~demux_state~~CalledByGraph_node4"><a xlink:href=".././proc/calculate_eph_interaction_ibzq.html" xlink:title="calculate_eph_interaction_ibzq">
+<g id="a_proc~~demux_state~~CalledByGraph_node5"><a xlink:href=".././proc/calculate_eph_interaction_ibzq.html" xlink:title="calculate_eph_interaction_ibzq">
 <polygon fill="#d9534f" stroke="#d9534f" points="257.5,-150 97.5,-150 97.5,-126 257.5,-126 257.5,-150"/>
 <text text-anchor="middle" x="177.5" y="-135.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">calculate_eph_interaction_ibzq</text>
 </a>
 </g>
 </g>
 <!-- proc~calculate_eph_interaction_ibzq&#45;&gt;proc~demux_state -->
-<g id="proc~~demux_state~~CalledByGraph_edge3" class="edge">
+<g id="proc~~demux_state~~CalledByGraph_edge4" class="edge">
 <title>proc~calculate_eph_interaction_ibzq&#45;&gt;proc~demux_state</title>
 <path fill="none" stroke="#000000" d="M257.75,-127.5C269.01,-126.01 280.27,-124.52 290.62,-123.14"/>
 <polygon fill="#000000" stroke="#000000" points="291.18,-126.6 300.64,-121.82 290.26,-119.66 291.18,-126.6"/>
-</g>
-<!-- proc~calculate_eph_interaction_ibzk -->
-<g id="proc~~demux_state~~CalledByGraph_node5" class="node">
-<title>proc~calculate_eph_interaction_ibzk</title>
-<g id="a_proc~~demux_state~~CalledByGraph_node5"><a xlink:href=".././proc/calculate_eph_interaction_ibzk.html" xlink:title="calculate_eph_interaction_ibzk">
-<polygon fill="#d9534f" stroke="#d9534f" points="257,-108 98,-108 98,-84 257,-84 257,-108"/>
-<text text-anchor="middle" x="177.5" y="-93.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">calculate_eph_interaction_ibzk</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_eph_interaction_ibzk&#45;&gt;proc~demux_state -->
-<g id="proc~~demux_state~~CalledByGraph_edge4" class="edge">
-<title>proc~calculate_eph_interaction_ibzk&#45;&gt;proc~demux_state</title>
-<path fill="none" stroke="#000000" d="M257.29,-106.44C268.71,-107.95 280.14,-109.47 290.64,-110.86"/>
-<polygon fill="#000000" stroke="#000000" points="290.42,-114.36 300.79,-112.2 291.34,-107.42 290.42,-114.36"/>
 </g>
 <!-- proc~calculate_ph_rta_rates -->
 <g id="proc~~demux_state~~CalledByGraph_node6" class="node">
@@ -382,53 +393,53 @@ public subroutine demux_state(m, nbands, iband, ik)
 <path fill="none" stroke="#000000" d="M238.17,-21.27C247.55,-24.18 256.83,-27.99 265,-33 290.75,-48.79 312.03,-76.88 324.62,-96.2"/>
 <polygon fill="#000000" stroke="#000000" points="321.8,-98.29 330.08,-104.89 327.72,-94.56 321.8,-98.29"/>
 </g>
-<!-- proc~calculate_3ph_interaction -->
+<!-- proc~calculate_echimp_interaction_ibzk -->
 <g id="proc~~demux_state~~CalledByGraph_node7" class="node">
-<title>proc~calculate_3ph_interaction</title>
-<g id="a_proc~~demux_state~~CalledByGraph_node7"><a xlink:href=".././proc/calculate_3ph_interaction.html" xlink:title="calculate_3ph_interaction">
-<polygon fill="#d9534f" stroke="#d9534f" points="244.5,-66 110.5,-66 110.5,-42 244.5,-42 244.5,-66"/>
-<text text-anchor="middle" x="177.5" y="-51.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">calculate_3ph_interaction</text>
+<title>proc~calculate_echimp_interaction_ibzk</title>
+<g id="a_proc~~demux_state~~CalledByGraph_node7"><a xlink:href=".././proc/calculate_echimp_interaction_ibzk.html" xlink:title="calculate_echimp_interaction_ibzk">
+<polygon fill="#d9534f" stroke="#d9534f" points="265,-108 90,-108 90,-84 265,-84 265,-108"/>
+<text text-anchor="middle" x="177.5" y="-93.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">calculate_echimp_interaction_ibzk</text>
 </a>
 </g>
 </g>
-<!-- proc~calculate_3ph_interaction&#45;&gt;proc~demux_state -->
+<!-- proc~calculate_echimp_interaction_ibzk&#45;&gt;proc~demux_state -->
 <g id="proc~~demux_state~~CalledByGraph_edge6" class="edge">
-<title>proc~calculate_3ph_interaction&#45;&gt;proc~demux_state</title>
-<path fill="none" stroke="#000000" d="M238.31,-66.11C247.39,-68.64 256.54,-71.59 265,-75 281.03,-81.46 297.78,-91.04 311.08,-99.41"/>
-<polygon fill="#000000" stroke="#000000" points="309.39,-102.49 319.69,-104.97 313.18,-96.6 309.39,-102.49"/>
+<title>proc~calculate_echimp_interaction_ibzk&#45;&gt;proc~demux_state</title>
+<path fill="none" stroke="#000000" d="M265.17,-107.48C274.01,-108.65 282.73,-109.81 290.88,-110.89"/>
+<polygon fill="#000000" stroke="#000000" points="290.49,-114.37 300.86,-112.21 291.41,-107.43 290.49,-114.37"/>
 </g>
 <!-- program~elphbolt -->
 <g id="proc~~demux_state~~CalledByGraph_node8" class="node">
 <title>program~elphbolt</title>
 <g id="a_proc~~demux_state~~CalledByGraph_node8"><a xlink:href=".././program/elphbolt.html" xlink:title="elphbolt">
-<polygon fill="#f0ad4e" stroke="#f0ad4e" points="54,-129 0,-129 0,-105 54,-105 54,-129"/>
-<text text-anchor="middle" x="27" y="-114.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">elphbolt</text>
+<polygon fill="#f0ad4e" stroke="#f0ad4e" points="54,-171 0,-171 0,-147 54,-147 54,-171"/>
+<text text-anchor="middle" x="27" y="-156.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">elphbolt</text>
 </a>
 </g>
 </g>
-<!-- program~elphbolt&#45;&gt;proc~calculate_echimp_interaction_ibzk -->
-<g id="proc~~demux_state~~CalledByGraph_edge7" class="edge">
-<title>program~elphbolt&#45;&gt;proc~calculate_echimp_interaction_ibzk</title>
-<path fill="none" stroke="#000000" d="M42.89,-129.34C54.92,-138.74 72.64,-151.32 90,-159 94.95,-161.19 100.16,-163.17 105.47,-164.97"/>
-<polygon fill="#000000" stroke="#000000" points="104.51,-168.33 115.1,-167.99 106.6,-161.65 104.51,-168.33"/>
-</g>
-<!-- program~elphbolt&#45;&gt;proc~calculate_eph_interaction_ibzq -->
-<g id="proc~~demux_state~~CalledByGraph_edge8" class="edge">
-<title>program~elphbolt&#45;&gt;proc~calculate_eph_interaction_ibzq</title>
-<path fill="none" stroke="#000000" d="M54.21,-120.71C63.77,-122.06 75.19,-123.67 87.17,-125.37"/>
-<polygon fill="#000000" stroke="#000000" points="86.93,-128.87 97.32,-126.8 87.91,-121.94 86.93,-128.87"/>
-</g>
 <!-- program~elphbolt&#45;&gt;proc~calculate_eph_interaction_ibzk -->
-<g id="proc~~demux_state~~CalledByGraph_edge9" class="edge">
+<g id="proc~~demux_state~~CalledByGraph_edge7" class="edge">
 <title>program~elphbolt&#45;&gt;proc~calculate_eph_interaction_ibzk</title>
-<path fill="none" stroke="#000000" d="M54.21,-113.29C64,-111.91 75.74,-110.25 88.02,-108.51"/>
-<polygon fill="#000000" stroke="#000000" points="88.55,-111.97 97.96,-107.11 87.57,-105.04 88.55,-111.97"/>
+<path fill="none" stroke="#000000" d="M42.89,-171.34C54.92,-180.74 72.64,-193.32 90,-201 94.95,-203.19 100.16,-205.17 105.47,-206.97"/>
+<polygon fill="#000000" stroke="#000000" points="104.51,-210.33 115.1,-209.99 106.6,-203.65 104.51,-210.33"/>
 </g>
 <!-- program~elphbolt&#45;&gt;proc~calculate_3ph_interaction -->
-<g id="proc~~demux_state~~CalledByGraph_edge10" class="edge">
+<g id="proc~~demux_state~~CalledByGraph_edge8" class="edge">
 <title>program~elphbolt&#45;&gt;proc~calculate_3ph_interaction</title>
-<path fill="none" stroke="#000000" d="M42.89,-104.66C54.92,-95.26 72.64,-82.68 90,-75 94.95,-72.81 100.16,-70.83 105.47,-69.03"/>
-<polygon fill="#000000" stroke="#000000" points="106.6,-72.35 115.1,-66.01 104.51,-65.67 106.6,-72.35"/>
+<path fill="none" stroke="#000000" d="M54.21,-162.71C67.17,-164.54 83.56,-166.86 100.09,-169.19"/>
+<polygon fill="#000000" stroke="#000000" points="99.98,-172.71 110.37,-170.65 100.96,-165.78 99.98,-172.71"/>
+</g>
+<!-- program~elphbolt&#45;&gt;proc~calculate_eph_interaction_ibzq -->
+<g id="proc~~demux_state~~CalledByGraph_edge9" class="edge">
+<title>program~elphbolt&#45;&gt;proc~calculate_eph_interaction_ibzq</title>
+<path fill="none" stroke="#000000" d="M54.21,-155.29C63.77,-153.94 75.19,-152.33 87.17,-150.63"/>
+<polygon fill="#000000" stroke="#000000" points="87.91,-154.06 97.32,-149.2 86.93,-147.13 87.91,-154.06"/>
+</g>
+<!-- program~elphbolt&#45;&gt;proc~calculate_echimp_interaction_ibzk -->
+<g id="proc~~demux_state~~CalledByGraph_edge10" class="edge">
+<title>program~elphbolt&#45;&gt;proc~calculate_echimp_interaction_ibzk</title>
+<path fill="none" stroke="#000000" d="M42.89,-146.66C54.92,-137.26 72.64,-124.68 90,-117 94.95,-114.81 100.16,-112.83 105.47,-111.03"/>
+<polygon fill="#000000" stroke="#000000" points="106.6,-114.35 115.1,-108.01 104.51,-107.67 106.6,-114.35"/>
 </g>
 </g>
 </svg>
@@ -593,6 +604,10 @@ public subroutine demux_state(m, nbands, iband, ik)
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
     
+    
+    <script src="../tipuesearch/tipuesearch_content.js"></script>
+    <script src="../tipuesearch/tipuesearch_set.js"></script>
+    <script src="../tipuesearch/tipuesearch.js"></script>
     
     
   </body>

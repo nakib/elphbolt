@@ -1,5 +1,5 @@
-#include thinkpad_gcc.make
-include thinkpad_intel.make
+include thinkpad_gcc.make
+#include thinkpad_intel.make
 #include msi_intel.make
 
 objects:= params.o misc.o spglib_wrapper.o numerics.o crystal.o symmetry.o wannier.o delta.o electron.o phonon.o bz_sums.o interactions.o bte.o elphbolt.o

@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
    
-   <meta name="description" content="A Fortran 2018 code for solving the coupled electron and phonon Boltzmann transport equations.">
+   <meta name="description" content="A solver for the coupled and decoupled electron and phonon Boltzmann transport equations.">
     
     <meta name="author" content="Nakib Haider Protik" >
     <link rel="icon" href="../favicon.png">
@@ -16,6 +16,8 @@
     <link href="../css/pygments.css" rel="stylesheet">
     <link href="../css/font-awesome.min.css" rel="stylesheet">
     <link href="../css/local.css" rel="stylesheet">
+    
+    <link  href="../tipuesearch/tipuesearch.css" rel="stylesheet">
     
     
 
@@ -93,6 +95,15 @@
 
           </ul>
         
+        <form action="../search.html" class="navbar-form navbar-right" role="search">
+        <div class="form-group">
+          <input type="text" class="form-control" placeholder="Search" name="q" id="tipue_search_input" autocomplete="off" required>
+        </div>
+<!--
+        <button type="submit" class="btn btn-default">Submit</button>
+-->
+        </form>
+        
         </div><!--/.nav-collapse -->
       </div>
     </nav>
@@ -119,7 +130,7 @@
      <li><i class="fa fa-list-ol"></i>
        <a data-toggle="tooltip"
     data-placement="bottom" data-html="true"
-    title="<p>18.7% of total for derived types.</p>Including implementation: 56 statements,  4.2% of total for derived types.">36 statements</a>
+    title="<p>16.8% of total for derived types.</p>Including implementation: 55 statements,  3.3% of total for derived types.">36 statements</a>
      </li> 
      
      
@@ -1067,7 +1078,7 @@ private subroutine deallocate_phonon_quantities(ph)
           
     
     <h3>
-private subroutine initialize(ph, wann, crys, sym, num)
+private subroutine initialize(ph, crys, sym, num)
     
     
    
@@ -1104,21 +1115,6 @@ private subroutine initialize(ph, wann, crys, sym, num)
   
   <td></td><td>::</td>
   <td><strong>ph</strong></td><td></td>
-  
-</tr>
-
-  
-  
-  
-  
-<tr>
-  
-  <td><span class="anchor" ></span>type(<a href='../type/epw_wannier.html'>epw_wannier</a>),</td>
-  <td>intent(in)</td>
-  <td></td>
-  
-  <td></td><td>::</td>
-  <td><strong>wann</strong></td><td></td>
   
 </tr>
 
@@ -1234,6 +1230,10 @@ private subroutine initialize(ph, wann, crys, sym, num)
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
     
+    
+    <script src="../tipuesearch/tipuesearch_content.js"></script>
+    <script src="../tipuesearch/tipuesearch_set.js"></script>
+    <script src="../tipuesearch/tipuesearch.js"></script>
     
     
   </body>

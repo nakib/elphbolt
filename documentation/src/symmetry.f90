@@ -15,7 +15,7 @@
 ! along with elphbolt. If not, see <http://www.gnu.org/licenses/>.
 
 module symmetry_module
-  !! Module containing type and procedures related crystal and
+  !! Module containing type and procedures related to crystal and
   !! Brillouin zone symmetries.
 
   use params, only: dp, k8
@@ -25,10 +25,11 @@ module symmetry_module
   use spglib_wrapper, only: get_operations, get_cartesian_operations, get_num_operations
   
   implicit none
-
+  
   private
   public symmetry, find_equiv_map, find_irred_wedge, create_fbz2ibz_map, &
        fbz2ibz, symmetrize_3x3_tensor
+  
 
   type symmetry
      !! Data and procedure related to symmetries.
@@ -71,7 +72,7 @@ contains
     integer(k8), intent(in) :: mesh(3)
 
     !Internal variables:
-    integer(k8) :: i, j, k, ii, jj, kk, ll, info, nq, nlen
+    integer(k8) :: i, ii, jj, kk, ll, info, nq, nlen
     integer(k8) :: P(3)
     integer(k8), allocatable :: rtmp(:,:,:), local_equiv_map(:,:)
     logical, allocatable :: valid(:)
@@ -207,11 +208,11 @@ contains
     integer(k8), intent(out) :: equiv_map(:,:)
 
     integer(k8) :: nmesh, chunk, counter, im, num_active_images
-    integer(k8), allocatable :: index_mesh(:,:), start[:], end[:]
+    integer(k8), allocatable :: index_mesh(:,:)
     integer(k8) :: i, isym, ivec(3), base
     real(dp) :: vec(3), vec_star(3, nsymm_rot), dnrm2
-    integer(k8), allocatable :: equiv_map_chunk(:,:)[:]
-
+    integer(k8), allocatable :: start[:], end[:], equiv_map_chunk(:,:)[:]
+    
     if(present(indexlist)) then
        nmesh = size(indexlist)
     else
@@ -236,7 +237,7 @@ contains
 
     !Allocate small work variable chunk for each image
     allocate(equiv_map_chunk(nsymm_rot, chunk)[*])
-
+    
     counter = 0
     do i = start, end !Run over total number of wave vectors.
        !Increase counter
@@ -259,7 +260,6 @@ contains
     do im = 1, num_active_images
        equiv_map(:, start[im]:end[im]) = equiv_map_chunk(:,:)[im]
     end do
-    sync all
   end subroutine find_equiv_map
 
   subroutine find_irred_wedge(mesh,nwavevecs_irred,wavevecs_irred, &
@@ -466,6 +466,5 @@ contains
     end do
 
     tensor(:,:) = aux(:,:)/nrots
-  end subroutine symmetrize_3x3_tensor
-  
+  end subroutine symmetrize_3x3_tensor  
 end module symmetry_module

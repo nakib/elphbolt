@@ -19,7 +19,7 @@ module phonon_module
 
   use params, only: dp, k8, bohr2nm, pi, twopi, Ryd2eV, oneI
   use misc, only: print_message, subtitle, expi, distribute_points, &
-       write2file_rank2_real
+       write2file_rank2_real, exit_with_message
   use numerics_module, only: numerics
   use wannier_module, only: epw_wannier
   use crystal_module, only: crystal, calculate_wavevectors_full
@@ -114,12 +114,11 @@ module phonon_module
 
 contains
 
-  subroutine initialize(ph, wann, crys, sym, num)
+  subroutine initialize(ph, crys, sym, num)
     !! Initialize the phonon data type, calculate ground state phonon properties,
     !! and read 3rd order force constants data. 
 
     class(phonon), intent(out) :: ph
-    type(epw_wannier), intent(in) :: wann
     type(crystal), intent(in) :: crys
     type(symmetry), intent(in) :: sym
     type(numerics), intent(in) :: num
@@ -137,7 +136,7 @@ contains
     call read_ifc2(ph, crys)
     
     !Calculate harmonic properties
-    call calculate_phonons(ph, wann, crys, sym, num)
+    call calculate_phonons(ph, crys, sym, num)
 
     if(.not. num%onlyebte) then
        !Read ifc3s and related quantities
@@ -154,11 +153,10 @@ contains
          ph%mm, ph%rr)
   end subroutine deallocate_phonon_quantities
   
-  subroutine calculate_phonons(ph, wann, crys, sym, num)
+  subroutine calculate_phonons(ph, crys, sym, num)
     !! Calculate phonon quantities on the FBZ and IBZ meshes.
 
     class(phonon), intent(inout) :: ph
-    type(epw_wannier), intent(in) :: wann
     type(crystal), intent(in) :: crys
     type(symmetry), intent(in) :: sym
     type(numerics), intent(in) :: num
@@ -426,30 +424,178 @@ contains
     type(crystal), intent(in) :: crys
     
     !Local variables
-    real(dp) :: tmp(3,3)
-    integer(k8) :: ii, jj, ll, mm, nn, ltem, mtem, ntem, info, P(3)
-    
-    !The file is in a simple sparse format, described in detail in
-    !the user documentation. See Doc/ShengBTE.pdf.
-    open(1, file = 'FORCE_CONSTANTS_3RD', status = "old")
-    read(1, *) ph%numtriplets
-    allocate(ph%Index_i(ph%numtriplets), ph%Index_j(ph%numtriplets), ph%Index_k(ph%numtriplets))
-    allocate(ph%ifc3(3, 3, 3, ph%numtriplets), ph%R_j(3, ph%numtriplets), ph%R_k(3,ph%numtriplets))
-    do ii = 1, ph%numtriplets
-       read(1, *) jj
-       read(1, *) ph%R_j(:, ii) !Ang
-       read(1, *) ph%R_k(:, ii) !Ang
-       read(1, *) ph%Index_i(ii), ph%Index_j(ii), ph%Index_k(ii)
-       do ll = 1, 3
-          do mm = 1, 3
-             do nn = 1, 3
-                read(1, *) ltem, mtem, ntem, ph%ifc3(ll, mm, nn, ii)
+    real(dp) :: tmp(3,3), r(crys%numatoms, 3), celldm(6), at(3,3), &
+         mass(crys%numelements), zeff(crys%numatoms, 3, 3), eps(3, 3)
+    real(dp), allocatable :: fc(:,:,:,:)
+    integer(k8) :: ii, jj, ll, mm, nn, ltem, mtem, ntem, info, P(3), &
+         na1, na2, na3, j1, j2, j3, na1_, na2_, na3_, j1_, j2_, j3_, &
+         triplet_counter, nR, nR_, qscell(3), tipo(crys%numatoms), i, j, &
+         ibrav, ntype, nat, jn1, jn2, jn3
+    integer(k8), allocatable :: R2(:,:), R3(:,:)
+    character(len = 1) :: polar_key
+    character(len = 6) :: label(crys%numelements)
+    logical :: sheng_file_exists, d3q_file_exists, save_nR
+
+    !Check what force constants files have been provided
+    sheng_file_exists = .False.
+    d3q_file_exists = .False.
+    inquire(file = 'FORCE_CONSTANTS_3RD', exist = sheng_file_exists)
+    inquire(file = 'mat3R', exist = d3q_file_exists)
+
+    if(sheng_file_exists .and. .not. d3q_file_exists) then
+       call print_message('Reading ShengBTE format third order force constants...')
+    else if(d3q_file_exists .and. .not. sheng_file_exists) then
+       call print_message('Reading d3q format third order force constants...')
+    else if(d3q_file_exists .and. sheng_file_exists) then
+       call print_message(&
+            'Both ShengBTE and d3q format third order force constants provided. Defaulting to ShengBTE format.')
+       d3q_file_exists = .False.
+    else
+       call exit_with_message('Third order force constant file not provided. Exiting.')
+    end if
+
+    if(sheng_file_exists) then
+       !The file is in a simple sparse format, described in detail in
+       !the user documentation. See Doc/ShengBTE.pdf.
+       open(1, file = 'FORCE_CONSTANTS_3RD', status = "old")
+       read(1, *) ph%numtriplets
+       allocate(ph%Index_i(ph%numtriplets), ph%Index_j(ph%numtriplets), ph%Index_k(ph%numtriplets))
+       allocate(ph%ifc3(3, 3, 3, ph%numtriplets), ph%R_j(3, ph%numtriplets), ph%R_k(3,ph%numtriplets))
+       do ii = 1, ph%numtriplets
+          read(1, *) jj
+          read(1, *) ph%R_j(:, ii) !Ang
+          read(1, *) ph%R_k(:, ii) !Ang
+          read(1, *) ph%Index_i(ii), ph%Index_j(ii), ph%Index_k(ii)
+          do ll = 1, 3
+             do mm = 1, 3
+                do nn = 1, 3
+                   read(1, *) ltem, mtem, ntem, ph%ifc3(ll, mm, nn, ii)
+                end do
              end do
           end do
        end do
-    end do
-    close(1)
-    !IFC3 units are eV/Ang^3
+       close(1)
+       !IFC3 units are eV/Ang^3
+    else       
+       !See SUBROUTINE read_fc3_grid of fc3_interp.f90 of the d3q code
+       !for more information about the format.
+       open(1, file = 'mat3R', status = "old")
+       
+       !Read some stuff that will not be used in the code.
+       read(1,*) ntype, nat, ibrav, celldm(1:6)
+       if (ibrav==0) then
+          read(1,*) ((at(i,j),i=1,3),j=1,3)
+       end if
+
+       do i = 1, ntype
+          read(1, *) j, label(i), mass(i)
+       end do
+
+       do i = 1, nat
+          read(1, *) j, tipo(i), r(i, 1:3)
+       end do
+
+       read(1, *) polar_key
+       if(polar_key == "T") then
+          do i = 1, 3
+             read(1, *) eps(i, 1:3)
+          end do
+          do i = 1, nat
+             read(1, *)
+             do j = 1, 3
+                read(1, *) zeff(i, j, 1:3)
+             end do
+          end do
+       end if
+       read(1,*) qscell(1:3)
+       
+       save_nR = .true.
+       do na1 = 1, crys%numatoms
+          do na2 = 1, crys%numatoms
+             do na3 = 1, crys%numatoms
+                do j1 =1, 3
+                   jn1 = j1 + (na1 - 1)*3
+                   do j2 =1, 3
+                      jn2 = j2 + (na2 - 1)*3
+                      do j3 =1, 3
+                         jn3 = j3 + (na3 - 1)*3
+                         !Read tensor elements location and triplet atoms.
+                         read(1, *) j1_, j2_, j3_, na1_, na2_, na3_
+                         if(any((/na1, na2, na3, j1, j2, j3/) /= &
+                              (/na1_, na2_, na3_, j1_, j2_, j3_/))) then
+                            call exit_with_message(&
+                                 "Wrong Triplet indices and/or tensor element location in mat3R file. Exiting.")
+                         end if
+
+                         !Read number of unit cells in file.
+                         read(1, *) nR_
+                         !Save this number only the first time it is read.
+                         !Also, allocate the various quantities.
+                         if(save_nR) then
+                            nR = nR_
+                            allocate(R2(3, nR), R3(3, nR), &
+                                 fc(ph%numbranches, ph%numbranches, ph%numbranches, nR))
+                            save_nR = .false.
+                         end if
+
+                         if(nR_ /= nR) call exit_with_message(&
+                              "Wrong number of unit cells in mat3R file. Exiting.")
+
+                         do ii = 1, nR
+                            !R2 and R3 are the same for every nR chunk.
+                            read(1, *) R2(:, ii), R3(:, ii), fc(jn1, jn2, jn3, ii)
+                            !At this point the fc units are Ry/Bohr^3
+                         end do
+                      end do
+                   end do
+                end do
+             end do
+          end do
+       end do
+       
+       !Number of triplets
+       ph%numtriplets = nR*crys%numatoms**3
+       
+       !Allocate quantities
+       allocate(ph%Index_i(ph%numtriplets), ph%Index_j(ph%numtriplets), ph%Index_k(ph%numtriplets))
+       allocate(ph%ifc3(3, 3, 3, ph%numtriplets), ph%R_j(3, ph%numtriplets), ph%R_k(3,ph%numtriplets))
+       
+       !Convert to the standard format.
+       triplet_counter = 0
+       do ii = 1, nR
+          do na1 = 1, crys%numatoms
+             do na2 = 1, crys%numatoms
+                do na3 = 1, crys%numatoms
+                   triplet_counter = triplet_counter + 1
+
+                   !Triplet
+                   ph%Index_i(triplet_counter) = na1
+                   ph%Index_j(triplet_counter) = na2
+                   ph%Index_k(triplet_counter) = na3
+
+                   !Positions of the 2nd and 3rd atom in the triplet
+                   !converted to Cartesian coordinates (Ang).
+                   ph%R_j(:, triplet_counter) = &
+                        matmul(crys%lattvecs, R2(:, ii)*10.0_dp) !Ang
+                   ph%R_k(:, triplet_counter) = &
+                        matmul(crys%lattvecs, R3(:, ii)*10.0_dp) !Ang
+                   
+                   do j1 =1, 3
+                      jn1 = j1 + (na1 - 1)*3
+                      do j2 =1, 3
+                         jn2 = j2 + (na2 - 1)*3
+                         do j3 =1, 3
+                            jn3 = j3 + (na3 - 1)*3
+                            ph%ifc3(j1, j2, j3, triplet_counter) = fc(jn1, jn2, jn3, ii)
+                         end do
+                      end do
+                   end do
+                end do
+             end do
+          end do
+       end do
+       ph%ifc3 = ph%ifc3*Ryd2eV/(bohr2nm*10.0_dp)**3 !eV/Ang^3
+    end if
 
     !Each vector is rounded to the nearest lattice vector.
     tmp = crys%lattvecs
@@ -480,13 +626,12 @@ contains
     integer(k8) :: i,j,ipol,jpol,iat,jat,idim,jdim,t1,t2,t3,m1,m2,m3,ik
     integer(k8) :: ndim,nwork,ncell_g(3)
     integer(k8),allocatable :: tipo(:)
-    character(len=5),allocatable :: label(:)
     real(dp) :: weight,total_weight,exp_g,ck
-    real(dp) :: r_ws(3), at(3,3)
+    real(dp) :: r_ws(3)
     real(dp) :: alpha,geg,gmax,kt,gr,volume_r,dnrm2
     real(dp) :: zig(3),zjg(3),dgeg(3),t(0:3),g(0:3),g_old(0:3)
     real(dp), allocatable :: omega2(:),rwork(:)
-    real(dp),allocatable :: k(:,:),mass(:),r(:,:),eps(:,:)
+    real(dp),allocatable :: k(:,:),mass(:),eps(:,:)
     real(dp),allocatable :: eival(:,:),vels(:,:,:),zeff(:,:,:)
     complex(dp) :: auxi(3)
     complex(dp),allocatable :: cauxiliar(:),eigenvectors(:,:),work(:)
@@ -739,9 +884,8 @@ contains
        end if
     end do
 
-    ! Return the result to the units used in the rest of ShengBTE.
-    !omegas=omegas*toTHz !THz
+    !Units conversion
     omegas=omegas*Ryd2eV !eV
-    if(present(velocities)) velocities=velocities*toTHz*bohr2nm
+    if(present(velocities)) velocities=velocities*toTHz*bohr2nm !Km/s
   end subroutine phonon_espresso
 end module phonon_module

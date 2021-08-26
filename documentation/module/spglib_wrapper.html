@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
    
-   <meta name="description" content="A Fortran 2018 code for solving the coupled electron and phonon Boltzmann transport equations.">
+   <meta name="description" content="A solver for the coupled and decoupled electron and phonon Boltzmann transport equations.">
     
     <meta name="author" content="Nakib Haider Protik" >
     <link rel="icon" href="../favicon.png">
@@ -16,6 +16,8 @@
     <link href="../css/pygments.css" rel="stylesheet">
     <link href="../css/font-awesome.min.css" rel="stylesheet">
     <link href="../css/local.css" rel="stylesheet">
+    
+    <link  href="../tipuesearch/tipuesearch.css" rel="stylesheet">
     
     
 
@@ -93,6 +95,15 @@
 
           </ul>
         
+        <form action="../search.html" class="navbar-form navbar-right" role="search">
+        <div class="form-group">
+          <input type="text" class="form-control" placeholder="Search" name="q" id="tipue_search_input" autocomplete="off" required>
+        </div>
+<!--
+        <button type="submit" class="btn btn-default">Submit</button>
+-->
+        </form>
+        
         </div><!--/.nav-collapse -->
       </div>
     </nav>
@@ -119,7 +130,7 @@
      <li><i class="fa fa-list-ol"></i>
        <a data-toggle="tooltip"
     data-placement="bottom" data-html="true"
-    title=" 2.0% of total for modules and submodules.">111 statements</a>
+    title=" 1.8% of total for modules and submodules.">111 statements</a>
      </li> 
      
      
@@ -427,68 +438,68 @@
 <title>program~elphbolt&#45;&gt;module~symmetry_module</title>
 <path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M417.5,-165.52C367.24,-161.2 354.03,-171.93 304,-165.52"/>
 </g>
-<!-- module~bz_sums -->
+<!-- module~phonon_module -->
 <g id="module~~spglib_wrapper~~UsedByGraph_node4" class="node">
+<title>module~phonon_module</title>
+<g id="a_module~~spglib_wrapper~~UsedByGraph_node4"><a xlink:href=".././module/phonon_module.html" xlink:title="phonon_module">
+<polygon fill="#337ab7" stroke="#337ab7" points="348,-137.52 258,-137.52 258,-113.52 348,-113.52 348,-137.52"/>
+<text text-anchor="middle" x="303" y="-123.12" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">phonon_module</text>
+</a>
+</g>
+</g>
+<!-- program~elphbolt&#45;&gt;module~phonon_module -->
+<g id="module~~spglib_wrapper~~UsedByGraph_edge10" class="edge">
+<title>program~elphbolt&#45;&gt;module~phonon_module</title>
+<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M521.5,-165.52C477.56,-176.67 464.67,-169.4 419.5,-165.52"/>
+<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M417.5,-165.52C389.03,-163.07 358.59,-151.82 336.4,-141.87"/>
+<polygon fill="#000000" stroke="#000000" points="337.68,-138.6 327.13,-137.57 334.73,-144.96 337.68,-138.6"/>
+</g>
+<!-- module~electron_module -->
+<g id="module~~spglib_wrapper~~UsedByGraph_node5" class="node">
+<title>module~electron_module</title>
+<g id="a_module~~spglib_wrapper~~UsedByGraph_node5"><a xlink:href=".././module/electron_module.html" xlink:title="electron_module">
+<polygon fill="#337ab7" stroke="#337ab7" points="349,-57.52 257,-57.52 257,-33.52 349,-33.52 349,-57.52"/>
+<text text-anchor="middle" x="303" y="-43.12" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">electron_module</text>
+</a>
+</g>
+</g>
+<!-- program~elphbolt&#45;&gt;module~electron_module -->
+<g id="module~~spglib_wrapper~~UsedByGraph_edge14" class="edge">
+<title>program~elphbolt&#45;&gt;module~electron_module</title>
+<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M610.47,-73.38C595.59,-53.57 562.7,-15.47 523.5,-5.52"/>
+<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M521.5,-5.52C458.19,10.55 382.96,-12.4 339.63,-29.61"/>
+<polygon fill="#000000" stroke="#000000" points="338.29,-26.37 330.36,-33.4 340.94,-32.85 338.29,-26.37"/>
+</g>
+<!-- module~bz_sums -->
+<g id="module~~spglib_wrapper~~UsedByGraph_node6" class="node">
 <title>module~bz_sums</title>
-<g id="a_module~~spglib_wrapper~~UsedByGraph_node4"><a xlink:href=".././module/bz_sums.html" xlink:title="bz_sums">
+<g id="a_module~~spglib_wrapper~~UsedByGraph_node6"><a xlink:href=".././module/bz_sums.html" xlink:title="bz_sums">
 <polygon fill="#337ab7" stroke="#337ab7" points="446,-137.52 391,-137.52 391,-113.52 446,-113.52 446,-137.52"/>
 <text text-anchor="middle" x="418.5" y="-123.12" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">bz_sums</text>
 </a>
 </g>
 </g>
 <!-- program~elphbolt&#45;&gt;module~bz_sums -->
-<g id="module~~spglib_wrapper~~UsedByGraph_edge7" class="edge">
+<g id="module~~spglib_wrapper~~UsedByGraph_edge16" class="edge">
 <title>program~elphbolt&#45;&gt;module~bz_sums</title>
 <path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M610.47,-97.65C595.59,-117.46 562.7,-155.56 523.5,-165.52"/>
 <path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M521.5,-165.52C493.56,-172.61 462.95,-157.28 442.62,-143.59"/>
 <polygon fill="#000000" stroke="#000000" points="444.5,-140.63 434.32,-137.7 440.45,-146.34 444.5,-140.63"/>
 </g>
 <!-- module~bte_module -->
-<g id="module~~spglib_wrapper~~UsedByGraph_node5" class="node">
+<g id="module~~spglib_wrapper~~UsedByGraph_node7" class="node">
 <title>module~bte_module</title>
-<g id="a_module~~spglib_wrapper~~UsedByGraph_node5"><a xlink:href=".././module/bte_module.html" xlink:title="bte_module">
+<g id="a_module~~spglib_wrapper~~UsedByGraph_node7"><a xlink:href=".././module/bte_module.html" xlink:title="bte_module">
 <polygon fill="#337ab7" stroke="#337ab7" points="557,-97.52 488,-97.52 488,-73.52 557,-73.52 557,-97.52"/>
 <text text-anchor="middle" x="522.5" y="-83.12" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">bte_module</text>
 </a>
 </g>
 </g>
 <!-- program~elphbolt&#45;&gt;module~bte_module -->
-<g id="module~~spglib_wrapper~~UsedByGraph_edge9" class="edge">
+<g id="module~~spglib_wrapper~~UsedByGraph_edge17" class="edge">
 <title>program~elphbolt&#45;&gt;module~bte_module</title>
 <path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M592.9,-85.52C584.97,-85.52 576.01,-85.52 567.24,-85.52"/>
 <polygon fill="#000000" stroke="#000000" points="567.1,-82.02 557.1,-85.52 567.1,-89.02 567.1,-82.02"/>
-</g>
-<!-- module~electron_module -->
-<g id="module~~spglib_wrapper~~UsedByGraph_node6" class="node">
-<title>module~electron_module</title>
-<g id="a_module~~spglib_wrapper~~UsedByGraph_node6"><a xlink:href=".././module/electron_module.html" xlink:title="electron_module">
-<polygon fill="#337ab7" stroke="#337ab7" points="349,-137.52 257,-137.52 257,-113.52 349,-113.52 349,-137.52"/>
-<text text-anchor="middle" x="303" y="-123.12" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">electron_module</text>
-</a>
-</g>
-</g>
-<!-- program~elphbolt&#45;&gt;module~electron_module -->
-<g id="module~~spglib_wrapper~~UsedByGraph_edge10" class="edge">
-<title>program~elphbolt&#45;&gt;module~electron_module</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M521.5,-165.52C477.56,-176.67 464.67,-169.4 419.5,-165.52"/>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M417.5,-165.52C389.03,-163.07 358.59,-151.82 336.4,-141.87"/>
-<polygon fill="#000000" stroke="#000000" points="337.68,-138.6 327.13,-137.57 334.73,-144.96 337.68,-138.6"/>
-</g>
-<!-- module~phonon_module -->
-<g id="module~~spglib_wrapper~~UsedByGraph_node7" class="node">
-<title>module~phonon_module</title>
-<g id="a_module~~spglib_wrapper~~UsedByGraph_node7"><a xlink:href=".././module/phonon_module.html" xlink:title="phonon_module">
-<polygon fill="#337ab7" stroke="#337ab7" points="348,-57.52 258,-57.52 258,-33.52 348,-33.52 348,-57.52"/>
-<text text-anchor="middle" x="303" y="-43.12" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">phonon_module</text>
-</a>
-</g>
-</g>
-<!-- program~elphbolt&#45;&gt;module~phonon_module -->
-<g id="module~~spglib_wrapper~~UsedByGraph_edge14" class="edge">
-<title>program~elphbolt&#45;&gt;module~phonon_module</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M610.47,-73.38C595.59,-53.57 562.7,-15.47 523.5,-5.52"/>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M521.5,-5.52C458.19,10.55 382.96,-12.4 339.63,-29.61"/>
-<polygon fill="#000000" stroke="#000000" points="338.29,-26.37 330.36,-33.4 340.94,-32.85 338.29,-26.37"/>
 </g>
 <!-- module~interactions -->
 <g id="module~~spglib_wrapper~~UsedByGraph_node8" class="node">
@@ -500,84 +511,84 @@
 </g>
 </g>
 <!-- program~elphbolt&#45;&gt;module~interactions -->
-<g id="module~~spglib_wrapper~~UsedByGraph_edge18" class="edge">
+<g id="module~~spglib_wrapper~~UsedByGraph_edge19" class="edge">
 <title>program~elphbolt&#45;&gt;module~interactions</title>
 <path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M521.5,-5.52C493.56,1.58 462.95,-13.75 442.62,-27.44"/>
 <polygon fill="#000000" stroke="#000000" points="440.45,-24.69 434.32,-33.33 444.5,-30.4 440.45,-24.69"/>
 </g>
-<!-- module~bz_sums&#45;&gt;module~symmetry_module -->
+<!-- module~phonon_module&#45;&gt;module~symmetry_module -->
 <g id="module~~spglib_wrapper~~UsedByGraph_edge3" class="edge">
+<title>module~phonon_module&#45;&gt;module~symmetry_module</title>
+<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M257.99,-118.74C249.42,-117.43 240.32,-116.03 231.35,-114.65"/>
+<polygon fill="#000000" stroke="#000000" points="231.75,-111.17 221.33,-113.1 230.68,-118.08 231.75,-111.17"/>
+</g>
+<!-- module~electron_module&#45;&gt;module~symmetry_module -->
+<g id="module~~spglib_wrapper~~UsedByGraph_edge4" class="edge">
+<title>module~electron_module&#45;&gt;module~symmetry_module</title>
+<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M275.69,-57.66C256.05,-66.72 228.98,-79.22 207.43,-89.16"/>
+<polygon fill="#000000" stroke="#000000" points="205.88,-86.02 198.27,-93.39 208.81,-92.38 205.88,-86.02"/>
+</g>
+<!-- module~bz_sums&#45;&gt;module~symmetry_module -->
+<g id="module~~spglib_wrapper~~UsedByGraph_edge5" class="edge">
 <title>module~bz_sums&#45;&gt;module~symmetry_module</title>
 <path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M399.61,-137.55C377.72,-150.91 339.23,-170.03 304,-165.52"/>
 <path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M302,-165.52C263.13,-160.53 222.84,-138.93 197.61,-123.07"/>
 <polygon fill="#000000" stroke="#000000" points="199.33,-120.02 189.03,-117.53 195.53,-125.9 199.33,-120.02"/>
 </g>
-<!-- module~bz_sums&#45;&gt;module~electron_module -->
-<g id="module~~spglib_wrapper~~UsedByGraph_edge11" class="edge">
-<title>module~bz_sums&#45;&gt;module~electron_module</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M390.89,-125.52C381.36,-125.52 370.23,-125.52 359.18,-125.52"/>
-<polygon fill="#000000" stroke="#000000" points="359.1,-122.02 349.1,-125.52 359.1,-129.02 359.1,-122.02"/>
-</g>
 <!-- module~bz_sums&#45;&gt;module~phonon_module -->
-<g id="module~~spglib_wrapper~~UsedByGraph_edge15" class="edge">
+<g id="module~~spglib_wrapper~~UsedByGraph_edge8" class="edge">
 <title>module~bz_sums&#45;&gt;module~phonon_module</title>
+<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M390.89,-125.52C381.16,-125.52 369.76,-125.52 358.48,-125.52"/>
+<polygon fill="#000000" stroke="#000000" points="358.21,-122.02 348.21,-125.52 358.21,-129.02 358.21,-122.02"/>
+</g>
+<!-- module~bz_sums&#45;&gt;module~electron_module -->
+<g id="module~~spglib_wrapper~~UsedByGraph_edge12" class="edge">
+<title>module~bz_sums&#45;&gt;module~electron_module</title>
 <path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M400.26,-113.36C381.4,-100.07 350.99,-78.63 329.4,-63.42"/>
 <polygon fill="#000000" stroke="#000000" points="331.22,-60.42 321.03,-57.52 327.19,-66.14 331.22,-60.42"/>
 </g>
 <!-- module~bte_module&#45;&gt;module~symmetry_module -->
-<g id="module~~spglib_wrapper~~UsedByGraph_edge4" class="edge">
+<g id="module~~spglib_wrapper~~UsedByGraph_edge6" class="edge">
 <title>module~bte_module&#45;&gt;module~symmetry_module</title>
 <path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M417.5,-85.52C353.82,-85.52 281.16,-92.28 231.51,-97.94"/>
 <polygon fill="#000000" stroke="#000000" points="230.81,-94.5 221.28,-99.13 231.61,-101.46 230.81,-94.5"/>
 </g>
-<!-- module~bte_module&#45;&gt;module~bz_sums -->
-<g id="module~~spglib_wrapper~~UsedByGraph_edge8" class="edge">
-<title>module~bte_module&#45;&gt;module~bz_sums</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M490.9,-97.52C479.8,-101.87 467.17,-106.82 455.64,-111.34"/>
-<polygon fill="#000000" stroke="#000000" points="454.31,-108.11 446.28,-115.01 456.86,-114.62 454.31,-108.11"/>
-</g>
-<!-- module~bte_module&#45;&gt;module~electron_module -->
-<g id="module~~spglib_wrapper~~UsedByGraph_edge13" class="edge">
-<title>module~bte_module&#45;&gt;module~electron_module</title>
+<!-- module~bte_module&#45;&gt;module~phonon_module -->
+<g id="module~~spglib_wrapper~~UsedByGraph_edge7" class="edge">
+<title>module~bte_module&#45;&gt;module~phonon_module</title>
 <path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M417.5,-85.52C387.7,-85.52 355.88,-97.93 333.53,-108.93"/>
 <polygon fill="#000000" stroke="#000000" points="331.88,-105.84 324.57,-113.51 335.07,-112.07 331.88,-105.84"/>
 </g>
-<!-- module~bte_module&#45;&gt;module~phonon_module -->
-<g id="module~~spglib_wrapper~~UsedByGraph_edge17" class="edge">
-<title>module~bte_module&#45;&gt;module~phonon_module</title>
+<!-- module~bte_module&#45;&gt;module~electron_module -->
+<g id="module~~spglib_wrapper~~UsedByGraph_edge11" class="edge">
+<title>module~bte_module&#45;&gt;module~electron_module</title>
 <path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M487.96,-85.52C468.07,-85.52 442.34,-85.52 419.5,-85.52"/>
 <path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M417.5,-85.52C387.7,-85.52 355.88,-73.1 333.53,-62.1"/>
 <polygon fill="#000000" stroke="#000000" points="335.07,-58.96 324.57,-57.52 331.88,-65.19 335.07,-58.96"/>
 </g>
+<!-- module~bte_module&#45;&gt;module~bz_sums -->
+<g id="module~~spglib_wrapper~~UsedByGraph_edge15" class="edge">
+<title>module~bte_module&#45;&gt;module~bz_sums</title>
+<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M490.9,-97.52C479.8,-101.87 467.17,-106.82 455.64,-111.34"/>
+<polygon fill="#000000" stroke="#000000" points="454.31,-108.11 446.28,-115.01 456.86,-114.62 454.31,-108.11"/>
+</g>
 <!-- module~bte_module&#45;&gt;module~interactions -->
-<g id="module~~spglib_wrapper~~UsedByGraph_edge19" class="edge">
+<g id="module~~spglib_wrapper~~UsedByGraph_edge18" class="edge">
 <title>module~bte_module&#45;&gt;module~interactions</title>
 <path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M490.9,-73.51C481.2,-69.71 470.33,-65.45 460.05,-61.42"/>
 <polygon fill="#000000" stroke="#000000" points="461.02,-58.04 450.43,-57.65 458.47,-64.56 461.02,-58.04"/>
 </g>
-<!-- module~electron_module&#45;&gt;module~symmetry_module -->
-<g id="module~~spglib_wrapper~~UsedByGraph_edge5" class="edge">
-<title>module~electron_module&#45;&gt;module~symmetry_module</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M256.9,-118.58C248.57,-117.3 239.76,-115.94 231.09,-114.61"/>
-<polygon fill="#000000" stroke="#000000" points="231.43,-111.12 221.02,-113.06 230.37,-118.04 231.43,-111.12"/>
-</g>
-<!-- module~phonon_module&#45;&gt;module~symmetry_module -->
-<g id="module~~spglib_wrapper~~UsedByGraph_edge6" class="edge">
-<title>module~phonon_module&#45;&gt;module~symmetry_module</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M275.69,-57.66C256.05,-66.72 228.98,-79.22 207.43,-89.16"/>
-<polygon fill="#000000" stroke="#000000" points="205.88,-86.02 198.27,-93.39 208.81,-92.38 205.88,-86.02"/>
-</g>
-<!-- module~interactions&#45;&gt;module~electron_module -->
-<g id="module~~spglib_wrapper~~UsedByGraph_edge12" class="edge">
-<title>module~interactions&#45;&gt;module~electron_module</title>
+<!-- module~interactions&#45;&gt;module~phonon_module -->
+<g id="module~~spglib_wrapper~~UsedByGraph_edge9" class="edge">
+<title>module~interactions&#45;&gt;module~phonon_module</title>
 <path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M400.26,-57.67C381.4,-70.96 350.99,-92.4 329.4,-107.61"/>
 <polygon fill="#000000" stroke="#000000" points="327.19,-104.89 321.03,-113.51 331.22,-110.61 327.19,-104.89"/>
 </g>
-<!-- module~interactions&#45;&gt;module~phonon_module -->
-<g id="module~~spglib_wrapper~~UsedByGraph_edge16" class="edge">
-<title>module~interactions&#45;&gt;module~phonon_module</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M384.98,-45.52C376.69,-45.52 367.57,-45.52 358.51,-45.52"/>
-<polygon fill="#000000" stroke="#000000" points="358.37,-42.02 348.37,-45.52 358.37,-49.02 358.37,-42.02"/>
+<!-- module~interactions&#45;&gt;module~electron_module -->
+<g id="module~~spglib_wrapper~~UsedByGraph_edge13" class="edge">
+<title>module~interactions&#45;&gt;module~electron_module</title>
+<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M384.98,-45.52C376.97,-45.52 368.18,-45.52 359.42,-45.52"/>
+<polygon fill="#000000" stroke="#000000" points="359.22,-42.02 349.22,-45.52 359.22,-49.02 359.22,-42.02"/>
 </g>
 </g>
 </svg>
@@ -1705,6 +1716,10 @@ public subroutine <a href='../proc/get_cartesian_operations.html'>get_cartesian_
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
     
+    
+    <script src="../tipuesearch/tipuesearch_content.js"></script>
+    <script src="../tipuesearch/tipuesearch_set.js"></script>
+    <script src="../tipuesearch/tipuesearch.js"></script>
     
     
   </body>

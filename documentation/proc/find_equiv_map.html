@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
    
-   <meta name="description" content="A Fortran 2018 code for solving the coupled electron and phonon Boltzmann transport equations.">
+   <meta name="description" content="A solver for the coupled and decoupled electron and phonon Boltzmann transport equations.">
     
     <meta name="author" content="Nakib Haider Protik" >
     <link rel="icon" href="../favicon.png">
@@ -16,6 +16,8 @@
     <link href="../css/pygments.css" rel="stylesheet">
     <link href="../css/font-awesome.min.css" rel="stylesheet">
     <link href="../css/local.css" rel="stylesheet">
+    
+    <link  href="../tipuesearch/tipuesearch.css" rel="stylesheet">
     
     
 
@@ -93,6 +95,15 @@
 
           </ul>
         
+        <form action="../search.html" class="navbar-form navbar-right" role="search">
+        <div class="form-group">
+          <input type="text" class="form-control" placeholder="Search" name="q" id="tipue_search_input" autocomplete="off" required>
+        </div>
+<!--
+        <button type="submit" class="btn btn-default">Submit</button>
+-->
+        </form>
+        
         </div><!--/.nav-collapse -->
       </div>
     </nav>
@@ -119,7 +130,7 @@
      <li><i class="fa fa-list-ol"></i>
        <a data-toggle="tooltip"
     data-placement="bottom" data-html="true"
-    title=" 2.1% of total for procedures.">45 statements</a>
+    title=" 1.9% of total for procedures.">44 statements</a>
      </li> 
      
      
@@ -317,65 +328,65 @@ public subroutine find_equiv_map(nsymm_rot, equiv_map, mesh, qrotations, indexli
 <polygon fill="none" stroke="black" points="88,-66 0,-66 0,-42 88,-42 88,-66"/>
 <text text-anchor="middle" x="44" y="-51.6" font-family="Helvetica,sans-Serif" font-size="10.50">find_equiv_map</text>
 </g>
-<!-- proc~mux_vector -->
-<g id="proc~~find_equiv_map~~CallsGraph_node2" class="node">
-<title>proc~mux_vector</title>
-<g id="a_proc~~find_equiv_map~~CallsGraph_node2"><a xlink:href=".././proc/mux_vector.html" xlink:title="mux_vector">
-<polygon fill="#d94e8f" stroke="#d94e8f" points="203.5,-108 135.5,-108 135.5,-84 203.5,-84 203.5,-108"/>
-<text text-anchor="middle" x="169.5" y="-93.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">mux_vector</text>
-</a>
-</g>
-</g>
-<!-- proc~find_equiv_map&#45;&gt;proc~mux_vector -->
-<g id="proc~~find_equiv_map~~CallsGraph_edge1" class="edge">
-<title>proc~find_equiv_map&#45;&gt;proc~mux_vector</title>
-<path fill="none" stroke="#000000" d="M80.39,-66.04C94.41,-70.8 110.65,-76.33 125.35,-81.32"/>
-<polygon fill="#000000" stroke="#000000" points="124.63,-84.78 135.23,-84.68 126.88,-78.15 124.63,-84.78"/>
-</g>
 <!-- proc~demux_mesh -->
-<g id="proc~~find_equiv_map~~CallsGraph_node3" class="node">
+<g id="proc~~find_equiv_map~~CallsGraph_node2" class="node">
 <title>proc~demux_mesh</title>
-<g id="a_proc~~find_equiv_map~~CallsGraph_node3"><a xlink:href=".././proc/demux_mesh.html" xlink:title="demux_mesh">
-<polygon fill="#d9534f" stroke="#d9534f" points="208,-66 131,-66 131,-42 208,-42 208,-66"/>
-<text text-anchor="middle" x="169.5" y="-51.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">demux_mesh</text>
+<g id="a_proc~~find_equiv_map~~CallsGraph_node2"><a xlink:href=".././proc/demux_mesh.html" xlink:title="demux_mesh">
+<polygon fill="#d9534f" stroke="#d9534f" points="208,-108 131,-108 131,-84 208,-84 208,-108"/>
+<text text-anchor="middle" x="169.5" y="-93.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">demux_mesh</text>
 </a>
 </g>
 </g>
 <!-- proc~find_equiv_map&#45;&gt;proc~demux_mesh -->
-<g id="proc~~find_equiv_map~~CallsGraph_edge2" class="edge">
+<g id="proc~~find_equiv_map~~CallsGraph_edge1" class="edge">
 <title>proc~find_equiv_map&#45;&gt;proc~demux_mesh</title>
-<path fill="none" stroke="#000000" d="M88.19,-54C98.74,-54 110.07,-54 120.81,-54"/>
-<polygon fill="#000000" stroke="#000000" points="120.88,-57.5 130.88,-54 120.88,-50.5 120.88,-57.5"/>
+<path fill="none" stroke="#000000" d="M80.39,-66.04C93.83,-70.6 109.31,-75.87 123.52,-80.7"/>
+<polygon fill="#000000" stroke="#000000" points="122.51,-84.06 133.1,-83.96 124.76,-77.43 122.51,-84.06"/>
 </g>
 <!-- proc~distribute_points -->
-<g id="proc~~find_equiv_map~~CallsGraph_node4" class="node">
+<g id="proc~~find_equiv_map~~CallsGraph_node3" class="node">
 <title>proc~distribute_points</title>
-<g id="a_proc~~find_equiv_map~~CallsGraph_node4"><a xlink:href=".././proc/distribute_points.html" xlink:title="distribute_points">
-<polygon fill="#d9534f" stroke="#d9534f" points="215,-24 124,-24 124,0 215,0 215,-24"/>
-<text text-anchor="middle" x="169.5" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">distribute_points</text>
+<g id="a_proc~~find_equiv_map~~CallsGraph_node3"><a xlink:href=".././proc/distribute_points.html" xlink:title="distribute_points">
+<polygon fill="#d9534f" stroke="#d9534f" points="215,-66 124,-66 124,-42 215,-42 215,-66"/>
+<text text-anchor="middle" x="169.5" y="-51.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">distribute_points</text>
 </a>
 </g>
 </g>
 <!-- proc~find_equiv_map&#45;&gt;proc~distribute_points -->
-<g id="proc~~find_equiv_map~~CallsGraph_edge3" class="edge">
+<g id="proc~~find_equiv_map~~CallsGraph_edge2" class="edge">
 <title>proc~find_equiv_map&#45;&gt;proc~distribute_points</title>
-<path fill="none" stroke="#000000" d="M80.39,-41.96C93.83,-37.4 109.31,-32.13 123.52,-27.3"/>
-<polygon fill="#000000" stroke="#000000" points="124.76,-30.57 133.1,-24.04 122.51,-23.94 124.76,-30.57"/>
+<path fill="none" stroke="#000000" d="M88.19,-54C96.4,-54 105.09,-54 113.61,-54"/>
+<polygon fill="#000000" stroke="#000000" points="113.86,-57.5 123.86,-54 113.86,-50.5 113.86,-57.5"/>
+</g>
+<!-- proc~mux_vector -->
+<g id="proc~~find_equiv_map~~CallsGraph_node4" class="node">
+<title>proc~mux_vector</title>
+<g id="a_proc~~find_equiv_map~~CallsGraph_node4"><a xlink:href=".././proc/mux_vector.html" xlink:title="mux_vector">
+<polygon fill="#d94e8f" stroke="#d94e8f" points="203.5,-24 135.5,-24 135.5,0 203.5,0 203.5,-24"/>
+<text text-anchor="middle" x="169.5" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">mux_vector</text>
+</a>
+</g>
+</g>
+<!-- proc~find_equiv_map&#45;&gt;proc~mux_vector -->
+<g id="proc~~find_equiv_map~~CallsGraph_edge3" class="edge">
+<title>proc~find_equiv_map&#45;&gt;proc~mux_vector</title>
+<path fill="none" stroke="#000000" d="M80.39,-41.96C94.41,-37.2 110.65,-31.67 125.35,-26.68"/>
+<polygon fill="#000000" stroke="#000000" points="126.88,-29.85 135.23,-23.32 124.63,-23.22 126.88,-29.85"/>
 </g>
 <!-- proc~exit_with_message -->
 <g id="proc~~find_equiv_map~~CallsGraph_node5" class="node">
 <title>proc~exit_with_message</title>
 <g id="a_proc~~find_equiv_map~~CallsGraph_node5"><a xlink:href=".././proc/exit_with_message.html" xlink:title="exit_with_message">
-<polygon fill="#d9534f" stroke="#d9534f" points="354,-108 251,-108 251,-84 354,-84 354,-108"/>
-<text text-anchor="middle" x="302.5" y="-93.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">exit_with_message</text>
+<polygon fill="#d9534f" stroke="#d9534f" points="354,-24 251,-24 251,0 354,0 354,-24"/>
+<text text-anchor="middle" x="302.5" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">exit_with_message</text>
 </a>
 </g>
 </g>
 <!-- proc~mux_vector&#45;&gt;proc~exit_with_message -->
 <g id="proc~~find_equiv_map~~CallsGraph_edge4" class="edge">
 <title>proc~mux_vector&#45;&gt;proc~exit_with_message</title>
-<path fill="none" stroke="#000000" d="M203.56,-96C214.86,-96 227.89,-96 240.68,-96"/>
-<polygon fill="#000000" stroke="#000000" points="240.85,-99.5 250.85,-96 240.85,-92.5 240.85,-99.5"/>
+<path fill="none" stroke="#000000" d="M203.56,-12C214.86,-12 227.89,-12 240.68,-12"/>
+<polygon fill="#000000" stroke="#000000" points="240.85,-15.5 250.85,-12 240.85,-8.5 240.85,-15.5"/>
 </g>
 </g>
 </svg>
@@ -642,6 +653,10 @@ public subroutine find_equiv_map(nsymm_rot, equiv_map, mesh, qrotations, indexli
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
     
+    
+    <script src="../tipuesearch/tipuesearch_content.js"></script>
+    <script src="../tipuesearch/tipuesearch_set.js"></script>
+    <script src="../tipuesearch/tipuesearch.js"></script>
     
     
   </body>

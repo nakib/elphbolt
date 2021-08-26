@@ -362,7 +362,7 @@ contains
 
     !Local variables
     integer(k8) :: ik, i, j, k, ijk(3), ii, jj, kk, tk, tl, aux, count
-    integer(k8) :: ip1, jp1, kp1, n1, n2, n3, tmp
+    integer(k8) :: ip1, jp1, n1, n2, n3, tmp
     integer(k8) :: triang_vertices_labels(2, 3)
     integer(k8) :: scvol_vertices(4, 3) !subcell vertices
 

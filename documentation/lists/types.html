@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
    
-   <meta name="description" content="A Fortran 2018 code for solving the coupled electron and phonon Boltzmann transport equations.">
+   <meta name="description" content="A solver for the coupled and decoupled electron and phonon Boltzmann transport equations.">
     
     <meta name="author" content="Nakib Haider Protik" >
     <link rel="icon" href="../favicon.png">
@@ -18,6 +18,8 @@ All Types &ndash; elphbolt
     <link href="../css/pygments.css" rel="stylesheet">
     <link href="../css/font-awesome.min.css" rel="stylesheet">
     <link href="../css/local.css" rel="stylesheet">
+    
+    <link  href="../tipuesearch/tipuesearch.css" rel="stylesheet">
     
     
 
@@ -95,6 +97,15 @@ All Types &ndash; elphbolt
 
           </ul>
         
+        <form action="../search.html" class="navbar-form navbar-right" role="search">
+        <div class="form-group">
+          <input type="text" class="form-control" placeholder="Search" name="q" id="tipue_search_input" autocomplete="off" required>
+        </div>
+<!--
+        <button type="submit" class="btn btn-default">Submit</button>
+-->
+        </form>
+        
         </div><!--/.nav-collapse -->
       </div>
     </nav>
@@ -135,57 +146,57 @@ All Types &ndash; elphbolt
 <g id="type~~graph~~TypeGraph" class="graph" transform="scale(1 1) rotate(0) translate(4 280)">
 <title>type~~graph~~TypeGraph</title>
 <polygon fill="white" stroke="transparent" points="-4,4 -4,-280 80,-280 80,4 -4,4"/>
-<!-- type~numerics -->
+<!-- type~phonon -->
 <g id="type~~graph~~TypeGraph_node1" class="node">
-<title>type~numerics</title>
-<g id="a_type~~graph~~TypeGraph_node1"><a xlink:href=".././type/numerics.html" xlink:title="numerics">
-<polygon fill="#5cb85c" stroke="#5cb85c" points="66,-24 10,-24 10,0 66,0 66,-24"/>
-<text text-anchor="middle" x="38" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">numerics</text>
-</a>
-</g>
-</g>
-<!-- type~crystal -->
-<g id="type~~graph~~TypeGraph_node2" class="node">
-<title>type~crystal</title>
-<g id="a_type~~graph~~TypeGraph_node2"><a xlink:href=".././type/crystal.html" xlink:title="crystal">
-<polygon fill="#5cb85c" stroke="#5cb85c" points="65,-66 11,-66 11,-42 65,-42 65,-66"/>
-<text text-anchor="middle" x="38" y="-51.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">crystal</text>
+<title>type~phonon</title>
+<g id="a_type~~graph~~TypeGraph_node1"><a xlink:href=".././type/phonon.html" xlink:title="phonon">
+<polygon fill="#5cb85c" stroke="#5cb85c" points="65,-24 11,-24 11,0 65,0 65,-24"/>
+<text text-anchor="middle" x="38" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">phonon</text>
 </a>
 </g>
 </g>
 <!-- type~symmetry -->
-<g id="type~~graph~~TypeGraph_node3" class="node">
+<g id="type~~graph~~TypeGraph_node2" class="node">
 <title>type~symmetry</title>
-<g id="a_type~~graph~~TypeGraph_node3"><a xlink:href=".././type/symmetry.html" xlink:title="symmetry">
-<polygon fill="#5cb85c" stroke="#5cb85c" points="67.5,-108 8.5,-108 8.5,-84 67.5,-84 67.5,-108"/>
-<text text-anchor="middle" x="38" y="-93.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">symmetry</text>
+<g id="a_type~~graph~~TypeGraph_node2"><a xlink:href=".././type/symmetry.html" xlink:title="symmetry">
+<polygon fill="#5cb85c" stroke="#5cb85c" points="67.5,-66 8.5,-66 8.5,-42 67.5,-42 67.5,-66"/>
+<text text-anchor="middle" x="38" y="-51.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">symmetry</text>
 </a>
 </g>
 </g>
 <!-- type~electron -->
-<g id="type~~graph~~TypeGraph_node4" class="node">
+<g id="type~~graph~~TypeGraph_node3" class="node">
 <title>type~electron</title>
-<g id="a_type~~graph~~TypeGraph_node4"><a xlink:href=".././type/electron.html" xlink:title="electron">
-<polygon fill="#5cb85c" stroke="#5cb85c" points="65,-150 11,-150 11,-126 65,-126 65,-150"/>
-<text text-anchor="middle" x="38" y="-135.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">electron</text>
-</a>
-</g>
-</g>
-<!-- type~phonon -->
-<g id="type~~graph~~TypeGraph_node5" class="node">
-<title>type~phonon</title>
-<g id="a_type~~graph~~TypeGraph_node5"><a xlink:href=".././type/phonon.html" xlink:title="phonon">
-<polygon fill="#5cb85c" stroke="#5cb85c" points="65,-192 11,-192 11,-168 65,-168 65,-192"/>
-<text text-anchor="middle" x="38" y="-177.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">phonon</text>
+<g id="a_type~~graph~~TypeGraph_node3"><a xlink:href=".././type/electron.html" xlink:title="electron">
+<polygon fill="#5cb85c" stroke="#5cb85c" points="65,-108 11,-108 11,-84 65,-84 65,-108"/>
+<text text-anchor="middle" x="38" y="-93.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">electron</text>
 </a>
 </g>
 </g>
 <!-- type~epw_wannier -->
-<g id="type~~graph~~TypeGraph_node6" class="node">
+<g id="type~~graph~~TypeGraph_node4" class="node">
 <title>type~epw_wannier</title>
-<g id="a_type~~graph~~TypeGraph_node6"><a xlink:href=".././type/epw_wannier.html" xlink:title="epw_wannier">
-<polygon fill="#5cb85c" stroke="#5cb85c" points="76,-234 0,-234 0,-210 76,-210 76,-234"/>
-<text text-anchor="middle" x="38" y="-219.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">epw_wannier</text>
+<g id="a_type~~graph~~TypeGraph_node4"><a xlink:href=".././type/epw_wannier.html" xlink:title="epw_wannier">
+<polygon fill="#5cb85c" stroke="#5cb85c" points="76,-150 0,-150 0,-126 76,-126 76,-150"/>
+<text text-anchor="middle" x="38" y="-135.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">epw_wannier</text>
+</a>
+</g>
+</g>
+<!-- type~numerics -->
+<g id="type~~graph~~TypeGraph_node5" class="node">
+<title>type~numerics</title>
+<g id="a_type~~graph~~TypeGraph_node5"><a xlink:href=".././type/numerics.html" xlink:title="numerics">
+<polygon fill="#5cb85c" stroke="#5cb85c" points="66,-192 10,-192 10,-168 66,-168 66,-192"/>
+<text text-anchor="middle" x="38" y="-177.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">numerics</text>
+</a>
+</g>
+</g>
+<!-- type~crystal -->
+<g id="type~~graph~~TypeGraph_node6" class="node">
+<title>type~crystal</title>
+<g id="a_type~~graph~~TypeGraph_node6"><a xlink:href=".././type/crystal.html" xlink:title="crystal">
+<polygon fill="#5cb85c" stroke="#5cb85c" points="65,-234 11,-234 11,-210 65,-210 65,-234"/>
+<text text-anchor="middle" x="38" y="-219.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">crystal</text>
 </a>
 </g>
 </g>
@@ -281,6 +292,10 @@ All Types &ndash; elphbolt
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
     
+    
+    <script src="../tipuesearch/tipuesearch_content.js"></script>
+    <script src="../tipuesearch/tipuesearch_set.js"></script>
+    <script src="../tipuesearch/tipuesearch.js"></script>
     
     
   </body>

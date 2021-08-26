@@ -62,11 +62,11 @@ module bte_module
      real(dp), allocatable :: el_field_term_T(:,:,:)
      !! Electron field coupling term for gradT field on the FBZ.
      real(dp), allocatable :: el_response_T(:,:,:)
-     !! electron response function for gradT field on the FBZ.
+     !! Electron response function for gradT field on the FBZ.
      real(dp), allocatable :: el_field_term_E(:,:,:)
      !! Electron field coupling term for E field on the FBZ.
      real(dp), allocatable :: el_response_E(:,:,:)
-     !! electron response function for E field on the FBZ.
+     !! Electron response function for E field on the FBZ.
    contains
 
      procedure :: solve_bte, post_process
@@ -77,6 +77,13 @@ contains
 
   subroutine solve_bte(bt, num, crys, sym, ph, el)
     !! Subroutine to solve the BTE
+    !!
+    !! bt BTE object
+    !! num Numerics object
+    !! crys Crystal object
+    !! sym Symmertry object
+    !! ph Phonon object
+    !! el Electron object
     
     class(bte), intent(inout) :: bt
     type(numerics), intent(in) :: num
@@ -1071,6 +1078,7 @@ contains
     !! Subroutine to calculate the phonon drag term.
     !! 
     !! T Temperature in K
+    !! num Numerics object
     !! el Electron object
     !! ph Phonon object
     !! sym Symmetry

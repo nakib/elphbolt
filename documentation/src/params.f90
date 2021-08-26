@@ -19,9 +19,15 @@ module params
   
   implicit none
 
-  integer, parameter :: dp = selected_real_kind(14,200)
+  integer, parameter :: r_int = 12
+  !! Exponent range for reals.
+  integer, parameter :: r_real = 200
+  !! Exponent range for reals.
+  integer, parameter :: p_real = 14
+  !! Number of digits for reals.
+  integer, parameter :: dp = selected_real_kind(p_real, r_real)
   !! Custom real precision.
-  integer, parameter :: k8 = selected_real_kind(8)
+  integer, parameter :: k8 = selected_int_kind(r_int)
   !! Custom integer precision.
 
   !Physical constants:

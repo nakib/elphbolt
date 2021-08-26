@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
    
-   <meta name="description" content="A Fortran 2018 code for solving the coupled electron and phonon Boltzmann transport equations.">
+   <meta name="description" content="A solver for the coupled and decoupled electron and phonon Boltzmann transport equations.">
     
     <meta name="author" content="Nakib Haider Protik" >
     <link rel="icon" href="../favicon.png">
@@ -16,6 +16,8 @@
     <link href="../css/pygments.css" rel="stylesheet">
     <link href="../css/font-awesome.min.css" rel="stylesheet">
     <link href="../css/local.css" rel="stylesheet">
+    
+    <link  href="../tipuesearch/tipuesearch.css" rel="stylesheet">
     
     
 
@@ -93,6 +95,15 @@
 
           </ul>
         
+        <form action="../search.html" class="navbar-form navbar-right" role="search">
+        <div class="form-group">
+          <input type="text" class="form-control" placeholder="Search" name="q" id="tipue_search_input" autocomplete="off" required>
+        </div>
+<!--
+        <button type="submit" class="btn btn-default">Submit</button>
+-->
+        </form>
+        
         </div><!--/.nav-collapse -->
       </div>
     </nav>
@@ -119,7 +130,7 @@
      <li><i class="fa fa-list-ol"></i>
        <a data-toggle="tooltip"
     data-placement="bottom" data-html="true"
-    title="<p>29.0% of total for derived types.</p>Including implementation: 173 statements, 12.8% of total for derived types.">56 statements</a>
+    title="<p>28.5% of total for derived types.</p>Including implementation: 211 statements, 12.8% of total for derived types.">61 statements</a>
      </li> 
      
      
@@ -267,6 +278,16 @@
       <a class="list-group-item" href="../type/electron.html#variable-metallic">metallic</a>
       
       <a class="list-group-item" href="../type/electron.html#variable-dos~2">dos</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-dopingtype">dopingtype</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-numconc">numconc</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-conclist">conclist</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-numt">numT</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-tlist">Tlist</a>
       
     </div>
   </div>
@@ -434,6 +455,16 @@
       
       <a class="list-group-item" href="../type/electron.html#variable-dos~2">dos</a>
       
+      <a class="list-group-item" href="../type/electron.html#variable-dopingtype">dopingtype</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-numconc">numconc</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-conclist">conclist</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-numt">numT</a>
+      
+      <a class="list-group-item" href="../type/electron.html#variable-tlist">Tlist</a>
+      
     </div>
   </div>
 </div>
@@ -526,7 +557,7 @@
   
   <td>public</td>
   <td></td><td>::</td>
-  <td><strong>numbands</strong></td><td></td><td></td><td><p>Total number of electronic bands (from DFT/Wannier).</p></td>
+  <td><strong>numbands</strong></td><td></td><td></td><td><p>Total number of electronic Wannier bands.</p></td>
   
 </tr>
 
@@ -751,7 +782,7 @@
   
   <td>public</td>
   <td></td><td>::</td>
-  <td><strong>fsthick</strong></td><td></td><td></td><td><p>Fermi surface thickness in (eV).</p></td>
+  <td><strong>fsthick</strong></td><td></td><td></td><td><p>Fermi surface thickness (eV).</p></td>
   
 </tr>
 
@@ -765,7 +796,7 @@
   
   <td>public</td>
   <td></td><td>::</td>
-  <td><strong>chempot</strong></td><td></td><td></td><td><p>Chemical potential.</p></td>
+  <td><strong>chempot</strong></td><td></td><td></td><td><p>Chemical potential in (eV).</p></td>
   
 </tr>
 
@@ -1222,6 +1253,76 @@
   
 </tr>
 
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-dopingtype"></span>character(len=1),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>dopingtype</strong></td><td></td><td></td><td><p>Type of doping. This is needed for runlevel 0 only.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-numconc"></span>integer(kind=k8),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>numconc</strong></td><td></td><td></td><td><p>Number of concentration points. This is needed for runlevel 0 only.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-conclist"></span>real(kind=dp),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>conclist</strong>(:)</td><td></td><td></td><td><p>List of concentrations. This is needed for runlevel 0 only.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-numt"></span>integer(kind=k8),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>numT</strong></td><td></td><td></td><td><p>Number of temperature points. This is needed for runlevel 0 only.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-tlist"></span>real(kind=dp),</td>
+  
+  <td>public,</td>
+  <td>allocatable</td><td>::</td>
+  <td><strong>Tlist</strong>(:)</td><td></td><td></td><td><p>List of temperatures. This is needed for runlevel 0 only.</p></td>
+  
+</tr>
+
 </tbody>
 </table>
 
@@ -1485,6 +1586,10 @@ private subroutine read_input_and_setup(el, wann, crys, sym, num)
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
     
+    
+    <script src="../tipuesearch/tipuesearch_content.js"></script>
+    <script src="../tipuesearch/tipuesearch_set.js"></script>
+    <script src="../tipuesearch/tipuesearch.js"></script>
     
     
   </body>

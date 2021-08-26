@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
    
-   <meta name="description" content="A Fortran 2018 code for solving the coupled electron and phonon Boltzmann transport equations.">
+   <meta name="description" content="A solver for the coupled and decoupled electron and phonon Boltzmann transport equations.">
     
     <meta name="author" content="Nakib Haider Protik" >
     <link rel="icon" href="../favicon.png">
@@ -16,6 +16,8 @@
     <link href="../css/pygments.css" rel="stylesheet">
     <link href="../css/font-awesome.min.css" rel="stylesheet">
     <link href="../css/local.css" rel="stylesheet">
+    
+    <link  href="../tipuesearch/tipuesearch.css" rel="stylesheet">
     
     
 
@@ -93,6 +95,15 @@
 
           </ul>
         
+        <form action="../search.html" class="navbar-form navbar-right" role="search">
+        <div class="form-group">
+          <input type="text" class="form-control" placeholder="Search" name="q" id="tipue_search_input" autocomplete="off" required>
+        </div>
+<!--
+        <button type="submit" class="btn btn-default">Submit</button>
+-->
+        </form>
+        
         </div><!--/.nav-collapse -->
       </div>
     </nav>
@@ -119,7 +130,7 @@
      <li><i class="fa fa-list-ol"></i>
        <a data-toggle="tooltip"
     data-placement="bottom" data-html="true"
-    title=" 2.7% of total for procedures.">59 statements</a>
+    title=" 2.5% of total for procedures.">57 statements</a>
      </li> 
      
      
@@ -319,35 +330,35 @@ public subroutine calculate_el_rta_rates(rta_rates_eph, rta_rates_echimp, num, c
 <polygon fill="none" stroke="black" points="118,-45 0,-45 0,-21 118,-21 118,-45"/>
 <text text-anchor="middle" x="59" y="-30.6" font-family="Helvetica,sans-Serif" font-size="10.50">calculate_el_rta_rates</text>
 </g>
-<!-- proc~demux_state -->
-<g id="proc~~calculate_el_rta_rates~~CallsGraph_node2" class="node">
-<title>proc~demux_state</title>
-<g id="a_proc~~calculate_el_rta_rates~~CallsGraph_node2"><a xlink:href=".././proc/demux_state.html" xlink:title="demux_state">
-<polygon fill="#d9534f" stroke="#d9534f" points="236.5,-66 162.5,-66 162.5,-42 236.5,-42 236.5,-66"/>
-<text text-anchor="middle" x="199.5" y="-51.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">demux_state</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_el_rta_rates&#45;&gt;proc~demux_state -->
-<g id="proc~~calculate_el_rta_rates~~CallsGraph_edge1" class="edge">
-<title>proc~calculate_el_rta_rates&#45;&gt;proc~demux_state</title>
-<path fill="none" stroke="#000000" d="M118.34,-41.85C129.65,-43.56 141.37,-45.34 152.23,-46.98"/>
-<polygon fill="#000000" stroke="#000000" points="151.94,-50.48 162.35,-48.52 152.98,-43.56 151.94,-50.48"/>
-</g>
 <!-- proc~distribute_points -->
-<g id="proc~~calculate_el_rta_rates~~CallsGraph_node3" class="node">
+<g id="proc~~calculate_el_rta_rates~~CallsGraph_node2" class="node">
 <title>proc~distribute_points</title>
-<g id="a_proc~~calculate_el_rta_rates~~CallsGraph_node3"><a xlink:href=".././proc/distribute_points.html" xlink:title="distribute_points">
-<polygon fill="#d9534f" stroke="#d9534f" points="245,-24 154,-24 154,0 245,0 245,-24"/>
-<text text-anchor="middle" x="199.5" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">distribute_points</text>
+<g id="a_proc~~calculate_el_rta_rates~~CallsGraph_node2"><a xlink:href=".././proc/distribute_points.html" xlink:title="distribute_points">
+<polygon fill="#d9534f" stroke="#d9534f" points="245,-66 154,-66 154,-42 245,-42 245,-66"/>
+<text text-anchor="middle" x="199.5" y="-51.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">distribute_points</text>
 </a>
 </g>
 </g>
 <!-- proc~calculate_el_rta_rates&#45;&gt;proc~distribute_points -->
-<g id="proc~~calculate_el_rta_rates~~CallsGraph_edge2" class="edge">
+<g id="proc~~calculate_el_rta_rates~~CallsGraph_edge1" class="edge">
 <title>proc~calculate_el_rta_rates&#45;&gt;proc~distribute_points</title>
-<path fill="none" stroke="#000000" d="M118.34,-24.15C126.74,-22.88 135.37,-21.57 143.71,-20.31"/>
-<polygon fill="#000000" stroke="#000000" points="144.34,-23.75 153.7,-18.79 143.29,-16.83 144.34,-23.75"/>
+<path fill="none" stroke="#000000" d="M118.34,-41.85C126.74,-43.12 135.37,-44.43 143.71,-45.69"/>
+<polygon fill="#000000" stroke="#000000" points="143.29,-49.17 153.7,-47.21 144.34,-42.25 143.29,-49.17"/>
+</g>
+<!-- proc~demux_state -->
+<g id="proc~~calculate_el_rta_rates~~CallsGraph_node3" class="node">
+<title>proc~demux_state</title>
+<g id="a_proc~~calculate_el_rta_rates~~CallsGraph_node3"><a xlink:href=".././proc/demux_state.html" xlink:title="demux_state">
+<polygon fill="#d9534f" stroke="#d9534f" points="236.5,-24 162.5,-24 162.5,0 236.5,0 236.5,-24"/>
+<text text-anchor="middle" x="199.5" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">demux_state</text>
+</a>
+</g>
+</g>
+<!-- proc~calculate_el_rta_rates&#45;&gt;proc~demux_state -->
+<g id="proc~~calculate_el_rta_rates~~CallsGraph_edge2" class="edge">
+<title>proc~calculate_el_rta_rates&#45;&gt;proc~demux_state</title>
+<path fill="none" stroke="#000000" d="M118.34,-24.15C129.65,-22.44 141.37,-20.66 152.23,-19.02"/>
+<polygon fill="#000000" stroke="#000000" points="152.98,-22.44 162.35,-17.48 151.94,-15.52 152.98,-22.44"/>
 </g>
 </g>
 </svg>
@@ -513,6 +524,10 @@ public subroutine calculate_el_rta_rates(rta_rates_eph, rta_rates_echimp, num, c
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
     
+    
+    <script src="../tipuesearch/tipuesearch_content.js"></script>
+    <script src="../tipuesearch/tipuesearch_set.js"></script>
+    <script src="../tipuesearch/tipuesearch.js"></script>
     
     
   </body>

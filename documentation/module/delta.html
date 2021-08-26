@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
    
-   <meta name="description" content="A Fortran 2018 code for solving the coupled electron and phonon Boltzmann transport equations.">
+   <meta name="description" content="A solver for the coupled and decoupled electron and phonon Boltzmann transport equations.">
     
     <meta name="author" content="Nakib Haider Protik" >
     <link rel="icon" href="../favicon.png">
@@ -16,6 +16,8 @@
     <link href="../css/pygments.css" rel="stylesheet">
     <link href="../css/font-awesome.min.css" rel="stylesheet">
     <link href="../css/local.css" rel="stylesheet">
+    
+    <link  href="../tipuesearch/tipuesearch.css" rel="stylesheet">
     
     
 
@@ -93,6 +95,15 @@
 
           </ul>
         
+        <form action="../search.html" class="navbar-form navbar-right" role="search">
+        <div class="form-group">
+          <input type="text" class="form-control" placeholder="Search" name="q" id="tipue_search_input" autocomplete="off" required>
+        </div>
+<!--
+        <button type="submit" class="btn btn-default">Submit</button>
+-->
+        </form>
+        
         </div><!--/.nav-collapse -->
       </div>
     </nav>
@@ -119,7 +130,7 @@
      <li><i class="fa fa-list-ol"></i>
        <a data-toggle="tooltip"
     data-placement="bottom" data-html="true"
-    title=" 6.3% of total for modules and submodules.">343 statements</a>
+    title=" 5.6% of total for modules and submodules.">343 statements</a>
      </li> 
      
      
@@ -397,32 +408,17 @@
 <path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M89.93,-78.67C81.34,-76.98 72.45,-75.24 64.17,-73.61"/>
 <polygon fill="#000000" stroke="#000000" points="64.58,-70.13 54.1,-71.64 63.24,-77 64.58,-70.13"/>
 </g>
-<!-- module~phonon_module -->
-<g id="module~~delta~~UsedByGraph_node3" class="node">
-<title>module~phonon_module</title>
-<g id="a_module~~delta~~UsedByGraph_node3"><a xlink:href=".././module/phonon_module.html" xlink:title="phonon_module">
-<polygon fill="#337ab7" stroke="#337ab7" points="181,-57.52 91,-57.52 91,-33.52 181,-33.52 181,-57.52"/>
-<text text-anchor="middle" x="136" y="-43.12" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">phonon_module</text>
-</a>
-</g>
-</g>
-<!-- module~phonon_module&#45;&gt;module~delta -->
-<g id="module~~delta~~UsedByGraph_edge3" class="edge">
-<title>module~phonon_module&#45;&gt;module~delta</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M90.86,-54.18C82.02,-55.91 72.83,-57.72 64.29,-59.39"/>
-<polygon fill="#000000" stroke="#000000" points="63.41,-56 54.27,-61.36 64.76,-62.87 63.41,-56"/>
-</g>
 <!-- module~bz_sums -->
-<g id="module~~delta~~UsedByGraph_node4" class="node">
+<g id="module~~delta~~UsedByGraph_node3" class="node">
 <title>module~bz_sums</title>
-<g id="a_module~~delta~~UsedByGraph_node4"><a xlink:href=".././module/bz_sums.html" xlink:title="bz_sums">
+<g id="a_module~~delta~~UsedByGraph_node3"><a xlink:href=".././module/bz_sums.html" xlink:title="bz_sums">
 <polygon fill="#337ab7" stroke="#337ab7" points="279,-137.52 224,-137.52 224,-113.52 279,-113.52 279,-137.52"/>
 <text text-anchor="middle" x="251.5" y="-123.12" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">bz_sums</text>
 </a>
 </g>
 </g>
 <!-- module~bz_sums&#45;&gt;module~delta -->
-<g id="module~~delta~~UsedByGraph_edge4" class="edge">
+<g id="module~~delta~~UsedByGraph_edge2" class="edge">
 <title>module~bz_sums&#45;&gt;module~delta</title>
 <path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M223.76,-126.58C191.17,-127.01 134.87,-124.92 90,-108.52 75.4,-103.18 60.92,-93.67 49.63,-85.05"/>
 <polygon fill="#000000" stroke="#000000" points="51.67,-82.2 41.67,-78.71 47.31,-87.68 51.67,-82.2"/>
@@ -433,23 +429,32 @@
 <path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M223.89,-116.61C211.54,-112.47 196.5,-107.44 182.44,-102.73"/>
 <polygon fill="#000000" stroke="#000000" points="183.49,-99.39 172.9,-99.53 181.27,-106.03 183.49,-99.39"/>
 </g>
+<!-- module~phonon_module -->
+<g id="module~~delta~~UsedByGraph_node5" class="node">
+<title>module~phonon_module</title>
+<g id="a_module~~delta~~UsedByGraph_node5"><a xlink:href=".././module/phonon_module.html" xlink:title="phonon_module">
+<polygon fill="#337ab7" stroke="#337ab7" points="181,-57.52 91,-57.52 91,-33.52 181,-33.52 181,-57.52"/>
+<text text-anchor="middle" x="136" y="-43.12" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">phonon_module</text>
+</a>
+</g>
+</g>
 <!-- module~bz_sums&#45;&gt;module~phonon_module -->
-<g id="module~~delta~~UsedByGraph_edge10" class="edge">
+<g id="module~~delta~~UsedByGraph_edge14" class="edge">
 <title>module~bz_sums&#45;&gt;module~phonon_module</title>
 <path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M234.79,-113.29C229.4,-109.01 223.38,-104.12 218,-99.52 201.52,-85.39 200.04,-78.58 182,-66.52 179.87,-65.09 177.62,-63.71 175.32,-62.39"/>
 <polygon fill="#000000" stroke="#000000" points="176.75,-59.19 166.28,-57.59 173.47,-65.37 176.75,-59.19"/>
 </g>
 <!-- module~interactions -->
-<g id="module~~delta~~UsedByGraph_node5" class="node">
+<g id="module~~delta~~UsedByGraph_node4" class="node">
 <title>module~interactions</title>
-<g id="a_module~~delta~~UsedByGraph_node5"><a xlink:href=".././module/interactions.html" xlink:title="interactions">
+<g id="a_module~~delta~~UsedByGraph_node4"><a xlink:href=".././module/interactions.html" xlink:title="interactions">
 <polygon fill="#337ab7" stroke="#337ab7" points="285,-57.52 218,-57.52 218,-33.52 285,-33.52 285,-57.52"/>
 <text text-anchor="middle" x="251.5" y="-43.12" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">interactions</text>
 </a>
 </g>
 </g>
 <!-- module~interactions&#45;&gt;module~delta -->
-<g id="module~~delta~~UsedByGraph_edge2" class="edge">
+<g id="module~~delta~~UsedByGraph_edge3" class="edge">
 <title>module~interactions&#45;&gt;module~delta</title>
 <path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M218.47,-33.5C185.58,-22.97 133.25,-11.24 90,-24.52 74.95,-29.13 60.26,-38.78 48.96,-47.67"/>
 <polygon fill="#000000" stroke="#000000" points="46.51,-45.15 41.03,-54.22 50.97,-50.55 46.51,-45.15"/>
@@ -461,85 +466,91 @@
 <polygon fill="#000000" stroke="#000000" points="177.69,-68.72 169.53,-75.48 180.12,-75.29 177.69,-68.72"/>
 </g>
 <!-- module~interactions&#45;&gt;module~phonon_module -->
-<g id="module~~delta~~UsedByGraph_edge11" class="edge">
+<g id="module~~delta~~UsedByGraph_edge15" class="edge">
 <title>module~interactions&#45;&gt;module~phonon_module</title>
 <path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M217.98,-45.52C209.69,-45.52 200.57,-45.52 191.51,-45.52"/>
 <polygon fill="#000000" stroke="#000000" points="191.37,-42.02 181.37,-45.52 191.37,-49.02 191.37,-42.02"/>
 </g>
-<!-- program~elphbolt -->
+<!-- module~phonon_module&#45;&gt;module~delta -->
+<g id="module~~delta~~UsedByGraph_edge4" class="edge">
+<title>module~phonon_module&#45;&gt;module~delta</title>
+<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M90.86,-54.18C82.02,-55.91 72.83,-57.72 64.29,-59.39"/>
+<polygon fill="#000000" stroke="#000000" points="63.41,-56 54.27,-61.36 64.76,-62.87 63.41,-56"/>
+</g>
+<!-- module~bte_module -->
 <g id="module~~delta~~UsedByGraph_node6" class="node">
+<title>module~bte_module</title>
+<g id="a_module~~delta~~UsedByGraph_node6"><a xlink:href=".././module/bte_module.html" xlink:title="bte_module">
+<polygon fill="#337ab7" stroke="#337ab7" points="390,-97.52 321,-97.52 321,-73.52 390,-73.52 390,-97.52"/>
+<text text-anchor="middle" x="355.5" y="-83.12" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">bte_module</text>
+</a>
+</g>
+</g>
+<!-- module~bte_module&#45;&gt;module~electron_module -->
+<g id="module~~delta~~UsedByGraph_edge5" class="edge">
+<title>module~bte_module&#45;&gt;module~electron_module</title>
+<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M250.5,-85.52C231.52,-83.96 210.71,-83.87 192.14,-84.35"/>
+<polygon fill="#000000" stroke="#000000" points="191.96,-80.86 182.08,-84.67 192.19,-87.85 191.96,-80.86"/>
+</g>
+<!-- module~bte_module&#45;&gt;module~bz_sums -->
+<g id="module~~delta~~UsedByGraph_edge9" class="edge">
+<title>module~bte_module&#45;&gt;module~bz_sums</title>
+<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M323.9,-97.52C312.8,-101.87 300.17,-106.82 288.64,-111.34"/>
+<polygon fill="#000000" stroke="#000000" points="287.31,-108.11 279.28,-115.01 289.86,-114.62 287.31,-108.11"/>
+</g>
+<!-- module~bte_module&#45;&gt;module~interactions -->
+<g id="module~~delta~~UsedByGraph_edge11" class="edge">
+<title>module~bte_module&#45;&gt;module~interactions</title>
+<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M323.9,-73.51C314.2,-69.71 303.33,-65.45 293.05,-61.42"/>
+<polygon fill="#000000" stroke="#000000" points="294.02,-58.04 283.43,-57.65 291.47,-64.56 294.02,-58.04"/>
+</g>
+<!-- module~bte_module&#45;&gt;module~phonon_module -->
+<g id="module~~delta~~UsedByGraph_edge13" class="edge">
+<title>module~bte_module&#45;&gt;module~phonon_module</title>
+<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M320.91,-86.89C300.99,-87.36 275.27,-87.38 252.5,-85.52"/>
+<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M250.5,-85.52C235.66,-84.3 202.18,-72.05 175.4,-61.42"/>
+<polygon fill="#000000" stroke="#000000" points="176.47,-58.07 165.88,-57.6 173.86,-64.57 176.47,-58.07"/>
+</g>
+<!-- program~elphbolt -->
+<g id="module~~delta~~UsedByGraph_node7" class="node">
 <title>program~elphbolt</title>
-<g id="a_module~~delta~~UsedByGraph_node6"><a xlink:href=".././program/elphbolt.html" xlink:title="elphbolt">
+<g id="a_module~~delta~~UsedByGraph_node7"><a xlink:href=".././program/elphbolt.html" xlink:title="elphbolt">
 <polygon fill="#f0ad4e" stroke="#f0ad4e" points="480,-97.52 426,-97.52 426,-73.52 480,-73.52 480,-97.52"/>
 <text text-anchor="middle" x="453" y="-83.12" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">elphbolt</text>
 </a>
 </g>
 </g>
 <!-- program~elphbolt&#45;&gt;module~electron_module -->
-<g id="module~~delta~~UsedByGraph_edge5" class="edge">
+<g id="module~~delta~~UsedByGraph_edge8" class="edge">
 <title>program~elphbolt&#45;&gt;module~electron_module</title>
 <path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M354.5,-165.52C295.13,-180.58 274.79,-169.46 218,-146.52 195.13,-137.28 172.76,-120.18 157.34,-106.76"/>
 <polygon fill="#000000" stroke="#000000" points="159.31,-103.83 149.53,-99.76 154.63,-109.04 159.31,-103.83"/>
 </g>
-<!-- program~elphbolt&#45;&gt;module~phonon_module -->
-<g id="module~~delta~~UsedByGraph_edge9" class="edge">
-<title>program~elphbolt&#45;&gt;module~phonon_module</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M443.47,-73.38C428.59,-53.57 395.7,-15.47 356.5,-5.52"/>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M354.5,-5.52C291.19,10.55 215.96,-12.4 172.63,-29.61"/>
-<polygon fill="#000000" stroke="#000000" points="171.29,-26.37 163.36,-33.4 173.94,-32.85 171.29,-26.37"/>
-</g>
 <!-- program~elphbolt&#45;&gt;module~bz_sums -->
-<g id="module~~delta~~UsedByGraph_edge13" class="edge">
+<g id="module~~delta~~UsedByGraph_edge10" class="edge">
 <title>program~elphbolt&#45;&gt;module~bz_sums</title>
 <path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M443.47,-97.65C428.59,-117.46 395.7,-155.56 356.5,-165.52"/>
 <path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M354.5,-165.52C326.56,-172.61 295.95,-157.28 275.62,-143.59"/>
 <polygon fill="#000000" stroke="#000000" points="277.5,-140.63 267.32,-137.7 273.45,-146.34 277.5,-140.63"/>
 </g>
 <!-- program~elphbolt&#45;&gt;module~interactions -->
-<g id="module~~delta~~UsedByGraph_edge15" class="edge">
+<g id="module~~delta~~UsedByGraph_edge12" class="edge">
 <title>program~elphbolt&#45;&gt;module~interactions</title>
 <path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M354.5,-5.52C326.56,1.58 295.95,-13.75 275.62,-27.44"/>
 <polygon fill="#000000" stroke="#000000" points="273.45,-24.69 267.32,-33.33 277.5,-30.4 273.45,-24.69"/>
 </g>
-<!-- module~bte_module -->
-<g id="module~~delta~~UsedByGraph_node7" class="node">
-<title>module~bte_module</title>
-<g id="a_module~~delta~~UsedByGraph_node7"><a xlink:href=".././module/bte_module.html" xlink:title="bte_module">
-<polygon fill="#337ab7" stroke="#337ab7" points="390,-97.52 321,-97.52 321,-73.52 390,-73.52 390,-97.52"/>
-<text text-anchor="middle" x="355.5" y="-83.12" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">bte_module</text>
-</a>
-</g>
+<!-- program~elphbolt&#45;&gt;module~phonon_module -->
+<g id="module~~delta~~UsedByGraph_edge16" class="edge">
+<title>program~elphbolt&#45;&gt;module~phonon_module</title>
+<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M443.47,-73.38C428.59,-53.57 395.7,-15.47 356.5,-5.52"/>
+<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M354.5,-5.52C291.19,10.55 215.96,-12.4 172.63,-29.61"/>
+<polygon fill="#000000" stroke="#000000" points="171.29,-26.37 163.36,-33.4 173.94,-32.85 171.29,-26.37"/>
 </g>
 <!-- program~elphbolt&#45;&gt;module~bte_module -->
 <g id="module~~delta~~UsedByGraph_edge17" class="edge">
 <title>program~elphbolt&#45;&gt;module~bte_module</title>
 <path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M425.9,-85.52C417.97,-85.52 409.01,-85.52 400.24,-85.52"/>
 <polygon fill="#000000" stroke="#000000" points="400.1,-82.02 390.1,-85.52 400.1,-89.02 400.1,-82.02"/>
-</g>
-<!-- module~bte_module&#45;&gt;module~electron_module -->
-<g id="module~~delta~~UsedByGraph_edge8" class="edge">
-<title>module~bte_module&#45;&gt;module~electron_module</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M250.5,-85.52C231.52,-83.96 210.71,-83.87 192.14,-84.35"/>
-<polygon fill="#000000" stroke="#000000" points="191.96,-80.86 182.08,-84.67 192.19,-87.85 191.96,-80.86"/>
-</g>
-<!-- module~bte_module&#45;&gt;module~phonon_module -->
-<g id="module~~delta~~UsedByGraph_edge12" class="edge">
-<title>module~bte_module&#45;&gt;module~phonon_module</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M320.91,-86.89C300.99,-87.36 275.27,-87.38 252.5,-85.52"/>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M250.5,-85.52C235.66,-84.3 202.18,-72.05 175.4,-61.42"/>
-<polygon fill="#000000" stroke="#000000" points="176.47,-58.07 165.88,-57.6 173.86,-64.57 176.47,-58.07"/>
-</g>
-<!-- module~bte_module&#45;&gt;module~bz_sums -->
-<g id="module~~delta~~UsedByGraph_edge14" class="edge">
-<title>module~bte_module&#45;&gt;module~bz_sums</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M323.9,-97.52C312.8,-101.87 300.17,-106.82 288.64,-111.34"/>
-<polygon fill="#000000" stroke="#000000" points="287.31,-108.11 279.28,-115.01 289.86,-114.62 287.31,-108.11"/>
-</g>
-<!-- module~bte_module&#45;&gt;module~interactions -->
-<g id="module~~delta~~UsedByGraph_edge16" class="edge">
-<title>module~bte_module&#45;&gt;module~interactions</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M323.9,-73.51C314.2,-69.71 303.33,-65.45 293.05,-61.42"/>
-<polygon fill="#000000" stroke="#000000" points="294.02,-58.04 283.43,-57.65 291.47,-64.56 294.02,-58.04"/>
 </g>
 </g>
 </svg>
@@ -1539,6 +1550,10 @@ public subroutine <a href='../proc/fill_triangles.html'>fill_triangles</a>(trian
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
     
+    
+    <script src="../tipuesearch/tipuesearch_content.js"></script>
+    <script src="../tipuesearch/tipuesearch_set.js"></script>
+    <script src="../tipuesearch/tipuesearch.js"></script>
     
     
   </body>

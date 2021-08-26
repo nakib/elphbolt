@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
    
-   <meta name="description" content="A Fortran 2018 code for solving the coupled electron and phonon Boltzmann transport equations.">
+   <meta name="description" content="A solver for the coupled and decoupled electron and phonon Boltzmann transport equations.">
     
     <meta name="author" content="Nakib Haider Protik" >
     <link rel="icon" href="../favicon.png">
@@ -16,6 +16,8 @@
     <link href="../css/pygments.css" rel="stylesheet">
     <link href="../css/font-awesome.min.css" rel="stylesheet">
     <link href="../css/local.css" rel="stylesheet">
+    
+    <link  href="../tipuesearch/tipuesearch.css" rel="stylesheet">
     
     
 
@@ -93,6 +95,15 @@
 
           </ul>
         
+        <form action="../search.html" class="navbar-form navbar-right" role="search">
+        <div class="form-group">
+          <input type="text" class="form-control" placeholder="Search" name="q" id="tipue_search_input" autocomplete="off" required>
+        </div>
+<!--
+        <button type="submit" class="btn btn-default">Submit</button>
+-->
+        </form>
+        
         </div><!--/.nav-collapse -->
       </div>
     </nav>
@@ -119,7 +130,7 @@
      <li><i class="fa fa-list-ol"></i>
        <a data-toggle="tooltip"
     data-placement="bottom" data-html="true"
-    title=" 6.2% of total for source files.">343 statements</a>
+    title=" 5.5% of total for source files.">343 statements</a>
      </li> 
      
      
@@ -330,7 +341,7 @@
 </g>
 </g>
 <!-- sourcefile~phonon.f90&#45;&gt;sourcefile~delta.f90 -->
-<g id="sourcefile~~delta.f90~~AfferentGraph_edge4" class="edge">
+<g id="sourcefile~~delta.f90~~AfferentGraph_edge1" class="edge">
 <title>sourcefile~phonon.f90&#45;&gt;sourcefile~delta.f90</title>
 <path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M90.9,-80.39C82.28,-78.49 72.92,-76.44 64.13,-74.5"/>
 <polygon fill="#000000" stroke="#000000" points="64.65,-71.03 54.13,-72.31 63.15,-77.87 64.65,-71.03"/>
@@ -387,7 +398,7 @@
 </g>
 </g>
 <!-- sourcefile~bz_sums.f90&#45;&gt;sourcefile~delta.f90 -->
-<g id="sourcefile~~delta.f90~~AfferentGraph_edge1" class="edge">
+<g id="sourcefile~~delta.f90~~AfferentGraph_edge4" class="edge">
 <title>sourcefile~bz_sums.f90&#45;&gt;sourcefile~delta.f90</title>
 <path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M205.88,-33.54C175.82,-23.51 128.93,-12.61 90,-24.56 74.95,-29.18 60.26,-38.83 48.96,-47.72"/>
 <polygon fill="#000000" stroke="#000000" points="46.51,-45.2 41.03,-54.27 50.97,-50.59 46.51,-45.2"/>
@@ -404,10 +415,44 @@
 <path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M200.77,-45.56C190.79,-45.56 179.82,-45.56 169.43,-45.56"/>
 <polygon fill="#000000" stroke="#000000" points="169.28,-42.06 159.28,-45.56 169.28,-49.06 169.28,-42.06"/>
 </g>
-<!-- sourcefile~elphbolt.f90 -->
+<!-- sourcefile~bte.f90 -->
 <g id="sourcefile~~delta.f90~~AfferentGraph_node6" class="node">
+<title>sourcefile~bte.f90</title>
+<g id="a_sourcefile~~delta.f90~~AfferentGraph_node6"><a xlink:href=".././sourcefile/bte.f90.html" xlink:title="bte.f90">
+<polygon fill="#f0ad4e" stroke="#f0ad4e" points="370,-97.56 316,-97.56 316,-73.56 370,-73.56 370,-97.56"/>
+<text text-anchor="middle" x="343" y="-83.16" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">bte.f90</text>
+</a>
+</g>
+</g>
+<!-- sourcefile~bte.f90&#45;&gt;sourcefile~phonon.f90 -->
+<g id="sourcefile~~delta.f90~~AfferentGraph_edge6" class="edge">
+<title>sourcefile~bte.f90&#45;&gt;sourcefile~phonon.f90</title>
+<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M236.5,-85.56C213.99,-83.68 188.83,-83.94 168.16,-84.78"/>
+<polygon fill="#000000" stroke="#000000" points="167.93,-81.28 158.1,-85.24 168.25,-88.27 167.93,-81.28"/>
+</g>
+<!-- sourcefile~bte.f90&#45;&gt;sourcefile~interactions.f90 -->
+<g id="sourcefile~~delta.f90~~AfferentGraph_edge9" class="edge">
+<title>sourcefile~bte.f90&#45;&gt;sourcefile~interactions.f90</title>
+<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M315.88,-95.65C304.83,-99.93 291.68,-105.01 279.39,-109.76"/>
+<polygon fill="#000000" stroke="#000000" points="277.84,-106.6 269.77,-113.47 280.36,-113.13 277.84,-106.6"/>
+</g>
+<!-- sourcefile~bte.f90&#45;&gt;sourcefile~electron.f90 -->
+<g id="sourcefile~~delta.f90~~AfferentGraph_edge12" class="edge">
+<title>sourcefile~bte.f90&#45;&gt;sourcefile~electron.f90</title>
+<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M315.57,-86.77C294.63,-87.43 264.64,-87.74 238.5,-85.56"/>
+<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M236.5,-85.56C208.58,-83.23 178.81,-71.97 157.14,-61.99"/>
+<polygon fill="#000000" stroke="#000000" points="158.62,-58.82 148.08,-57.68 155.61,-65.14 158.62,-58.82"/>
+</g>
+<!-- sourcefile~bte.f90&#45;&gt;sourcefile~bz_sums.f90 -->
+<g id="sourcefile~~delta.f90~~AfferentGraph_edge15" class="edge">
+<title>sourcefile~bte.f90&#45;&gt;sourcefile~bz_sums.f90</title>
+<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M315.88,-75.47C304.83,-71.19 291.68,-66.11 279.39,-61.36"/>
+<polygon fill="#000000" stroke="#000000" points="280.36,-57.99 269.77,-57.64 277.84,-64.51 280.36,-57.99"/>
+</g>
+<!-- sourcefile~elphbolt.f90 -->
+<g id="sourcefile~~delta.f90~~AfferentGraph_node7" class="node">
 <title>sourcefile~elphbolt.f90</title>
-<g id="a_sourcefile~~delta.f90~~AfferentGraph_node6"><a xlink:href=".././sourcefile/elphbolt.f90.html" xlink:title="elphbolt.f90">
+<g id="a_sourcefile~~delta.f90~~AfferentGraph_node7"><a xlink:href=".././sourcefile/elphbolt.f90.html" xlink:title="elphbolt.f90">
 <polygon fill="#f0ad4e" stroke="#f0ad4e" points="474,-97.56 406,-97.56 406,-73.56 474,-73.56 474,-97.56"/>
 <text text-anchor="middle" x="440" y="-83.16" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">elphbolt.f90</text>
 </a>
@@ -420,7 +465,7 @@
 <polygon fill="#000000" stroke="#000000" points="145.25,-104.8 135.87,-99.87 140.13,-109.57 145.25,-104.8"/>
 </g>
 <!-- sourcefile~elphbolt.f90&#45;&gt;sourcefile~interactions.f90 -->
-<g id="sourcefile~~delta.f90~~AfferentGraph_edge9" class="edge">
+<g id="sourcefile~~delta.f90~~AfferentGraph_edge10" class="edge">
 <title>sourcefile~elphbolt.f90&#45;&gt;sourcefile~interactions.f90</title>
 <path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M430.53,-97.68C415.74,-117.47 383.06,-155.54 344,-165.56"/>
 <path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M342,-165.56C328.02,-169.15 294.94,-154.83 269.91,-142.34"/>
@@ -434,50 +479,16 @@
 <polygon fill="#000000" stroke="#000000" points="159.33,-26.51 151.41,-33.56 161.99,-32.99 159.33,-26.51"/>
 </g>
 <!-- sourcefile~elphbolt.f90&#45;&gt;sourcefile~bz_sums.f90 -->
-<g id="sourcefile~~delta.f90~~AfferentGraph_edge15" class="edge">
+<g id="sourcefile~~delta.f90~~AfferentGraph_edge16" class="edge">
 <title>sourcefile~elphbolt.f90&#45;&gt;sourcefile~bz_sums.f90</title>
 <path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M342,-5.56C328.02,-1.97 294.94,-16.29 269.91,-28.78"/>
 <polygon fill="#000000" stroke="#000000" points="268.09,-25.78 260.77,-33.44 271.27,-32.02 268.09,-25.78"/>
-</g>
-<!-- sourcefile~bte.f90 -->
-<g id="sourcefile~~delta.f90~~AfferentGraph_node7" class="node">
-<title>sourcefile~bte.f90</title>
-<g id="a_sourcefile~~delta.f90~~AfferentGraph_node7"><a xlink:href=".././sourcefile/bte.f90.html" xlink:title="bte.f90">
-<polygon fill="#f0ad4e" stroke="#f0ad4e" points="370,-97.56 316,-97.56 316,-73.56 370,-73.56 370,-97.56"/>
-<text text-anchor="middle" x="343" y="-83.16" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">bte.f90</text>
-</a>
-</g>
 </g>
 <!-- sourcefile~elphbolt.f90&#45;&gt;sourcefile~bte.f90 -->
 <g id="sourcefile~~delta.f90~~AfferentGraph_edge17" class="edge">
 <title>sourcefile~elphbolt.f90&#45;&gt;sourcefile~bte.f90</title>
 <path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M405.77,-85.56C397.57,-85.56 388.74,-85.56 380.4,-85.56"/>
 <polygon fill="#000000" stroke="#000000" points="380.18,-82.06 370.18,-85.56 380.18,-89.06 380.18,-82.06"/>
-</g>
-<!-- sourcefile~bte.f90&#45;&gt;sourcefile~phonon.f90 -->
-<g id="sourcefile~~delta.f90~~AfferentGraph_edge6" class="edge">
-<title>sourcefile~bte.f90&#45;&gt;sourcefile~phonon.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M236.5,-85.56C213.99,-83.68 188.83,-83.94 168.16,-84.78"/>
-<polygon fill="#000000" stroke="#000000" points="167.93,-81.28 158.1,-85.24 168.25,-88.27 167.93,-81.28"/>
-</g>
-<!-- sourcefile~bte.f90&#45;&gt;sourcefile~interactions.f90 -->
-<g id="sourcefile~~delta.f90~~AfferentGraph_edge10" class="edge">
-<title>sourcefile~bte.f90&#45;&gt;sourcefile~interactions.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M315.88,-95.65C304.83,-99.93 291.68,-105.01 279.39,-109.76"/>
-<polygon fill="#000000" stroke="#000000" points="277.84,-106.6 269.77,-113.47 280.36,-113.13 277.84,-106.6"/>
-</g>
-<!-- sourcefile~bte.f90&#45;&gt;sourcefile~electron.f90 -->
-<g id="sourcefile~~delta.f90~~AfferentGraph_edge12" class="edge">
-<title>sourcefile~bte.f90&#45;&gt;sourcefile~electron.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M315.57,-86.77C294.63,-87.43 264.64,-87.74 238.5,-85.56"/>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M236.5,-85.56C208.58,-83.23 178.81,-71.97 157.14,-61.99"/>
-<polygon fill="#000000" stroke="#000000" points="158.62,-58.82 148.08,-57.68 155.61,-65.14 158.62,-58.82"/>
-</g>
-<!-- sourcefile~bte.f90&#45;&gt;sourcefile~bz_sums.f90 -->
-<g id="sourcefile~~delta.f90~~AfferentGraph_edge16" class="edge">
-<title>sourcefile~bte.f90&#45;&gt;sourcefile~bz_sums.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M315.88,-75.47C304.83,-71.19 291.68,-66.11 279.39,-61.36"/>
-<polygon fill="#000000" stroke="#000000" points="280.36,-57.99 269.77,-57.64 277.84,-64.51 280.36,-57.99"/>
 </g>
 </g>
 </svg>
@@ -935,7 +946,7 @@
 <a name="ln-362"></a>
 <a name="ln-363"></a>    <span class="c">!Local variables</span>
 <a name="ln-364"></a>    <span class="kt">integer</span><span class="p">(</span><span class="n">k8</span><span class="p">)</span> <span class="kd">::</span> <span class="n">ik</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">ijk</span><span class="p">(</span><span class="mi">3</span><span class="p">),</span> <span class="n">ii</span><span class="p">,</span> <span class="n">jj</span><span class="p">,</span> <span class="n">kk</span><span class="p">,</span> <span class="n">tk</span><span class="p">,</span> <span class="n">tl</span><span class="p">,</span> <span class="n">aux</span><span class="p">,</span> <span class="nb">count</span>
-<a name="ln-365"></a><span class="nb">    </span><span class="kt">integer</span><span class="p">(</span><span class="n">k8</span><span class="p">)</span> <span class="kd">::</span> <span class="n">ip1</span><span class="p">,</span> <span class="n">jp1</span><span class="p">,</span> <span class="n">kp1</span><span class="p">,</span> <span class="n">n1</span><span class="p">,</span> <span class="n">n2</span><span class="p">,</span> <span class="n">n3</span><span class="p">,</span> <span class="n">tmp</span>
+<a name="ln-365"></a><span class="nb">    </span><span class="kt">integer</span><span class="p">(</span><span class="n">k8</span><span class="p">)</span> <span class="kd">::</span> <span class="n">ip1</span><span class="p">,</span> <span class="n">jp1</span><span class="p">,</span> <span class="n">n1</span><span class="p">,</span> <span class="n">n2</span><span class="p">,</span> <span class="n">n3</span><span class="p">,</span> <span class="n">tmp</span>
 <a name="ln-366"></a>    <span class="kt">integer</span><span class="p">(</span><span class="n">k8</span><span class="p">)</span> <span class="kd">::</span> <span class="n">triang_vertices_labels</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span>
 <a name="ln-367"></a>    <span class="kt">integer</span><span class="p">(</span><span class="n">k8</span><span class="p">)</span> <span class="kd">::</span> <span class="n">scvol_vertices</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span> <span class="c">!subcell vertices</span>
 <a name="ln-368"></a>
@@ -1196,6 +1207,10 @@
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
     
+    
+    <script src="../tipuesearch/tipuesearch_content.js"></script>
+    <script src="../tipuesearch/tipuesearch_set.js"></script>
+    <script src="../tipuesearch/tipuesearch.js"></script>
     
     
   </body>

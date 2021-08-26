@@ -85,15 +85,18 @@ module wannier_module
 
 contains
 
-  subroutine read_EPW_Wannier(wann)
+  subroutine read_EPW_Wannier(wann, num)
     !! Read Wannier representation of the hamiltonian, dynamical matrix, and the
     !! e-ph matrix elements from file epwdata.fmt.
 
     class(epw_wannier), intent(out) :: wann
-
+    type(numerics), intent(in) :: num
+    
     !Local variables
     integer(k8) :: iuc, ib, jb
     integer(k8) :: coarse_qmesh(3)
+    real(dp) :: ef
+    real(dp), allocatable :: dummy(:)
 
     namelist /wannier/ coarse_qmesh
 
@@ -102,7 +105,7 @@ contains
     !Open input file
     open(1, file = 'input.nml', status = 'old')
 
-    coarse_qmesh = (/1, 1, 1/)
+    coarse_qmesh = (/0, 0, 0/)
     read(1, nml = wannier)
     if(any(coarse_qmesh <= 0)) then
        call exit_with_message('Bad input(s) in wannier.')
@@ -113,9 +116,10 @@ contains
     close(1)
     
     open(1,file=filename_epwdata,status='old')
-    read(1,*) !ef
+    read(1,*) ef !Fermi energy. Read but ignored here.
     read(1,*) wann%numwannbands, wann%nwsk, wann%numbranches, wann%nwsq, wann%nwsg
-    read(1,*) !zstar, epsil: non-zero only for polar materials
+    allocate(dummy((wann%numbranches/3 + 1)*9)) !numatoms*9 Born, 9 epsilon elements.
+    read(1,*) dummy !Born, epsilon. Read but ignored here.
 
     !Read real space hamiltonian
     call print_message("Reading Wannier rep. Hamiltonian...")
@@ -140,12 +144,16 @@ contains
     end do
     close(1)
 
-    !Read real space matrix elements
-    call print_message("Reading Wannier rep. e-ph vertex...")
-    open(1, file = filename_epwgwann, status = 'old', access = 'stream')
-    allocate(wann%gwann(wann%numwannbands,wann%numwannbands,wann%nwsk,wann%numbranches,wann%nwsg))
-    wann%gwann = 0.0_dp
-    read(1) wann%gwann
+    if(.not. num%read_gk2 .or. .not. num%read_gq2 .or. &
+         num%plot_along_path) then
+       !Read real space matrix elements
+       call print_message("Reading Wannier rep. e-ph vertex...")
+       open(1, file = filename_epwgwann, status = 'old', access = 'stream')
+       allocate(wann%gwann(wann%numwannbands,wann%numwannbands,wann%nwsk,&
+            wann%numbranches,wann%nwsg))
+       wann%gwann = 0.0_dp
+       read(1) wann%gwann
+    end if
     close(1)
 
     !Read cell maps of q, k, g meshes.
@@ -284,7 +292,7 @@ contains
     real(dp), intent(out) :: energies(nq, wann%numbranches)
     complex(dp), intent(out), optional :: evecs(nq, wann%numbranches, wann%numbranches)
     
-    integer(k8) :: iuc, ib, jb, ipol, iq, na, nb, nwork, aux
+    integer(k8) :: iuc, ib, jb, iq, na, nb, nwork, aux
     complex(dp) :: caux
     real(dp), allocatable :: rwork(:)
     complex(dp), allocatable :: work(:)
@@ -376,11 +384,11 @@ contains
     real(dp), intent(in) :: q(3) !Cartesian
     complex(dp), intent(inout) :: dyn(wann%numbranches,wann%numbranches)
 
-    complex(dp) :: dyn_l(wann%numbranches,wann%numbranches)
+    complex(dp) :: dyn_l(wann%numbranches,wann%numbranches), fnat(3)
     real(dp) :: qeq,     &! <q+g| epsilon |q+g>
-         arg, zig(3), zjg(3), g(3), gmax, alph, geg, &
-         tpiba, dgeg(3), fnat(3), rr(crys%numatoms,crys%numatoms,3)
-    integer(k8) :: iat,jat,i,idim,jdim,ipol,jpol,m1,m2,m3,nq1,nq2,nq3
+         arg, zig(3), zjg(3), g(3), gmax, alph, &
+         tpiba, dgeg(3), rr(crys%numatoms,crys%numatoms,3)
+    integer(k8) :: iat,jat,idim,jdim,ipol,jpol,m1,m2,m3,nq1,nq2,nq3
     complex(dp) :: fac, facqd, facq
     
     tpiba = twopi/twonorm(crys%lattvecs(:,1))*bohr2nm
@@ -393,7 +401,6 @@ contains
 
     gmax= 14.0_dp !dimensionless
     alph= tpiba**2 !bohr^-2
-    geg = gmax*alph*4.0_dp
     !In Ry units, qe = sqrt(2.0)
     fac = 8.0_dp*pi/(crys%volume/bohr2nm**3)
 
@@ -409,7 +416,7 @@ contains
 
                 do iat = 1,crys%numatoms
                    zig(:)=matmul(g,crys%born(:,:,iat))
-                   fnat(:)=0.0_dp
+                   fnat(:)= (0.0_dp,0.0_dp)
                    do jat = 1,crys%numatoms
                       rr(iat,jat,:) = (crys%basis_cart(:,iat)-crys%basis_cart(:,jat))/bohr2nm
                       arg = dot_product(g,rr(iat,jat,:))
@@ -478,11 +485,11 @@ contains
     character(len = 2) :: wannspace
     
     !Local variables
-    integer(kind=4) :: ip, iws, nws, np, mp, sp, mtype
-    complex(dp) :: caux, u(wann%numbranches), gbloch, &
+    integer(k8) :: ip, iws, nws, np, mp, sp, mtype
+    complex(dp) :: caux, u(wann%numbranches), gbloch, unm, &
          overlap(wann%numwannbands,wann%numwannbands), glprefac
     complex(dp), allocatable :: UkpgUk(:, :), UkpgUkuq(:)
-    real(dp) :: g2_epw, unm
+    real(dp) :: g2_epw
 
     if(wannspace /= 'el' .and. wannspace /= 'ph') then
        call exit_with_message(&
@@ -572,10 +579,10 @@ contains
     
     real(dp), intent(in) :: q(3) !Cartesian
     complex(dp), intent(in) :: uqs(wann%numbranches)
-    complex(dp), intent(inout) :: glprefac
+    complex(dp), intent(out) :: glprefac
 
     real(dp) :: qeq,     &! <q+g| epsilon |q+g>
-         arg, zaq, g(3), gmax, alph, geg,tpiba
+         arg, zaq, g(3), gmax, alph, tpiba
     integer(k8) :: na,ipol, m1,m2,m3,nq1,nq2,nq3
     complex(dp) :: fac, facqd, facq
 
@@ -589,8 +596,7 @@ contains
 
     gmax= 14.d0 !dimensionless
     alph= tpiba**2 !bohr^-2
-    geg = gmax*alph*4.0d0
-    !In Ry units, qe = sqrt(2.0)
+    !In Ry units, qe = sqrt(2.0) and epsilon_0 = 1/(4\pi)
     fac = 8.d0*pi/(crys%volume/bohr2nm**3)*oneI
     glprefac = (0.d0,0.d0)
 
@@ -706,14 +712,20 @@ contains
     call chdir(num%cwd)
   end subroutine gReq_epw
 
-  subroutine deallocate_wannier(wann)
+  subroutine deallocate_wannier(wann, num)
     !! Deallocates some Wannier quantities
 
     class(epw_wannier), intent(inout) :: wann
+    type(numerics), intent(in) :: num
     
     deallocate(wann%rcells_k, wann%rcells_q, wann%rcells_g, &
          wann%elwsdeg, wann%phwsdeg, wann%gwsdeg, &
-         wann%Hwann, wann%gwann, wann%Dphwann)
+         wann%Hwann, wann%Dphwann)
+
+    if(.not. num%read_gk2 .and. .not. num%read_gq2 .or. &
+         num%plot_along_path) then
+       deallocate(wann%gwann)
+    end if
   end subroutine deallocate_wannier
   
   subroutine plot_along_path(wann, crys, num)
@@ -740,7 +752,7 @@ contains
     if(this_image() == 1) then
 
        !Threshold used to measure degeneracy
-       thres = 1.0e-4_dp
+       thres = 1.0e-6_dp !0.001 meV
 
        !Read list of wavevectors in crystal coordinates
        open(1, file = trim('highsympath.txt'), status = 'old')

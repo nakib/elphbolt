@@ -18,9 +18,9 @@ module misc
   !! Module containing miscellaneous math and numerics related functions and subroutines.
 
   use params, only: dp, k8, kB
-
+  
   implicit none
-
+  
   public
   private :: sort_int, sort_real
 
@@ -30,6 +30,29 @@ module misc
   
 contains
 
+  subroutine linspace(grid, min, max, num)
+    !! Create equidistant grid.
+
+    real(dp), allocatable, intent(out) :: grid(:)
+    real(dp), intent(in) :: min, max
+    integer(k8), intent(in) :: num
+
+    !Local variables
+    integer(k8) :: i
+    real(dp) :: spacing
+
+    !Allocate grid array
+    allocate(grid(num))
+
+    !Calculate grid spacing
+    spacing = (max - min)/dble(num - 1)
+
+    !Calculate grid
+    do i = 1, num
+       grid(i) = min + (i - 1)*spacing
+    end do
+  end subroutine linspace
+  
   subroutine exit_with_message(message)
     !! Exit with error message.
 
@@ -92,7 +115,6 @@ contains
        end do
        close(1)
     end if
-    sync all
   end subroutine write2file_rank3_real
 
   subroutine write2file_response(filename, data, bandlist)
@@ -143,6 +165,43 @@ contains
     end if
     sync all
   end subroutine write2file_response
+
+  subroutine readfile_response(filename, data, bandlist)
+    !! Read list of vectors to band/branch resolved files.
+
+    character(len = *), intent(in) :: filename
+    real(dp), intent(out) :: data(:,:,:)
+    integer(k8), intent(in), optional :: bandlist(:)
+
+    !Local variables
+    integer(k8) :: ib, ibstart, ibend, nb, ik, nk, dim
+    character(len = 1) :: numcols
+    character(len = 1024) :: bandtag
+    
+    nk = size(data(:, 1, 1))
+    if(present(bandlist)) then
+       nb = size(bandlist)
+       ibstart = bandlist(1)
+       ibend = bandlist(nb)
+    else
+       nb = size(data(1, :, 1))
+       ibstart = 1
+       ibend = nb
+    end if
+    dim = size(data(1, 1, :))
+    write(numcols, "(I0)") dim
+
+    !Band/branch resolved
+    do ib = ibstart, ibend
+       write(bandtag, "(I0)") ib
+       open(1, file = trim(filename//bandtag), status = "old")
+       do ik = 1, nk
+          read(1, *) data(ik, ib, :)
+       end do
+       close(1)
+    end do
+    sync all
+  end subroutine readfile_response
   
   subroutine append2file_transport_tensor(filename, it, data, bandlist)
     !! Append 3x3 tensor to band/branch resolved files.
@@ -196,6 +255,61 @@ contains
     sync all
   end subroutine append2file_transport_tensor
 
+  subroutine write2file_spectral_tensor(filename, data, bandlist)
+    !! Append 3x3 spectral transport tensor to band/branch resolved files.
+
+    character(len = *), intent(in) :: filename
+    real(dp), intent(in) :: data(:,:,:,:)
+    integer(k8), intent(in), optional :: bandlist(:)
+
+    !Local variables
+    integer(k8) :: ie, ne, ib, nb, ibstart, ibend
+    character(len = 1) :: numcols
+    character(len = 1024) :: bandtag
+    real(dp) :: aux(3,3)
+    
+    if(this_image() == 1) then
+       !Number of energy points on grid
+       ne = size(data(1, 1, 1, :))
+       
+       !Number of bands/branches and bounds
+       if(present(bandlist)) then
+          nb = size(bandlist)
+          ibstart = bandlist(1)
+          ibend = bandlist(nb)
+       else
+          nb = size(data(:, 1, 1, 1))
+          ibstart = 1
+          ibend = nb
+       end if
+
+       write(numcols, "(I0)") 9
+
+       !Band/branch summed
+       open(1, file = trim(filename//"tot"), status = "replace")
+       do ie = 1, ne
+          aux = 0.0_dp
+          do ib = ibstart, ibend
+             aux(:,:) = aux(:,:) + data(ib, :, :, ie)
+          end do
+          write(1, "("//trim(adjustl(numcols))//"E20.10)") aux
+       end do
+       close(1)
+
+       !Band/branch resolved
+       do ib = ibstart, ibend
+          write(bandtag, "(I0)") ib
+          open(2, file = trim(filename//bandtag), status = "replace")
+          do ie = 1, ne
+             write(2, "("//trim(adjustl(numcols))//"E20.10)") &
+                  data(ib, :, :, ie)
+          end do
+          close(2)
+       end do
+    end if
+    sync all
+  end subroutine write2file_spectral_tensor
+
   subroutine int_div(num, denom, q, r)
     !! Quotient(q) and remainder(r) of the integer division num/denom.
 
@@ -244,7 +358,8 @@ contains
 
     real(dp), intent(in) :: x
 
-    expi = cmplx(cos(x), sin(x))
+    !expi = cmplx(cos(x), sin(x))
+    expi = cmplx(cos(x), sin(x), dp)
   end function expi
 
   pure real(dp) function twonorm(v)
@@ -476,6 +591,7 @@ contains
     real(dp) :: aux
 
     aux = 0.0_dp
+    equalpol = 0_k8
 
     !Find on the coarse mesh the two diagonals.
     r0 = modulo(floor(q/dble(refinement)), coarsemesh)
@@ -627,7 +743,8 @@ contains
        write(*,'(A75)') "| [*] https://www.gnu.org/philosophy/free-sw.en.html                      |"
        write(*,'(A75)') "+-------------------------------------------------------------------------+" 
        print*, ' '
-       write(*, "(A, I5)") 'Number of coarray images = ', num_images()
+
+       write(*, '(A, I5)') 'Number of coarray images = ', num_images()
     end if
   end subroutine welcome
   

@@ -5,7 +5,7 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
    
-   <meta name="description" content="A Fortran 2018 code for solving the coupled electron and phonon Boltzmann transport equations.">
+   <meta name="description" content="A solver for the coupled and decoupled electron and phonon Boltzmann transport equations.">
     
     <meta name="author" content="Nakib Haider Protik" >
     <link rel="icon" href="../favicon.png">
@@ -16,6 +16,8 @@
     <link href="../css/pygments.css" rel="stylesheet">
     <link href="../css/font-awesome.min.css" rel="stylesheet">
     <link href="../css/local.css" rel="stylesheet">
+    
+    <link  href="../tipuesearch/tipuesearch.css" rel="stylesheet">
     
     
 
@@ -93,6 +95,15 @@
 
           </ul>
         
+        <form action="../search.html" class="navbar-form navbar-right" role="search">
+        <div class="form-group">
+          <input type="text" class="form-control" placeholder="Search" name="q" id="tipue_search_input" autocomplete="off" required>
+        </div>
+<!--
+        <button type="submit" class="btn btn-default">Submit</button>
+-->
+        </form>
+        
         </div><!--/.nav-collapse -->
       </div>
     </nav>
@@ -119,7 +130,7 @@
      <li><i class="fa fa-list-ol"></i>
        <a data-toggle="tooltip"
     data-placement="bottom" data-html="true"
-    title="<p>12.4% of total for derived types.</p>Including implementation: 123 statements,  9.1% of total for derived types.">24 statements</a>
+    title="<p>16.8% of total for derived types.</p>Including implementation: 188 statements, 11.4% of total for derived types.">36 statements</a>
      </li> 
      
      
@@ -174,9 +185,19 @@
       
       <a class="list-group-item" href="../type/numerics.html#variable-datadumpdir">datadumpdir</a>
       
+      <a class="list-group-item" href="../type/numerics.html#variable-datadumpdir_t">datadumpdir_T</a>
+      
+      <a class="list-group-item" href="../type/numerics.html#variable-datadumpdir_t_chempot">datadumpdir_T_chempot</a>
+      
       <a class="list-group-item" href="../type/numerics.html#variable-g2dir">g2dir</a>
       
       <a class="list-group-item" href="../type/numerics.html#variable-vdir">Vdir</a>
+      
+      <a class="list-group-item" href="../type/numerics.html#variable-wdir">Wdir</a>
+      
+      <a class="list-group-item" href="../type/numerics.html#variable-xdir">Xdir</a>
+      
+      <a class="list-group-item" href="../type/numerics.html#variable-ydir">Ydir</a>
       
       <a class="list-group-item" href="../type/numerics.html#variable-read_gq2">read_gq2</a>
       
@@ -184,11 +205,15 @@
       
       <a class="list-group-item" href="../type/numerics.html#variable-read_v">read_V</a>
       
+      <a class="list-group-item" href="../type/numerics.html#variable-read_w">read_W</a>
+      
       <a class="list-group-item" href="../type/numerics.html#variable-tetrahedra">tetrahedra</a>
       
       <a class="list-group-item" href="../type/numerics.html#variable-phe">phe</a>
       
       <a class="list-group-item" href="../type/numerics.html#variable-phiso">phiso</a>
+      
+      <a class="list-group-item" href="../type/numerics.html#variable-phsubs">phsubs</a>
       
       <a class="list-group-item" href="../type/numerics.html#variable-onlyphbte">onlyphbte</a>
       
@@ -203,6 +228,20 @@
       <a class="list-group-item" href="../type/numerics.html#variable-conv_thres">conv_thres</a>
       
       <a class="list-group-item" href="../type/numerics.html#variable-plot_along_path~2">plot_along_path</a>
+      
+      <a class="list-group-item" href="../type/numerics.html#variable-runlevel">runlevel</a>
+      
+      <a class="list-group-item" href="../type/numerics.html#variable-ph_en_min">ph_en_min</a>
+      
+      <a class="list-group-item" href="../type/numerics.html#variable-ph_en_max">ph_en_max</a>
+      
+      <a class="list-group-item" href="../type/numerics.html#variable-ph_en_num">ph_en_num</a>
+      
+      <a class="list-group-item" href="../type/numerics.html#variable-el_en_min">el_en_min</a>
+      
+      <a class="list-group-item" href="../type/numerics.html#variable-el_en_max">el_en_max</a>
+      
+      <a class="list-group-item" href="../type/numerics.html#variable-el_en_num">el_en_num</a>
       
     </div>
   </div>
@@ -229,6 +268,8 @@
   <div class="panel-heading text-left"><h3 class="panel-title"><a data-toggle="collapse" href="#boundprocs-0">Type-Bound Procedures</a></h3></div>
   <div id="boundprocs-0" class="panel-collapse collapse">
     <div class="list-group">
+      
+      <a class="list-group-item" href="../type/numerics.html#boundprocedure-create_chempot_dirs">create_chempot_dirs</a>
       
       <a class="list-group-item" href="../type/numerics.html#boundprocedure-initialize~2">initialize</a>
       
@@ -274,9 +315,19 @@
       
       <a class="list-group-item" href="../type/numerics.html#variable-datadumpdir">datadumpdir</a>
       
+      <a class="list-group-item" href="../type/numerics.html#variable-datadumpdir_t">datadumpdir_T</a>
+      
+      <a class="list-group-item" href="../type/numerics.html#variable-datadumpdir_t_chempot">datadumpdir_T_chempot</a>
+      
       <a class="list-group-item" href="../type/numerics.html#variable-g2dir">g2dir</a>
       
       <a class="list-group-item" href="../type/numerics.html#variable-vdir">Vdir</a>
+      
+      <a class="list-group-item" href="../type/numerics.html#variable-wdir">Wdir</a>
+      
+      <a class="list-group-item" href="../type/numerics.html#variable-xdir">Xdir</a>
+      
+      <a class="list-group-item" href="../type/numerics.html#variable-ydir">Ydir</a>
       
       <a class="list-group-item" href="../type/numerics.html#variable-read_gq2">read_gq2</a>
       
@@ -284,11 +335,15 @@
       
       <a class="list-group-item" href="../type/numerics.html#variable-read_v">read_V</a>
       
+      <a class="list-group-item" href="../type/numerics.html#variable-read_w">read_W</a>
+      
       <a class="list-group-item" href="../type/numerics.html#variable-tetrahedra">tetrahedra</a>
       
       <a class="list-group-item" href="../type/numerics.html#variable-phe">phe</a>
       
       <a class="list-group-item" href="../type/numerics.html#variable-phiso">phiso</a>
+      
+      <a class="list-group-item" href="../type/numerics.html#variable-phsubs">phsubs</a>
       
       <a class="list-group-item" href="../type/numerics.html#variable-onlyphbte">onlyphbte</a>
       
@@ -303,6 +358,20 @@
       <a class="list-group-item" href="../type/numerics.html#variable-conv_thres">conv_thres</a>
       
       <a class="list-group-item" href="../type/numerics.html#variable-plot_along_path~2">plot_along_path</a>
+      
+      <a class="list-group-item" href="../type/numerics.html#variable-runlevel">runlevel</a>
+      
+      <a class="list-group-item" href="../type/numerics.html#variable-ph_en_min">ph_en_min</a>
+      
+      <a class="list-group-item" href="../type/numerics.html#variable-ph_en_max">ph_en_max</a>
+      
+      <a class="list-group-item" href="../type/numerics.html#variable-ph_en_num">ph_en_num</a>
+      
+      <a class="list-group-item" href="../type/numerics.html#variable-el_en_min">el_en_min</a>
+      
+      <a class="list-group-item" href="../type/numerics.html#variable-el_en_max">el_en_max</a>
+      
+      <a class="list-group-item" href="../type/numerics.html#variable-el_en_num">el_en_num</a>
       
     </div>
   </div>
@@ -329,6 +398,8 @@
   <div class="panel-heading text-left"><h3 class="panel-title"><a data-toggle="collapse" href="#boundprocs-1">Type-Bound Procedures</a></h3></div>
   <div id="boundprocs-1" class="panel-collapse collapse">
     <div class="list-group">
+      
+      <a class="list-group-item" href="../type/numerics.html#boundprocedure-create_chempot_dirs">create_chempot_dirs</a>
       
       <a class="list-group-item" href="../type/numerics.html#boundprocedure-initialize~2">initialize</a>
       
@@ -394,7 +465,7 @@
   
   <td>public</td>
   <td></td><td>::</td>
-  <td><strong>fsthick</strong></td><td></td><td></td><td><p>Fermi surface thickness in (eV).</p></td>
+  <td><strong>fsthick</strong></td><td></td><td></td><td><p>Fermi surface thickness in eV.</p></td>
   
 </tr>
 
@@ -432,6 +503,34 @@
   
 <tr>
   
+  <td><span class="anchor" id="variable-datadumpdir_t"></span>character(len=1024),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>datadumpdir_T</strong></td><td></td><td></td><td><p>Runtime temperature dependent data dump repository.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-datadumpdir_t_chempot"></span>character(len=1024),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>datadumpdir_T_chempot</strong></td><td></td><td></td><td><p>Runtime temperature and chemical potential dependent data dump repository.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
   <td><span class="anchor" id="variable-g2dir"></span>character(len=1024),</td>
   
   <td>public</td>
@@ -451,6 +550,48 @@
   <td>public</td>
   <td></td><td>::</td>
   <td><strong>Vdir</strong></td><td></td><td></td><td><p>Directory for ph-ph vertex.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-wdir"></span>character(len=1024),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>Wdir</strong></td><td></td><td></td><td><p>Directory for ph-ph transition rates.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-xdir"></span>character(len=1024),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>Xdir</strong></td><td></td><td></td><td><p>Directory for e-ph transition rates.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-ydir"></span>character(len=1024),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>Ydir</strong></td><td></td><td></td><td><p>Directory for ph-e transition rates.</p></td>
   
 </tr>
 
@@ -492,7 +633,21 @@
   
   <td>public</td>
   <td></td><td>::</td>
-  <td><strong>read_V</strong></td><td></td><td></td><td><p>Choose if earlier ph-ph vertices are to be used.</p></td>
+  <td><strong>read_V</strong></td><td></td><td></td><td><p>Choose if earlier ph-ph (IBZ q) vertices are to be used.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-read_w"></span>logical,</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>read_W</strong></td><td></td><td></td><td><p>Choose if earlier ph-ph (IBZ q) transition probabilities are to be used.</p></td>
   
 </tr>
 
@@ -535,6 +690,20 @@
   <td>public</td>
   <td></td><td>::</td>
   <td><strong>phiso</strong></td><td></td><td></td><td><p>Use phonon-isotope scattering?</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-phsubs"></span>logical,</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>phsubs</strong></td><td></td><td></td><td><p>Use phonon-substitution scattering?</p></td>
   
 </tr>
 
@@ -636,6 +805,104 @@
   
 </tr>
 
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-runlevel"></span>integer(kind=k8),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>runlevel</strong></td><td></td><td></td><td><p>Control for the type of calculation.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-ph_en_min"></span>real(kind=dp),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>ph_en_min</strong></td><td></td><td></td><td><p>Bounds of equidistant phonon energy mesh.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-ph_en_max"></span>real(kind=dp),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>ph_en_max</strong></td><td></td><td></td><td><p>Bounds of equidistant phonon energy mesh.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-ph_en_num"></span>integer(kind=k8),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>ph_en_num</strong></td><td></td><td></td><td><p>Number of equidistant phonon energy mesh points.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-el_en_min"></span>real(kind=dp),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>el_en_min</strong></td><td></td><td></td><td><p>Bounds of equidistant phonon energy mesh.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-el_en_max"></span>real(kind=dp),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>el_en_max</strong></td><td></td><td></td><td><p>Bounds of equidistant phonon energy mesh.</p></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" id="variable-el_en_num"></span>integer(kind=k8),</td>
+  
+  <td>public</td>
+  <td></td><td>::</td>
+  <td><strong>el_en_num</strong></td><td></td><td></td><td><p>Number of equidistant phonon energy mesh points.</p></td>
+  
+</tr>
+
 </tbody>
 </table>
 
@@ -653,6 +920,90 @@
     
      
 <div class="panel panel-default">
+  <div class="panel-heading codesum"><span class="anchor" id="boundprocedure-create_chempot_dirs"></span><h3>procedure, public :: <strong>create_chempot_dirs</strong>  
+    
+  </h3></div>
+  
+  <ul class="list-group">
+    
+      <li class="list-group-item">
+      
+        
+          
+    
+    <h3>
+private subroutine create_chempot_dirs(n, chempot)
+    
+    
+   
+</h3>
+    
+
+
+
+<p>Subroutine to create data dump directory tagged by the chemical potential
+ and subdirectories within.</p>
+    
+    <h4>Arguments</h4>
+    
+      
+      
+<table class="table table-striped varlist">
+<thead><tr><th>Type</th>
+<th>Intent</th><th>Optional</th>
+<th>Attributes</th><th></th><th>Name</th><th></th></thead>
+
+
+
+<tbody>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" ></span>class(<a href='../type/numerics.html'>numerics</a>),</td>
+  <td>intent(inout)</td>
+  <td></td>
+  
+  <td></td><td>::</td>
+  <td><strong>n</strong></td><td></td>
+  
+</tr>
+
+  
+  
+  
+  
+<tr>
+  
+  <td><span class="anchor" ></span>real(kind=dp),</td>
+  <td>intent(in)</td>
+  <td></td>
+  
+  <td></td><td>::</td>
+  <td><strong>chempot</strong></td><td></td>
+  
+</tr>
+
+</tbody>
+</table>
+
+      
+    
+    
+
+        
+      
+      </li>
+    
+  </ul>
+</div>
+
+    
+     
+<div class="panel panel-default">
   <div class="panel-heading codesum"><span class="anchor" id="boundprocedure-initialize~2"></span><h3>procedure, public :: <strong>initialize</strong>  => read_input_and_setup 
     
   </h3></div>
@@ -665,7 +1016,7 @@
           
     
     <h3>
-private subroutine read_input_and_setup(n, twod)
+private subroutine read_input_and_setup(n, crys)
     
     
    
@@ -674,7 +1025,7 @@ private subroutine read_input_and_setup(n, twod)
 
 
 
-<p>Read input file for information related to the numerics.</p>
+<p>Read input file for information related to the numerics.</p><a href="../proc/read_input_and_setup.html" class="pull-right"><emph>Read more&hellip;</emph></a>
     
     <h4>Arguments</h4>
     
@@ -710,12 +1061,12 @@ private subroutine read_input_and_setup(n, twod)
   
 <tr>
   
-  <td><span class="anchor" ></span>logical,</td>
+  <td><span class="anchor" ></span>type(<a href='../type/crystal.html'>crystal</a>),</td>
   <td>intent(in)</td>
   <td></td>
   
   <td></td><td>::</td>
-  <td><strong>twod</strong></td><td></td>
+  <td><strong>crys</strong></td><td></td>
   
 </tr>
 
@@ -786,6 +1137,10 @@ private subroutine read_input_and_setup(n, twod)
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
     
+    
+    <script src="../tipuesearch/tipuesearch_content.js"></script>
+    <script src="../tipuesearch/tipuesearch_set.js"></script>
+    <script src="../tipuesearch/tipuesearch.js"></script>
     
     
   </body>
