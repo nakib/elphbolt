@@ -91,7 +91,7 @@ contains
     real(dp), allocatable :: rates_3ph(:,:), rates_phe(:,:), rates_eph(:,:), &
          I_diff(:,:,:), I_drag(:,:,:), ph_kappa(:,:,:), ph_alphabyT(:,:,:), &
          el_sigma(:,:,:), el_sigmaS(:,:,:), el_alphabyT(:,:,:), el_kappa0(:,:,:), &
-         dummy(:,:,:)
+         dummy(:,:,:), ph_drag_term_T(:,:,:), ph_drag_term_E(:,:,:)
     real(dp) :: ph_kappa_scalar, ph_kappa_scalar_old, el_sigma_scalar, el_sigma_scalar_old, &
          el_sigmaS_scalar, el_sigmaS_scalar_old, el_kappa0_scalar, el_kappa0_scalar_old, &
          ph_alphabyT_scalar, ph_alphabyT_scalar_old, el_alphabyT_scalar, el_alphabyT_scalar_old, &
@@ -350,8 +350,9 @@ contains
           write(*,*) trim(tableheader)
        end if
        
-       !This will be needed below
-       allocate(I_drag(el%nk, el%numbands, 3), I_diff(el%nk, el%numbands, 3))
+       !These will be needed below
+       allocate(I_drag(el%nk, el%numbands, 3), I_diff(el%nk, el%numbands, 3), &
+            ph_drag_term_T(el%nk, el%numbands, 3), ph_drag_term_E(el%nk, el%numbands, 3))
        
        !Start iterator
        do it_ph = 1, num%maxiter       
@@ -370,11 +371,17 @@ contains
                crys%volume, ph%qmesh, bt%ph_response_E, sym, ph_alphabyT, dummy)
           ph_alphabyT = ph_alphabyT/crys%T
 
+          !Calculate phonon drag term for the current phBTE iteration.
+          call calculate_phonon_drag(crys%T, num, el, ph, sym, bt%el_rta_rates_ibz, &
+               bt%ph_response_E, ph_drag_term_E)
+          call calculate_phonon_drag(crys%T, num, el, ph, sym, bt%el_rta_rates_ibz, &
+               bt%ph_response_T, ph_drag_term_T)
+          
           !Iterate electron response all the way
           do it_el = 1, num%maxiter
              !E field:
-             call iterate_bte_el(crys%T, .True., num, el, ph, sym,&
-                  bt%el_rta_rates_ibz, bt%el_field_term_E, bt%el_response_E, bt%ph_response_E)        
+             call iterate_bte_el(crys%T, .True., num, el, ph, sym, &
+                  bt%el_rta_rates_ibz, bt%el_field_term_E, bt%el_response_E, ph_drag_term_E)
 
              !Calculate electron transport coefficients
              call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, &
@@ -383,8 +390,8 @@ contains
              el_alphabyT = el_alphabyT/crys%T
 
              !delT field:
-             call iterate_bte_el(crys%T, .True., num, el, ph, sym,&
-                  bt%el_rta_rates_ibz, bt%el_field_term_T, bt%el_response_T, bt%ph_response_T)
+             call iterate_bte_el(crys%T, .True., num, el, ph, sym, &
+                  bt%el_rta_rates_ibz, bt%el_field_term_T, bt%el_response_T, ph_drag_term_T)
              !Enforce Kelvin-Onsager relation:
              !Fix "diffusion" part
              do icart = 1, 3
@@ -478,6 +485,9 @@ contains
                   "         ", ph_alphabyT_scalar, "           ", KO_dev
           end if
        end do
+
+       !Don't need these anymore
+       deallocate(I_drag, I_diff, ph_drag_term_T, ph_drag_term_E)
     end if !drag
     
     if(num%onlyphbte .or. num%drag) then !Phonon BTE       
@@ -628,7 +638,7 @@ contains
       a = 0.0_dp !lower bound
       b = 2.0_dp !upper bound
       maxiter = 100
-      thresh = 1.0e-7_dp
+      thresh = 1.0e-6_dp
       do it = 1, maxiter
          lambda = 0.5_dp*(a + b)
          !Calculate electron transport coefficients
@@ -925,18 +935,18 @@ contains
   end subroutine iterate_bte_ph
 
   subroutine iterate_bte_el(T, drag, num, el, ph, sym, rta_rates_ibz, field_term, &
-       response_el, response_ph)
+       response_el, ph_drag_term)
     !! Subroutine to iterate the electron BTE one step.
     !! 
     !! T Temperature in K
     !! drag Is drag included?
     !! el Electron object
-    !! ph Phonons object
+    !! ph Phonon object
     !! sym Symmetry
     !! rta_rates_ibz Electron RTA scattering rates
     !! field_term Electron field coupling term
     !! response_el Electron response function
-    !! response_ph Phonon response function
+    !! ph_drag_term Phonon drag term
     
     type(electron), intent(in) :: el
     type(phonon), intent(in) :: ph
@@ -944,7 +954,7 @@ contains
     type(symmetry), intent(in) :: sym
     logical, intent(in) :: drag
     real(dp), intent(in) :: T, rta_rates_ibz(:,:), field_term(:,:,:)
-    real(dp), intent(in), optional :: response_ph(:,:,:)
+    real(dp), intent(in), optional :: ph_drag_term(:,:,:)
     real(dp), intent(inout) :: response_el(:,:,:)
 
     !Local variables
@@ -959,8 +969,8 @@ contains
     !Set output directory of transition probilities
     write(tag, "(E9.3)") T
 
-    if(drag .and. .not. present(response_ph)) then
-       call exit_with_message("For drag in electron BTE, must provide phonon response. Exiting.")
+    if(drag .and. .not. present(ph_drag_term)) then
+       call exit_with_message("For drag in electron BTE, must provide phonon drag term. Exiting.")
     end if
     
     !Number of electron bands
@@ -974,7 +984,8 @@ contains
 
     if(drag) then
        !Number of phonon branches
-       numbranches = size(response_ph(1,:,1))
+       !numbranches = size(response_ph(1,:,1))
+       numbranches = size(ph_drag_term(1,:,1))
     end if
 
     !Allocate coarrays
@@ -1025,14 +1036,6 @@ contains
           do iproc = 1, nprocs
              !Grab the final electron and, if needed, the interacting phonon
              call demux_state(istate_el(iproc), numbands, n, ikp)
-             if(drag) then
-                if(istate_ph(iproc) < 0) then !This phonon is on the (fine) electron mesh
-                   call demux_state(-istate_ph(iproc), numbranches, s, iq)
-                   iq = -iq !Keep the negative tag
-                else !This phonon is on the phonon mesh
-                   call demux_state(istate_ph(iproc), numbranches, s, iq)
-                end if
-             end if
 
              !Self contribution:
              
@@ -1041,31 +1044,6 @@ contains
              
              response_el_reduce(ik_fbz, m, :) = response_el_reduce(ik_fbz, m, :) + &
                   response_el(aux, n, :)*(Xplus(iproc) + Xminus(iproc))
-
-             !Drag contribution:
-             
-             if(drag) then
-                if(iq < 0) then !Need to interpolate on this point
-                   !Calculate the fine mesh wave vector, 0-based index vector
-                   call demux_vector(-iq, fineq_indvec, el%kmesh, 0_k8)
-                   
-                   !Find image of phonon wave vector due to the current symmetry
-                   fineq_indvec = modulo( &
-                        nint(matmul(sym%qrotations(:, :, ik_sym), fineq_indvec)), el%kmesh)
-
-                   !Interpolate response function on this wave vector
-                   do ipol = 1, 3
-                      call interpolate(ph%qmesh, el%mesh_ref_array, response_ph(:, s, ipol), &
-                           fineq_indvec, ForG(ipol))
-                   end do
-                else
-                   !F(q) or G(q)
-                   ForG(:) = response_ph(ph%equiv_map(ik_sym, iq), s, :)
-                end if
-                !Here we use the fact that F(-q) = -F(q) and G(-q) = -G(q)
-                response_el_reduce(ik_fbz, m, :) = response_el_reduce(ik_fbz, m, :) - &
-                     ForG(:)*(Xplus(iproc) + Xminus(iproc))
-             end if
           end do
 
           !Iterate BTE
@@ -1078,12 +1056,142 @@ contains
     call co_sum(response_el_reduce)
     response_el = response_el_reduce
 
+    if(drag) then
+       !Drag contribution:
+       response_el(:,:,:) = response_el(:,:,:) + ph_drag_term(:,:,:)
+    end if
+       
     !Symmetrize response function
     do ik_fbz = 1, nk
        response_el(ik_fbz,:,:)=transpose(&
             matmul(el%symmetrizers(:,:,ik_fbz),transpose(response_el(ik_fbz,:,:))))
     end do
   end subroutine iterate_bte_el
+
+  subroutine calculate_phonon_drag(T, num, el, ph, sym, rta_rates_ibz, response_ph, ph_drag_term)
+    !! Subroutine to calculate the phonon drag term.
+    !! 
+    !! T Temperature in K
+    !! el Electron object
+    !! ph Phonon object
+    !! sym Symmetry
+    !! rta_rates_ibz Electron RTA scattering rates
+    !! response_ph Phonon response function
+    !! ph_drag_term Phonon drag term
+
+    type(electron), intent(in) :: el
+    type(phonon), intent(in) :: ph
+    type(numerics), intent(in) :: num
+    type(symmetry), intent(in) :: sym
+    real(dp), intent(in) :: T, rta_rates_ibz(:,:), response_ph(:,:,:)
+    real(dp), intent(out) :: ph_drag_term(:,:,:)
+
+    !Local variables
+    integer(k8) :: nstates_irred, nprocs, chunk, istate, numbands, numbranches, &
+         ik_ibz, m, ieq, ik_sym, ik_fbz, iproc, iq, s, im, nk, &
+         num_active_images, ipol, fineq_indvec(3)
+    integer(k8), allocatable :: istate_el(:), istate_ph(:), start[:], end[:]
+    real(dp) :: tau_ibz, ForG(3)
+    real(dp), allocatable :: Xplus(:), Xminus(:), ph_drag_term_reduce(:,:,:)[:]
+    character(1024) :: filepath_Xminus, filepath_Xplus, tag
+    
+    !Number of electron bands
+    numbands = el%numbands
+
+    !Number of in-window FBZ wave vectors
+    nk = el%nk
+
+    !Total number of IBZ states
+    nstates_irred = el%nk_irred*numbands
+    
+    !Number of phonon branches
+    numbranches = ph%numbranches
+
+    !Allocate coarrays
+    allocate(start[*], end[*])
+    allocate(ph_drag_term_reduce(nk, numbands, 3)[*])
+    
+    !Initialize coarray
+    ph_drag_term_reduce(:,:,:) = 0.0_dp
+
+    !Divide electron states among images
+    call distribute_points(nstates_irred, chunk, start, end, num_active_images)
+
+    !Run over electron IBZ states
+    do istate = start, end
+       !Demux state index into band (m) and wave vector (ik_ibz) indices
+       call demux_state(istate, numbands, m, ik_ibz)
+
+       !Apply energy window to initial (IBZ blocks) electron
+       if(abs(el%ens_irred(ik_ibz, m) - el%enref) > el%fsthick) cycle
+
+       !RTA lifetime
+       tau_ibz = 0.0_dp
+       if(rta_rates_ibz(ik_ibz, m) /= 0.0_dp) then
+          tau_ibz = 1.0_dp/rta_rates_ibz(ik_ibz, m)
+       end if
+
+       !Set X+ filename
+       write(tag, '(I9)') istate
+       filepath_Xplus = trim(adjustl(num%Xdir))//'/Xplus.istate'//trim(adjustl(tag))
+
+       !Read X+ from file
+       call read_transition_probs_e(trim(adjustl(filepath_Xplus)), nprocs, Xplus, &
+            istate_el, istate_ph)
+
+       !Set X- filename
+       write(tag, '(I9)') istate
+       filepath_Xminus = trim(adjustl(num%Xdir))//'/Xminus.istate'//trim(adjustl(tag))
+
+       !Read X- from file
+       call read_transition_probs_e(trim(adjustl(filepath_Xminus)), nprocs, Xminus)
+
+       !Sum over the number of equivalent k-points of the IBZ point
+       do ieq = 1, el%nequiv(ik_ibz)
+          ik_sym = el%ibz2fbz_map(ieq, ik_ibz, 1) !symmetry
+          call binsearch(el%indexlist, el%ibz2fbz_map(ieq, ik_ibz, 2), ik_fbz)
+          
+          !Sum over scattering processes
+          do iproc = 1, nprocs
+             if(istate_ph(iproc) < 0) then !This phonon is on the (fine) electron mesh
+                call demux_state(-istate_ph(iproc), numbranches, s, iq)
+                iq = -iq !Keep the negative tag
+             else !This phonon is on the phonon mesh
+                call demux_state(istate_ph(iproc), numbranches, s, iq)
+             end if
+
+             !Drag contribution:             
+             if(iq < 0) then !Need to interpolate on this point
+                !Calculate the fine mesh wave vector, 0-based index vector
+                call demux_vector(-iq, fineq_indvec, el%kmesh, 0_k8)
+
+                !Find image of phonon wave vector due to the current symmetry
+                fineq_indvec = modulo( &
+                     nint(matmul(sym%qrotations(:, :, ik_sym), fineq_indvec)), el%kmesh)
+
+                !Interpolate response function on this wave vector
+                do ipol = 1, 3
+                   call interpolate(ph%qmesh, el%mesh_ref_array, response_ph(:, s, ipol), &
+                        fineq_indvec, ForG(ipol))
+                end do
+             else
+                !F(q) or G(q)
+                ForG(:) = response_ph(ph%equiv_map(ik_sym, iq), s, :)
+             end if
+             !Here we use the fact that F(-q) = -F(q) and G(-q) = -G(q)
+             ph_drag_term_reduce(ik_fbz, m, :) = ph_drag_term_reduce(ik_fbz, m, :) - &
+                  ForG(:)*(Xplus(iproc) + Xminus(iproc))
+          end do
+          
+          !Multiply life time factor 
+          ph_drag_term_reduce(ik_fbz, m, :) = ph_drag_term_reduce(ik_fbz, m, :)*tau_ibz
+       end do
+    end do
+
+    !Reduce from all images
+    call co_sum(ph_drag_term_reduce)
+    ph_drag_term = ph_drag_term_reduce
+  end subroutine calculate_phonon_drag
 
   pure logical function converged(oldval, newval, thres)
     !! Function to check if newval is the same as oldval
