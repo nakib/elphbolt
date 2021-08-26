@@ -285,7 +285,7 @@
       !
       qeq = ( g1 * ( epsil(1,1)*g1 + epsil(1,2)*g2 + epsil(1,3)*g3 ) + &
               g2 * ( epsil(2,1)*g1 + epsil(2,2)*g2 + epsil(2,3)*g3 ) + &
-              g3 * ( epsil(3,1)*g1 + epsil(3,2)*g2 + epsil(3,3)*g3 ) ) !*twopi/alat
+              g3 * ( epsil(3,1)*g1 + epsil(3,2)*g2 + epsil(3,3)*g3 ) ) !*(twopi/alat)^2
       !
       IF ( qeq > 0.0d0 .AND. qeq/alph/4.0d0 < gmax ) THEN
         !
@@ -416,7 +416,7 @@
       !
       qeq = ( g1 * (epsil(1,1)*g1 + epsil(1,2)*g2 + epsil(1,3)*g3 ) + &
               g2 * (epsil(2,1)*g1 + epsil(2,2)*g2 + epsil(2,3)*g3 ) + &
-              g3 * (epsil(3,1)*g1 + epsil(3,2)*g2 + epsil(3,3)*g3 ) ) !*twopi/alat
+              g3 * (epsil(3,1)*g1 + epsil(3,2)*g2 + epsil(3,3)*g3 ) ) !*(twopi/alat)^2
       !
       IF (qeq > 0.0d0 .AND. qeq/alph/4.0d0 < gmax ) THEN
         !

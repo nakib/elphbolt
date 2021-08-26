@@ -22,7 +22,7 @@ module numerics_module
   use crystal_module, only: crystal
 
   implicit none
-
+  
   private
   public numerics
 

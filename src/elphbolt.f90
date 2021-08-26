@@ -23,8 +23,8 @@ program elphbolt
   !! and Phys. Rev. B 102, 245202 (2020) with both the electron-phonon and phonon-phonon
   !! interactions computed ab initio.
 
-  use misc, only: welcome, print_message, subtitle
   use params, only: k8, dp
+  use misc, only: welcome, print_message, subtitle
   use numerics_module, only: numerics
   use crystal_module, only: crystal
   use symmetry_module, only: symmetry
@@ -46,9 +46,9 @@ program elphbolt
   type(electron) :: el
   type(phonon) :: ph
   type(bte) :: bt
-
+  
   !Print banner and other information
-  call welcome
+  call welcome  
   
   !Set up crystal
   call crys%initialize

@@ -487,6 +487,10 @@ contains
        !Restart with RTA solution
        bt%ph_response_T = bt%ph_field_term_T
 
+       if(this_image() == 1) then
+          write(*,*) "iter    k_ph[W/m/K]"
+       end if
+
        do it_ph = 1, num%maxiter
           call iterate_bte_ph(crys%T, .False., num, ph, el, bt%ph_rta_rates_ibz, &
                bt%ph_field_term_T, bt%ph_response_T)
@@ -550,7 +554,6 @@ contains
           el_alphabyT = el_alphabyT/crys%T
 
           !delT field:
-
           call iterate_bte_el(crys%T, .False., num, el, ph, sym,&
                bt%el_rta_rates_ibz, bt%el_field_term_T, bt%el_response_T, bt%ph_response_T)
           !Enforce Kelvin-Onsager relation

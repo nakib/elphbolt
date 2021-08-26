@@ -18,9 +18,9 @@ module misc
   !! Module containing miscellaneous math and numerics related functions and subroutines.
 
   use params, only: dp, k8, kB
-
+  
   implicit none
-
+  
   public
   private :: sort_int, sort_real
 
@@ -115,7 +115,6 @@ contains
        end do
        close(1)
     end if
-    sync all
   end subroutine write2file_rank3_real
 
   subroutine write2file_response(filename, data, bandlist)
@@ -742,7 +741,8 @@ contains
        write(*,'(A75)') "| [*] https://www.gnu.org/philosophy/free-sw.en.html                      |"
        write(*,'(A75)') "+-------------------------------------------------------------------------+" 
        print*, ' '
-       write(*, "(A, I5)") 'Number of coarray images = ', num_images()
+
+       write(*, '(A, I5)') 'Number of coarray images = ', num_images()
     end if
   end subroutine welcome
   
