@@ -358,7 +358,8 @@ contains
 
     real(dp), intent(in) :: x
 
-    expi = cmplx(cos(x), sin(x))
+    !expi = cmplx(cos(x), sin(x))
+    expi = cmplx(cos(x), sin(x), dp)
   end function expi
 
   pure real(dp) function twonorm(v)
@@ -590,6 +591,7 @@ contains
     real(dp) :: aux
 
     aux = 0.0_dp
+    equalpol = 0_k8
 
     !Find on the coarse mesh the two diagonals.
     r0 = modulo(floor(q/dble(refinement)), coarsemesh)

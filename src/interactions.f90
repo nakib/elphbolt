@@ -142,7 +142,7 @@ contains
          q1_indvec(3), q2_indvec(3), q3_minus_indvec(3), index_minus, index_plus, &
          neg_iq2, neg_q2_indvec(3), num_active_images, plus_count, minus_count
     real(dp) :: en1, en2, en3, massfac, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
-         occup_fac, Vp2_index_plus, const, bose2, bose3, delta_minus, delta_plus
+         occup_fac, const, bose2, bose3, delta_minus, delta_plus
     real(dp), allocatable :: Vm2_1(:), Vm2_2(:), Wm(:), Wp(:)
     integer(k8), allocatable :: istate2_plus(:), istate3_plus(:), istate2_minus(:), istate3_minus(:)
     complex(dp) :: phases_q2q3(ph%numtriplets)
@@ -520,11 +520,11 @@ contains
          ikp_window, start, end, chunk, k_indvec(3), kp_indvec(3), &
          q_indvec(3), nprocs, count, num_active_images
     integer(k8), allocatable :: istate1(:), istate2(:)
-    real(dp) :: k(3), kp(3), q(3), en_ph, en_el, en_elp, const, delta, &
+    real(dp) :: k(3), q(3), en_ph, en_el, en_elp, const, delta, &
          invboseplus1, fermi1, fermi2, occup_fac
     real(dp), allocatable :: g2_istate(:), Y_istate(:)
     complex(dp) :: gReq_iq(wann%numwannbands, wann%numwannbands, wann%numbranches, wann%nwsk)
-    character(len = 1024) :: filename, filename_Y
+    character(len = 1024) :: filename
 
     if(key /= 'g' .and. key /= 'Y') then
        call exit_with_message(&
@@ -783,7 +783,7 @@ contains
     integer(k8), allocatable :: istate_el(:), istate_ph(:)
     complex(dp) :: gkRp_ik(wann%numwannbands,wann%numwannbands,wann%numbranches,wann%nwsq), &
          ph_evecs_iq(1, ph%numbranches,ph%numbranches)
-    character(len = 1024) :: filename, filename_X
+    character(len = 1024) :: filename
     logical :: needfinephon
 
     if(key /= 'g' .and. key /= 'X') then
@@ -1210,8 +1210,8 @@ contains
     type(electron), intent(in), optional :: el
 
     !Local variables
-    integer(k8) :: nstates_irred, procs, istate, nprocs_3ph_plus, nprocs_3ph_minus, &
-         nprocs_phe, iproc, chunk, s, iq, im, num_active_images
+    integer(k8) :: nstates_irred, istate, nprocs_3ph_plus, nprocs_3ph_minus, &
+         nprocs_phe, iproc, chunk, s, iq, num_active_images
     integer(k8), allocatable :: start[:], end[:]
     real(dp), allocatable :: rta_rates_3ph_psum(:,:)[:], rta_rates_phe_psum(:,:)[:], &
          W(:), Y(:)
@@ -1309,8 +1309,8 @@ contains
     type(electron), intent(in) :: el
     
     !Local variables
-    integer(k8) :: nstates_irred, procs, istate, nprocs_eph, &
-         iproc, chunk, m, ik, im, num_active_images
+    integer(k8) :: nstates_irred, istate, nprocs_eph, &
+         iproc, chunk, m, ik, num_active_images
     integer(k8), allocatable :: start[:], end[:]
     real(dp), allocatable :: rta_rates_eph_psum(:,:)[:], &
          rta_rates_echimp_psum(:,:)[:], X(:)

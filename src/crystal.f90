@@ -101,9 +101,9 @@ contains
     !Local variables
     integer(k8) :: i, j, k, numelements, numatoms
     integer(k8), allocatable :: atomtypes(:), num_atomtypes(:)
-    real(dp), allocatable :: masses(:), gfactors(:), born(:,:,:), basis(:,:), &
+    real(dp), allocatable :: masses(:), born(:,:,:), basis(:,:), &
          basis_cart(:,:), subs_perc(:), subs_masses(:), subs_conc(:)
-    real(dp) :: epsilon(3,3), lattvecs(3,3), volume, reclattvecs(3,3), volume_bz, T, &
+    real(dp) :: epsilon(3,3), lattvecs(3,3), T, &
          epsilon0, epsiloninf, subs_mavg
     character(len=3), allocatable :: elements(:)
     character(len=100) :: name
@@ -191,7 +191,7 @@ contains
     if(c%twod) then
        if(lattvecs(1,3) /= 0 .or. lattvecs(2,3) /= 0 .or. lattvecs(3,3) == 0) then
           call exit_with_message('For 2d systems, cross plane lattice vector must be &
-               of the for (0 0 h).')
+               &of the for (0 0 h).')
        end if
        c%thickness = lattvecs(3,3)
        c%dim = 2.0_dp

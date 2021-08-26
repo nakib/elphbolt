@@ -284,7 +284,7 @@ contains
     real(dp), intent(in) :: chempot
 
     !Local variables
-    character(len = 1024) :: datadumpdir, tag
+    character(len = 1024) :: tag
 
     !Create chemical potential dependent data dump directory
     write(tag, "(E14.8)") chempot

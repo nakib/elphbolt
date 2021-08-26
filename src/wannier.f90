@@ -292,7 +292,7 @@ contains
     real(dp), intent(out) :: energies(nq, wann%numbranches)
     complex(dp), intent(out), optional :: evecs(nq, wann%numbranches, wann%numbranches)
     
-    integer(k8) :: iuc, ib, jb, ipol, iq, na, nb, nwork, aux
+    integer(k8) :: iuc, ib, jb, iq, na, nb, nwork, aux
     complex(dp) :: caux
     real(dp), allocatable :: rwork(:)
     complex(dp), allocatable :: work(:)
@@ -384,11 +384,11 @@ contains
     real(dp), intent(in) :: q(3) !Cartesian
     complex(dp), intent(inout) :: dyn(wann%numbranches,wann%numbranches)
 
-    complex(dp) :: dyn_l(wann%numbranches,wann%numbranches)
+    complex(dp) :: dyn_l(wann%numbranches,wann%numbranches), fnat(3)
     real(dp) :: qeq,     &! <q+g| epsilon |q+g>
          arg, zig(3), zjg(3), g(3), gmax, alph, &
-         tpiba, dgeg(3), fnat(3), rr(crys%numatoms,crys%numatoms,3)
-    integer(k8) :: iat,jat,i,idim,jdim,ipol,jpol,m1,m2,m3,nq1,nq2,nq3
+         tpiba, dgeg(3), rr(crys%numatoms,crys%numatoms,3)
+    integer(k8) :: iat,jat,idim,jdim,ipol,jpol,m1,m2,m3,nq1,nq2,nq3
     complex(dp) :: fac, facqd, facq
     
     tpiba = twopi/twonorm(crys%lattvecs(:,1))*bohr2nm
@@ -416,7 +416,7 @@ contains
 
                 do iat = 1,crys%numatoms
                    zig(:)=matmul(g,crys%born(:,:,iat))
-                   fnat(:)=0.0_dp
+                   fnat(:)= (0.0_dp,0.0_dp)
                    do jat = 1,crys%numatoms
                       rr(iat,jat,:) = (crys%basis_cart(:,iat)-crys%basis_cart(:,jat))/bohr2nm
                       arg = dot_product(g,rr(iat,jat,:))
@@ -485,11 +485,11 @@ contains
     character(len = 2) :: wannspace
     
     !Local variables
-    integer(kind=4) :: ip, iws, nws, np, mp, sp, mtype
-    complex(dp) :: caux, u(wann%numbranches), gbloch, &
+    integer(k8) :: ip, iws, nws, np, mp, sp, mtype
+    complex(dp) :: caux, u(wann%numbranches), gbloch, unm, &
          overlap(wann%numwannbands,wann%numwannbands), glprefac
     complex(dp), allocatable :: UkpgUk(:, :), UkpgUkuq(:)
-    real(dp) :: g2_epw, unm
+    real(dp) :: g2_epw
 
     if(wannspace /= 'el' .and. wannspace /= 'ph') then
        call exit_with_message(&

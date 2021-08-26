@@ -68,7 +68,7 @@ program elphbolt
   end if
   
   !Calculate phonons
-  call ph%initialize(wann, crys, sym, num)
+  call ph%initialize(crys, sym, num)
 
   select case(num%runlevel)
   case(1) !BTE solving case

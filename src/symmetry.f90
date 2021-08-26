@@ -72,7 +72,7 @@ contains
     integer(k8), intent(in) :: mesh(3)
 
     !Internal variables:
-    integer(k8) :: i, j, k, ii, jj, kk, ll, info, nq, nlen
+    integer(k8) :: i, ii, jj, kk, ll, info, nq, nlen
     integer(k8) :: P(3)
     integer(k8), allocatable :: rtmp(:,:,:), local_equiv_map(:,:)
     logical, allocatable :: valid(:)

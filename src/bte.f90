@@ -632,7 +632,7 @@ contains
 
       !Internal variables
       integer(k8) :: it, maxiter
-      real(dp) :: a, b, aux(3,3), sigmaS(size(I_drag(1,:,1)), 3, 3),&
+      real(dp) :: a, b, sigmaS(size(I_drag(1,:,1)), 3, 3),&
            thresh, sigmaS_scalar, dummy(size(I_drag(1,:,1)), 3, 3)
       
       a = 0.0_dp !lower bound
@@ -683,7 +683,7 @@ contains
 
     !Local variables
     integer(k8) :: ik_ibz, ik_fbz, ieq, ib, nk_ibz, nk, nbands, pow, &
-         im, chunk, num_active_images
+         chunk, num_active_images
     integer(k8), allocatable :: start[:], end[:]
     real(dp), allocatable :: field_term_reduce(:,:,:)[:]
     real(dp) :: A
@@ -787,7 +787,7 @@ contains
 
     !Local variables
     integer(k8) :: nstates_irred, chunk, istate1, numbranches, s1, &
-         iq1_ibz, ieq, iq1_sym, iq1_fbz, iproc, iq2, s2, iq3, s3, im, nq, &
+         iq1_ibz, ieq, iq1_sym, iq1_fbz, iproc, iq2, s2, iq3, s3, nq, &
          num_active_images, numbands, ik, ikp, m, n, nprocs_phe, aux1, aux2, &
          nprocs_3ph_plus, nprocs_3ph_minus
     integer(k8), allocatable :: istate2_plus(:), istate3_plus(:), &
@@ -959,10 +959,9 @@ contains
 
     !Local variables
     integer(k8) :: nstates_irred, nprocs, chunk, istate, numbands, numbranches, &
-         ik_ibz, m, ieq, ik_sym, ik_fbz, iproc, ikp, n, iq, s, im, nk, &
-         num_active_images, aux, ipol, fineq_indvec(3)
+         ik_ibz, m, ieq, ik_sym, ik_fbz, iproc, ikp, n, nk, num_active_images, aux
     integer(k8), allocatable :: istate_el(:), istate_ph(:), start[:], end[:]
-    real(dp) :: tau_ibz, ForG(3)
+    real(dp) :: tau_ibz
     real(dp), allocatable :: Xplus(:), Xminus(:), response_el_reduce(:,:,:)[:]
     character(1024) :: filepath_Xminus, filepath_Xplus, tag
 
@@ -1088,8 +1087,8 @@ contains
 
     !Local variables
     integer(k8) :: nstates_irred, nprocs, chunk, istate, numbands, numbranches, &
-         ik_ibz, m, ieq, ik_sym, ik_fbz, iproc, iq, s, im, nk, &
-         num_active_images, ipol, fineq_indvec(3)
+         ik_ibz, m, ieq, ik_sym, ik_fbz, iproc, iq, s, nk, num_active_images, &
+         ipol, fineq_indvec(3)
     integer(k8), allocatable :: istate_el(:), istate_ph(:), start[:], end[:]
     real(dp) :: tau_ibz, ForG(3)
     real(dp), allocatable :: Xplus(:), Xminus(:), ph_drag_term_reduce(:,:,:)[:]

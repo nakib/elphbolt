@@ -114,12 +114,11 @@ module phonon_module
 
 contains
 
-  subroutine initialize(ph, wann, crys, sym, num)
+  subroutine initialize(ph, crys, sym, num)
     !! Initialize the phonon data type, calculate ground state phonon properties,
     !! and read 3rd order force constants data. 
 
     class(phonon), intent(out) :: ph
-    type(epw_wannier), intent(in) :: wann
     type(crystal), intent(in) :: crys
     type(symmetry), intent(in) :: sym
     type(numerics), intent(in) :: num
@@ -137,7 +136,7 @@ contains
     call read_ifc2(ph, crys)
     
     !Calculate harmonic properties
-    call calculate_phonons(ph, wann, crys, sym, num)
+    call calculate_phonons(ph, crys, sym, num)
 
     if(.not. num%onlyebte) then
        !Read ifc3s and related quantities
@@ -154,11 +153,10 @@ contains
          ph%mm, ph%rr)
   end subroutine deallocate_phonon_quantities
   
-  subroutine calculate_phonons(ph, wann, crys, sym, num)
+  subroutine calculate_phonons(ph, crys, sym, num)
     !! Calculate phonon quantities on the FBZ and IBZ meshes.
 
     class(phonon), intent(inout) :: ph
-    type(epw_wannier), intent(in) :: wann
     type(crystal), intent(in) :: crys
     type(symmetry), intent(in) :: sym
     type(numerics), intent(in) :: num
@@ -426,13 +424,13 @@ contains
     type(crystal), intent(in) :: crys
     
     !Local variables
-    real(dp) :: tmp(3,3), r(crys%numatoms, 3), wscell(3,0:3), celldm(6), at(3,3), &
+    real(dp) :: tmp(3,3), r(crys%numatoms, 3), celldm(6), at(3,3), &
          mass(crys%numelements), zeff(crys%numatoms, 3, 3), eps(3, 3)
     real(dp), allocatable :: fc(:,:,:,:)
     integer(k8) :: ii, jj, ll, mm, nn, ltem, mtem, ntem, info, P(3), &
          na1, na2, na3, j1, j2, j3, na1_, na2_, na3_, j1_, j2_, j3_, &
-         triplet_counter, nR, nR_, qscell(3), tipo(crys%numatoms), t1, t2, t3, i, j, &
-         iat, jat, ibrav, m1, m2, m3, ntype, nat, jn1, jn2, jn3
+         triplet_counter, nR, nR_, qscell(3), tipo(crys%numatoms), i, j, &
+         ibrav, ntype, nat, jn1, jn2, jn3
     integer(k8), allocatable :: R2(:,:), R3(:,:)
     character(len = 1) :: polar_key
     character(len = 6) :: label(crys%numelements)
@@ -628,13 +626,12 @@ contains
     integer(k8) :: i,j,ipol,jpol,iat,jat,idim,jdim,t1,t2,t3,m1,m2,m3,ik
     integer(k8) :: ndim,nwork,ncell_g(3)
     integer(k8),allocatable :: tipo(:)
-    character(len=5),allocatable :: label(:)
     real(dp) :: weight,total_weight,exp_g,ck
-    real(dp) :: r_ws(3), at(3,3)
+    real(dp) :: r_ws(3)
     real(dp) :: alpha,geg,gmax,kt,gr,volume_r,dnrm2
     real(dp) :: zig(3),zjg(3),dgeg(3),t(0:3),g(0:3),g_old(0:3)
     real(dp), allocatable :: omega2(:),rwork(:)
-    real(dp),allocatable :: k(:,:),mass(:),r(:,:),eps(:,:)
+    real(dp),allocatable :: k(:,:),mass(:),eps(:,:)
     real(dp),allocatable :: eival(:,:),vels(:,:,:),zeff(:,:,:)
     complex(dp) :: auxi(3)
     complex(dp),allocatable :: cauxiliar(:),eigenvectors(:,:),work(:)
