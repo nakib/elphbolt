@@ -1,4 +1,3 @@
-#+OPTIONS: toc:2
 #+OPTIONS: ^:{}
 [[./logo/logo.png]]
 * elphbolt
@@ -15,8 +14,9 @@ Stylistically, it is designed to be simple, small, fast, and extensible. Object 
 
 ~elphbolt~ currently interfaces with the ~Quantum Espresso~ suite for the phonon quantities and the ~EPW~ code for the Wannier space information.
 
-Current status: v1.0.0 release candidate.
+~elphbolt~ grew out of my PhD work but is now for all of the transport physics community. Feel free to fork and contribute to this project. Tailor it to your own liking/needs and please pay it forward. Let me know of bugs and feature requests. There is a [[https://discord.gg/SZN66GsCHb][discord server]] for informal discussions about theory, set up, usage, extensions, maintenance, possible collaborations, etc. You might find me hanging out there from time to time.
 
+Current status: v1.0.0 release candidate.
 ** Installation on HPC systems with ~gcc~
 
 *** 1. Get ~spglib~
@@ -214,5 +214,3 @@ Below I(F)BZ = irreducible (full) Brillouin zone; RTA = relaxation time approxim
 | ~drag_iterated_ph_alphabyT_spectral_*~                              | ~./T*/~   | Am^{-1}K^{-1}eV^{-1}     | Branch resolved (~_<integer>~) and total (~_tot~) spectral phonon Peltier(-ish) coefficient tensor in the iterated drag theory.                                                          |
 | ~RTA{nodrag}[drag]_{[iterated_ph]}_kappa_spectral_*~                | ~./T*/~   | Wm^{-1}K^{-1}eV^{-1}     | Branch resolved (~_<integer>~) and total (~_tot~) spectral phonon thermal conductivity tensor in the RTA {[iterated]} {dragless} [drag] theory.                                          |
 | ~el[ph].en_grid~                                                    | ~./~      | eV                       | Uniform electron [phonon] energy mesh for spectral coefficient calculation.                                                                                                              |
-** Community
-~elphbolt~ grew out of my PhD work but is now for all of the transport physics community. Feel free to fork and contribute to this project. Tailor it to your own liking/needs and please pay it forward. Let me know of bugs and feature requests. There is a [[https://discord.gg/SZN66GsCHb][discord server]] for informal discussions about theory, set up, usage, extensions, maintenance, possible collaborations, etc. You might find me hanging out there from time to time.
