@@ -1,6 +1,6 @@
 #!/bin/bash
 
-workdir="<enter suitable working directory>"
+workdir="./Si_6r4_300K_CBM_gcc/"
 inputdir="./input"
 
 mkdir $workdir
@@ -23,9 +23,9 @@ ln -s ../$inputdir/espresso.ifc2 .
 #ln -s ../$inputdir/highsympath.txt .
 #ln -s ../$inputdir/initialk.txt .
 
-#Call elphbolt.x, for example, like this:
-#~/OpenCoarrays/opencoarrays-install/bin/cafrun -n 2 ~/elphbolt/elphbolt.x
-
-#You need to adapt this script for submission to HPC queueing systems.
+#gcc+opencoarrays
+#Call elphbolt.x, for example, like this to run with 2 coarray images:
+~/OpenCoarrays/opencoarrays-install/bin/cafrun -n 2 ~/elphbolt/elphbolt.x
+##
 
 cd ..
