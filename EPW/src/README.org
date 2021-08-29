@@ -1,0 +1,13 @@
+* ~EPW~ modified source
+We provide here the following modified source code files for ~EPW v5.1~
+that ships with ~Quantum Espresso v6.4.1~:
+
+  - ~ephwann_shuffle.f90~
+    Modification: An extra code block has been added to print out the Wigner-Seitz
+    vectors and degeneracies that will later be needed in ~elphbolt~.
+  
+  - ~rigid_epw.f90~
+    Modification: The argument of the exponential in a couple of Ewald sums were
+    dimensionful. These bugs are fixed.
+ 
+In both these files search for "NHP" to jump to the modified sections.
