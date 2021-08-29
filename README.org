@@ -10,11 +10,11 @@ Using *ab initio* electron-phonon and phonon-phonon interactions and a fully wav
 - phonon and electronic contributions to the thermopower; and
 - effect of the mutual electron-phonon drag on the transport coefficients listed above.
 
-Stylistically, it is designed to be simple, small, fast, and extensible. Object oriented programming concepts are combined with the procedural style, which allows fast development, while resulting in a rather compact code (~ 6700 lines of code). The symmetries of the crystal are fully exploited and the transport active Fermi window is used to allow the sampling of extremely fine wave vector meshes needed for an accurate solution of the BTEs. Parallelism is achieved through modern Fortran's intrinsic ~coarrays~ feature that is fully supported by recent versions of both the ~gcc~ and ~intel~ compilers.
+Stylistically, it is designed to be simple, small, fast, and extensible. Object oriented programming concepts are combined with the procedural style, which allows fast development, while resulting in a rather compact source (~ 6700 lines of code). The symmetries of the crystal are fully exploited and the transport active Fermi window is used to allow the sampling of extremely fine wave vector meshes needed for an accurate solution of the BTEs. Parallelism is achieved through modern Fortran's intrinsic ~coarrays~ feature that is fully supported by recent versions of both the ~gcc~ and ~intel~ compilers.
 
 ~elphbolt~ currently interfaces with the ~Quantum Espresso~ suite for the phonon quantities and the ~EPW~ code for the Wannier space information.
 
-~elphbolt~ grew out of my PhD work but is now for all of the transport physics community. Feel free to fork and contribute to this project. Tailor it to your own liking/needs and please pay it forward. Let me know of bugs and feature requests. There is a [[https://discord.gg/SZN66GsCHb][discord server]] for informal discussions about theory, set up, usage, extensions, maintenance, possible collaborations, etc. You might find me hanging out there from time to time.
+~elphbolt~ grew out of my PhD work but is now for all of the transport physics community. Feel free to fork and contribute to this project. Tailor it to your own liking/needs and please pay it forward in the spirit of *free software* and *Open science*. Let me know of bugs, feature requests, criticism, and praises. You may use the *Discussions* section of this repository for this purpose. There is also a [[https://discord.gg/SZN66GsCHb][discord server]] for informal discussions about theory, set up, usage, extensions, maintenance, possible collaborations, etc. You might find me hanging out there from time to time. I'd love to have a coffee with you and talk physics there in the *office-hour* voice channel.
 
 Current status: v1.0.0 release candidate.
 ** Installation on HPC systems with ~gcc~
@@ -69,7 +69,7 @@ These include the files ~rcells_k~, ~rcells_q~, ~rcells_g~, ~wsdeg_k~, ~wsdeg_q~
 
 *** High symmetry electron and phonon wave vector path and initial electron wave vector
 
-You need to provide a wave vector path file named ~highsympath.txt~ (to be used as both the electron and phonon wave vectors) and an initial electron wave vector file named ~initialk.txt~ if you want the electron bands, phonon dispersions, and electron-phonon matrix elements calculated along the path.
+You need to provide a wave vector path file named ~highsympath.txt~ (to be used as both the electron and phonon wave vectors) and an initial electron wave vector file named ~initialk.txt~ if you want the electron bands, phonon dispersions, and electron-phonon matrix elements calculated along the path. The first line of ~highsympath.txt~ must be an integer equaling the number of wave vectors in the path. This should be following by the same number of rows of wave vectors expressed in crystal coordinates (fractions of the reciprocal lattice vectors). The ~initialk.txt~ file must simply contain one wave vector in crystal coordinates.
 
 ** Description of ~input.nml~
 
@@ -171,7 +171,7 @@ Below I(F)BZ = irreducible (full) Brillouin zone; RTA = relaxation time approxim
 |----------------------------+-------------------+--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------|
 | ~gk2.istate*~              | ~datadumpdir/g2/~ | eV^{2}                   | Squared e-ph (1-phonon) vertices for every IBZ electron state. Binary.                                                                         |
 | ~gq2.istate*~              | ~datadumpdir/g2/~ | eV^{2}                   | Squared e-ph (1-phonon) vertices for every IBZ electron state. Binary.                                                                         |
-| ~Vm2.istate*~              | ~datadumpdir/V2/~ | eV^{2}\r{A}^{-6}amu^{-3} | Squared ph-ph (3-phonon) vertices for every IBZ phonon state. Binary.                                                                          |
+| ~Vm2.istate*~              | ~datadumpdir/V2/~ | eV^{2}\AA^{-6}amu^{-3}      | Squared ph-ph (3-phonon) vertices for every IBZ phonon state. Binary.                                                                          |
 | ~el(ph).dos~               | ~./~              | eV^{-1}                  | Band resolved electronic (phononic) density of states. ~numbands~ (~numbranches~) columns of reals.                                            |
 | ~el(ph).ens_ibz~           | ~./~              | eV                       | IBZ electronic (phononic) band energies. ~numbands~ (~numbranches~) columns of reals.                                                          |
 | ~el.inwindow_states_ibz~   | ~./~              | none                     | IBZ electronic states (wave vector index, band index) within the transport active window. 2 columns of integers.                               |
