@@ -17,6 +17,10 @@ Stylistically, it is designed to be simple, small, fast, and extensible. Object 
 ~elphbolt~ grew out of my PhD work but is now for all of the transport physics community. Feel free to fork and contribute to this project. Tailor it to your own liking/needs and please pay it forward in the spirit of *free software* and *Open science*. Let me know of bugs, feature requests, criticism, and praises. You may use the *Discussions* section of this repository for this purpose. There is also a [[https://discord.gg/SZN66GsCHb][discord server]] for informal discussions about theory, set up, usage, extensions, maintenance, possible collaborations, etc. You might find me hanging out there from time to time. I'd love to have a coffee with you and talk physics there in the *office-hour* voice channel.
 
 Current status: v1.0.0 release candidate.
+** Documentation
+
+The source is heavily commented and auto-documented with ~FORD~ (https://github.com/cmacmackin/ford). For call graphs and detailed documentation, read ~documentation/index.html~ with your browser. 
+
 ** Installation on HPC systems with ~gcc~
 
 *** 1. Get ~spglib~
