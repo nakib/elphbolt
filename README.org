@@ -35,9 +35,9 @@ Above, you can change the build path with the additional argument ~--install-pre
 
 *** 3. Create your ~<title>.make~ file
 
-In the ~elphbolt~ src directory you will find a few ~<title>.make~ files. Adapt them to your own architecture. Then, in the ~Makefile~ include your personal ~<title>.make~ file at the top, commenting out any exiting one.
+In the ~Makefiles~ src directory you will find a few ~<title>.make~ files. Adapt them to your own architecture. Then, in the ~Makefile~ include your personal ~<title>.make~ file at the top, commenting out any exiting one. Copy your ~Makefile~ and ~arch.make~ files to the ~src/~
 
-Once you have done the above, simply say ~make~. This should build the executable ~elphbolt.x~ one directory above.
+Once you have done the above, go into ~src/~ and simply say ~make~. This should build the executable ~elphbolt.x~ one directory above.
 
 ** Tests
 
