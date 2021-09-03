@@ -1,6 +1,6 @@
 #+OPTIONS: ^:{}
 [[./logo/logo.png]]
-* elphbolt v1.0.0
+* elphbolt [v1.0.0 release candidate]
 ~elphbolt~ (short for electron-phonon Boltzmann transport) is a modern Fortran (2018 standard) code for solving the coupled electron and phonon Boltzmann transport equations (BTEs). It is a "free as in freedom" code distributed under the GNU General Public License (GPL) version 3. You can read more about the philosophy of software freedom here: [[https://www.gnu.org/philosophy/free-sw.en.html]].
 
 Using *ab initio* electron-phonon and phonon-phonon interactions and a fully wave vector and electron band/phonon branch resolved formulation of the BTEs, ~elphbolt~ can calculate the
