@@ -14,7 +14,7 @@ Stylistically, it is designed to be simple, small, fast, and extensible. Object 
 
 ~elphbolt~ currently interfaces with the ~Quantum Espresso~ suite for the phonon quantities and the ~EPW~ code for the Wannier space information.
 
-~elphbolt~ grew out of my PhD work but is now for all of the transport physics community. Feel free to fork and contribute to this project. Tailor it to your own liking/needs and please pay it forward in the spirit of *free software* and *Open science*. Let me know of bugs, feature requests, criticism, and praises. You may use the *Discussions* section of this repository for this purpose. There is also a [[https://discord.gg/SZN66GsCHb][discord server]] for informal discussions about theory, set up, usage, extensions, maintenance, possible collaborations, etc. You might find me hanging out there from time to time. I'd love to have a coffee with you and talk physics there in the *office-hour* voice channel.
+~elphbolt~ for all of the transport physics community. Feel free to fork and contribute to this project. Tailor it to your own liking/needs and please pay it forward in the spirit of *free software* and *Open science*. Let me know of bugs, suggestions for improvement, feature requests, criticism, and praises. You may use the *Discussions* section of this repository for this purpose. There is also a [[https://discord.gg/SZN66GsCHb][discord server]] for informal discussions about theory, set up, usage, extensions, maintenance, possible collaborations, etc. You might find me hanging out there from time to time. I'd love to have a coffee with you and talk physics there in the *office-hour* voice channel.
 
 Current status: v1.0.0 release candidate.
 ** Documentation
@@ -39,7 +39,7 @@ Above, you can change the build path with the additional argument ~--install-pre
 
 *** 3. Create your ~<title>.make~ file
 
-In the ~Makefiles~ src directory you will find a few ~<title>.make~ files. Adapt them to your own architecture. Then, in the ~Makefile~ include your personal ~<title>.make~ file at the top, commenting out any exiting one. Copy your ~Makefile~ and ~arch.make~ files to the ~src/~
+In the ~Makefiles~ directory you will find a few ~<title>.make~ files. Adapt them to your own architecture. Then, in the ~Makefile~ include your personal ~<title>.make~ file at the top, commenting out any exiting one. Copy your ~Makefile~ and ~<title>.make~ files to the ~src/~ directory.
 
 Once you have done the above, go into ~src/~ and simply say ~make~. This should build the executable ~elphbolt.x~ one directory above.
 
@@ -49,11 +49,13 @@ A full example for cubic silicon is provided. More examples will be added over t
 
 ** Workflow
 
-This is a transport code. And it comes after doing some DFT, DFPT, and Wannier calculations. Users of the popular ~ShengBTE~ ([[https://bitbucket.org/sousaw/shengbte/src/master/]]) code will find that just one extra step (an ~EPW~ calculation) on top of the ~ShengBTE~ workflow is needed to obtain all the input files necessary for a full ~elphbolt~ calculation. Following is the set of input files:
+This is a transport code. And it comes after doing some DFT, DFPT, and Wannier calculations. Users of the popular ~ShengBTE~ ([[https://bitbucket.org/sousaw/shengbte/src/master/]]) code will find that just one extra step (an ~EPW~ calculation) on top of the ~ShengBTE~ workflow is needed to obtain all the input files necessary for a coupled BTEs calculation with ~elphbolt~. You can, however, calculate just a decoupled phonon or electron BTE, if you so choose. For these, only a subset of the input files will be needed. For example, if you want to calculate just a decoupled electron BTE, then you do not need to provide the third order force constants. Similarly, if you are interested in just a phonon BTE without the phonon-electron interactions, then the Wannier parameters are not required.
+
+Following is the full set of input files:
 
 *** Input file
 
-The input file - ~input.nml~ - contains the information about the crystal and the various parameters of the calculation. A full description of all the input parameters will be provided soon in the documentation.
+The input file - ~input.nml~ - contains the information about the crystal and the various parameters of the calculation. A full description of all the input parameters is given in the next section. Also take a look at the ~input.nml~ file for the cubic silicon example.
 
 *** Second order interatomic force constants
 
@@ -73,7 +75,9 @@ These include the files ~rcells_k~, ~rcells_q~, ~rcells_g~, ~wsdeg_k~, ~wsdeg_q~
 
 *** High symmetry electron and phonon wave vector path and initial electron wave vector
 
-You need to provide a wave vector path file named ~highsympath.txt~ (to be used as both the electron and phonon wave vectors) and an initial electron wave vector file named ~initialk.txt~ if you want the electron bands, phonon dispersions, and electron-phonon matrix elements calculated along the path. The first line of ~highsympath.txt~ must be an integer equaling the number of wave vectors in the path. This should be following by the same number of rows of wave vectors expressed in crystal coordinates (fractions of the reciprocal lattice vectors). The ~initialk.txt~ file must simply contain one wave vector in crystal coordinates.
+These are required if you want to plot the electronic bands, phonon dispersions, and the electron-phonon matrix elements along high symmetry paths in the Brillouin zone.
+
+You need to provide a wave vector path file named ~highsympath.txt~ (to be used as both the electron and phonon wave vectors) and an initial electron wave vector file named ~initialk.txt~ if you want the electron bands, phonon dispersions, and electron-phonon matrix elements calculated along the path. The first line of ~highsympath.txt~ must be an integer equaling the number of wave vectors in the path. This should be followed by the same number of rows of wave vectors expressed in crystal coordinates (fractions of the reciprocal lattice vectors). The ~initialk.txt~ file must simply contain one wave vector in crystal coordinates.
 
 ** Description of ~input.nml~
 
