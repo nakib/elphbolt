@@ -12,7 +12,7 @@ Using *ab initio* electron-phonon and phonon-phonon interactions and a fully wav
 
 Stylistically, it is designed to be simple, small, fast, and extensible. Object oriented programming concepts are combined with the procedural style, which allows fast development, while resulting in a rather compact source (~ 6700 lines of code). The symmetries of the crystal are fully exploited and the transport active Fermi window is used to allow the sampling of extremely fine wave vector meshes needed for an accurate solution of the BTEs. Parallelism is achieved through modern Fortran's intrinsic ~coarrays~ feature that is fully supported by recent versions of both the ~gcc~ and ~intel~ compilers.
 
-~elphbolt~ currently interfaces with the ~Quantum Espresso~ suite for the phonon quantities and the ~EPW~ code for the Wannier space information.
+~elphbolt~ currently interfaces with the ~Quantum Espresso~ (https://www.quantum-espresso.org/) suite for the phonon quantities, and its core module ~EPW~ (https://epw-code.org/) code for the Wannier space information.
 
 ~elphbolt~ for all of the transport physics community. Feel free to fork and contribute to this project. Tailor it to your own liking/needs and please pay it forward in the spirit of *free software* and *Open science*. Let me know of bugs, suggestions for improvement, feature requests, criticism, and praises. You may use the *Discussions* section of this repository for this purpose. There is also a [[https://discord.gg/SZN66GsCHb][discord server]] for informal discussions about theory, set up, usage, extensions, maintenance, possible collaborations, etc. You might find me hanging out there from time to time. I'd love to have a coffee with you and talk physics there in the *office-hour* voice channel.
 
