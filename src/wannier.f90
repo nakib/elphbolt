@@ -575,6 +575,10 @@ contains
     !! q: phonon wvec in Cartesian coords., Bohr^-1
     !! uqs: phonon eigenfn for mode (s,q)
     !! glprefac: is the output in Ry units (EPW/QE)
+    !
+    ! This is similar to the subroutine dyn_nonanalytic above,
+    ! adapted from ShengBTE's subroutine phonon_espresso.
+    ! ShengBTE is distributed under GPL v3 or later.
 
     class(epw_wannier), intent(in) :: wann
     type(crystal), intent(in) :: crys
@@ -583,8 +587,7 @@ contains
     complex(dp), intent(in) :: uqs(wann%numbranches)
     complex(dp), intent(out) :: glprefac
 
-    real(dp) :: qeq,     &! <q+g| epsilon |q+g>
-         arg, zaq, g(3), gmax, alph, tpiba
+    real(dp) :: qeq, arg, zaq, g(3), gmax, alph, tpiba
     integer(k8) :: na,ipol, m1,m2,m3,nq1,nq2,nq3
     complex(dp) :: fac, facqd, facq
 
