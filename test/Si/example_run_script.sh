@@ -20,8 +20,6 @@ ln -s ../$inputdir/epwdata.fmt .
 ln -s ../$inputdir/epmatwp1 .
 ln -s ../$inputdir/FORCE_CONSTANTS_3RD .
 ln -s ../$inputdir/espresso.ifc2 .
-#ln -s ../$inputdir/highsympath.txt .
-#ln -s ../$inputdir/initialk.txt .
 
 #gcc+opencoarrays
 #Call elphbolt.x, for example, like this to run with 2 coarray images:

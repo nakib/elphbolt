@@ -1,9 +1,9 @@
 * Example: Si
-  - Download input and output data from here: https://drive.google.com/file/d/1vgCkG5QuxJo02Q54pZhI1P6QXTSn37eG/view?usp=sharing
-  - Runtime: ~3 minutes on 2 cpu cores.
+  - Download input and output data from here: https://drive.google.com/file/d/1V6sbk4T_Qyalw53Y56Gi2mk6_pKvrOeJ/view?usp=sharing
+  - Runtime: approximately 3 minutes on 2 cpu cores.
 
-This is a test calculation for cubic Si to demonstrate the use of ~elphbolt~. Please note that the *q* and *k* wave vector meshes in ~input.nml~ are extremely coarse and will not produce converged results for the transport coefficients. However, you will be able to run this example on your laptop in under 3 minutes. For converged results at 300K, you must use something along the lines of: ~qmesh = 50 50 50~ and ~mesh_ref = 3~. But such a calculation will require HPC systems.
+This is a test calculation for cubic Si to demonstrate the use of ~elphbolt~. Please note that the wave vector meshes in ~input.nml~ is extremely coarse and will not produce converged results for the transport coefficients. However, you will be able to run this example on your laptop in under 3 minutes. For converged results, you must use something along the lines of: ~qmesh = 50 50 50~ and ~mesh_ref = 3~.
 
-All output data are in the directory /Si_6r4_300K_CBM_gcc/. Look for the file /output_gcc/ for the terminal print of the run.
+Look for the file /output_gcc/ for the terminal print of the run.
 
 This calculation was done on 2 cpu cores of a Lenovo Thinkpad T440 machine running Ubuntu 20.04.2 LTS. The code was compiled with ~gcc v9.3.0 (Ubuntu 9.3.0-17ubuntu1~20.04)~ and ~OpenCoarrays v2.0.0~.
