@@ -29,9 +29,9 @@ The source is heavily commented and auto-documented with ~FORD~ (https://github.
 
 *** 2. Get ~OpenCoarrays~
 
-~OpenCoarrays~ ([[http://www.opencoarrays.org]]) is an implementation of the ~coarrays~ functionalities. Some HPC systems include it (for example MareNostrum4 and, more recently, LaPalma of the Barcelona Supercomputing Center (BSC)). In that case, load it. If not, you can build it from source. Below are a couple of concrete examples:
+~OpenCoarrays~ ([[http://www.opencoarrays.org]]) is an implementation of the ~coarrays~ functionalities. Some HPC systems include it (for example, MareNostrum4 (BSC) and LaPalma (IAC)). In that case, load it. If not, you can build it from source. Below are a couple of concrete examples:
 
-I was able to build version 2.0.0 on the LaPalma system of BSC by first loading ~gcc~, ~openmpi~, and ~cmake~, then going into the ~OpenCoarrays-2.0.0~ directory and saying ~./install.sh~. The executables ~caf~ and ~cafrun~ were then installed in ~/OpenCoarrays-2.0.0/prerequisites/installations/bin/~. I added the above directory to my ~$PATH~ in my ~bashrc~.
+I was able to build version 2.0.0 on the LaPalma system of IAC by first loading ~gcc~, ~openmpi~, and ~cmake~, then going into the ~OpenCoarrays-2.0.0~ directory and saying ~./install.sh~. The executables ~caf~ and ~cafrun~ were then installed in ~/OpenCoarrays-2.0.0/prerequisites/installations/bin/~. I added the above directory to my ~$PATH~ in my ~bashrc~.
 
 On the Sirius cluster of Boston College, I was able to build version 2.9.2 by first loading ~gnu_gcc/9.2.0~, ~openmpi/4.0.5gcc9.2.0~, and ~cmake/3.18.4~, then going into the ~OpenCoarrays-2.9.2~ directory and saying ~./install.sh --with-fortran /usr/public/gnu_gcc/9.2.0/bin/gfortran --with-cxx /usr/public/gnu_gcc/9.2.0/bin/g++ --with-c /usr/public/gnu_gcc/9.2.0/bin/gcc --with-mpi /usr/public/openmpi/4.0.5gcc.9.2.0/ --with-cmake /usr/public/cmake/3.18.4/bin/cmake~. The executables ~caf~ and ~cafrun~ were then installed in ~/OpenCoarrays-2.9.2/prerequisites/installations/opencoarrays/2.9.2/bin/~. I added the above directory to my ~$PATH~ in my ~bashrc~. 
 
