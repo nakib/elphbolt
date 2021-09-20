@@ -608,8 +608,10 @@ contains
 
   subroutine phonon_espresso(ph, crys, nk, kpoints, omegas, eigenvect, velocities)
     !! Subroutine to calculate phonons from the 2nd order force constants.
-    !! This is adapted from Quantum Espresso and ShengBTE.
-
+    !
+    ! This is adapted from ShengBTE's subroutine of the same name.
+    ! ShengBTE is distributed under GPL v3 or later.
+    
     type(phonon), intent(in) :: ph
     type(crystal), intent(in) :: crys
     integer(k8), intent(in) :: nk

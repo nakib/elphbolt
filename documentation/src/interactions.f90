@@ -40,12 +40,12 @@ contains
 
   pure real(dp) function transfac(v1, v2)
     !! Calculate the "transport factor" that suppresses forward scattering
-    !! v1, v2: velocities in cartesian coordinates
+    !! v1, v2: vectors in cartesian coordinates
     
     real(dp), intent(in) :: v1(3),v2(3)
     real(dp) :: v1sc, v2sc, thresh
 
-    thresh = 1.0e-4_dp
+    thresh = 1.0e-8_dp
     transfac = 0.0_dp
     v1sc = twonorm(v1)
     v2sc = twonorm(v2)
@@ -1081,7 +1081,7 @@ contains
     integer(k8) :: nstates_irred, istate, m, ik, n, ikp, &
          start, end, chunk, k_indvec(3), kp_indvec(3), &
          q_indvec(3), count, nprocs, num_active_images
-    real(dp) :: k(3), kp(3), q_mag, const, en_el, delta, g2, vk(3), vkp(3)
+    real(dp) :: k(3), kp(3), q_mag, const, en_el, delta, g2
     real(dp), allocatable :: Xchimp_istate(:)
     integer(k8), allocatable :: istate_el(:)
     character(len = 1024) :: filename
@@ -1116,9 +1116,6 @@ contains
 
        !Apply energy window to initial (IBZ blocks) electron
        if(abs(en_el - el%enref) > el%fsthick) cycle
-
-       !Velocity of initial electron
-       vk = el%vels_irred(ik, m, :)
        
        !Initial (IBZ blocks) wave vector (crystal coords.)
        k = el%wavevecs_irred(ik, :)
@@ -1139,7 +1136,7 @@ contains
 
           !Find interacting phonon wave vector
           !Note that q, k, and k' are all on the same mesh
-          q_indvec = modulo(kp_indvec - k_indvec, el%kmesh) !0-based index vector
+          q_indvec = kp_indvec - k_indvec !0-based index vector
 
           !Calculate length of the wave vector
           q_mag = qdist(q_indvec/dble(el%kmesh), crys%reclattvecs)
@@ -1154,9 +1151,6 @@ contains
                       
              !Increment g2 processes counter
              count = count + 1
-
-             !Velocity of final electron
-             vkp = el%vels(ikp, n, :)
              
              !Evaulate delta function
              if(num%tetrahedra) then
@@ -1168,7 +1162,8 @@ contains
              end if
 
              !Save Xchimp
-             Xchimp_istate(count) = g2*transfac(vk, vkp)*delta
+             Xchimp_istate(count) = g2*transfac(matmul(crys%reclattvecs,k), &
+                  matmul(crys%reclattvecs,kp))*delta
              
              !Save final electron state
              istate_el(count) = mux_state(el%numbands, n, ikp)

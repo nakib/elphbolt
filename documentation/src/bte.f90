@@ -608,7 +608,6 @@ contains
              ! Change back to cwd
              call chdir(trim(adjustl(num%cwd)))
              
-             call print_message("--------------------------------------------")
              exit
           else
              !Print out band resolved transport coefficients

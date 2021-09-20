@@ -376,6 +376,9 @@ contains
     !!
     !! q: the phonon wave vector in Cartesian coords., Bohr^-1
     !! dyn: the dynamical matrix
+    !
+    ! This is adapted from ShengBTE's subroutine phonon_espresso.
+    ! ShengBTE is distributed under GPL v3 or later.
 
     class(epw_wannier), intent(in) :: wann
     type(crystal), intent(in) :: crys
@@ -385,8 +388,7 @@ contains
     complex(dp), intent(inout) :: dyn(wann%numbranches,wann%numbranches)
 
     complex(dp) :: dyn_l(wann%numbranches,wann%numbranches), fnat(3)
-    real(dp) :: qeq,     &! <q+g| epsilon |q+g>
-         arg, zig(3), zjg(3), g(3), gmax, alph, &
+    real(dp) :: qeq, arg, zig(3), zjg(3), g(3), gmax, alph, &
          tpiba, dgeg(3), rr(crys%numatoms,crys%numatoms,3)
     integer(k8) :: iat,jat,idim,jdim,ipol,jpol,m1,m2,m3,nq1,nq2,nq3
     complex(dp) :: fac, facqd, facq
@@ -573,6 +575,10 @@ contains
     !! q: phonon wvec in Cartesian coords., Bohr^-1
     !! uqs: phonon eigenfn for mode (s,q)
     !! glprefac: is the output in Ry units (EPW/QE)
+    !
+    ! This is similar to the subroutine dyn_nonanalytic above,
+    ! adapted from ShengBTE's subroutine phonon_espresso.
+    ! ShengBTE is distributed under GPL v3 or later.
 
     class(epw_wannier), intent(in) :: wann
     type(crystal), intent(in) :: crys
@@ -581,8 +587,7 @@ contains
     complex(dp), intent(in) :: uqs(wann%numbranches)
     complex(dp), intent(out) :: glprefac
 
-    real(dp) :: qeq,     &! <q+g| epsilon |q+g>
-         arg, zaq, g(3), gmax, alph, tpiba
+    real(dp) :: qeq, arg, zaq, g(3), gmax, alph, tpiba
     integer(k8) :: na,ipol, m1,m2,m3,nq1,nq2,nq3
     complex(dp) :: fac, facqd, facq
 
