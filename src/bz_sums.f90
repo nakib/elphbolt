@@ -65,7 +65,7 @@ contains
             /crys%volume/perm0/crys%epsilon0) !nm^-1
 
        if(this_image() == 1) then
-          write(*, "(A, 1E16.8, A)") ' Thomas-Fermi screening wave length = ', crys%qTF, ' 1/nm'
+          write(*, "(A, 1E16.8, A)") ' Thomas-Fermi screening wave vector = ', crys%qTF, ' 1/nm'
        end if
     end if
   end subroutine calculate_qTF
