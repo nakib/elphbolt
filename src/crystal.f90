@@ -85,6 +85,8 @@ module crystal_module
      !! Dimension of the system
      real(dp) :: thickness
      !! Thickness of the system
+     real(dp) :: bound_length
+     !! Characteristic boundary scattering length in mm
      
    contains
 
@@ -104,7 +106,7 @@ contains
     real(dp), allocatable :: masses(:), born(:,:,:), basis(:,:), &
          basis_cart(:,:), subs_perc(:), subs_masses(:), subs_conc(:)
     real(dp) :: epsilon(3,3), lattvecs(3,3), T, &
-         epsilon0, epsiloninf, subs_mavg
+         epsilon0, epsiloninf, subs_mavg, bound_length
     character(len=3), allocatable :: elements(:)
     character(len=100) :: name
     logical :: polar, autoisotopes, read_epsiloninf, twod
@@ -112,7 +114,7 @@ contains
     namelist /allocations/ numelements, numatoms
     namelist /crystal_info/ name, elements, atomtypes, basis, lattvecs, &
          polar, born, epsilon, read_epsiloninf, epsilon0, epsiloninf, &
-         masses, T, autoisotopes, twod, subs_masses, subs_conc
+         masses, T, autoisotopes, twod, subs_masses, subs_conc, bound_length
 
     call subtitle("Setting up crystal...")
 
@@ -159,12 +161,16 @@ contains
     twod = .false.
     subs_masses = 0.0_dp
     subs_conc = 0.0_dp
+    bound_length = 1.e12_dp !mm, practically inifinity
     read(1, nml = crystal_info)
     if(any(atomtypes < 1) .or. T < 0.0_dp) then
        call exit_with_message('Bad input(s) in crystal_info.')
     end if
     if(.not. autoisotopes .and. any(masses < 0)) then
        call exit_with_message('Bad input(s) in crystal_info.')
+    end if
+    if(bound_length <= 0.0_dp) then
+       call exit_with_message('Characteristic length for boundary scattering must be positive.')
     end if
 
     !Close input file
@@ -187,6 +193,7 @@ contains
     c%twod = twod
     c%subs_masses = subs_masses
     c%subs_conc = subs_conc
+    c%bound_length = bound_length
     
     if(c%twod) then
        if(lattvecs(1,3) /= 0 .or. lattvecs(2,3) /= 0 .or. lattvecs(3,3) == 0) then

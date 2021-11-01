@@ -35,7 +35,7 @@ program elphbolt
   use bz_sums, only: calculate_dos, calculate_qTF
   use interactions, only: calculate_gReq, calculate_gkRp, calculate_3ph_interaction, &
        calculate_eph_interaction_ibzq, calculate_eph_interaction_ibzk, &
-       calculate_echimp_interaction_ibzk
+       calculate_echimp_interaction_ibzk, calculate_bound_scatt_rates
   
   implicit none
   
@@ -79,6 +79,10 @@ program elphbolt
 
         !Calculate Thomas-Fermi screening
         call calculate_qTF(crys, el)
+
+        !Calculate boundary scattering rates.
+        call calculate_bound_scatt_rates(el%prefix, num%elbound, crys%bound_length, &
+             el%vels, el%indexlist_irred, bt%el_rta_rates_bound_ibz)
      end if
 
      !Calculate phonon density of states and, if needed, phonon-isotope
@@ -86,6 +90,10 @@ program elphbolt
      call calculate_dos(ph, num%tetrahedra, crys%gfactors, crys%subs_gfactors, &
           crys%atomtypes, bt%ph_rta_rates_iso_ibz, bt%ph_rta_rates_subs_ibz, &
           num%phiso, num%phsubs)
+
+     !Calculate boundary scattering rates.
+     call calculate_bound_scatt_rates(ph%prefix, num%phbound, crys%bound_length, &
+          ph%vels, ph%indexlist_irred, bt%ph_rta_rates_bound_ibz)
 
      if(num%plot_along_path) then
         call subtitle("Plotting along high-symmetry path...")

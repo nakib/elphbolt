@@ -83,9 +83,9 @@ module phonon_module
      real(dp), allocatable :: ens(:,:)
      !! List of phonon energies on FBZ.
      real(dp), allocatable :: vels(:,:,:)
-     !! List of phonon velocities on IBZ.
+     !! List of phonon velocities on FBZ.
      complex(dp), allocatable :: evecs(:,:,:)
-     !! List of all phonon eigenvectors on IBZ.
+     !! List of all phonon eigenvectors on FBZ.
      integer(k8) :: scell(3)
      !! q-mesh used in DFPT or, equivalently, supercell used in finite displencement
      !! method for calculating the 2nd order force constants.

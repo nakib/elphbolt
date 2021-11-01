@@ -20,7 +20,7 @@ module interactions
   use params, only: k8, dp, pi, twopi, amu, qe, hbar_eVps, perm0
   use misc, only: exit_with_message, print_message, distribute_points, &
        demux_state, mux_vector, mux_state, expi, Bose, binsearch, Fermi, &
-       twonorm
+       twonorm, write2file_rank2_real
   use wannier_module, only: epw_wannier
   use crystal_module, only: crystal
   use electron_module, only: electron
@@ -34,7 +34,8 @@ module interactions
   public calculate_gReq, calculate_gkRp, calculate_3ph_interaction, &
        calculate_ph_rta_rates, read_transition_probs_e, &
        calculate_eph_interaction_ibzq, calculate_eph_interaction_ibzk, &
-       calculate_echimp_interaction_ibzk, calculate_el_rta_rates
+       calculate_echimp_interaction_ibzk, calculate_el_rta_rates, &
+       calculate_bound_scatt_rates
 
 contains
 
@@ -1236,10 +1237,7 @@ contains
     allocate(rta_rates_3ph(ph%nq_irred, ph%numbranches), rta_rates_phe(ph%nq_irred, ph%numbranches))
     rta_rates_3ph(:, :) = 0.0_dp
     rta_rates_phe(:, :) = 0.0_dp
-    
-    !Allocate transition probabilities variable
-    !allocate(W(nprocs_3ph))
-    
+        
     !Run over first phonon IBZ states
     do istate = start, end
        !Demux state index into branch (s) and wave vector (iq) indices
@@ -1250,7 +1248,6 @@ contains
        filepath_Wp = trim(adjustl(num%Wdir))//'/Wp.istate'//trim(adjustl(tag))
        
        !Read W+ from file
-       !call read_transition_probs_3ph(trim(adjustl(filepath_Wp)), W)
        if(allocated(W)) deallocate(W)
        call read_transition_probs_e(trim(adjustl(filepath_Wp)), nprocs_3ph_plus, W)
 
@@ -1262,7 +1259,6 @@ contains
        filepath_Wm = trim(adjustl(num%Wdir))//'/Wm.istate'//trim(adjustl(tag))
        
        !Read W- from file
-       !call read_transition_probs_3ph(trim(adjustl(filepath_Wm)), W)
        if(allocated(W)) deallocate(W)
        call read_transition_probs_e(trim(adjustl(filepath_Wm)), nprocs_3ph_minus, W)
 
@@ -1420,4 +1416,47 @@ contains
     end if
     close(1)
   end subroutine read_transition_probs_e
+
+  subroutine calculate_bound_scatt_rates(prefix, finite_crys, length, vels_fbz, &
+       indexlist_irred, scatt_rates)
+    !! Subroutine to calculate the phonon/electron-boundary scattering rates.
+    !!
+    !! prefix Type of particle
+    !! finite_crys Is the crystal finite?
+    !! length Characteristic boundary scattering length scale in mm
+    !! vels Velocities on the FBZ
+    !! indexlist_irred List of muxed indices of the IBZ wedge.
+    !! scatt_rates Boundary scattering rates on the IBZ
+
+    character(len = 2), intent(in) :: prefix
+    logical, intent(in) :: finite_crys
+    real(dp), intent(in) :: length
+    real(dp), intent(in) :: vels_fbz(:,:,:)
+    integer(k8), intent(in) :: indexlist_irred(:)
+    real(dp), allocatable, intent(out) :: scatt_rates(:,:)
+
+    !Local variables
+    integer(k8) :: ik, ib, nk_irred, nb
+
+    !Number of IBZ wave vectors and bands
+    nk_irred = size(indexlist_irred(:))
+    nb = size(vels_fbz(1,:,1))
+    
+    !Allocate boundary scattering rates and initialize to infinite crystal values
+    allocate(scatt_rates(nk_irred, nb))
+    scatt_rates = 0.0_dp
+    
+    !Check finiteness of crystal
+    if(finite_crys) then
+       do ik = 1, nk_irred
+          do ib = 1, nb
+             scatt_rates(ik, ib) = twonorm(vels_fbz(indexlist_irred(ik), ib, :))&
+                  /length*1.e-6_dp !THz
+          end do
+       end do
+    end if
+
+    !Write to file
+    call write2file_rank2_real(prefix // '.W_rta_'//prefix//'bound', scatt_rates)
+  end subroutine calculate_bound_scatt_rates
 end module interactions
