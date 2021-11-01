@@ -69,12 +69,16 @@ module numerics_module
      !! Use phonon-isotope scattering?
      logical :: phsubs
      !! Use phonon-substitution scattering?
+     logical :: phbound
+     !! Use phonon-boundary scattering?
      logical :: onlyphbte
      !! Choose if only phonon BTE will be solved.
      logical :: onlyebte
      !! Choose if electron BTE will be solved.
      logical :: elchimp
      !! Use electron-charged impurity scattering?
+     logical :: elbound
+     !! Use electron-boundary scattering?
      logical :: drag
      !! Choose if the drag effect will be included.
      integer(k8) :: maxiter
@@ -115,12 +119,12 @@ contains
     real(dp) :: fsthick, conv_thres, ph_en_min, ph_en_max, el_en_min, el_en_max
     character(len = 1024) :: datadumpdir, tag
     logical :: read_gq2, read_gk2, read_V, read_W, tetrahedra, phe, phiso, phsubs, &
-         onlyphbte, onlyebte, elchimp, drag, plot_along_path
+         phbound, onlyphbte, onlyebte, elchimp, elbound, drag, plot_along_path
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
          read_V, read_W, tetrahedra, phe, phiso, phsubs, onlyphbte, onlyebte, maxiter, &
          conv_thres, drag, elchimp, plot_along_path, runlevel, ph_en_min, ph_en_max, &
-         ph_en_num, el_en_min, el_en_max, el_en_num
+         ph_en_num, el_en_min, el_en_max, el_en_num, phbound, elbound
 
     call subtitle("Reading numerics information...")
     
@@ -140,9 +144,11 @@ contains
     phe = .false.
     phiso = .false.
     phsubs = .false.
+    phbound = .false.
     onlyphbte = .false.
     onlyebte = .false.
     elchimp = .false.
+    elbound = .false.
     drag = .true.
     plot_along_path = .false.
     maxiter = 50
@@ -177,9 +183,11 @@ contains
     n%phe = phe
     n%phiso = phiso
     n%phsubs = phsubs
+    n%phbound = phbound
     n%onlyphbte = onlyphbte
     n%onlyebte = onlyebte
     n%elchimp = elchimp
+    n%elbound = elbound
     n%maxiter = maxiter
     n%conv_thres = conv_thres
     n%drag = drag
@@ -263,9 +271,19 @@ contains
        write(*, "(A, L)") "Reuse ph-ph transition probabilities: ", n%read_W
        write(*, "(A, L)") "Use tetrahedron method: ", n%tetrahedra
        write(*, "(A, L)") "Include ph-e interaction: ", n%phe
-       write(*, "(A, L)") "Include ph-isotope interaction: ", n%phiso
+       write(*, "(A, L)") "Include ph-isotope interaction: ", n%phiso       
        write(*, "(A, L)") "Include ph-substitution interaction: ", n%phsubs
-       write(*, "(A, L)") "Include electron-charged impurity interaction: ", n%elchimp
+       write(*, "(A, L)") "Include ph-boundary interaction: ", n%phbound
+       if(n%phbound) then
+          write(*,"(A,(1E16.8,x),A)") 'Characteristic length for ph-boundary scattering =', &
+               crys%bound_length, 'mm'
+       end if
+       write(*, "(A, L)") "Include el-charged impurity interaction: ", n%elchimp
+       write(*, "(A, L)") "Include el-boundary interaction: ", n%elbound
+       if(n%elbound) then
+          write(*,"(A,(1E16.8,x),A)") 'Characteristic length for el-boundary scattering =', &
+               crys%bound_length, 'mm'
+       end if
        if(n%onlyphbte) write(*, "(A, L)") "Calculate only phonon BTE: ", n%onlyphbte
        if(n%onlyebte) write(*, "(A, L)") "Calculate only electron BTE: ", n%onlyebte
        write(*, "(A, L)") "Include drag: ", n%drag

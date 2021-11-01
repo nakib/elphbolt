@@ -701,7 +701,7 @@ contains
        end if
 
        !Hole concentration
-       !By convention, the electron carrier concentration will have a positive sign.
+       !By convention, the hole carrier concentration will have a positive sign.
        if(el%indhighvalence > 0) then !Calculation includes valence bands
           do ib = el%indlowband, el%indhighvalence !Valence bands manifold
              el%conc(ib) = el%conc(ib) + (1.0_dp - Fermi(el%ens(ik, ib), el%chempot, T))
@@ -759,7 +759,7 @@ contains
     end if
 
     !Maximum number of iterations
-    maxiter = 1000
+    maxiter = 5000
 
     !Convergence threshold
     thresh = 1.0e-12_dp
@@ -786,11 +786,11 @@ contains
        !Loop over concentrations
        do iconc = 1, numconc
           if(dopingtype == 'n') then
-             a = el%enref - 10.0_dp !guess lower bound
-             b = el%enref + 10.0_dp !guess upper bound
+             a = el%enref - 12.0_dp !guess lower bound
+             b = el%enref + 12.0_dp !guess upper bound
           else
-             a = el%enref + 10.0_dp !guess lower bound
-             b = el%enref - 10.0_dp !guess upper bound
+             a = el%enref + 12.0_dp !guess lower bound
+             b = el%enref - 12.0_dp !guess upper bound
           end if
           do it = 1, maxiter
              mu = 0.5_dp*(a + b)

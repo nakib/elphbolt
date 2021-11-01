@@ -44,6 +44,8 @@ module bte_module
      !! Phonon RTA scattering rates on the IBZ due to isotope scattering.
      real(dp), allocatable :: ph_rta_rates_subs_ibz(:,:)
      !! Phonon RTA scattering rates on the IBZ due to substitution scattering.
+     real(dp), allocatable :: ph_rta_rates_bound_ibz(:,:)
+     !! Phonon RTA scattering rates on the IBZ due to boundary scattering.
      real(dp), allocatable :: ph_rta_rates_ibz(:,:)
      !! Phonon RTA scattering rates on the IBZ.
      real(dp), allocatable :: ph_field_term_T(:,:,:)
@@ -57,6 +59,8 @@ module bte_module
      
      real(dp), allocatable :: el_rta_rates_echimp_ibz(:,:)
      !! Electron RTA scattering rates on the IBZ due to charged impurity scattering.
+     real(dp), allocatable :: el_rta_rates_bound_ibz(:,:)
+     !! Electron RTA scattering rates on the IBZ due to boundary scattering.
      real(dp), allocatable :: el_rta_rates_ibz(:,:)
      !! Electron RTA scattering rates on the IBZ.
      real(dp), allocatable :: el_field_term_T(:,:,:)
@@ -133,7 +137,8 @@ contains
        
        !Matthiessen's rule
        bt%ph_rta_rates_ibz = rates_3ph + rates_phe + &
-            bt%ph_rta_rates_iso_ibz + bt%ph_rta_rates_subs_ibz
+            bt%ph_rta_rates_iso_ibz + bt%ph_rta_rates_subs_ibz + &
+            bt%ph_rta_rates_bound_ibz
 
        !gradT field:
        ! Calculate field term (gradT=>F0)
@@ -219,7 +224,8 @@ contains
        allocate(bt%el_rta_rates_ibz(el%nk_irred, el%numbands))
 
        !Matthiessen's rule
-       bt%el_rta_rates_ibz = rates_eph + bt%el_rta_rates_echimp_ibz
+       bt%el_rta_rates_ibz = rates_eph + bt%el_rta_rates_echimp_ibz + &
+            bt%el_rta_rates_bound_ibz
 
        !gradT field:
        ! Calculate field term (gradT=>I0)
