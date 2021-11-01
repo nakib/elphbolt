@@ -175,24 +175,25 @@ There are 5 Namelists in the ~input.nml~ file: ~allocations~, ~crystal_info~, ~e
 
 The code produces a large amount of data. Here, we provide a description of the various types output files.
 
-Below I(F)BZ = irreducible (full) Brillouin zone; RTA = relaxation time approximation; ch. imp. = charged impurities; ~numbranches~ = number of phonon branches.
+Below I(F)BZ = irreducible (full) Brillouin zone; RTA = relaxation time approximation; ch. imp. = charged impurities; bound = boundary; subs = substitution; ~numbands~ = number of electron bands; and ~numbranches~ = number of phonon branches.
 
 *** Zero temperature data
 
-| File name                  | Directory         | Units                    | Description                                                                                                                                    |
-|----------------------------+-------------------+--------------------------+------------------------------------------------------------------------------------------------------------------------------------------------|
-| ~gk2.istate*~              | ~datadumpdir/g2/~ | eV^{2}                   | Squared e-ph (1-phonon) vertices for every IBZ electron state. Binary.                                                                         |
-| ~gq2.istate*~              | ~datadumpdir/g2/~ | eV^{2}                   | Squared e-ph (1-phonon) vertices for every IBZ electron state. Binary.                                                                         |
-| ~Vm2.istate*~              | ~datadumpdir/V2/~ | eV^{2}Å^{-6}amu^{-3}         | Squared ph-ph (3-phonon) vertices for every IBZ phonon state. Binary.                                                                          |
-| ~el(ph).dos~               | ~./~              | eV^{-1}                  | Band resolved electronic (phononic) density of states. ~numbands~ (~numbranches~) columns of reals.                                            |
-| ~el(ph).ens_ibz~           | ~./~              | eV                       | IBZ electronic (phononic) band energies. ~numbands~ (~numbranches~) columns of reals.                                                          |
-| ~el.inwindow_states_ibz~   | ~./~              | none                     | IBZ electronic states (wave vector index, band index) within the transport active window. 2 columns of integers.                               |
-| ~el(ph).vels_ibz~          | ~./~              | Kms^{-1}                 | IBZ electronic (phononic) band (branch) velocities. In each row, there are 3 (Cartesian direction) sets of ~numbands~ (~numbranches~) numbers. |
-| ~el(ph).wavevecs_ibz[fbz]~ | ~./~              | crystal                  | IBZ [FBZ] electronic (phononic) wave vectors. For the electrons, these are only within the transport window.                                   |
-| ~ph.W_rta_phiso[subs]~     | ~./~              | THz                      | IBZ RTA ph-iso [subs] scattering rates. ~numbranches~ columns of reals.                                                                        |
-| ~el.ens_kpath~             | ~./~              | eV                       | Electron energies along the given k-path.                                                                                                      |
-| ~ph.ens_qpath~             | ~./~              | eV                       | Phonon energies along the given q-path.                                                                                                        |
-| ~gk_qpath~                 | ~./~              | eV                       | Absolute value of the e-ph matrix elements (averaged over the degenerate bands and branches) for the given k-vector and q-path.                |
+| File name                     | Directory         | Units                | Description                                                                                                                                    |
+|-------------------------------+-------------------+----------------------+------------------------------------------------------------------------------------------------------------------------------------------------|
+| ~gk2.istate*~                 | ~datadumpdir/g2/~ | eV^{2}               | Squared e-ph (1-phonon) vertices for every IBZ electron state. Binary.                                                                         |
+| ~gq2.istate*~                 | ~datadumpdir/g2/~ | eV^{2}               | Squared e-ph (1-phonon) vertices for every IBZ electron state. Binary.                                                                         |
+| ~Vm2.istate*~                 | ~datadumpdir/V2/~ | eV^{2}Å^{-6}amu^{-3} | Squared ph-ph (3-phonon) vertices for every IBZ phonon state. Binary.                                                                          |
+| ~el(ph).dos~                  | ~./~              | eV^{-1}              | Band resolved electronic (phononic) density of states. ~numbands~ (~numbranches~) columns of reals.                                            |
+| ~el(ph).ens_ibz~              | ~./~              | eV                   | IBZ electronic (phononic) band energies. ~numbands~ (~numbranches~) columns of reals.                                                          |
+| ~el.inwindow_states_ibz~      | ~./~              | none                 | IBZ electronic states (wave vector index, band index) within the transport active window. 2 columns of integers.                               |
+| ~el(ph).vels_ibz~             | ~./~              | Kms^{-1}             | IBZ electronic (phononic) band (branch) velocities. In each row, there are 3 (Cartesian direction) sets of ~numbands~ (~numbranches~) numbers. |
+| ~el(ph).wavevecs_ibz[fbz]~    | ~./~              | crystal              | IBZ [FBZ] electronic (phononic) wave vectors. For the electrons, these are only within the transport window.                                   |
+| ~el.W_rta_elbound~            | ~./~              | THz                  | IBZ RTA el-bound  scattering rates. ~numbands~ columns of reals.                                                                               |
+| ~ph.W_rta_phiso(bound)[subs]~ | ~./~              | THz                  | IBZ RTA ph-iso (bound) [subs] scattering rates. ~numbranches~ columns of reals.                                                                |
+| ~el.ens_kpath~                | ~./~              | eV                   | Electron energies along the given k-path.                                                                                                      |
+| ~ph.ens_qpath~                | ~./~              | eV                   | Phonon energies along the given q-path.                                                                                                        |
+| ~gk_qpath~                    | ~./~              | eV                   | Absolute value of the e-ph matrix elements (averaged over the degenerate bands and branches) for the given k-vector and q-path.                |
 
 *** Finite temperature data
 
