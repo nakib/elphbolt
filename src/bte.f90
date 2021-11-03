@@ -528,9 +528,7 @@ contains
              write(*,"(I3, A, 1E16.8)") it_ph, "    ", ph_kappa_scalar
           end if
 
-          if(converged(ph_kappa_scalar_old, ph_kappa_scalar, num%conv_thres) .and. &
-               converged(ph_alphabyT_scalar_old, ph_alphabyT_scalar, num%conv_thres)) then
-
+          if(converged(ph_kappa_scalar_old, ph_kappa_scalar, num%conv_thres)) then
              !Print converged branch resolved response functions
              ! Change to data output directory
              call chdir(trim(adjustl(Tdir)))
@@ -1211,7 +1209,12 @@ contains
     real(dp), intent(in) :: oldval, newval, thres
 
     converged = .False.
-    if(abs(newval - oldval) < thres) converged = .True. 
+
+    if(newval == oldval) then
+       converged = .True.
+    else if(oldval /= 0.0_dp) then
+       if(abs(newval - oldval)/abs(oldval) < thres) converged = .True.
+    end if
   end function converged
 
   subroutine post_process(bt, num, crys, sym, ph, el)
