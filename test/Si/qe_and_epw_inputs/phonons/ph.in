@@ -1,0 +1,13 @@
+--
+&inputph
+  prefix   = 'si',
+  epsil    = .false.,
+  outdir= '<enter phonon output directory>',
+  fildyn   = '<enter phonon output directory>/si.dyn',
+  ldisp    = .true.
+  fildvscf = 'dvscf'
+  nq1=6,
+  nq2=6,
+  nq3=6,
+  tr2_ph   =  1.0d-13,
+ /

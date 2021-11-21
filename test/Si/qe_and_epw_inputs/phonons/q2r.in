@@ -1,0 +1,6 @@
+&input
+  fildyn='<enter phonon output directory>/si.dyn',
+  zasr='simple',
+  flfrc='./espresso.ifc2'
+/
+

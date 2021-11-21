@@ -1,0 +1,6 @@
+* Anharmonic phonon calculation checklist
+  - Generate supercells with displacement (~3phonopre.sh~)
+  - Run scf calculation on each of these supercells (~3scf_submitjob.sh~)
+  - Generate third order force constants (~3phonopost.sh~)
+  - The following output file will be needed for the ~elphbolt~ calculation
+    - ~FORCE_CONSTANTS_3RD~

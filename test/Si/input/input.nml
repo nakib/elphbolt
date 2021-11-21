@@ -1,0 +1,41 @@
+&allocations
+        numelements=1
+        numatoms=2
+/
+
+&crystal_info
+	name = 'Cubic Si'
+	elements="Si"
+        atomtypes=1 1
+	lattvecs(:,1) =  -0.27010011   0.00000000   0.27010011
+        lattvecs(:,2) =   0.00000000   0.27010011   0.27010011
+        lattvecs(:,3) =  -0.27010011   0.27010011   0.00000000   
+        basis(:,1) =    0.00 0.00 0.00
+        basis(:,2) =    0.25 0.25 0.25
+        T = 300.0 !K
+        epsilon0 = 11.7 !From Ioffe
+/
+
+&electrons
+	spindeg = 2
+	indlowband = 5 !Lowest transport band
+	indhighband = 6 !Highest transport band
+	indlowconduction = 5 !Lowest conduction band
+	numbands = 8 !Total wannier bands
+	enref = 6.70035 !eV, CBM
+	chempot = 6.70035 !eV, CBM
+/
+
+&numerics
+	qmesh = 6 6 6
+	mesh_ref = 4 !kmesh = 24 24 24
+	fsthick = 0.4 !eV about enref
+	datadumpdir = './scratch/' !Or, enter suitable scratch directory
+        conv_thres = 0.0001
+        maxiter = 50 !Maximum number of iterations
+/
+
+&wannier
+    coarse_qmesh = 6 6 6
+/
+

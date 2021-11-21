@@ -1,0 +1,8 @@
+* Phonon calculations checklist
+  - Do scf (~pw.x~) calculation
+  - Do phonon (~ph.x~) calculation
+  - Calculate 2nd order force constants (~q2r.x~)
+  - Run script ~pp.py~ in the phonon output directory.
+    This script ships with the ~EPW~ code.
+  - The following output file will be needed for the ~elphbolt~ calculation.
+    - ~espresso.ifc2~

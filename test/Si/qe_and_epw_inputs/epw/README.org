@@ -1,0 +1,11 @@
+* EPW calculations checklist
+  - Do scf (~pw.x~) calculation
+  - Do nscf (~pw.x~) calculation
+  - Do EPW (~ph.x~) calculation
+    - Make sure that you have run ~pp.py~ after your phonon calculations.
+    - The following output files will be needed for the ~elphbolt~ calculation.
+      Some of these file names may have a prefix. In that case, remove the prefix. 
+      - ~epmatwp1~
+      - ~epwdata.fmt~
+      - ~rcells_g~, ~rcell_k~, ~rcells_q~
+      - ~wsdeg_g~, ~wsdeg_k~, ~wsdeg_q~

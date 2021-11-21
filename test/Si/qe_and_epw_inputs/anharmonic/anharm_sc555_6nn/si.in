@@ -1,0 +1,35 @@
+ &control
+    calculation='scf'
+    prefix='si'
+    restart_mode='from_scratch'
+    pseudo_dir='../pp'
+    outdir='./'
+    tprnfor=.true.
+    tstress=.true.
+    wf_collect=.false.
+ /
+ &system
+    ibrav           = 0
+    nat             = 2
+    ntyp            = 1
+    ecutwfc         = 45
+ /
+ &electrons
+    diagonalization = 'david'
+    mixing_beta     = 0.7
+    conv_thr        = 1.0d-10
+ /
+
+ATOMIC_SPECIES
+  Si  28.0855  Si.pz-vbc.UPF
+
+ATOMIC_POSITIONS crystal
+  Si   0.00  0.00  0.00
+  Si   0.25  0.25  0.25
+
+K_POINTS gamma
+
+CELL_PARAMETERS angstrom !in ibrav 2 equivalent format
+  -2.701000905  0.000000000   2.701000905
+   0.000000000  2.701000905   2.701000905
+  -2.701000905  2.701000905   0.000000000
