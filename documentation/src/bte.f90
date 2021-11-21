@@ -22,7 +22,7 @@ module bte_module
   use misc, only: print_message, exit_with_message, write2file_rank2_real, &
        distribute_points, demux_state, binsearch, interpolate, demux_vector, &
        trace, subtitle, append2file_transport_tensor, write2file_response, &
-       linspace, readfile_response, write2file_spectral_tensor, subtitle
+       linspace, readfile_response, write2file_spectral_tensor, subtitle, timer
   use numerics_module, only: numerics
   use crystal_module, only: crystal
   use symmetry_module, only: symmetry
@@ -107,6 +107,7 @@ contains
          el_sigmaS_scalar, el_sigmaS_scalar_old, el_kappa0_scalar, el_kappa0_scalar_old, &
          ph_alphabyT_scalar, ph_alphabyT_scalar_old, el_alphabyT_scalar, el_alphabyT_scalar_old, &
          KO_dev, tot_alphabyT_scalar, lambda
+    type(timer) :: t
 
     call subtitle("Calculating transport...")
 
@@ -121,6 +122,8 @@ contains
     sync all
 
     if(.not. num%onlyebte) then
+       call t%start_timer('RTA e BTE')
+       
        !Allocate phonon transport coefficients
        allocate(ph_kappa(ph%numbranches, 3, 3), ph_alphabyT(ph%numbranches, 3, 3), &
             dummy(ph%numbranches, 3, 3))
@@ -210,9 +213,13 @@ contains
 
        ! Change back to cwd
        call chdir(trim(adjustl(num%cwd)))
+
+       call t%end_timer('RTA e BTE')
     end if
 
     if(.not. num%onlyphbte) then
+       call t%start_timer('RTA ph BTE')
+       
        !Allocate electron transport coefficients
        allocate(el_sigma(el%numbands, 3, 3), el_sigmaS(el%numbands, 3, 3), &
             el_alphabyT(el%numbands, 3, 3), el_kappa0(el%numbands, 3, 3))
@@ -317,9 +324,13 @@ contains
 
        ! Change back to cwd
        call chdir(trim(adjustl(num%cwd)))
+
+       call t%end_timer('RTA ph BTE')
     end if
     
     if(num%drag) then !Coupled BTEs
+       call t%start_timer('Coupled e-ph BTEs')
+       
        tot_alphabyT_scalar = el_alphabyT_scalar + ph_alphabyT_scalar
        KO_dev = 100.0_dp*abs(&
             (el_sigmaS_scalar - tot_alphabyT_scalar)/tot_alphabyT_scalar)
@@ -501,9 +512,13 @@ contains
 
        !Don't need these anymore
        deallocate(I_drag, I_diff, ph_drag_term_T, ph_drag_term_E)
+
+       call t%end_timer('Coupled e-ph BTEs')
     end if !drag
     
-    if(num%onlyphbte .or. num%drag) then !Phonon BTE       
+    if(num%onlyphbte .or. num%drag) then !Phonon BTE
+       call t%start_timer('Iterative decoupled ph BTE')
+       
        call print_message("Decoupled phonon transport:")
        call print_message("---------------------------")
 
@@ -548,9 +563,13 @@ contains
              ph_kappa_scalar_old = ph_kappa_scalar
           end if
        end do
+
+       call t%end_timer('Iterative decoupled ph BTE')
     end if
 
-    if(num%onlyebte .or. num%drag) then !Electron BTE       
+    if(num%onlyebte .or. num%drag) then !Electron BTE
+       call t%start_timer('Iterative decoupled e BTE')
+       
        call print_message("Decoupled electron transport:")
        call print_message("-----------------------------")
 
@@ -630,6 +649,8 @@ contains
              el_alphabyT_scalar_old = el_alphabyT_scalar
           end if
        end do
+
+       call t%end_timer('Iterative decoupled e BTE')
     end if
 
   contains

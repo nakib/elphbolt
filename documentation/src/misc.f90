@@ -24,12 +24,75 @@ module misc
   public
   private :: sort_int, sort_real
 
+  type timer
+     !! Container for timing related data and procedures.
+
+     integer(k8) :: rate = 0
+     integer(k8) :: start = -1
+     integer(k8) :: end = -1
+     character(len = 1024) :: event
+
+   contains
+
+     procedure :: start_timer, end_timer
+  end type timer
+
   interface sort
      module procedure :: sort_int, sort_real
   end interface sort
   
 contains
 
+  subroutine start_timer(t, event)
+    !! Start/Reset the timer. This is a blocking call.
+    !! Only image 1 can modify timing information.
+
+    class(timer), intent(out) :: t
+    character(len = *), intent(in) :: event
+
+    sync all
+    if(this_image() == 1) then
+       !Set the clock rate
+       call system_clock(count_rate = t%rate)
+
+       !Clock in
+       call system_clock(count = t%start)
+
+       !(Re)set the event name
+       t%event = event
+    end if
+  end subroutine start_timer
+
+  subroutine end_timer(t, event)
+    !! End the timer and print the elapsed time. This is a blocking call.
+    !! Only image 1 can modify timing information.
+
+    class(timer), intent(inout) :: t
+    character(len = *), intent(in) :: event
+
+    !Local variable
+    real(dp) :: time_elapsed
+
+    sync all
+    if(this_image() == 1) then
+       !Clock in
+       call system_clock(count = t%end)
+
+       !Check the event name and if clock-in happened
+       if((event /= t%event) .or. (t%start == -1_k8)) then
+          call exit_with_message('Clock-in event does not match this clock-out event.')
+       end if
+
+       !Calculate and print time taken for this event
+       time_elapsed = dble(t%end - t%start)/t%rate/3600.0_dp !hours
+       !time_elapsed = dble(end - start)/rate/3600.0_dp*num_images() !cpu-hours
+       write(*, "(A)") ".............."
+       write(*, "(A, A, 1E16.8, A)") "| Timing info:", trim(event), time_elapsed, " hr"
+       !write(*, "(A, A, 1E16.8, A)") "| Timing info:", trim(event), time_elapsed, " cpu-hrs"
+       write(*, "(A)") ".............."
+    end if
+  end subroutine end_timer
+  
   subroutine linspace(grid, min, max, num)
     !! Create equidistant grid.
 

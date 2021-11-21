@@ -1,14 +1,13 @@
 * Example: Si
-** Generate force constanst and Wannier data
+** Generate force constants and Wannier data
    - All the input files for the ~Quantum Espresso~ and ~EPW~ calculations are provided in the directory ~qe_and_epw_inputs~.
-   - Alternatively, for the time being, you can download input and output data from here: https://drive.google.com/file/d/1V6sbk4T_Qyalw53Y56Gi2mk6_pKvrOeJ/view?usp=sharing
-     Please note that this link will be removed in the near future since the download size is very large.
+   - Alternatively, for the time being, you can download input and output data from here: https://drive.google.com/file/d/1V6sbk4T_Qyalw53Y56Gi2mk6_pKvrOeJ/view?usp=sharing. Please note that this link will be removed in the near future since the download size is very large.
 
 ** Run ~elphbolt~
    - Runtime: approximately ~3 minutes on 2 cpu cores.
 
- This is a test calculation for cubic Si to demonstrate the use of ~elphbolt~. Please note that the wave vector meshes in ~input.nml~ is extremely coarse and will not produce converged results for the transport coefficients. For converged results, you must use something along the lines of: ~qmesh = 50 50 50~ and ~mesh_ref = 3~.
+ This is a test calculation for cubic Si to demonstrate the use of ~elphbolt~. Please note that the wave vector meshes in ~input.nml~ are extremely coarse and will not produce converged results for the transport coefficients. For converged results, you must use something along the lines of: ~qmesh = 50 50 50~ and ~mesh_ref = 3~.
 
- The file /output_gcc/ gives the terminal print of the run.
+ The file /output_gcc.txt/ gives the terminal print of the run.
 
  This calculation was done on 2 cpu cores of a Lenovo Thinkpad T440 machine running Ubuntu 20.04.2 LTS. The code was compiled with ~gcc v9.3.0 (Ubuntu 9.3.0-17ubuntu1~20.04)~ and ~OpenCoarrays v2.0.0~.

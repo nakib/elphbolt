@@ -130,7 +130,7 @@
      <li><i class="fa fa-list-ol"></i>
        <a data-toggle="tooltip"
     data-placement="bottom" data-html="true"
-    title=" 2.6% of total for procedures.">60 statements</a>
+    title=" 2.5% of total for procedures.">60 statements</a>
      </li> 
      
      
@@ -365,18 +365,18 @@ public subroutine form_triangles(nk, mesh, triang, triangcount, triangmap, block
 <polygon fill="none" stroke="black" points="81,-66 0,-66 0,-42 81,-42 81,-66"/>
 <text text-anchor="middle" x="40.5" y="-51.6" font-family="Helvetica,sans-Serif" font-size="10.50">form_triangles</text>
 </g>
-<!-- proc~demux_vector -->
+<!-- proc~mux_vector -->
 <g id="proc~~form_triangles~~CallsGraph_node2" class="node">
-<title>proc~demux_vector</title>
-<g id="a_proc~~form_triangles~~CallsGraph_node2"><a xlink:href=".././proc/demux_vector.html" xlink:title="demux_vector">
-<polygon fill="#d9534f" stroke="#d9534f" points="197,-108 117,-108 117,-84 197,-84 197,-108"/>
-<text text-anchor="middle" x="157" y="-93.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">demux_vector</text>
+<title>proc~mux_vector</title>
+<g id="a_proc~~form_triangles~~CallsGraph_node2"><a xlink:href=".././proc/mux_vector.html" xlink:title="mux_vector">
+<polygon fill="#d94e8f" stroke="#d94e8f" points="191,-108 123,-108 123,-84 191,-84 191,-108"/>
+<text text-anchor="middle" x="157" y="-93.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">mux_vector</text>
 </a>
 </g>
 </g>
-<!-- proc~form_triangles&#45;&gt;proc~demux_vector -->
+<!-- proc~form_triangles&#45;&gt;proc~mux_vector -->
 <g id="proc~~form_triangles~~CallsGraph_edge1" class="edge">
-<title>proc~form_triangles&#45;&gt;proc~demux_vector</title>
+<title>proc~form_triangles&#45;&gt;proc~mux_vector</title>
 <path fill="none" stroke="#000000" d="M74.31,-66.04C86.53,-70.52 100.57,-75.67 113.53,-80.42"/>
 <polygon fill="#000000" stroke="#000000" points="112.59,-83.8 123.18,-83.96 115,-77.23 112.59,-83.8"/>
 </g>
@@ -395,18 +395,18 @@ public subroutine form_triangles(nk, mesh, triang, triangcount, triangmap, block
 <path fill="none" stroke="#000000" d="M81.23,-54C92.8,-54 105.43,-54 116.96,-54"/>
 <polygon fill="#000000" stroke="#000000" points="117.17,-57.5 127.17,-54 117.17,-50.5 117.17,-57.5"/>
 </g>
-<!-- proc~mux_vector -->
+<!-- proc~demux_vector -->
 <g id="proc~~form_triangles~~CallsGraph_node4" class="node">
-<title>proc~mux_vector</title>
-<g id="a_proc~~form_triangles~~CallsGraph_node4"><a xlink:href=".././proc/mux_vector.html" xlink:title="mux_vector">
-<polygon fill="#d94e8f" stroke="#d94e8f" points="191,-24 123,-24 123,0 191,0 191,-24"/>
-<text text-anchor="middle" x="157" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">mux_vector</text>
+<title>proc~demux_vector</title>
+<g id="a_proc~~form_triangles~~CallsGraph_node4"><a xlink:href=".././proc/demux_vector.html" xlink:title="demux_vector">
+<polygon fill="#d9534f" stroke="#d9534f" points="197,-24 117,-24 117,0 197,0 197,-24"/>
+<text text-anchor="middle" x="157" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">demux_vector</text>
 </a>
 </g>
 </g>
-<!-- proc~form_triangles&#45;&gt;proc~mux_vector -->
+<!-- proc~form_triangles&#45;&gt;proc~demux_vector -->
 <g id="proc~~form_triangles~~CallsGraph_edge3" class="edge">
-<title>proc~form_triangles&#45;&gt;proc~mux_vector</title>
+<title>proc~form_triangles&#45;&gt;proc~demux_vector</title>
 <path fill="none" stroke="#000000" d="M74.31,-41.96C86.53,-37.48 100.57,-32.33 113.53,-27.58"/>
 <polygon fill="#000000" stroke="#000000" points="115,-30.77 123.18,-24.04 112.59,-24.2 115,-30.77"/>
 </g>
@@ -419,17 +419,17 @@ public subroutine form_triangles(nk, mesh, triang, triangcount, triangmap, block
 </a>
 </g>
 </g>
-<!-- proc~demux_vector&#45;&gt;proc~exit_with_message -->
-<g id="proc~~form_triangles~~CallsGraph_edge4" class="edge">
-<title>proc~demux_vector&#45;&gt;proc~exit_with_message</title>
-<path fill="none" stroke="#000000" d="M193.96,-83.96C207.62,-79.4 223.35,-74.13 237.79,-69.3"/>
-<polygon fill="#000000" stroke="#000000" points="239.16,-72.53 247.53,-66.04 236.94,-65.89 239.16,-72.53"/>
-</g>
 <!-- proc~mux_vector&#45;&gt;proc~exit_with_message -->
-<g id="proc~~form_triangles~~CallsGraph_edge5" class="edge">
+<g id="proc~~form_triangles~~CallsGraph_edge4" class="edge">
 <title>proc~mux_vector&#45;&gt;proc~exit_with_message</title>
-<path fill="none" stroke="#000000" d="M191.3,-23.14C205.48,-27.89 222.25,-33.5 237.58,-38.63"/>
-<polygon fill="#000000" stroke="#000000" points="236.8,-42.06 247.4,-41.92 239.02,-35.42 236.8,-42.06"/>
+<path fill="none" stroke="#000000" d="M191.3,-84.86C205.48,-80.11 222.25,-74.5 237.58,-69.37"/>
+<polygon fill="#000000" stroke="#000000" points="239.02,-72.58 247.4,-66.08 236.8,-65.94 239.02,-72.58"/>
+</g>
+<!-- proc~demux_vector&#45;&gt;proc~exit_with_message -->
+<g id="proc~~form_triangles~~CallsGraph_edge5" class="edge">
+<title>proc~demux_vector&#45;&gt;proc~exit_with_message</title>
+<path fill="none" stroke="#000000" d="M193.96,-24.04C207.62,-28.6 223.35,-33.87 237.79,-38.7"/>
+<polygon fill="#000000" stroke="#000000" points="236.94,-42.11 247.53,-41.96 239.16,-35.47 236.94,-42.11"/>
 </g>
 </g>
 </svg>
