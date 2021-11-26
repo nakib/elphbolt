@@ -465,6 +465,30 @@ contains
              ! Change back to cwd
              call chdir(trim(adjustl(num%cwd)))
           end if
+
+          tot_alphabyT_scalar = el_alphabyT_scalar + ph_alphabyT_scalar
+          KO_dev = 100.0_dp*abs(&
+               (el_sigmaS_scalar - tot_alphabyT_scalar)/tot_alphabyT_scalar)
+
+          if(this_image() == 1) then
+             write(*,"(I3, A, 1E16.8, A, 1E16.8, A, 1E16.8, A, 1E16.8, &
+                  A, 1E16.8, A, 1E16.8, A, 1F6.3)") it_ph, "     ", el_kappa0_scalar, &
+                  "      ", el_sigmaS_scalar, "     ", ph_kappa_scalar, &
+                  "    ", el_sigma_scalar, "        ", el_alphabyT_scalar, &
+                  "         ", ph_alphabyT_scalar, "           ", KO_dev
+          end if
+
+          !Print out band resolved transport coefficients
+          ! Change to data output directory
+          call chdir(trim(adjustl(Tdir)))
+          call append2file_transport_tensor('drag_ph_kappa_', it_ph, ph_kappa)
+          call append2file_transport_tensor('drag_ph_alphabyT_', it_ph, ph_alphabyT)
+          call append2file_transport_tensor('drag_el_sigmaS_', it_ph, el_sigmaS, el%bandlist)
+          call append2file_transport_tensor('drag_el_sigma_', it_ph, el_sigma, el%bandlist)
+          call append2file_transport_tensor('drag_el_alphabyT_', it_ph, el_alphabyT, el%bandlist)
+          call append2file_transport_tensor('drag_el_kappa0_', it_ph, el_kappa0, el%bandlist)
+          ! Change back to cwd
+          call chdir(trim(adjustl(num%cwd)))
           
           !Check convergence
           if(converged(ph_kappa_scalar_old, ph_kappa_scalar, num%conv_thres) .and. &
@@ -483,30 +507,6 @@ contains
           else
              ph_kappa_scalar_old = ph_kappa_scalar
              ph_alphabyT_scalar_old = ph_alphabyT_scalar
-
-             !Print out band resolved transport coefficients
-             ! Change to data output directory
-             call chdir(trim(adjustl(Tdir)))
-             call append2file_transport_tensor('drag_ph_kappa_', it_ph, ph_kappa)
-             call append2file_transport_tensor('drag_ph_alphabyT_', it_ph, ph_alphabyT)
-             call append2file_transport_tensor('drag_el_sigmaS_', it_ph, el_sigmaS, el%bandlist)
-             call append2file_transport_tensor('drag_el_sigma_', it_ph, el_sigma, el%bandlist)
-             call append2file_transport_tensor('drag_el_alphabyT_', it_ph, el_alphabyT, el%bandlist)
-             call append2file_transport_tensor('drag_el_kappa0_', it_ph, el_kappa0, el%bandlist)
-             ! Change back to cwd
-             call chdir(trim(adjustl(num%cwd)))
-          end if
-
-          tot_alphabyT_scalar = el_alphabyT_scalar + ph_alphabyT_scalar
-          KO_dev = 100.0_dp*abs(&
-               (el_sigmaS_scalar - tot_alphabyT_scalar)/tot_alphabyT_scalar)
-
-          if(this_image() == 1) then
-             write(*,"(I3, A, 1E16.8, A, 1E16.8, A, 1E16.8, A, 1E16.8, &
-                  A, 1E16.8, A, 1E16.8, A, 1F6.3)") it_ph, "     ", el_kappa0_scalar, &
-                  "      ", el_sigmaS_scalar, "     ", ph_kappa_scalar, &
-                  "    ", el_sigma_scalar, "        ", el_alphabyT_scalar, &
-                  "         ", ph_alphabyT_scalar, "           ", KO_dev
           end if
        end do
 
@@ -543,6 +543,13 @@ contains
              write(*,"(I3, A, 1E16.8)") it_ph, "    ", ph_kappa_scalar
           end if
 
+          !Print out branch resolved transport coefficients
+          ! Change to data output directory
+          call chdir(trim(adjustl(Tdir)))
+          call append2file_transport_tensor('nodrag_ph_kappa_', it_ph, ph_kappa)
+          ! Change back to cwd
+          call chdir(trim(adjustl(num%cwd)))
+          
           if(converged(ph_kappa_scalar_old, ph_kappa_scalar, num%conv_thres)) then
              !Print converged branch resolved response functions
              ! Change to data output directory
@@ -553,13 +560,6 @@ contains
              
              exit
           else
-             !Print out branch resolved transport coefficients
-             ! Change to data output directory
-             call chdir(trim(adjustl(Tdir)))
-             call append2file_transport_tensor('nodrag_ph_kappa_', it_ph, ph_kappa)
-             ! Change back to cwd
-             call chdir(trim(adjustl(num%cwd)))
-             
              ph_kappa_scalar_old = ph_kappa_scalar
           end if
        end do
@@ -617,6 +617,16 @@ contains
                   "     ", el_sigma_scalar, "     ", el_alphabyT_scalar
           end if
 
+          !Print out band resolved transport coefficients
+          ! Change to data output directory
+          call chdir(trim(adjustl(Tdir)))
+          call append2file_transport_tensor('nodrag_el_sigmaS_', it_el, el_sigmaS, el%bandlist)
+          call append2file_transport_tensor('nodrag_el_sigma_', it_el, el_sigma, el%bandlist)
+          call append2file_transport_tensor('nodrag_el_alphabyT_', it_el, el_alphabyT, el%bandlist)
+          call append2file_transport_tensor('nodrag_el_kappa0_', it_el, el_kappa0, el%bandlist)
+          ! Change back to cwd
+          call chdir(trim(adjustl(num%cwd)))
+          
           !Check convergence
           if(converged(el_kappa0_scalar_old, el_kappa0_scalar, num%conv_thres) .and. &
                converged(el_sigmaS_scalar_old, el_sigmaS_scalar, num%conv_thres) .and. &
@@ -633,16 +643,6 @@ contains
              
              exit
           else
-             !Print out band resolved transport coefficients
-             ! Change to data output directory
-             call chdir(trim(adjustl(Tdir)))
-             call append2file_transport_tensor('nodrag_el_sigmaS_', it_el, el_sigmaS, el%bandlist)
-             call append2file_transport_tensor('nodrag_el_sigma_', it_el, el_sigma, el%bandlist)
-             call append2file_transport_tensor('nodrag_el_alphabyT_', it_el, el_alphabyT, el%bandlist)
-             call append2file_transport_tensor('nodrag_el_kappa0_', it_el, el_kappa0, el%bandlist)
-             ! Change back to cwd
-             call chdir(trim(adjustl(num%cwd)))
-             
              el_kappa0_scalar_old = el_kappa0_scalar
              el_sigmaS_scalar_old = el_sigmaS_scalar
              el_sigma_scalar_old = el_sigma_scalar
