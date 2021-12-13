@@ -108,17 +108,18 @@ module phonon_module
       
    contains
 
-     procedure :: initialize, deallocate_phonon_quantities
+     procedure, public :: initialize, deallocate_phonon_quantities
+     procedure, private :: calculate_phonons, read_ifc2, read_ifc3
      
   end type phonon
 
 contains
 
-  subroutine initialize(ph, crys, sym, num)
+  subroutine initialize(self, crys, sym, num)
     !! Initialize the phonon data type, calculate ground state phonon properties,
     !! and read 3rd order force constants data. 
 
-    class(phonon), intent(out) :: ph
+    class(phonon), intent(out) :: self
     type(crystal), intent(in) :: crys
     type(symmetry), intent(in) :: sym
     type(numerics), intent(in) :: num
@@ -126,37 +127,37 @@ contains
     call subtitle("Setting up phonons...")
 
     !Set phonon branches
-    ph%numbranches = crys%numatoms*3
+    self%numbranches = crys%numatoms*3
     !Set wave vector mesh
-    ph%qmesh = num%qmesh
+    self%qmesh = num%qmesh
     !Set number of phonon wave vectors
-    ph%nq = product(ph%qmesh(:))
+    self%nq = product(self%qmesh(:))
 
     !Read ifc2 and related quantities
-    call read_ifc2(ph, crys)
+    call read_ifc2(self, crys)
     
     !Calculate harmonic properties
-    call calculate_phonons(ph, crys, sym, num)
+    call calculate_phonons(self, crys, sym, num)
 
     if(.not. num%onlyebte) then
        !Read ifc3s and related quantities
-       call read_ifc3(ph, crys)
+       call read_ifc3(self, crys)
     end if
   end subroutine initialize
 
-  subroutine deallocate_phonon_quantities(ph)
+  subroutine deallocate_phonon_quantities(self)
     !! Deallocate the electron eigenvectors
 
-    class(phonon), intent(inout) :: ph
+    class(phonon), intent(inout) :: self
 
-    deallocate(ph%evecs, ph%ifc2, ph%ifc3, ph%Index_i, ph%Index_j, ph%Index_k, &
-         ph%mm, ph%rr)
+    deallocate(self%evecs, self%ifc2, self%ifc3, self%Index_i, self%Index_j, self%Index_k, &
+         self%mm, self%rr)
   end subroutine deallocate_phonon_quantities
   
-  subroutine calculate_phonons(ph, crys, sym, num)
+  subroutine calculate_phonons(self, crys, sym, num)
     !! Calculate phonon quantities on the FBZ and IBZ meshes.
 
-    class(phonon), intent(inout) :: ph
+    class(phonon), intent(inout) :: self
     type(crystal), intent(in) :: crys
     type(symmetry), intent(in) :: sym
     type(numerics), intent(in) :: num
@@ -180,44 +181,44 @@ contains
     allocate(start[*], end[*])
 
     !Divide wave vectors among images
-    call distribute_points(ph%nq, chunk, start, end, num_active_images)
+    call distribute_points(self%nq, chunk, start, end, num_active_images)
 
     !Allocate small work variable chunk for each image
-    allocate(ens_chunk(chunk, ph%numbranches)[*])
-    allocate(vels_chunk(chunk, ph%numbranches, 3)[*])
-    allocate(evecs_chunk(chunk, ph%numbranches, ph%numbranches)[*])
+    allocate(ens_chunk(chunk, self%numbranches)[*])
+    allocate(vels_chunk(chunk, self%numbranches, 3)[*])
+    allocate(evecs_chunk(chunk, self%numbranches, self%numbranches)[*])
 
     !Calculate FBZ mesh
-    call calculate_wavevectors_full(ph%qmesh, ph%wavevecs, blocks)
+    call calculate_wavevectors_full(self%qmesh, self%wavevecs, blocks)
 
     !Print phonon FBZ mesh
-    call write2file_rank2_real("ph.wavevecs_fbz", ph%wavevecs)
+    call write2file_rank2_real("ph.wavevecs_fbz", self%wavevecs)
     
     !Calculate FBZ phonon quantities
-    call phonon_espresso(ph, crys, chunk, ph%wavevecs(start:end, :), &
+    call phonon_espresso(self, crys, chunk, self%wavevecs(start:end, :), &
          ens_chunk, evecs_chunk, vels_chunk)
 
     !Gather the chunks from the images
-    allocate(ph%ens(ph%nq, ph%numbranches))
-    allocate(ph%vels(ph%nq, ph%numbranches, 3))
-    allocate(ph%evecs(ph%nq, ph%numbranches, ph%numbranches))
+    allocate(self%ens(self%nq, self%numbranches))
+    allocate(self%vels(self%nq, self%numbranches, 3))
+    allocate(self%evecs(self%nq, self%numbranches, self%numbranches))
     sync all
     do im = 1, num_active_images
-       ph%ens(start[im]:end[im], :) = ens_chunk(:,:)[im]
-       ph%vels(start[im]:end[im], :, :) = vels_chunk(:,:,:)[im]
-       ph%evecs(start[im]:end[im], :, :) = evecs_chunk(:,:,:)[im]
+       self%ens(start[im]:end[im], :) = ens_chunk(:,:)[im]
+       self%vels(start[im]:end[im], :, :) = vels_chunk(:,:,:)[im]
+       self%evecs(start[im]:end[im], :, :) = evecs_chunk(:,:,:)[im]
     end do
     sync all
     deallocate(ens_chunk, vels_chunk, evecs_chunk)
     
     !Calculate IBZ mesh
     call print_message("Calculating IBZ and IBZ -> FBZ mappings...")
-    call find_irred_wedge(ph%qmesh, ph%nq_irred, ph%wavevecs_irred, &
-         ph%indexlist_irred, ph%nequiv, sym%nsymm_rot, sym%qrotations, &
-         ph%ibz2fbz_map, ph%equiv_map, blocks)
+    call find_irred_wedge(self%qmesh, self%nq_irred, self%wavevecs_irred, &
+         self%indexlist_irred, self%nequiv, sym%nsymm_rot, sym%qrotations, &
+         self%ibz2fbz_map, self%equiv_map, blocks)
 
     !Print phonon IBZ mesh
-    call write2file_rank2_real("ph.wavevecs_ibz", ph%wavevecs_irred)
+    call write2file_rank2_real("ph.wavevecs_ibz", self%wavevecs_irred)
     
     !Create symmetrizers of wave vector dependent vectors ShengBTE style
     allocate(symmetrizers_chunk(3, 3, chunk)[*])
@@ -225,7 +226,7 @@ contains
     do iq = start, end
        kk = 0
        do jj = 1, sym%nsymm
-          if(ph%equiv_map(jj, iq) == iq) then
+          if(self%equiv_map(jj, iq) == iq) then
              symmetrizers_chunk(:, :, iq - start + 1) = &
                   symmetrizers_chunk(:, :, iq - start + 1) + &
                   sym%crotations_orig(:, :, jj)
@@ -238,49 +239,49 @@ contains
        end if
     end do
     
-    allocate(ph%symmetrizers(3, 3, ph%nq))
+    allocate(self%symmetrizers(3, 3, self%nq))
     sync all
     do im = 1, num_active_images
-       ph%symmetrizers(:, :, start[im]:end[im]) = symmetrizers_chunk(:,:,:)[im]
+       self%symmetrizers(:, :, start[im]:end[im]) = symmetrizers_chunk(:,:,:)[im]
     end do
     sync all
     deallocate(symmetrizers_chunk)
     
     !Symmetrize phonon energies and velocities.
-    do i = 1, ph%nq_irred !an irreducible point
-       ii = ph%indexlist_irred(i)
-       ph%vels(ii,:,:)=transpose(&
-            matmul(ph%symmetrizers(:,:,ii),transpose(ph%vels(ii,:,:))))
-       do l = 1, ph%nequiv(i) !number of equivalent points of i
-          il = ph%ibz2fbz_map(l, i, 2) ! (i, l) -> il
-          s = ph%ibz2fbz_map(l, i, 1) ! mapping rotation
+    do i = 1, self%nq_irred !an irreducible point
+       ii = self%indexlist_irred(i)
+       self%vels(ii,:,:)=transpose(&
+            matmul(self%symmetrizers(:,:,ii),transpose(self%vels(ii,:,:))))
+       do l = 1, self%nequiv(i) !number of equivalent points of i
+          il = self%ibz2fbz_map(l, i, 2) ! (i, l) -> il
+          s = self%ibz2fbz_map(l, i, 1) ! mapping rotation
 
           !energy
-          ph%ens(il,:) = ph%ens(ii,:)
+          self%ens(il,:) = self%ens(ii,:)
 
           !velocity
-          do ib = 1, ph%numbranches
+          do ib = 1, self%numbranches
              !here use real space (Cartesian) rotations
-             ph%vels(il, ib, :) = matmul(sym%crotations(:, :, s), ph%vels(ii, ib, :))
+             self%vels(il, ib, :) = matmul(sym%crotations(:, :, s), self%vels(ii, ib, :))
           end do
        end do
     end do
     
     !Print out irreducible phonon energies and velocities
     if(this_image() == 1) then
-       write(numcols, "(I0)") ph%numbranches
+       write(numcols, "(I0)") self%numbranches
        open(1, file = "ph.ens_ibz", status = "replace")
-       do iq = 1, ph%nq_irred
+       do iq = 1, self%nq_irred
           write(1, "(" // trim(adjustl(numcols)) // "E20.10)") &
-               ph%ens(ph%indexlist_irred(iq), :)
+               self%ens(self%indexlist_irred(iq), :)
        end do
        close(1)
 
-       write(numcols, "(I0)") 3*ph%numbranches
+       write(numcols, "(I0)") 3*self%numbranches
        open(1, file = "ph.vels_ibz", status = "replace")
-       do iq = 1, ph%nq_irred
+       do iq = 1, self%nq_irred
           write(1, "(" // trim(adjustl(numcols)) // "E20.10)") &
-               ph%vels(ph%indexlist_irred(iq), :, :)
+               self%vels(self%indexlist_irred(iq), :, :)
        end do
        close(1)
     end if
@@ -288,22 +289,22 @@ contains
     !Calculate phonon tetrahedra
     if(num%tetrahedra) then
        call print_message("Calculating phonon mesh tetrahedra...")
-       call form_tetrahedra_3d(ph%nq, ph%qmesh, ph%tetra, ph%tetracount, &
-            ph%tetramap, .false.)
-       call fill_tetrahedra_3d(ph%tetra, ph%ens, ph%tetra_evals)
+       call form_tetrahedra_3d(self%nq, self%qmesh, self%tetra, self%tetracount, &
+            self%tetramap, .false.)
+       call fill_tetrahedra_3d(self%tetra, self%ens, self%tetra_evals)
     else
        call print_message("Calculating phonon mesh triangles...")
-       call form_triangles(ph%nq, ph%qmesh, ph%triang, ph%triangcount, &
-            ph%triangmap, .false.)
-       call fill_triangles(ph%triang, ph%ens, ph%triang_evals)
+       call form_triangles(self%nq, self%qmesh, self%triang, self%triangcount, &
+            self%triangmap, .false.)
+       call fill_triangles(self%triang, self%ens, self%triang_evals)
     end if
   end subroutine calculate_phonons
   
-  subroutine read_ifc2(ph, crys)
+  subroutine read_ifc2(self, crys)
     !! Read the 2nd order force constants from the Quantum Espresso format.
     !! This is adapted from ShengBTE.
     
-    class(phonon), intent(inout) :: ph
+    class(phonon), intent(inout) :: self
     type(crystal), intent(in) :: crys
 
     !Local variables
@@ -316,8 +317,8 @@ contains
     character(len = 6) :: label(crys%numelements)
     real(dp), parameter :: massfactor=1.8218779_dp*6.022e-4_dp
 
-    allocate(ph%mm(crys%numatoms, crys%numatoms))
-    allocate(ph%rr(crys%numatoms, crys%numatoms, 3))
+    allocate(self%mm(crys%numatoms, crys%numatoms))
+    allocate(self%rr(crys%numatoms, crys%numatoms, 3))
     
     open(1,file="espresso.ifc2",status="old")
     !Read some stuff that will not be used in the code.
@@ -350,16 +351,16 @@ contains
     end if
     read(1,*) qscell(1:3)
 
-    ph%scell = qscell
+    self%scell = qscell
     
     !Read the force constants.
-    allocate(ph%ifc2(3, 3, nat, nat, ph%scell(1), ph%scell(2), ph%scell(3)))
+    allocate(self%ifc2(3, 3, nat, nat, self%scell(1), self%scell(2), self%scell(3)))
     nfc2 = 3*3*nat*nat
     do i = 1, nfc2
        read(1, *) ipol, jpol, iat, jat
-       do j = 1, ph%scell(1)*ph%scell(2)*ph%scell(3)
+       do j = 1, self%scell(1)*self%scell(2)*self%scell(3)
           read(1, *) t1, t2, t3, &
-               ph%ifc2(ipol, jpol, iat, jat, t1, t2, t3)
+               self%ifc2(ipol, jpol, iat, jat, t1, t2, t3)
        end do
     end do
     close(1)
@@ -368,24 +369,24 @@ contains
     do i = 1, 3
        do j = 1, 3
           do iat = 1, nat
-             ph%ifc2(i, j, iat, iat, 1, 1, 1) = ph%ifc2(i, j, iat, iat, 1, 1, 1) - &
-                  sum(ph%ifc2(i, j, iat, :, :, :, :))
+             self%ifc2(i, j, iat, iat, 1, 1, 1) = self%ifc2(i, j, iat, iat, 1, 1, 1) - &
+                  sum(self%ifc2(i, j, iat, :, :, :, :))
           end do
        end do
     end do
 
-    ph%cell_r(:, 1:3) = transpose(crys%lattvecs)/bohr2nm
+    self%cell_r(:, 1:3) = transpose(crys%lattvecs)/bohr2nm
     do i = 1, 3
-       ph%cell_r(i, 0) = dnrm2(3, ph%cell_r(i, 1:3), 1)
+       self%cell_r(i, 0) = dnrm2(3, self%cell_r(i, 1:3), 1)
     end do
-    ph%cell_g(:, 1:3) = transpose(crys%reclattvecs)*bohr2nm
+    self%cell_g(:, 1:3) = transpose(crys%reclattvecs)*bohr2nm
     do i = 1, 3
-       ph%cell_g(i, 0) = dnrm2(3, ph%cell_g(i, 1:3), 1)
+       self%cell_g(i, 0) = dnrm2(3, self%cell_g(i, 1:3), 1)
     end do
 
-    wscell(1,1:3) = ph%cell_r(1,1:3)*ph%scell(1)
-    wscell(2,1:3) = ph%cell_r(2,1:3)*ph%scell(2)
-    wscell(3,1:3) = ph%cell_r(3,1:3)*ph%scell(3)
+    wscell(1,1:3) = self%cell_r(1,1:3)*self%scell(1)
+    wscell(2,1:3) = self%cell_r(2,1:3)*self%scell(2)
+    wscell(3,1:3) = self%cell_r(3,1:3)*self%scell(3)
 
     j = 1
     do m1 = -2, 2
@@ -395,32 +396,32 @@ contains
                 cycle
              end if
              do i = 1, 3
-                ph%rws(j, i) = wscell(1, i)*m1 + wscell(2, i)*m2 + wscell(3, i)*m3
+                self%rws(j, i) = wscell(1, i)*m1 + wscell(2, i)*m2 + wscell(3, i)*m3
              end do
-             ph%rws(j, 0) = 0.5*dot_product(ph%rws(j, 1:3), ph%rws(j, 1:3))
+             self%rws(j, 0) = 0.5*dot_product(self%rws(j, 1:3), self%rws(j, 1:3))
              j = j + 1
           end do
        end do
     end do
 
     do i = 1, nat
-       ph%mm(i, i) = mass(tipo(i))
-       ph%rr(i, i, :) = 0
+       self%mm(i, i) = mass(tipo(i))
+       self%rr(i, i, :) = 0
        do j = i + 1, nat
-          ph%mm(i, j) = sqrt(mass(tipo(i))*mass(tipo(j)))
-          ph%rr(i, j, 1:3) = r(i, 1:3) - r(j, 1:3)
-          ph%mm(j, i) = ph%mm(i, j)
-          ph%rr(j, i, 1:3) = -ph%rr(i, j, 1:3)
+          self%mm(i, j) = sqrt(mass(tipo(i))*mass(tipo(j)))
+          self%rr(i, j, 1:3) = r(i, 1:3) - r(j, 1:3)
+          self%mm(j, i) = self%mm(i, j)
+          self%rr(j, i, 1:3) = -self%rr(i, j, 1:3)
        end do
     end do
     
   end subroutine read_ifc2
   
-  subroutine read_ifc3(ph, crys)
+  subroutine read_ifc3(self, crys)
     !! Read the 3rd order force constants in the thirdorder.py format.
     !! This subroutine is adapted from ShengBTE.
 
-    class(phonon), intent(inout) :: ph
+    class(phonon), intent(inout) :: self
     type(crystal), intent(in) :: crys
     
     !Local variables
@@ -458,18 +459,20 @@ contains
        !The file is in a simple sparse format, described in detail in
        !the user documentation. See Doc/ShengBTE.pdf.
        open(1, file = 'FORCE_CONSTANTS_3RD', status = "old")
-       read(1, *) ph%numtriplets
-       allocate(ph%Index_i(ph%numtriplets), ph%Index_j(ph%numtriplets), ph%Index_k(ph%numtriplets))
-       allocate(ph%ifc3(3, 3, 3, ph%numtriplets), ph%R_j(3, ph%numtriplets), ph%R_k(3,ph%numtriplets))
-       do ii = 1, ph%numtriplets
+       read(1, *) self%numtriplets
+       allocate(self%Index_i(self%numtriplets), self%Index_j(self%numtriplets), &
+            self%Index_k(self%numtriplets))
+       allocate(self%ifc3(3, 3, 3, self%numtriplets), self%R_j(3, self%numtriplets), &
+            self%R_k(3,self%numtriplets))
+       do ii = 1, self%numtriplets
           read(1, *) jj
-          read(1, *) ph%R_j(:, ii) !Ang
-          read(1, *) ph%R_k(:, ii) !Ang
-          read(1, *) ph%Index_i(ii), ph%Index_j(ii), ph%Index_k(ii)
+          read(1, *) self%R_j(:, ii) !Ang
+          read(1, *) self%R_k(:, ii) !Ang
+          read(1, *) self%Index_i(ii), self%Index_j(ii), self%Index_k(ii)
           do ll = 1, 3
              do mm = 1, 3
                 do nn = 1, 3
-                   read(1, *) ltem, mtem, ntem, ph%ifc3(ll, mm, nn, ii)
+                   read(1, *) ltem, mtem, ntem, self%ifc3(ll, mm, nn, ii)
                 end do
              end do
           end do
@@ -534,7 +537,7 @@ contains
                          if(save_nR) then
                             nR = nR_
                             allocate(R2(3, nR), R3(3, nR), &
-                                 fc(ph%numbranches, ph%numbranches, ph%numbranches, nR))
+                                 fc(self%numbranches, self%numbranches, self%numbranches, nR))
                             save_nR = .false.
                          end if
 
@@ -554,11 +557,11 @@ contains
        end do
        
        !Number of triplets
-       ph%numtriplets = nR*crys%numatoms**3
+       self%numtriplets = nR*crys%numatoms**3
        
        !Allocate quantities
-       allocate(ph%Index_i(ph%numtriplets), ph%Index_j(ph%numtriplets), ph%Index_k(ph%numtriplets))
-       allocate(ph%ifc3(3, 3, 3, ph%numtriplets), ph%R_j(3, ph%numtriplets), ph%R_k(3,ph%numtriplets))
+       allocate(self%Index_i(self%numtriplets), self%Index_j(self%numtriplets), self%Index_k(self%numtriplets))
+       allocate(self%ifc3(3, 3, 3, self%numtriplets), self%R_j(3, self%numtriplets), self%R_k(3,self%numtriplets))
        
        !Convert to the standard format.
        triplet_counter = 0
@@ -569,15 +572,15 @@ contains
                    triplet_counter = triplet_counter + 1
 
                    !Triplet
-                   ph%Index_i(triplet_counter) = na1
-                   ph%Index_j(triplet_counter) = na2
-                   ph%Index_k(triplet_counter) = na3
+                   self%Index_i(triplet_counter) = na1
+                   self%Index_j(triplet_counter) = na2
+                   self%Index_k(triplet_counter) = na3
 
                    !Positions of the 2nd and 3rd atom in the triplet
                    !converted to Cartesian coordinates (Ang).
-                   ph%R_j(:, triplet_counter) = &
+                   self%R_j(:, triplet_counter) = &
                         matmul(crys%lattvecs, R2(:, ii)*10.0_dp) !Ang
-                   ph%R_k(:, triplet_counter) = &
+                   self%R_k(:, triplet_counter) = &
                         matmul(crys%lattvecs, R3(:, ii)*10.0_dp) !Ang
                    
                    do j1 =1, 3
@@ -586,7 +589,7 @@ contains
                          jn2 = j2 + (na2 - 1)*3
                          do j3 =1, 3
                             jn3 = j3 + (na3 - 1)*3
-                            ph%ifc3(j1, j2, j3, triplet_counter) = fc(jn1, jn2, jn3, ii)
+                            self%ifc3(j1, j2, j3, triplet_counter) = fc(jn1, jn2, jn3, ii)
                          end do
                       end do
                    end do
@@ -594,16 +597,16 @@ contains
              end do
           end do
        end do
-       ph%ifc3 = ph%ifc3*Ryd2eV/(bohr2nm*10.0_dp)**3 !eV/Ang^3
+       self%ifc3 = self%ifc3*Ryd2eV/(bohr2nm*10.0_dp)**3 !eV/Ang^3
     end if
 
     !Each vector is rounded to the nearest lattice vector.
     tmp = crys%lattvecs
-    call dgesv(3, ph%numtriplets, tmp, 3, P, ph%R_j, 3, info)
-    ph%R_j = matmul(crys%lattvecs, anint(ph%R_j/10.0_dp)) !nm
+    call dgesv(3, self%numtriplets, tmp, 3, P, self%R_j, 3, info)
+    self%R_j = matmul(crys%lattvecs, anint(self%R_j/10.0_dp)) !nm
     tmp = crys%lattvecs
-    call dgesv(3, ph%numtriplets, tmp, 3, P, ph%R_k, 3, info)
-    ph%R_k = matmul(crys%lattvecs, anint(ph%R_k/10.0_dp)) !nm
+    call dgesv(3, self%numtriplets, tmp, 3, P, self%R_k, 3, info)
+    self%R_k = matmul(crys%lattvecs, anint(self%R_k/10.0_dp)) !nm
   end subroutine read_ifc3
 
   subroutine phonon_espresso(ph, crys, nk, kpoints, omegas, eigenvect, velocities)
