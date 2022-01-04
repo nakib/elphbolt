@@ -80,6 +80,9 @@ contains
     real(dp), allocatable :: translations(:,:), ctranslations(:,:)
     real(dp) :: tmp1(3,3), tmp2(3,3), tmp3(3,3)
 
+    !External procedures
+    external :: dgesv
+    
     call subtitle("Analyzing symmetry...")
     
     !Number of points in wave vector mesh
