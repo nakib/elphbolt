@@ -267,7 +267,7 @@ contains
     character(len = 1) :: polar_key
     character(len = 6) :: label(crys%numelements)
     real(dp), parameter :: massfactor=1.8218779_dp*6.022e-4_dp
-
+    
     allocate(self%mm(crys%numatoms, crys%numatoms))
     allocate(self%rr(crys%numatoms, crys%numatoms, 3))
     
@@ -388,6 +388,9 @@ contains
     character(len = 6) :: label(crys%numelements)
     logical :: sheng_file_exists, d3q_file_exists, save_nR
 
+    !External procedures
+    external :: dgesv
+
     !Check what force constants files have been provided
     sheng_file_exists = .False.
     d3q_file_exists = .False.
@@ -478,7 +481,7 @@ contains
                          if(any((/na1, na2, na3, j1, j2, j3/) /= &
                               (/na1_, na2_, na3_, j1_, j2_, j3_/))) then
                             call exit_with_message(&
-                                 "Wrong Triplet indices and/or tensor element location in mat3R file. Exiting.")
+                                 "Wrong triplet indices and/or tensor element location in mat3R file. Exiting.")
                          end if
 
                          !Read number of unit cells in file.
@@ -594,6 +597,9 @@ contains
     complex(dp),allocatable :: dyn(:,:),dyn_s(:,:,:),dyn_g(:,:,:)
     complex(dp),allocatable :: ddyn(:,:,:),ddyn_s(:,:,:,:),ddyn_g(:,:,:,:)
 
+    !External procedures
+    external :: zheev
+    
     ! Quantum Espresso's 2nd-order format contains information about
     ! lattice vectors, atomic positions, Born effective charges and so
     ! forth in its header. The information is read but completely
@@ -713,9 +719,8 @@ contains
           end do
        end do
     end do
-    ! The nonanalytic correction has two components in this
-    ! approximation. Results may differ slightly between this method
-    ! and the one implemented in the previous subroutine.
+
+    !The nonanalytic correction has two components in this approximation.
     dyn_g = 0.0_dp
     if(present(velocities)) ddyn_g = 0.0_dp
     if(crys%polar) then

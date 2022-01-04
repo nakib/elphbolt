@@ -421,7 +421,6 @@ contains
 
     real(dp), intent(in) :: x
 
-    !expi = cmplx(cos(x), sin(x))
     expi = cmplx(cos(x), sin(x), dp)
   end function expi
 
@@ -653,6 +652,9 @@ contains
     real(dp), allocatable :: T(:, :), c(:)
     real(dp) :: aux
 
+    !External procedures
+    external :: dgesv
+    
     aux = 0.0_dp
     equalpol = 0_k8
 
