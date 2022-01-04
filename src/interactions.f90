@@ -24,7 +24,7 @@ module interactions
   use wannier_module, only: epw_wannier
   use crystal_module, only: crystal
   use electron_module, only: electron
-  use phonon_module, only: phonon, phonon_espresso
+  use phonon_module, only: phonon
   use numerics_module, only: numerics
   use delta, only: delta_fn_tetra, delta_fn_triang
 
@@ -901,9 +901,6 @@ contains
 
              !Calculate the fine mesh phonon.
              qlist(1, :) = q
-             !This could be very slow:
-             !call phonon_espresso(ph, crys, 1_k8, qlist, ph_ens_iq, ph_evecs_iq)
-             !This is much faster:
              call wann%ph_wann_epw(crys, 1_k8, qlist, ph_ens_iq, ph_evecs_iq)
           else !Original (coarser) mesh phonon
              q_indvec = modulo(q_indvec/el%mesh_ref_array, ph%wvmesh) !0-based index vector

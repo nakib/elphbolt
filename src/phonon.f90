@@ -31,7 +31,7 @@ module phonon_module
   implicit none
 
   private
-  public phonon, phonon_espresso
+  public phonon
   
   type, extends(particle) :: phonon
      !! Data and procedures related to phonons.
@@ -59,7 +59,8 @@ module phonon_module
    contains
 
      procedure, public :: initialize, deallocate_phonon_quantities
-     procedure, private :: calculate_phonons, read_ifc2, read_ifc3
+     procedure, private :: calculate_phonons, read_ifc2, read_ifc3, &
+          phonon_espresso
      
   end type phonon
 
@@ -559,19 +560,19 @@ contains
     self%R_k = matmul(crys%lattvecs, anint(self%R_k/10.0_dp)) !nm
   end subroutine read_ifc3
 
-  subroutine phonon_espresso(ph, crys, nk, kpoints, omegas, eigenvect, velocities)
+  subroutine phonon_espresso(self, crys, nk, kpoints, omegas, eigenvect, velocities)
     !! Subroutine to calculate phonons from the 2nd order force constants.
     !
     ! This is adapted from ShengBTE's subroutine of the same name.
     ! ShengBTE is distributed under GPL v3 or later.
     
-    type(phonon), intent(in) :: ph
+    class(phonon), intent(in) :: self
     type(crystal), intent(in) :: crys
     integer(k8), intent(in) :: nk
     real(dp), intent(in) :: kpoints(nk, 3)
-    real(dp), intent(out) :: omegas(nk, ph%numbands)
-    real(dp), optional, intent(out) :: velocities(nk, ph%numbands, 3)
-    complex(kind=8), optional, intent(out) :: eigenvect(nk, ph%numbands, ph%numbands)
+    real(dp), intent(out) :: omegas(nk, self%numbands)
+    real(dp), optional, intent(out) :: velocities(nk, self%numbands, 3)
+    complex(kind=8), optional, intent(out) :: eigenvect(nk, self%numbands, self%numbands)
 
     ! QE's 2nd-order files are in Ryd units.
     real(kind=8),parameter :: toTHz=20670.687,&
@@ -643,7 +644,7 @@ contains
     gmax=14.
     alpha=(twopi*bohr2nm/dnrm2(3,crys%lattvecs(:,1),1))**2
     geg=gmax*4.*alpha
-    ncell_g=int(sqrt(geg)/ph%cell_g(:,0))+1
+    ncell_g=int(sqrt(geg)/self%cell_g(:,0))+1
     
     dyn_s = 0.0_dp
     if(present(velocities)) ddyn_s = 0.0_dp
@@ -651,18 +652,18 @@ contains
     do iat=1,nat
        do jat=1,nat
           total_weight=0.0d0
-          do m1=-2*ph%scell(1),2*ph%scell(1)
-             do m2=-2*ph%scell(2),2*ph%scell(2)
-                do m3=-2*ph%scell(3),2*ph%scell(3)
+          do m1=-2*self%scell(1),2*self%scell(1)
+             do m2=-2*self%scell(2),2*self%scell(2)
+                do m3=-2*self%scell(3),2*self%scell(3)
                    do i=1,3
-                      t(i)=m1*ph%cell_r(1,i)+m2*ph%cell_r(2,i)+m3*ph%cell_r(3,i)
-                      r_ws(i)=t(i)+ph%rr(iat,jat,i)
+                      t(i)=m1*self%cell_r(1,i)+m2*self%cell_r(2,i)+m3*self%cell_r(3,i)
+                      r_ws(i)=t(i)+self%rr(iat,jat,i)
                    end do
                    weight=0.d0
                    nreq=1
                    j=0
                    Do ir=1,124
-                      ck=dot_product(r_ws,ph%rws(ir,1:3))-ph%rws(ir,0)
+                      ck=dot_product(r_ws,self%rws(ir,1:3))-self%rws(ir,0)
                       if(ck.gt.1e-6) then
                          j=1
                          cycle
@@ -675,17 +676,17 @@ contains
                       weight=1.d0/dble(nreq)
                    end if
                    if(weight.gt.0.d0) then
-                      t1=mod(m1+1,ph%scell(1))
+                      t1=mod(m1+1,self%scell(1))
                       if(t1.le.0) then
-                         t1=t1+ph%scell(1)
+                         t1=t1+self%scell(1)
                       end if
-                      t2=mod(m2+1,ph%scell(2))
+                      t2=mod(m2+1,self%scell(2))
                       if(t2.Le.0) then
-                         t2=t2+ph%scell(2)
+                         t2=t2+self%scell(2)
                       end if
-                      t3=mod(m3+1,ph%scell(3))
+                      t3=mod(m3+1,self%scell(3))
                       if(t3.le.0) then
-                         t3=t3+ph%scell(3)
+                         t3=t3+self%scell(3)
                       end if
                       do ik=1,nk
                          kt=dot_product(k(ik,1:3),t(1:3))
@@ -694,12 +695,12 @@ contains
                             do jpol=1,3
                                jdim = (jat-1)*3+jpol
                                dyn_s(ik,idim,jdim)=dyn_s(ik,idim,jdim)+&
-                                    ph%ifc2(ipol,jpol,iat,jat,t1,t2,t3)*&
+                                    self%ifc2(ipol,jpol,iat,jat,t1,t2,t3)*&
                                     expi(-kt)*weight
                                if(present(velocities)) then
                                   ddyn_s(ik,idim,jdim,1:3)=ddyn_s(ik,idim,jdim,1:3)-&
                                        oneI*t(1:3)*&
-                                       ph%ifc2(ipol,jpol,iat,jat,t1,t2,t3)*&
+                                       self%ifc2(ipol,jpol,iat,jat,t1,t2,t3)*&
                                        expi(-kt)*weight
                                end if
                             end do
@@ -721,8 +722,8 @@ contains
        do m1=-ncell_g(1),ncell_g(1)
           do m2=-ncell_g(2),ncell_g(2)
              do m3=-ncell_g(3),ncell_g(3)
-                g(1:3)=m1*ph%cell_g(1,1:3)+&
-                     m2*ph%cell_g(2,1:3)+m3*ph%cell_g(3,1:3)
+                g(1:3)=m1*self%cell_g(1,1:3)+&
+                     m2*self%cell_g(2,1:3)+m3*self%cell_g(3,1:3)
                 geg=dot_product(g(1:3),matmul(eps,g(1:3)))
                 if(geg.gt.0.0d0.and.geg/alpha/4.0d0.lt.gmax) then
                    exp_g=exp(-geg/alpha/4.0d0)/geg
@@ -730,7 +731,7 @@ contains
                       zig(1:3)=matmul(g(1:3),zeff(iat,1:3,1:3))
                       auxi(1:3)=0.
                       do jat=1,nat
-                         gr=dot_product(g(1:3),ph%rr(iat,jat,1:3))
+                         gr=dot_product(g(1:3),self%rr(iat,jat,1:3))
                          zjg(1:3)=matmul(g(1:3),zeff(jat,1:3,1:3))
                          auxi(1:3)=auxi(1:3)+zjg(1:3)*expi(gr)
                       end do
@@ -754,7 +755,7 @@ contains
                       do iat=1,nat
                          zig(1:3)=matmul(g(1:3),zeff(iat,1:3,1:3))
                          do jat=1,nat
-                            gr=dot_product(g(1:3),ph%rr(iat,jat,1:3))
+                            gr=dot_product(g(1:3),self%rr(iat,jat,1:3))
                             zjg(1:3)=matmul(g(1:3),zeff(jat,1:3,1:3))
                             do ipol=1,3
                                idim=(iat-1)*3+ipol
@@ -767,7 +768,7 @@ contains
                                         ddyn_g(ik,idim,jdim,i)=ddyn_g(ik,idim,jdim,i)+&
                                              exp_g*expi(gr)*&
                                              (zjg(jpol)*zeff(iat,i,ipol)+zig(ipol)*zeff(jat,i,jpol)+&
-                                             zig(ipol)*zjg(jpol)*oneI*ph%rr(iat,jat,i)-&
+                                             zig(ipol)*zjg(jpol)*oneI*self%rr(iat,jat,i)-&
                                              zig(ipol)*zjg(jpol)*(dgeg(i)/alpha/4.0+dgeg(i)/geg))
                                      end do
                                   end if
@@ -799,9 +800,9 @@ contains
                 do jat=1,nat
                    idim=(iat-1)*3+ipol
                    jdim=(jat-1)*3+jpol
-                   dyn(idim,jdim)=dyn(idim,jdim)/ph%mm(iat,jat)
+                   dyn(idim,jdim)=dyn(idim,jdim)/self%mm(iat,jat)
                    if(present(velocities)) then
-                      ddyn(idim,jdim,1:3)=ddyn(idim,jdim,1:3)/ph%mm(iat,jat)
+                      ddyn(idim,jdim,1:3)=ddyn(idim,jdim,1:3)/self%mm(iat,jat)
                    end if
                 end do
              end do
