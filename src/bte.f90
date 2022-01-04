@@ -125,11 +125,11 @@ contains
        call t%start_timer('RTA e BTE')
        
        !Allocate phonon transport coefficients
-       allocate(ph_kappa(ph%numbranches, 3, 3), ph_alphabyT(ph%numbranches, 3, 3), &
-            dummy(ph%numbranches, 3, 3))
+       allocate(ph_kappa(ph%numbands, 3, 3), ph_alphabyT(ph%numbands, 3, 3), &
+            dummy(ph%numbands, 3, 3))
 
        !Allocate total RTA scattering rates
-       allocate(bt%ph_rta_rates_ibz(ph%nq_irred, ph%numbranches))
+       allocate(bt%ph_rta_rates_ibz(ph%nwv_irred, ph%numbands))
 
        !Calculate RTA scattering rates
        if(num%phe) then
@@ -149,18 +149,18 @@ contains
             crys%T, 0.0_dp, ph%ens, ph%vels, bt%ph_rta_rates_ibz, bt%ph_field_term_T)
 
        ! Symmetrize field term
-       do iq = 1, ph%nq
+       do iq = 1, ph%nwv
           bt%ph_field_term_T(iq,:,:)=transpose(&
                matmul(ph%symmetrizers(:,:,iq),transpose(bt%ph_field_term_T(iq,:,:))))
        end do
 
        ! RTA solution of BTE
-       allocate(bt%ph_response_T(ph%nq, ph%numbranches, 3))
+       allocate(bt%ph_response_T(ph%nwv, ph%numbands, 3))
        bt%ph_response_T = bt%ph_field_term_T
 
        ! Calculate transport coefficient
        call calculate_transport_coeff('ph', 'T', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
-            crys%volume, ph%qmesh, bt%ph_response_T, sym, ph_kappa, dummy)
+            crys%volume, ph%wvmesh, bt%ph_response_T, sym, ph_kappa, dummy)
        !---------------------------------------------------------------------------------!
 
        !E field:
@@ -169,12 +169,12 @@ contains
             crys%T, 0.0_dp, ph%ens, ph%vels, bt%ph_rta_rates_ibz, bt%ph_field_term_E)
 
        ! RTA solution of BTE
-       allocate(bt%ph_response_E(ph%nq, ph%numbranches, 3))
+       allocate(bt%ph_response_E(ph%nwv, ph%numbands, 3))
        bt%ph_response_E = bt%ph_field_term_E
 
        ! Calculate transport coefficient
        call calculate_transport_coeff('ph', 'E', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
-            crys%volume, ph%qmesh, bt%ph_response_E, sym, ph_alphabyT, dummy)
+            crys%volume, ph%wvmesh, bt%ph_response_E, sym, ph_alphabyT, dummy)
        ph_alphabyT = ph_alphabyT/crys%T
        !---------------------------------------------------------------------------------!
 
@@ -228,7 +228,7 @@ contains
        call calculate_el_rta_rates(rates_eph, bt%el_rta_rates_echimp_ibz, num, crys, el)
 
        !Allocate total RTA scattering rates
-       allocate(bt%el_rta_rates_ibz(el%nk_irred, el%numbands))
+       allocate(bt%el_rta_rates_ibz(el%nwv_irred, el%numbands))
 
        !Matthiessen's rule
        bt%el_rta_rates_ibz = rates_eph + bt%el_rta_rates_echimp_ibz + &
@@ -241,18 +241,18 @@ contains
             bt%el_field_term_T, el%indexlist)
 
        ! Symmetrize field term
-       do ik = 1, el%nk
+       do ik = 1, el%nwv
           bt%el_field_term_T(ik,:,:)=transpose(&
                matmul(el%symmetrizers(:,:,ik),transpose(bt%el_field_term_T(ik,:,:))))
        end do
 
        ! RTA solution of BTE
-       allocate(bt%el_response_T(el%nk, el%numbands, 3))
+       allocate(bt%el_response_T(el%nwv, el%numbands, 3))
        bt%el_response_T = bt%el_field_term_T
 
        ! Calculate transport coefficient
        call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, el%ens, &
-            el%vels, crys%volume, el%kmesh, bt%el_response_T, sym, el_kappa0, el_sigmaS)
+            el%vels, crys%volume, el%wvmesh, bt%el_response_T, sym, el_kappa0, el_sigmaS)
 
        !E field:
        ! Calculate field term (E=>J0)
@@ -261,18 +261,18 @@ contains
             bt%el_field_term_E, el%indexlist)
 
        ! Symmetrize field term
-       do ik = 1, el%nk
+       do ik = 1, el%nwv
           bt%el_field_term_E(ik,:,:)=transpose(&
                matmul(el%symmetrizers(:,:,ik),transpose(bt%el_field_term_E(ik,:,:))))
        end do
 
        ! RTA solution of BTE
-       allocate(bt%el_response_E(el%nk, el%numbands, 3))
+       allocate(bt%el_response_E(el%nwv, el%numbands, 3))
        bt%el_response_E = bt%el_field_term_E
 
        ! Calculate transport coefficient
        call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, el%ens, el%vels, &
-            crys%volume, el%kmesh, bt%el_response_E, sym, el_alphabyT, el_sigma)
+            crys%volume, el%wvmesh, bt%el_response_E, sym, el_alphabyT, el_sigma)
        el_alphabyT = el_alphabyT/crys%T
        !--!
 
@@ -375,8 +375,8 @@ contains
        end if
        
        !These will be needed below
-       allocate(I_drag(el%nk, el%numbands, 3), I_diff(el%nk, el%numbands, 3), &
-            ph_drag_term_T(el%nk, el%numbands, 3), ph_drag_term_E(el%nk, el%numbands, 3))
+       allocate(I_drag(el%nwv, el%numbands, 3), I_diff(el%nwv, el%numbands, 3), &
+            ph_drag_term_T(el%nwv, el%numbands, 3), ph_drag_term_E(el%nwv, el%numbands, 3))
        
        !Start iterator
        do it_ph = 1, num%maxiter       
@@ -390,9 +390,9 @@ contains
 
           !Calculate phonon transport coefficients
           call calculate_transport_coeff('ph', 'T', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
-               crys%volume, ph%qmesh, bt%ph_response_T, sym, ph_kappa, dummy)
+               crys%volume, ph%wvmesh, bt%ph_response_T, sym, ph_kappa, dummy)
           call calculate_transport_coeff('ph', 'E', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
-               crys%volume, ph%qmesh, bt%ph_response_E, sym, ph_alphabyT, dummy)
+               crys%volume, ph%wvmesh, bt%ph_response_E, sym, ph_alphabyT, dummy)
           ph_alphabyT = ph_alphabyT/crys%T
 
           !Calculate phonon drag term for the current phBTE iteration.
@@ -409,7 +409,7 @@ contains
 
              !Calculate electron transport coefficients
              call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, &
-                  el%ens, el%vels, crys%volume, el%kmesh, bt%el_response_E, sym, &
+                  el%ens, el%vels, crys%volume, el%wvmesh, bt%el_response_E, sym, &
                   el_alphabyT, el_sigma)
              el_alphabyT = el_alphabyT/crys%T
 
@@ -429,7 +429,7 @@ contains
 
              !Calculate electron transport coefficients
              call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
-                  el%ens, el%vels, crys%volume, el%kmesh, bt%el_response_T, sym, &
+                  el%ens, el%vels, crys%volume, el%wvmesh, bt%el_response_T, sym, &
                   el_kappa0, el_sigmaS)
 
              !Calculate electron transport scalars
@@ -535,7 +535,7 @@ contains
 
           !Calculate phonon transport coefficients
           call calculate_transport_coeff('ph', 'T', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
-               crys%volume, ph%qmesh, bt%ph_response_T, sym, ph_kappa, dummy)
+               crys%volume, ph%wvmesh, bt%ph_response_T, sym, ph_kappa, dummy)
 
           !Calculate and print phonon transport scalar
           ph_kappa_scalar = trace(sum(ph_kappa, dim = 1))/crys%dim
@@ -589,7 +589,7 @@ contains
 
           !Calculate electron transport coefficients
           call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, &
-               el%ens, el%vels, crys%volume, el%kmesh, bt%el_response_E, sym, &
+               el%ens, el%vels, crys%volume, el%wvmesh, bt%el_response_E, sym, &
                el_alphabyT, el_sigma)
           el_alphabyT = el_alphabyT/crys%T
 
@@ -603,7 +603,7 @@ contains
           end do
 
           call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
-               el%ens, el%vels, crys%volume, el%kmesh, bt%el_response_T, sym, &
+               el%ens, el%vels, crys%volume, el%wvmesh, bt%el_response_T, sym, &
                el_kappa0, el_sigmaS)
 
           !Calculate and print electron transport scalars
@@ -674,7 +674,7 @@ contains
          lambda = 0.5_dp*(a + b)
          !Calculate electron transport coefficients
          call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
-              el%ens, el%vels, crys%volume, el%kmesh, lambda*I_drag, sym, &
+              el%ens, el%vels, crys%volume, el%wvmesh, lambda*I_drag, sym, &
               dummy, sigmaS)         
          sigmaS_scalar = trace(sum(sigmaS, dim = 1))/crys%dim
 
@@ -1130,13 +1130,13 @@ contains
     numbands = el%numbands
 
     !Number of in-window FBZ wave vectors
-    nk = el%nk
+    nk = el%nwv
 
     !Total number of IBZ states
-    nstates_irred = el%nk_irred*numbands
+    nstates_irred = el%nwv_irred*numbands
     
     !Number of phonon branches
-    numbranches = ph%numbranches
+    numbranches = ph%numbands
 
     !Allocate coarrays
     allocate(start[*], end[*])
@@ -1194,15 +1194,15 @@ contains
              !Drag contribution:             
              if(iq < 0) then !Need to interpolate on this point
                 !Calculate the fine mesh wave vector, 0-based index vector
-                call demux_vector(-iq, fineq_indvec, el%kmesh, 0_k8)
+                call demux_vector(-iq, fineq_indvec, el%wvmesh, 0_k8)
 
                 !Find image of phonon wave vector due to the current symmetry
                 fineq_indvec = modulo( &
-                     nint(matmul(sym%qrotations(:, :, ik_sym), fineq_indvec)), el%kmesh)
+                     nint(matmul(sym%qrotations(:, :, ik_sym), fineq_indvec)), el%wvmesh)
 
                 !Interpolate response function on this wave vector
                 do ipol = 1, 3
-                   call interpolate(ph%qmesh, el%mesh_ref_array, response_ph(:, s, ipol), &
+                   call interpolate(ph%wvmesh, el%mesh_ref_array, response_ph(:, s, ipol), &
                         fineq_indvec, ForG(ipol))
                 end do
              else
@@ -1290,7 +1290,7 @@ contains
        call print_message(" Calculating RTA electron kappa0 and sigmaS...")
 
        !  Allocate response function
-       allocate(bt%el_response_T(el%nk, el%numbands, 3))
+       allocate(bt%el_response_T(el%nwv, el%numbands, 3))
 
        !  Read response function
        call readfile_response('RTA_I0_', bt%el_response_T, el%bandlist)
@@ -1339,7 +1339,7 @@ contains
        call print_message(" Calculating RTA electron sigma and alpha/T...")
 
        !  Allocate response function
-       allocate(bt%el_response_E(el%nk, el%numbands, 3))
+       allocate(bt%el_response_E(el%nwv, el%numbands, 3))
 
        !  Read response function
        call readfile_response('RTA_J0_', bt%el_response_E, el%bandlist)
@@ -1393,14 +1393,14 @@ contains
        call print_message(" Calculating RTA phonon kappa...")
 
        !  Allocate response function
-       allocate(bt%ph_response_T(ph%nq, ph%numbranches, 3))
+       allocate(bt%ph_response_T(ph%nwv, ph%numbands, 3))
 
        !  Read response function
        call readfile_response('RTA_F0_', bt%ph_response_T)
 
        !  Allocate spectral transport coefficients
-       allocate(ph_kappa(ph%numbranches, 3, 3, num%ph_en_num), &
-            dummy(ph%numbranches, 3, 3, num%ph_en_num))
+       allocate(ph_kappa(ph%numbands, 3, 3, num%ph_en_num), &
+            dummy(ph%numbands, 3, 3, num%ph_en_num))
 
        !  Calculate spectral function
        call calculate_spectral_transport_coeff(ph, 'T', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
@@ -1439,7 +1439,7 @@ contains
        call print_message(" Calculating iterated electron kappa0 and sigmaS...")
 
        !  Allocate response function
-       allocate(bt%el_response_T(el%nk, el%numbands, 3))
+       allocate(bt%el_response_T(el%nwv, el%numbands, 3))
 
        !  Read response function
        call readfile_response('partdcpl_I0_', bt%el_response_T, el%bandlist)
@@ -1470,7 +1470,7 @@ contains
        call print_message(" Calculating iterated electron sigma and alpha/T...")
 
        !  Allocate response function
-       allocate(bt%el_response_E(el%nk, el%numbands, 3))
+       allocate(bt%el_response_E(el%nwv, el%numbands, 3))
 
        !  Read response function
        call readfile_response('partdcpl_J0_', bt%el_response_E, el%bandlist)
@@ -1506,7 +1506,7 @@ contains
        call print_message(" Calculating iterated electron kappa0 and sigmaS...")
 
        !  Allocate response function
-       allocate(bt%el_response_T(el%nk, el%numbands, 3))
+       allocate(bt%el_response_T(el%nwv, el%numbands, 3))
 
        !  Read response function
        call readfile_response('drag_I0_', bt%el_response_T, el%bandlist)
@@ -1537,7 +1537,7 @@ contains
        call print_message(" Calculating iterated electron sigma and alpha/T...")
 
        !  Allocate response function
-       allocate(bt%el_response_E(el%nk, el%numbands, 3))
+       allocate(bt%el_response_E(el%nwv, el%numbands, 3))
 
        !  Read response function
        call readfile_response('drag_J0_', bt%el_response_E, el%bandlist)
@@ -1573,14 +1573,14 @@ contains
        call print_message(" Calculating iterated phonon kappa...")
 
        !  Allocate response function
-       allocate(bt%ph_response_T(ph%nq, ph%numbranches, 3))
+       allocate(bt%ph_response_T(ph%nwv, ph%numbands, 3))
 
        !  Read response function
        call readfile_response('drag_F0_', bt%ph_response_T)
 
        !  Allocate spectral transport coefficients
-       allocate(ph_kappa(ph%numbranches, 3, 3, num%ph_en_num), &
-            dummy(ph%numbranches, 3, 3, num%ph_en_num))
+       allocate(ph_kappa(ph%numbands, 3, 3, num%ph_en_num), &
+            dummy(ph%numbands, 3, 3, num%ph_en_num))
 
        !  Calculate spectral function
        call calculate_spectral_transport_coeff(ph, 'T', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
@@ -1599,13 +1599,13 @@ contains
        call print_message(" Calculating iterated phonon alpha/T...")
 
        !  Allocate response function
-       allocate(bt%ph_response_E(ph%nq, ph%numbranches, 3))
+       allocate(bt%ph_response_E(ph%nwv, ph%numbands, 3))
 
        !  Read response function
        call readfile_response('drag_G0_', bt%ph_response_E)
 
        !  Allocate spectral transport coefficients
-       allocate(ph_alphabyT(ph%numbranches, 3, 3, num%ph_en_num))
+       allocate(ph_alphabyT(ph%numbands, 3, 3, num%ph_en_num))
 
        !  Calculate spectral function
        call calculate_spectral_transport_coeff(ph, 'E', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &

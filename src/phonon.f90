@@ -18,6 +18,7 @@ module phonon_module
   !! Module containing type and procedures related to the phononic properties.
 
   use params, only: dp, k8, bohr2nm, pi, twopi, Ryd2eV, oneI
+  use particle_module, only: particle
   use misc, only: print_message, subtitle, expi, distribute_points, &
        write2file_rank2_real, exit_with_message
   use numerics_module, only: numerics
@@ -32,60 +33,11 @@ module phonon_module
   private
   public phonon, phonon_espresso
   
-  type phonon
+  type, extends(particle) :: phonon
      !! Data and procedures related to phonons.
      
      character(len = 2) :: prefix = 'ph'
      !! Prefix idenitfying particle type.
-     integer(k8) :: numbranches
-     !! Total number of phonon branches.
-     integer(k8) :: nq
-     !! Number of phonon wave vectors in the full Brillouin zone (FBZ).
-     integer(k8) :: nq_irred
-     !! Number of phonon wave vectors in the irreducible wedge of Brillouin zone (IBZ).
-     integer(k8) :: qmesh(3) 
-     !! Phonon wave vector mesh.
-     real(dp), allocatable :: wavevecs(:,:)
-     !! List of all phonon wave vectors (crystal coordinates).
-     real(dp), allocatable :: wavevecs_irred(:,:)
-     !! List of irreducible phonon wave vectors (crystal coordinates).
-     integer(k8), allocatable :: indexlist_irred(:)
-     !! List of muxed indices of the IBZ wedge.
-     integer(k8), allocatable :: nequiv(:)
-     !! List of the number of equivalent points for each IBZ point.
-     integer(k8), allocatable :: ibz2fbz_map(:,:,:)
-     !! Map from an IBZ phonon point to its images.
-     !! The third axis contains the pair (symmetry index, image).
-     integer(k8), allocatable :: equiv_map(:,:)
-     !! Map of equivalent points under rotations.
-     !! Axis 1 runs over rotations.
-     !! Axis 2 runs over wave vectors (full Brillouin zone).
-     real(dp), allocatable :: symmetrizers(:,:,:)
-     !! Symmetrizers of wave vector dependent vectors.
-     integer(k8), allocatable :: tetra(:,:)
-     !! List of all the wave vector mesh tetrahedra vertices.
-     !! First axis lists tetraheda and the second axis lists the vertices.
-     integer(k8), allocatable :: tetracount(:)
-     !! The number of tetrahedra in which a wave vector belongs.
-     integer(k8), allocatable :: tetramap(:,:,:)
-     !! Mapping from a wave vector to the (tetrahedron, vertex) where it belongs.
-     real(dp), allocatable :: tetra_evals(:,:,:)
-     !! Tetrahedra vertices filled with eigenvalues.
-     integer(k8), allocatable :: triang(:,:)
-     !! List of all the wave vector mesh triangles vertices.
-     !! First axis lists triangles and the second axis lists the vertices.
-     integer(k8), allocatable :: triangcount(:)
-     !! The number of triangles in which a wave vector belongs.
-     integer(k8), allocatable :: triangmap(:,:,:)
-     !! Mapping from a wave vector to the (triangle, vertex) where it belongs.
-     real(dp), allocatable :: triang_evals(:,:,:)
-     !! Triangles vertices filled with eigenvalues.
-     real(dp), allocatable :: ens(:,:)
-     !! List of phonon energies on FBZ.
-     real(dp), allocatable :: vels(:,:,:)
-     !! List of phonon velocities on FBZ.
-     complex(dp), allocatable :: evecs(:,:,:)
-     !! List of all phonon eigenvectors on FBZ.
      integer(k8) :: scell(3)
      !! q-mesh used in DFPT or, equivalently, supercell used in finite displencement
      !! method for calculating the 2nd order force constants.
@@ -99,10 +51,8 @@ module phonon_module
      !! Position of the 2nd and 3rd atoms in supercell for an ifc3 triplet.
      integer(k8), allocatable :: Index_i(:), Index_j(:), Index_k(:)
      !! Label of primitive cell atoms in the ifc3 triplet.
-     real(dp), allocatable :: dos(:,:)
-     !! Branch resolved density of states.
 
-     !Data read from ifc2 file. This will be used in the phonon calculation.
+     !Data read from ifc2 file. These will be used in the phonon calculation.
      real(dp) :: rws(124, 0:3), cell_r(1:3, 0:3), cell_g(1:3, 0:3)
      real(dp), allocatable :: mm(:,:), rr(:,:,:)
       
@@ -127,11 +77,11 @@ contains
     call subtitle("Setting up phonons...")
 
     !Set phonon branches
-    self%numbranches = crys%numatoms*3
+    self%numbands = crys%numatoms*3
     !Set wave vector mesh
-    self%qmesh = num%qmesh
+    self%wvmesh = num%qmesh
     !Set number of phonon wave vectors
-    self%nq = product(self%qmesh(:))
+    self%nwv = product(self%wvmesh(:))
 
     !Read ifc2 and related quantities
     call read_ifc2(self, crys)
@@ -181,15 +131,15 @@ contains
     allocate(start[*], end[*])
 
     !Divide wave vectors among images
-    call distribute_points(self%nq, chunk, start, end, num_active_images)
+    call distribute_points(self%nwv, chunk, start, end, num_active_images)
 
     !Allocate small work variable chunk for each image
-    allocate(ens_chunk(chunk, self%numbranches)[*])
-    allocate(vels_chunk(chunk, self%numbranches, 3)[*])
-    allocate(evecs_chunk(chunk, self%numbranches, self%numbranches)[*])
+    allocate(ens_chunk(chunk, self%numbands)[*])
+    allocate(vels_chunk(chunk, self%numbands, 3)[*])
+    allocate(evecs_chunk(chunk, self%numbands, self%numbands)[*])
 
     !Calculate FBZ mesh
-    call calculate_wavevectors_full(self%qmesh, self%wavevecs, blocks)
+    call calculate_wavevectors_full(self%wvmesh, self%wavevecs, blocks)
 
     !Print phonon FBZ mesh
     call write2file_rank2_real("ph.wavevecs_fbz", self%wavevecs)
@@ -199,9 +149,9 @@ contains
          ens_chunk, evecs_chunk, vels_chunk)
 
     !Gather the chunks from the images
-    allocate(self%ens(self%nq, self%numbranches))
-    allocate(self%vels(self%nq, self%numbranches, 3))
-    allocate(self%evecs(self%nq, self%numbranches, self%numbranches))
+    allocate(self%ens(self%nwv, self%numbands))
+    allocate(self%vels(self%nwv, self%numbands, 3))
+    allocate(self%evecs(self%nwv, self%numbands, self%numbands))
     sync all
     do im = 1, num_active_images
        self%ens(start[im]:end[im], :) = ens_chunk(:,:)[im]
@@ -213,7 +163,7 @@ contains
     
     !Calculate IBZ mesh
     call print_message("Calculating IBZ and IBZ -> FBZ mappings...")
-    call find_irred_wedge(self%qmesh, self%nq_irred, self%wavevecs_irred, &
+    call find_irred_wedge(self%wvmesh, self%nwv_irred, self%wavevecs_irred, &
          self%indexlist_irred, self%nequiv, sym%nsymm_rot, sym%qrotations, &
          self%ibz2fbz_map, self%equiv_map, blocks)
 
@@ -239,7 +189,7 @@ contains
        end if
     end do
     
-    allocate(self%symmetrizers(3, 3, self%nq))
+    allocate(self%symmetrizers(3, 3, self%nwv))
     sync all
     do im = 1, num_active_images
        self%symmetrizers(:, :, start[im]:end[im]) = symmetrizers_chunk(:,:,:)[im]
@@ -248,7 +198,7 @@ contains
     deallocate(symmetrizers_chunk)
     
     !Symmetrize phonon energies and velocities.
-    do i = 1, self%nq_irred !an irreducible point
+    do i = 1, self%nwv_irred !an irreducible point
        ii = self%indexlist_irred(i)
        self%vels(ii,:,:)=transpose(&
             matmul(self%symmetrizers(:,:,ii),transpose(self%vels(ii,:,:))))
@@ -260,7 +210,7 @@ contains
           self%ens(il,:) = self%ens(ii,:)
 
           !velocity
-          do ib = 1, self%numbranches
+          do ib = 1, self%numbands
              !here use real space (Cartesian) rotations
              self%vels(il, ib, :) = matmul(sym%crotations(:, :, s), self%vels(ii, ib, :))
           end do
@@ -269,17 +219,17 @@ contains
     
     !Print out irreducible phonon energies and velocities
     if(this_image() == 1) then
-       write(numcols, "(I0)") self%numbranches
+       write(numcols, "(I0)") self%numbands
        open(1, file = "ph.ens_ibz", status = "replace")
-       do iq = 1, self%nq_irred
+       do iq = 1, self%nwv_irred
           write(1, "(" // trim(adjustl(numcols)) // "E20.10)") &
                self%ens(self%indexlist_irred(iq), :)
        end do
        close(1)
 
-       write(numcols, "(I0)") 3*self%numbranches
+       write(numcols, "(I0)") 3*self%numbands
        open(1, file = "ph.vels_ibz", status = "replace")
-       do iq = 1, self%nq_irred
+       do iq = 1, self%nwv_irred
           write(1, "(" // trim(adjustl(numcols)) // "E20.10)") &
                self%vels(self%indexlist_irred(iq), :, :)
        end do
@@ -289,12 +239,12 @@ contains
     !Calculate phonon tetrahedra
     if(num%tetrahedra) then
        call print_message("Calculating phonon mesh tetrahedra...")
-       call form_tetrahedra_3d(self%nq, self%qmesh, self%tetra, self%tetracount, &
+       call form_tetrahedra_3d(self%nwv, self%wvmesh, self%tetra, self%tetracount, &
             self%tetramap, .false.)
        call fill_tetrahedra_3d(self%tetra, self%ens, self%tetra_evals)
     else
        call print_message("Calculating phonon mesh triangles...")
-       call form_triangles(self%nq, self%qmesh, self%triang, self%triangcount, &
+       call form_triangles(self%nwv, self%wvmesh, self%triang, self%triangcount, &
             self%triangmap, .false.)
        call fill_triangles(self%triang, self%ens, self%triang_evals)
     end if
@@ -537,7 +487,7 @@ contains
                          if(save_nR) then
                             nR = nR_
                             allocate(R2(3, nR), R3(3, nR), &
-                                 fc(self%numbranches, self%numbranches, self%numbranches, nR))
+                                 fc(self%numbands, self%numbands, self%numbands, nR))
                             save_nR = .false.
                          end if
 
@@ -619,9 +569,9 @@ contains
     type(crystal), intent(in) :: crys
     integer(k8), intent(in) :: nk
     real(dp), intent(in) :: kpoints(nk, 3)
-    real(dp), intent(out) :: omegas(nk, ph%numbranches)
-    real(dp), optional, intent(out) :: velocities(nk, ph%numbranches, 3)
-    complex(kind=8), optional, intent(out) :: eigenvect(nk, ph%numbranches, ph%numbranches)
+    real(dp), intent(out) :: omegas(nk, ph%numbands)
+    real(dp), optional, intent(out) :: velocities(nk, ph%numbands, 3)
+    complex(kind=8), optional, intent(out) :: eigenvect(nk, ph%numbands, ph%numbands)
 
     ! QE's 2nd-order files are in Ryd units.
     real(kind=8),parameter :: toTHz=20670.687,&
