@@ -158,15 +158,17 @@ module electron_module
      
    contains
 
-     procedure :: initialize=>read_input_and_setup, deallocate_eigenvecs
+     procedure, public :: initialize=>read_input_and_setup, deallocate_eigenvecs
+     procedure, private :: calculate_electrons, calculate_carrier_conc, &
+          calculate_chempot
   end type electron
 
 contains
 
-  subroutine read_input_and_setup(el, wann, crys, sym, num)
+  subroutine read_input_and_setup(self, wann, crys, sym, num)
     !! Read input file and setup groundstate electronic system.
 
-    class(electron), intent(out) :: el
+    class(electron), intent(out) :: self
     type(epw_wannier), intent(in) :: wann
     type(crystal), intent(in) :: crys
     type(symmetry), intent(in) :: sym
@@ -244,74 +246,74 @@ contains
        end if
     end if
     
-    el%spindeg = spindeg
-    el%numbands = numbands
-    el%indlowband = indlowband
-    el%indhighband = indhighband
-    el%numtransbands = el%indhighband - el%indlowband + 1
-    allocate(el%bandlist(el%numtransbands))
-    do ib = 1, el%numtransbands
-       el%bandlist(ib) = indlowband + ib - 1
+    self%spindeg = spindeg
+    self%numbands = numbands
+    self%indlowband = indlowband
+    self%indhighband = indhighband
+    self%numtransbands = self%indhighband - self%indlowband + 1
+    allocate(self%bandlist(self%numtransbands))
+    do ib = 1, self%numtransbands
+       self%bandlist(ib) = indlowband + ib - 1
     end do
-    el%metallic = metallic
-    el%indlowconduction = indlowconduction
-    el%indhighvalence = indhighvalence
-    el%enref = enref
-    el%chempot = chempot
-    el%Zn = Zn
-    el%Zp = Zp
-    if(el%metallic) then
-       el%Zn = 0
-       el%Zp = 0
+    self%metallic = metallic
+    self%indlowconduction = indlowconduction
+    self%indhighvalence = indhighvalence
+    self%enref = enref
+    self%chempot = chempot
+    self%Zn = Zn
+    self%Zp = Zp
+    if(self%metallic) then
+       self%Zn = 0
+       self%Zp = 0
     end if
     if(num%runlevel == 0) then
-       el%numT = numT
-       el%numconc = numconc
-       allocate(el%Tlist(el%numT), el%conclist(el%numconc))
-       el%Tlist(:) = Tlist(1:numT)
-       el%conclist(:) = conclist(1:numconc)
-       el%dopingtype = dopingtype
+       self%numT = numT
+       self%numconc = numconc
+       allocate(self%Tlist(self%numT), self%conclist(self%numconc))
+       self%Tlist(:) = Tlist(1:numT)
+       self%conclist(:) = conclist(1:numconc)
+       self%dopingtype = dopingtype
     end if
     
     !Close input file
     close(1)
 
     !Set some electronic properties from the numerics object
-    el%mesh_ref = num%mesh_ref
-    el%mesh_ref_array = (/num%mesh_ref, num%mesh_ref, num%mesh_ref/)
+    self%mesh_ref = num%mesh_ref
+    self%mesh_ref_array = (/num%mesh_ref, num%mesh_ref, num%mesh_ref/)
     if(crys%twod) then
-       el%kmesh(3) = 1_k8
-       el%mesh_ref_array(3) = 1_k8
+       self%kmesh(3) = 1_k8
+       self%mesh_ref_array(3) = 1_k8
     end if
-    el%kmesh = el%mesh_ref_array*num%qmesh
-    el%fsthick = num%fsthick
+    self%kmesh = self%mesh_ref_array*num%qmesh
+    self%fsthick = num%fsthick
     
     !Print out information.
     if(this_image() == 1) then
-       write(*, "(A, I1)") "Spin degeneracy = ", el%spindeg
-       write(*, "(A, I5)") "Number of Wannier electronic bands = ", el%numbands
-       write(*, "(A, I5)") "Number of transport active electronic bands = ", el%numtransbands
+       write(*, "(A, I1)") "Spin degeneracy = ", self%spindeg
+       write(*, "(A, I5)") "Number of Wannier electronic bands = ", self%numbands
+       write(*, "(A, I5)") "Number of transport active electronic bands = ", self%numtransbands
        write(*, "(A, I5, I5)") "Lowest and highest transport active electronic bands = ", &
-            el%bandlist(1), el%bandlist(el%numtransbands)
-       write(*, "(A, 1E16.8, A)") "Reference electron energy = ", el%enref, ' eV'
-       write(*, "(A, L)") "System is metallic: ", el%metallic
+            self%bandlist(1), self%bandlist(self%numtransbands)
+       write(*, "(A, 1E16.8, A)") "Reference electron energy = ", self%enref, ' eV'
+       write(*, "(A, L)") "System is metallic: ", self%metallic
        if(indlowconduction > 0) then
-          write(*, "(A, I5)") "Lowest conduction band index = ", el%indlowconduction
+          write(*, "(A, I5)") "Lowest conduction band index = ", self%indlowconduction
        end if
        if(indhighvalence > 0) then
-          write(*, "(A, I5)") "Highest valence band index = ", el%indhighvalence
+          write(*, "(A, I5)") "Highest valence band index = ", self%indhighvalence
        end if
     end if
     
     !Calculate electrons
-    call calculate_electrons(el, wann, crys, sym, num)
+    call calculate_electrons(self, wann, crys, sym, num)
     
     !Set total number of charged impurities
-    if(.not. el%metallic) then
-       el%chimp_conc_n = 0.0_dp
-       el%chimp_conc_p = 0.0_dp
-       if(el%Zn > 0) el%chimp_conc_n = el%chimp_conc_n + el%conc_el/el%Zn
-       if(el%Zp > 0) el%chimp_conc_p = el%chimp_conc_p + el%conc_hole/el%Zp
+    if(.not. self%metallic) then
+       self%chimp_conc_n = 0.0_dp
+       self%chimp_conc_p = 0.0_dp
+       if(self%Zn > 0) self%chimp_conc_n = self%chimp_conc_n + self%conc_el/self%Zn
+       if(self%Zp > 0) self%chimp_conc_p = self%chimp_conc_p + self%conc_hole/self%Zp
     end if
 
     !Print out information.
@@ -323,28 +325,32 @@ contains
        else
           concunits = ' cm^-3'
        end if
-       write(*, "(A, 1E16.8, A)") "Chemical potential = ", el%chempot, ' eV'
-       if(.not. el%metallic) then
+       write(*, "(A, 1E16.8, A)") "Chemical potential = ", self%chempot, ' eV'
+       if(.not. self%metallic) then
           write(*, "(A, 1E16.8)") 'Band resolved carrier concentration (+/- = hole/electron):'
-          do ib = el%indlowband, el%indhighband
+          do ib = self%indlowband, self%indhighband
              write(*, "(A, I5, A, 1E16.8, A)") ' Band: ', ib, ', concentration: ', &
-                  el%conc(ib), concunits
+                  self%conc(ib), concunits
           end do
-          write(*, "(A, 1E16.8, A)") "Absolute total electron concentration = ", el%conc_el, concunits
-          write(*, "(A, 1E16.8, A)") "Absolute total hole concentration = ", el%conc_hole, concunits
-          write(*, "(A, 1E16.8)") "Ionization of donor impurity = ", el%Zn
-          write(*, "(A, 1E16.8)") "Ionization of acceptor impurity = ", el%Zp
-          write(*, "(A, 1E16.8, A)") "Donor impurity concentration = ", el%chimp_conc_n, concunits
-          write(*, "(A, 1E16.8, A)") "Acceptor impurity concentration = ", el%chimp_conc_p, concunits
+          write(*, "(A, 1E16.8, A)") "Absolute total electron concentration = ", self%conc_el, &
+               concunits
+          write(*, "(A, 1E16.8, A)") "Absolute total hole concentration = ", self%conc_hole, &
+               concunits
+          write(*, "(A, 1E16.8)") "Ionization of donor impurity = ", self%Zn
+          write(*, "(A, 1E16.8)") "Ionization of acceptor impurity = ", self%Zp
+          write(*, "(A, 1E16.8, A)") "Donor impurity concentration = ", self%chimp_conc_n, &
+               concunits
+          write(*, "(A, 1E16.8, A)") "Acceptor impurity concentration = ", self%chimp_conc_p, &
+               concunits
        end if
     end if
   end subroutine read_input_and_setup
   
-  subroutine calculate_electrons(el, wann, crys, sym, num)
+  subroutine calculate_electrons(self, wann, crys, sym, num)
     !! Calculate electron energy window restricted wave vector meshes
     !! and the electronic properties on them
 
-    class(electron), intent(inout) :: el
+    class(electron), intent(inout) :: self
     type(epw_wannier), intent(in) :: wann
     type(crystal), intent(in) :: crys
     type(symmetry), intent(in) :: sym
@@ -364,67 +370,68 @@ contains
     call print_message("--------------------------------")
     
     !Set initial FBZ total number of wave vectors
-    el%nk = product(el%kmesh)
+    self%nk = product(self%kmesh)
     
     !The electronic mesh setup proceeds in multiple steps:
     ! 1. Calculate full electron wave vector mesh
     call print_message("Calculating FBZ...")
     blocks = .false.
-    call calculate_wavevectors_full(el%kmesh, el%wavevecs, blocks)
+    call calculate_wavevectors_full(self%kmesh, self%wavevecs, blocks)
     
     ! 2. Calculate the IBZ
     call print_message("Calculating IBZ and IBZ -> FBZ mappings...")
-    call find_irred_wedge(el%kmesh, el%nk_irred, el%wavevecs_irred, &
-         el%indexlist_irred, el%nequiv, sym%nsymm_rot, sym%qrotations, &
-         el%ibz2fbz_map, el%equiv_map, blocks)
+    call find_irred_wedge(self%kmesh, self%nk_irred, self%wavevecs_irred, &
+         self%indexlist_irred, self%nequiv, sym%nsymm_rot, sym%qrotations, &
+         self%ibz2fbz_map, self%equiv_map, blocks)
     
     ! 3. Calculate IBZ quantities
     call print_message("Calculating IBZ energies...")
-    allocate(el%ens_irred(el%nk_irred, wann%numwannbands), &
-         el%vels_irred(el%nk_irred, wann%numwannbands, 3), &
-         el%evecs_irred(el%nk_irred, wann%numwannbands, wann%numwannbands))
-    call wann%el_wann_epw(crys, el%nk_irred, el%wavevecs_irred, el%ens_irred, &
-         el%vels_irred, el%evecs_irred)
+    allocate(self%ens_irred(self%nk_irred, wann%numwannbands), &
+         self%vels_irred(self%nk_irred, wann%numwannbands, 3), &
+         self%evecs_irred(self%nk_irred, wann%numwannbands, wann%numwannbands))
+    call wann%el_wann_epw(crys, self%nk_irred, self%wavevecs_irred, self%ens_irred, &
+         self%vels_irred, self%evecs_irred)
     
     ! 4. Map out FBZ quantities from IBZ ones
     call print_message("Mapping out FBZ energies...")
-    allocate(el%indexlist(el%nk), el%ens(el%nk, wann%numwannbands), el%vels(el%nk, wann%numwannbands, 3))
+    allocate(self%indexlist(self%nk), self%ens(self%nk, wann%numwannbands), &
+         self%vels(self%nk, wann%numwannbands, 3))
     
-    do i = 1,el%nk_irred !an irreducible point
-       do l = 1,el%nequiv(i) !number of equivalent points of i
-          il = el%ibz2fbz_map(l, i, 2) ! (i, l) -> il
-          s = el%ibz2fbz_map(l, i, 1) ! mapping rotation
+    do i = 1,self%nk_irred !an irreducible point
+       do l = 1,self%nequiv(i) !number of equivalent points of i
+          il = self%ibz2fbz_map(l, i, 2) ! (i, l) -> il
+          s = self%ibz2fbz_map(l, i, 1) ! mapping rotation
 
           !index list
-          el%indexlist(il) = il
+          self%indexlist(il) = il
 
           !energy
-          el%ens(il,:) = el%ens_irred(i,:)
+          self%ens(il,:) = self%ens_irred(i,:)
           
           !velocity
-          do ib = 1, el%numtransbands !wann%numwannbands
+          do ib = 1, self%numtransbands !wann%numwannbands
              !here use real space (Cartesian) rotations
-             el%vels(il, ib, :) = matmul(sym%crotations(:, :, s), el%vels_irred(i, ib, :))
+             self%vels(il, ib, :) = matmul(sym%crotations(:, :, s), self%vels_irred(i, ib, :))
           end do
        end do
     end do
 
-    if(.not. el%metallic) then
+    if(.not. self%metallic) then
        if(num%runlevel == 0) then !Calculate chemical potentials for
           !the given temperatures and concentrations
           if(crys%twod) then
-             call calculate_chempot(el, crys%volume, el%dopingtype, el%Tlist, el%conclist, &
+             call calculate_chempot(self, crys%volume, self%dopingtype, self%Tlist, self%conclist, &
                   crys%thickness)
           else
-             call calculate_chempot(el, crys%volume, el%dopingtype, el%Tlist, el%conclist)
+             call calculate_chempot(self, crys%volume, self%dopingtype, self%Tlist, self%conclist)
           end if
           call exit_with_message("Chemical potentials calculated. Runlevel 0 finished. Exiting.")
        else !Calculate carrier concentration for non-metals
           call print_message("Calculating carrier concentrations...")
           if(crys%twod) then
-             call calculate_carrier_conc(el, crys%T, crys%volume, crys%thickness)
+             call calculate_carrier_conc(self, crys%T, crys%volume, crys%thickness)
           else
-             call calculate_carrier_conc(el, crys%T, crys%volume)
+             call calculate_carrier_conc(self, crys%T, crys%volume)
           end if
        end if
     end if
@@ -433,138 +440,139 @@ contains
     call print_message("-----------------------------------------------")
     
     ! 5. Find energy window restricted FBZ blocks.
-    !    After this step, el%nk, el%indexlist will refer
+    !    After this step, self%nk, self%indexlist will refer
     !    to the energy restricted mesh.
     call print_message("Calculating Fermi window restricted FBZ blocks...")
-    call apply_energy_window(el%nk, el%indexlist, el%ens, el%enref, el%fsthick)
+    call apply_energy_window(self%nk, self%indexlist, self%ens, self%enref, self%fsthick)
     
     ! 6. Sort index list and related quanties of FBZ blocks
     call print_message("Sorting FBZ blocks index list...")
-    call sort(el%indexlist)
+    call sort(self%indexlist)
 
     ! 7. Get FBZ blocks wave vectors, energies, velocities and eigenvectors.
-    !    After this step, el%wavevecs, el%ens, el%vels, and el%evecs
+    !    After this step, self%wavevecs, self%ens, self%vels, and self%evecs
     !    will refer to the energy restricted mesh.
     call print_message("Calcutating FBZ blocks quantities...")
     
     !wave vectors
-    deallocate(el%wavevecs)
+    deallocate(self%wavevecs)
     
     blocks = .true.
-    call calculate_wavevectors_full(el%kmesh, el%wavevecs, blocks, el%indexlist) !wave vectors
+    call calculate_wavevectors_full(self%kmesh, self%wavevecs, blocks, self%indexlist) !wave vectors
 
     !Print electron FBZ mesh
-    call write2file_rank2_real("el.wavevecs_fbz", el%wavevecs)
+    call write2file_rank2_real("el.wavevecs_fbz", self%wavevecs)
     
     !energies and velocities
-    call fbz_blocks_quantities(el%indexlist, el%ens, el%vels)
+    call fbz_blocks_quantities(self%indexlist, self%ens, self%vels)
 
     !Get FBZ blocks eigenvectors from direct calculations since we are
     !not getting these from IBZ quantities via symmetry rotations
-    allocate(el%evecs(el%nk, wann%numwannbands, wann%numwannbands))
-    allocate(el_ens_tmp(el%nk, wann%numwannbands), el_vels_tmp(el%nk, wann%numwannbands, 3))
-    call wann%el_wann_epw(crys, el%nk, el%wavevecs, el_ens_tmp, el_vels_tmp, el%evecs)
+    allocate(self%evecs(self%nk, wann%numwannbands, wann%numwannbands))
+    allocate(el_ens_tmp(self%nk, wann%numwannbands), el_vels_tmp(self%nk, wann%numwannbands, 3))
+    call wann%el_wann_epw(crys, self%nk, self%wavevecs, el_ens_tmp, el_vels_tmp, self%evecs)
     deallocate(el_ens_tmp, el_vels_tmp) !free up memory
     
     ! 8. Find IBZ of energy window restricted blocks
-    !    After this step, el%nk_irred, el%indexlist_irred, 
-    !    el%wavevecs_irred, el%nequiv, and el%ibz2fbz_map
+    !    After this step, self%nk_irred, self%indexlist_irred, 
+    !    self%wavevecs_irred, self%nequiv, and self%ibz2fbz_map
     !    will refer to the energy restricted mesh 
     call print_message("Calculating IBZ blocks...")
-    deallocate(el%wavevecs_irred, el%indexlist_irred, el%nequiv, &
-         el%ibz2fbz_map, el%equiv_map)
+    deallocate(self%wavevecs_irred, self%indexlist_irred, self%nequiv, &
+         self%ibz2fbz_map, self%equiv_map)
     blocks = .true.
-    call find_irred_wedge(el%kmesh, el%nk_irred, el%wavevecs_irred, &
-         el%indexlist_irred, el%nequiv, sym%nsymm_rot, sym%qrotations, &
-         el%ibz2fbz_map, el%equiv_map, blocks, el%indexlist)
+    call find_irred_wedge(self%kmesh, self%nk_irred, self%wavevecs_irred, &
+         self%indexlist_irred, self%nequiv, sym%nsymm_rot, sym%qrotations, &
+         self%ibz2fbz_map, self%equiv_map, blocks, self%indexlist)
 
     !Print electron IBZ mesh
-    call write2file_rank2_real("el.wavevecs_ibz", el%wavevecs_irred)
+    call write2file_rank2_real("el.wavevecs_ibz", self%wavevecs_irred)
     
     !Create symmetrizers of wave vector dependent vectors ShengBTE style
-    allocate(el%symmetrizers(3, 3, el%nk))
-    el%symmetrizers = 0.0_dp
-    do i = 1, el%nk
-       ii = el%indexlist(i)
+    allocate(self%symmetrizers(3, 3, self%nk))
+    self%symmetrizers = 0.0_dp
+    do i = 1, self%nk
+       ii = self%indexlist(i)
        kk = 0
        do jj = 1, sym%nsymm
-          if(el%equiv_map(jj, i) == ii) then
-             el%symmetrizers(:, :, i) = el%symmetrizers(:, :, i) + &
+          if(self%equiv_map(jj, i) == ii) then
+             self%symmetrizers(:, :, i) = self%symmetrizers(:, :, i) + &
                   sym%crotations_orig(:, :, jj)
              kk = kk + 1
           end if
        end do
        if(kk > 1) then
-          el%symmetrizers(:, :, i) = el%symmetrizers(:, :, i)/kk
+          self%symmetrizers(:, :, i) = self%symmetrizers(:, :, i)/kk
        end if
     end do
     
     ! 9. Get IBZ blocks energies, velocities, and eigen vectors.
     call print_message("Calcutating IBZ blocks quantities...")
-    deallocate(el%ens_irred, el%vels_irred, el%evecs_irred)
-    allocate(el%ens_irred(el%nk_irred, wann%numwannbands), &
-         el%vels_irred(el%nk_irred, wann%numwannbands, 3), &
-         el%evecs_irred(el%nk_irred, wann%numwannbands, wann%numwannbands))
-    call wann%el_wann_epw(crys, el%nk_irred, el%wavevecs_irred, el%ens_irred, &
-         el%vels_irred, el%evecs_irred)
+    deallocate(self%ens_irred, self%vels_irred, self%evecs_irred)
+    allocate(self%ens_irred(self%nk_irred, wann%numwannbands), &
+         self%vels_irred(self%nk_irred, wann%numwannbands, 3), &
+         self%evecs_irred(self%nk_irred, wann%numwannbands, wann%numwannbands))
+    call wann%el_wann_epw(crys, self%nk_irred, self%wavevecs_irred, self%ens_irred, &
+         self%vels_irred, self%evecs_irred)
     
     ! 10. Calculate the number of FBZ blocks electronic states
     !     available for scattering
-    el%nstates_inwindow = 0
-    do i = 1,el%nk !over FBZ blocks
+    self%nstates_inwindow = 0
+    do i = 1,self%nk !over FBZ blocks
        do ib = 1,wann%numwannbands !bands
-          if(abs(el%ens(i, ib) - el%enref) <= el%fsthick) &
-               el%nstates_inwindow = el%nstates_inwindow + 1
+          if(abs(self%ens(i, ib) - self%enref) <= self%fsthick) &
+               self%nstates_inwindow = self%nstates_inwindow + 1
        end do
     end do
     if(this_image() == 1) write(*, "(A, I10)") &
-         " Number of energy restricted FBZ blocks states = ", el%nstates_inwindow
+         " Number of energy restricted FBZ blocks states = ", self%nstates_inwindow
 
     ! 11. Create FBZ blocks to IBZ blocks map
     call print_message("Calculating FBZ -> IBZ mappings...")
     !call create_fbz2ibz_map
-    call create_fbz2ibz_map(el%fbz2ibz_map,el%nk,el%nk_irred,el%indexlist,el%nequiv,el%ibz2fbz_map)
+    call create_fbz2ibz_map(self%fbz2ibz_map,self%nk,self%nk_irred, &
+         self%indexlist,self%nequiv,self%ibz2fbz_map)
     
-    do i = 1, el%nk_irred !IBZ
-       do l = 1, el%nequiv(i) !number of equivalent points of i
-          il = el%ibz2fbz_map(l, i, 2) ! (i, l) -> il
-          s = el%ibz2fbz_map(l, i, 1) ! symmetry
-          call binsearch(el%indexlist, il, aux)
+    do i = 1, self%nk_irred !IBZ
+       do l = 1, self%nequiv(i) !number of equivalent points of i
+          il = self%ibz2fbz_map(l, i, 2) ! (i, l) -> il
+          s = self%ibz2fbz_map(l, i, 1) ! symmetry
+          call binsearch(self%indexlist, il, aux)
 
           !energy
-          el%ens(aux,:) = el%ens_irred(i,:)
+          self%ens(aux,:) = self%ens_irred(i,:)
           
           !velocity
           do ib = 1,wann%numwannbands
              !here use real space (Cartesian) rotations
-             el%vels(aux, ib, :) = matmul(sym%crotations(:, :, s), el%vels_irred(i, ib, :))
+             self%vels(aux, ib, :) = matmul(sym%crotations(:, :, s), self%vels_irred(i, ib, :))
           end do
-          el%vels(aux,:,:) = transpose(&
-               matmul(el%symmetrizers(:,:,aux),transpose(el%vels(aux,:,:))))
+          self%vels(aux,:,:) = transpose(&
+               matmul(self%symmetrizers(:,:,aux),transpose(self%vels(aux,:,:))))
        end do
     end do
         
     ! 12. Calculate the number of IBZ electronic states available for scattering
-    el%nstates_irred_inwindow = 0
-    do istate = 1,el%nk_irred*wann%numwannbands
+    self%nstates_irred_inwindow = 0
+    do istate = 1,self%nk_irred*wann%numwannbands
        !Demux state index into band (ib) and wave vector (i) indices
        call demux_state(istate, wann%numwannbands, ib, i)
-       if(abs(el%ens_irred(i, ib) - el%enref) <= el%fsthick) then 
-          el%nstates_irred_inwindow = el%nstates_irred_inwindow + 1
+       if(abs(self%ens_irred(i, ib) - self%enref) <= self%fsthick) then 
+          self%nstates_irred_inwindow = self%nstates_irred_inwindow + 1
        end if
     end do
     if(this_image() == 1) write(*, "(A, I10)") " Number of energy restricted IBZ blocks states = ", &
-         el%nstates_irred_inwindow
+         self%nstates_irred_inwindow
     
     !Calculate list of IBZ in-window states = (wave vector index, band index)
-    allocate(el%IBZ_inwindow_states(el%nstates_irred_inwindow,2))
+    allocate(self%IBZ_inwindow_states(self%nstates_irred_inwindow,2))
     count = 0
-    do istate = 1, el%nk_irred*wann%numwannbands
+    do istate = 1, self%nk_irred*wann%numwannbands
        !Demux state index into band (ib) and wave vector (i) indices
        call demux_state(istate, wann%numwannbands, ib, i)
-       if(abs(el%ens_irred(i, ib) - el%enref) <= el%fsthick) then
+       if(abs(self%ens_irred(i, ib) - self%enref) <= self%fsthick) then
           count = count + 1
-          el%IBZ_inwindow_states(count,:) = (/i, ib/)
+          self%IBZ_inwindow_states(count,:) = (/i, ib/)
        end if
     end do
 
@@ -575,29 +583,29 @@ contains
        write(numcols,"(I0)") 2
        open(1,file=trim(filename),status='replace')
        write(1,*) "#k-vec index     band index"
-       do i = 1, el%nstates_irred_inwindow
-          write(1,"("//trim(adjustl(numcols))//"I10)") el%IBZ_inwindow_states(i,:)
+       do i = 1, self%nstates_irred_inwindow
+          write(1,"("//trim(adjustl(numcols))//"I10)") self%IBZ_inwindow_states(i,:)
        end do
        close(1)
     end if
     !Deallocating this here since this is not used later in the program
-    deallocate(el%IBZ_inwindow_states)
+    deallocate(self%IBZ_inwindow_states)
 
     !Print out irreducible electron energies and velocities
-    call write2file_rank2_real("el.ens_ibz", el%ens_irred)
-    call write2file_rank3_real("el.vels_ibz", el%vels_irred)
+    call write2file_rank2_real("el.ens_ibz", self%ens_irred)
+    call write2file_rank3_real("el.vels_ibz", self%vels_irred)
     
     !Calculate electron tetrahedra
     if(num%tetrahedra) then
        call print_message("Calculating electron mesh tetrahedra...")
-       call form_tetrahedra_3d(el%nk, el%kmesh, el%tetra, el%tetracount, &
-            el%tetramap, .true., el%indexlist)
-       call fill_tetrahedra_3d(el%tetra, el%ens, el%tetra_evals)
+       call form_tetrahedra_3d(self%nk, self%kmesh, self%tetra, self%tetracount, &
+            self%tetramap, .true., self%indexlist)
+       call fill_tetrahedra_3d(self%tetra, self%ens, self%tetra_evals)
     else
        call print_message("Calculating electron mesh triangles...")
-       call form_triangles(el%nk, el%kmesh, el%triang, el%triangcount, &
-            el%triangmap, .true., el%indexlist)
-       call fill_triangles(el%triang, el%ens, el%triang_evals)
+       call form_triangles(self%nk, self%kmesh, self%triang, self%triangcount, &
+            self%triangmap, .true., self%indexlist)
+       call fill_triangles(self%triang, self%ens, self%triang_evals)
     end if
   end subroutine calculate_electrons
 
@@ -667,11 +675,11 @@ contains
     velocities(1:nk, :, :) = velocities_tmp(1:nk, :, :)
   end subroutine fbz_blocks_quantities
 
-  subroutine calculate_carrier_conc(el, T, vol, h)
+  subroutine calculate_carrier_conc(self, T, vol, h)
     !! Subroutine to calculate the band resolved carrier concentration
     !! for a given chemical potential and temperature.
 
-    class(electron), intent(inout) :: el
+    class(electron), intent(inout) :: self
     real(dp), intent(in) :: T, vol
     real(dp), intent(in), optional :: h
 
@@ -680,53 +688,53 @@ contains
     integer(k8) :: ib, ik
 
     !Allocate conc
-    allocate(el%conc(el%numbands))
-    el%conc = 0.0_dp
+    allocate(self%conc(self%numbands))
+    self%conc = 0.0_dp
 
-    el%conc_el = 0.0_dp
-    el%conc_hole = 0.0_dp
+    self%conc_el = 0.0_dp
+    self%conc_hole = 0.0_dp
     
     !Normalization and units factor
-    const = el%spindeg/dble(product(el%kmesh))/vol/(1.0e-21_dp)
+    const = self%spindeg/dble(product(self%kmesh))/vol/(1.0e-21_dp)
 
-    do ik = 1, el%nk
+    do ik = 1, self%nk
        !Electron concentration
        !By convention, the electron carrier concentration will have a negative sign.
-       if(el%indlowconduction > 0) then !Calculation includes conduction bands
-          do ib = el%indlowconduction, el%indhighband !Conduction bands manifold
-             el%conc(ib) = el%conc(ib) - Fermi(el%ens(ik, ib), el%chempot, T)
+       if(self%indlowconduction > 0) then !Calculation includes conduction bands
+          do ib = self%indlowconduction, self%indhighband !Conduction bands manifold
+             self%conc(ib) = self%conc(ib) - Fermi(self%ens(ik, ib), self%chempot, T)
           end do
           !Total electron concentration
-          el%conc_el = abs(sum(el%conc(el%indlowconduction:el%indhighband)))
+          self%conc_el = abs(sum(self%conc(self%indlowconduction:self%indhighband)))
        end if
 
        !Hole concentration
        !By convention, the hole carrier concentration will have a positive sign.
-       if(el%indhighvalence > 0) then !Calculation includes valence bands
-          do ib = el%indlowband, el%indhighvalence !Valence bands manifold
-             el%conc(ib) = el%conc(ib) + (1.0_dp - Fermi(el%ens(ik, ib), el%chempot, T))
+       if(self%indhighvalence > 0) then !Calculation includes valence bands
+          do ib = self%indlowband, self%indhighvalence !Valence bands manifold
+             self%conc(ib) = self%conc(ib) + (1.0_dp - Fermi(self%ens(ik, ib), self%chempot, T))
           end do
           !Total hole concentration
-          el%conc_hole = sum(el%conc(el%indlowband:el%indhighvalence))
+          self%conc_hole = sum(self%conc(self%indlowband:self%indhighvalence))
        end if
     end do
-    el%conc = el%conc*const !cm^-3
-    el%conc_el = el%conc_el*const !cm^-3
-    el%conc_hole = el%conc_hole*const !cm^-3
+    self%conc = self%conc*const !cm^-3
+    self%conc_el = self%conc_el*const !cm^-3
+    self%conc_hole = self%conc_hole*const !cm^-3
 
     !If h is present that means the system is 2d
     if(present(h)) then
-       el%conc = el%conc*h*1.0e-7_dp !cm^-2
-       el%conc_el = el%conc_el*h*1.0e-7_dp !cm^-2
-       el%conc_hole = el%conc_hole*h*1.0e-7_dp !cm^-2
+       self%conc = self%conc*h*1.0e-7_dp !cm^-2
+       self%conc_el = self%conc_el*h*1.0e-7_dp !cm^-2
+       self%conc_hole = self%conc_hole*h*1.0e-7_dp !cm^-2
     end if    
   end subroutine calculate_carrier_conc
 
-  subroutine calculate_chempot(el, vol, dopingtype, Tlist, conclist, h)
+  subroutine calculate_chempot(self, vol, dopingtype, Tlist, conclist, h)
     !! Subroutine to calculate the chemical potential for a
     !! given carrier concentration.
 
-    class(electron), intent(in) :: el
+    class(electron), intent(in) :: self
     real(dp), intent(in) :: vol, Tlist(:), conclist(:)
     character(len = 1), intent(in) :: dopingtype
     real(dp), intent(in), optional :: h
@@ -750,10 +758,10 @@ contains
     chempot = -99.99_dp
     
     !Total number of points in full mesh
-    ngrid = product(el%kmesh)
+    ngrid = product(self%kmesh)
 
     !Normalization and units factor
-    const = el%spindeg/dble(ngrid)/vol/(1.0e-21_dp)
+    const = self%spindeg/dble(ngrid)/vol/(1.0e-21_dp)
     if(present(h)) then !2d system
        const = const*h*1.0e-7_dp
     end if
@@ -766,11 +774,11 @@ contains
 
     !Check doping type
     if(dopingtype == 'n') then
-       low = el%indlowconduction
-       high = el%indhighband
+       low = self%indlowconduction
+       high = self%indhighband
     else
-       low =  el%indlowband
-       high = el%indhighvalence
+       low =  self%indlowband
+       high = self%indhighvalence
     end if
 
     !Loop over temperatures
@@ -786,21 +794,21 @@ contains
        !Loop over concentrations
        do iconc = 1, numconc
           if(dopingtype == 'n') then
-             a = el%enref - 12.0_dp !guess lower bound
-             b = el%enref + 12.0_dp !guess upper bound
+             a = self%enref - 12.0_dp !guess lower bound
+             b = self%enref + 12.0_dp !guess upper bound
           else
-             a = el%enref + 12.0_dp !guess lower bound
-             b = el%enref - 12.0_dp !guess upper bound
+             a = self%enref + 12.0_dp !guess lower bound
+             b = self%enref - 12.0_dp !guess upper bound
           end if
           do it = 1, maxiter
              mu = 0.5_dp*(a + b)
              aux = 0.0_dp
              do ib = low, high
-                do ik = 1, el%nk
+                do ik = 1, self%nk
                    if(dopingtype == 'n') then
-                      aux = aux + Fermi(el%ens(ik, ib), mu, Tlist(itemp))
+                      aux = aux + Fermi(self%ens(ik, ib), mu, Tlist(itemp))
                    else
-                      aux = aux + 1.0_dp - Fermi(el%ens(ik, ib), mu, Tlist(itemp))
+                      aux = aux + 1.0_dp - Fermi(self%ens(ik, ib), mu, Tlist(itemp))
                    end if
                 end do
              end do
@@ -827,11 +835,11 @@ contains
     end do
   end subroutine calculate_chempot
 
-  subroutine deallocate_eigenvecs(el)
+  subroutine deallocate_eigenvecs(self)
     !! Deallocate the electron eigenvectors
 
-    class(electron), intent(inout) :: el
+    class(electron), intent(inout) :: self
 
-    deallocate(el%evecs, el%evecs_irred)
+    deallocate(self%evecs, self%evecs_irred)
   end subroutine deallocate_eigenvecs
 end module electron_module
