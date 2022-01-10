@@ -24,7 +24,7 @@ module interactions
   use wannier_module, only: epw_wannier
   use crystal_module, only: crystal
   use electron_module, only: electron
-  use phonon_module, only: phonon, phonon_espresso
+  use phonon_module, only: phonon
   use numerics_module, only: numerics
   use delta, only: delta_fn_tetra, delta_fn_triang
 
@@ -163,10 +163,10 @@ contains
     const = pi/4.0_dp*hbar_eVps**5*(qe/amu)**3*1.0d-12
 
     !Total number of IBZ blocks states
-    nstates_irred = ph%nq_irred*ph%numbranches
+    nstates_irred = ph%nwv_irred*ph%numbands
 
     !Maximum total number of 3-phonon processes for a given initial phonon state
-    nprocs = ph%nq*ph%numbranches**2
+    nprocs = ph%nwv*ph%numbands**2
     
     !Allocate |V^-|^2
     if(key == 'V') allocate(Vm2_1(nprocs), Vm2_2(nprocs))
@@ -229,7 +229,7 @@ contains
        minus_count = 0_k8
        
        !Demux state index into branch (s) and wave vector (iq) indices
-       call demux_state(istate1, ph%numbranches, s1, iq1_ibz)
+       call demux_state(istate1, ph%numbands, s1, iq1_ibz)
 
        !Muxed index of wave vector from the IBZ index list.
        !This will be used to access IBZ information from the FBZ quantities.
@@ -242,22 +242,22 @@ contains
        q1 = ph%wavevecs(iq1, :)
 
        !Convert from crystal to 0-based index vector
-       q1_indvec = nint(q1*ph%qmesh)
+       q1_indvec = nint(q1*ph%wvmesh)
        
        !Run over second (FBZ) phonon wave vectors
-       do iq2 = 1, ph%nq
+       do iq2 = 1, ph%nwv
           !Initial (IBZ blocks) wave vector (crystal coords.)
           q2 = ph%wavevecs(iq2, :)
 
           !Convert from crystal to 0-based index vector
-          q2_indvec = nint(q2*ph%qmesh)
+          q2_indvec = nint(q2*ph%wvmesh)
 
           !Folded final phonon wave vector
-          q3_minus_indvec = modulo(q1_indvec - q2_indvec, ph%qmesh) !0-based index vector
-          q3_minus = q3_minus_indvec/dble(ph%qmesh) !crystal coords.
+          q3_minus_indvec = modulo(q1_indvec - q2_indvec, ph%wvmesh) !0-based index vector
+          q3_minus = q3_minus_indvec/dble(ph%wvmesh) !crystal coords.
 
           !Muxed index of q3_minus
-          iq3_minus = mux_vector(q3_minus_indvec, ph%qmesh, 0_k8)
+          iq3_minus = mux_vector(q3_minus_indvec, ph%wvmesh, 0_k8)
           
           if(key == 'V') then
              if(en1 /= 0.0_dp) then
@@ -277,13 +277,13 @@ contains
           end if
           
           !Run over branches of second phonon
-          do s2 = 1, ph%numbranches
+          do s2 = 1, ph%numbands
              !Energy of phonon 2
              en2 = ph%ens(iq2, s2)
 
              !Get index of -q2
-             neg_q2_indvec = modulo(-q2_indvec, ph%qmesh)
-             neg_iq2 = mux_vector(neg_q2_indvec, ph%qmesh, 0_k8)
+             neg_q2_indvec = modulo(-q2_indvec, ph%wvmesh)
+             neg_iq2 = mux_vector(neg_q2_indvec, ph%wvmesh, 0_k8)
 
              if(key == 'W') then
                 !Bose factor for phonon 2
@@ -291,25 +291,25 @@ contains
              end if
              
              !Run over branches of third phonon
-             do s3 = 1, ph%numbranches                
+             do s3 = 1, ph%numbands                
                 !Minus process index
-                index_minus = ((iq2 - 1)*ph%numbranches + (s2 - 1))*ph%numbranches + s3
+                index_minus = ((iq2 - 1)*ph%numbands + (s2 - 1))*ph%numbands + s3
 
                 !Energy of phonon 3
                 en3 = ph%ens(iq3_minus, s3)
 
                 !Evaluate delta functions
                 if(num%tetrahedra) then
-                   delta_minus = delta_fn_tetra(en1 - en3, iq2, s2, ph%qmesh, ph%tetramap, &
+                   delta_minus = delta_fn_tetra(en1 - en3, iq2, s2, ph%wvmesh, ph%tetramap, &
                         ph%tetracount, ph%tetra_evals) !minus process
 
-                   delta_plus = delta_fn_tetra(en3 - en1, neg_iq2, s2, ph%qmesh, ph%tetramap, &
+                   delta_plus = delta_fn_tetra(en3 - en1, neg_iq2, s2, ph%wvmesh, ph%tetramap, &
                         ph%tetracount, ph%tetra_evals) !plus process
                 else
-                   delta_minus = delta_fn_triang(en1 - en3, iq2, s2, ph%qmesh, ph%triangmap, &
+                   delta_minus = delta_fn_triang(en1 - en3, iq2, s2, ph%wvmesh, ph%triangmap, &
                         ph%triangcount, ph%triang_evals) !minus process
 
-                   delta_plus = delta_fn_triang(en3 - en1, neg_iq2, s2, ph%qmesh, ph%triangmap, &
+                   delta_plus = delta_fn_triang(en3 - en1, neg_iq2, s2, ph%wvmesh, ph%triangmap, &
                         ph%triangcount, ph%triang_evals) !plus process
                 end if
                 
@@ -327,7 +327,7 @@ contains
                       Vm2_1(minus_count) = Vm2_3ph(ph%evecs(iq1, s1, :), &
                            conjg(ph%evecs(iq2, s2, :)), conjg(ph%evecs(iq3_minus, s3, :)), &
                            ph%Index_i(:), ph%Index_j(:), ph%Index_k(:), ph%ifc3(:,:,:,:), &
-                           phases_q2q3, ph%numtriplets, ph%numbranches)
+                           phases_q2q3, ph%numtriplets, ph%numbands)
                    end if
 
                    if(delta_plus > 0.0_dp) then
@@ -338,7 +338,7 @@ contains
                       Vm2_2(plus_count) = Vm2_3ph(ph%evecs(iq1, s1, :), &
                            conjg(ph%evecs(iq2, s2, :)), conjg(ph%evecs(iq3_minus, s3, :)), &
                            ph%Index_i(:), ph%Index_j(:), ph%Index_k(:), ph%ifc3(:,:,:,:), &
-                           phases_q2q3, ph%numtriplets, ph%numbranches)
+                           phases_q2q3, ph%numtriplets, ph%numbands)
                    end if
                 end if
 
@@ -362,15 +362,15 @@ contains
                       !Save W-
                       !Wm(minus_count) = Vm2(index_minus)*occup_fac*delta_minus/en1/en2/en3
                       Wm(minus_count) = Vm2_1(minus_count)*occup_fac*delta_minus/en1/en2/en3
-                      istate2_minus(minus_count) = mux_state(ph%numbranches, s2, iq2)
-                      istate3_minus(minus_count) = mux_state(ph%numbranches, s3, iq3_minus)
+                      istate2_minus(minus_count) = mux_state(ph%numbands, s2, iq2)
+                      istate3_minus(minus_count) = mux_state(ph%numbands, s3, iq3_minus)
                    end if
                  
                    !Calculate W+:
 
                    !Grab index of corresponding plus process using
                    !V-(s1q1|s2q2,s3q3) = V+(s1q1|s2-q2,s3q3)
-                   index_plus = ((neg_iq2 - 1)*ph%numbranches + (s2 - 1))*ph%numbranches + s3
+                   index_plus = ((neg_iq2 - 1)*ph%numbands + (s2 - 1))*ph%numbands + s3
 
                    !Temperature dependent occupation factor
                    !(bose1 + 1)*(bose2 + 1)*bose3/(bose1*(bose1 + 1))
@@ -383,8 +383,8 @@ contains
 
                       !Save W+
                       Wp(plus_count) = Vm2_2(plus_count)*occup_fac*delta_plus/en1/en2/en3
-                      istate2_plus(plus_count) = mux_state(ph%numbranches, s2, neg_iq2)
-                      istate3_plus(plus_count) = mux_state(ph%numbranches, s3, iq3_minus)
+                      istate2_plus(plus_count) = mux_state(ph%numbands, s2, neg_iq2)
+                      istate3_plus(plus_count) = mux_state(ph%numbands, s3, iq3_minus)
                    end if
                 end if
              end do !s3
@@ -455,10 +455,10 @@ contains
 
     call print_message("Calculating g(Re,Rp) -> g(Re,q) for all IBZ q...")
 
-    call distribute_points(ph%nq_irred, chunk, iqstart, iqend, num_active_images)
+    call distribute_points(ph%nwv_irred, chunk, iqstart, iqend, num_active_images)
 
     if(this_image() == 1) then
-       print*, "   #q = ", ph%nq_irred
+       print*, "   #q = ", ph%nwv_irred
        print*, "   #q/image = ", chunk
     end if
 
@@ -481,10 +481,10 @@ contains
 
     call print_message("Calculating g(Re,Rp) -> g(k,Rp) for all IBZ k...")
 
-    call distribute_points(el%nk_irred, chunk, ikstart, ikend, num_active_images)
+    call distribute_points(el%nwv_irred, chunk, ikstart, ikend, num_active_images)
 
     if(this_image() == 1) then
-       write(*, "(A, I10)") " #k = ", el%nk_irred
+       write(*, "(A, I10)") " #k = ", el%nwv_irred
        write(*, "(A, I10)") " #k/image = ", chunk
     end if
 
@@ -541,7 +541,7 @@ contains
     !Allocate and initialize g2_istate
     if(key == 'g') then
        !Maximum length of g2_istate
-       nprocs = el%nstates_inwindow*ph%numbranches
+       nprocs = el%nstates_inwindow*ph%numbands
        allocate(g2_istate(nprocs))
        g2_istate(:) = 0.0_dp
     end if
@@ -550,7 +550,7 @@ contains
     const = twopi/hbar_eVps
     
     !Total number of IBZ blocks states
-    nstates_irred = ph%nq_irred*ph%numbranches
+    nstates_irred = ph%nwv_irred*ph%numbands
 
     call distribute_points(nstates_irred, chunk, start, end, num_active_images)
     
@@ -561,7 +561,7 @@ contains
 
     do istate = start, end !over IBZ blocks states
        !Demux state index into branch (s) and wave vector (iq) indices
-       call demux_state(istate, ph%numbranches, s, iq)
+       call demux_state(istate, ph%numbands, s, iq)
 
        if(key == 'g') then
           !Load gReq(iq) here for use inside the loops below
@@ -593,7 +593,7 @@ contains
        q = ph%wavevecs(iq_fbz, :)
 
        !Convert from crystal to 0-based index vector
-       q_indvec = nint(q*ph%qmesh)
+       q_indvec = nint(q*ph%wvmesh)
 
        !Load g2_istate from disk for scattering rates calculation
        if(key == 'Y') then
@@ -625,18 +625,18 @@ contains
        count = 0
        
        !Run over initial (in-window, FBZ blocks) electron wave vectors
-       do ik = 1, el%nk
+       do ik = 1, el%nwv
           !Initial wave vector (crystal coords.)
           k = el%wavevecs(ik, :)
 
           !Convert from crystal to 0-based index vector
-          k_indvec = nint(k*el%kmesh)
+          k_indvec = nint(k*el%wvmesh)
           
           !Find final electron wave vector
-          kp_indvec = modulo(k_indvec + el%mesh_ref_array*q_indvec, el%kmesh) !0-based index vector
+          kp_indvec = modulo(k_indvec + el%mesh_ref_array*q_indvec, el%wvmesh) !0-based index vector
 
           !Muxed index of kp
-          ikp = mux_vector(kp_indvec, el%kmesh, 0_k8)
+          ikp = mux_vector(kp_indvec, el%wvmesh, 0_k8)
 
           !Check if final electron wave vector is within energy window
           call binsearch(el%indexlist, ikp, ikp_window)
@@ -679,10 +679,10 @@ contains
 
                    !Evaluate delta function
                    if(num%tetrahedra) then
-                      delta = delta_fn_tetra(en_elp - en_ph, ik, m, el%kmesh, el%tetramap, &
+                      delta = delta_fn_tetra(en_elp - en_ph, ik, m, el%wvmesh, el%tetramap, &
                            el%tetracount, el%tetra_evals)
                    else
-                      delta = delta_fn_triang(en_elp - en_ph, ik, m, el%kmesh, el%triangmap, &
+                      delta = delta_fn_triang(en_elp - en_ph, ik, m, el%wvmesh, el%triangmap, &
                            el%triangcount, el%triang_evals)
                    end if
 
@@ -778,12 +778,12 @@ contains
     integer(k8) :: nstates_irred, istate, m, ik, n, ikp, s, &
          iq, start, end, chunk, k_indvec(3), kp_indvec(3), &
          q_indvec(3), count, nprocs, num_active_images
-    real(dp) :: k(3), kp(3), q(3), ph_ens_iq(1, ph%numbranches), qlist(1, 3), &
+    real(dp) :: k(3), kp(3), q(3), ph_ens_iq(1, ph%numbands), qlist(1, 3), &
          const, bosefac, fermi_minus_fac, fermi_plus_fac, en_ph, en_el, delta, occup_fac
     real(dp), allocatable :: g2_istate(:), Xplus_istate(:), Xminus_istate(:)
     integer(k8), allocatable :: istate_el(:), istate_ph(:)
     complex(dp) :: gkRp_ik(wann%numwannbands,wann%numwannbands,wann%numbranches,wann%nwsq), &
-         ph_evecs_iq(1, ph%numbranches,ph%numbranches)
+         ph_evecs_iq(1, ph%numbands,ph%numbands)
     character(len = 1024) :: filename
     logical :: needfinephon
 
@@ -810,7 +810,7 @@ contains
     const = twopi/hbar_eVps
 
     !Total number of IBZ blocks states
-    nstates_irred = el%nk_irred*wann%numwannbands
+    nstates_irred = el%nwv_irred*wann%numwannbands
     
     call distribute_points(nstates_irred, chunk, start, end, num_active_images)
     
@@ -847,7 +847,7 @@ contains
        k = el%wavevecs_irred(ik, :)
 
        !Convert from crystal to 0-based index vector
-       k_indvec = nint(k*el%kmesh)
+       k_indvec = nint(k*el%wvmesh)
 
        !Load g2_istate from disk for scattering rates calculation
        if(key == 'X') then
@@ -881,12 +881,12 @@ contains
        count = 0
        
        !Run over final (FBZ blocks) electron wave vectors
-       do ikp = 1, el%nk
+       do ikp = 1, el%nwv
           !Final wave vector (crystal coords.)
           kp = el%wavevecs(ikp, :)
 
           !Convert from crystal to 0-based index vector
-          kp_indvec = nint(kp*el%kmesh)
+          kp_indvec = nint(kp*el%wvmesh)
 
           !Find interacting phonon wave vector
           !Note that q, k, and k' are all on the same mesh
@@ -894,22 +894,19 @@ contains
           needfinephon = .false.
           if(any(mod(q_indvec(:), el%mesh_ref_array) /= 0_k8)) then
              needfinephon = .true.
-             q_indvec = modulo(q_indvec, el%kmesh) !0-based index vector
-             q = q_indvec/dble(el%kmesh) !crystal coords.
+             q_indvec = modulo(q_indvec, el%wvmesh) !0-based index vector
+             q = q_indvec/dble(el%wvmesh) !crystal coords.
              !Muxed index of q
-             iq = mux_vector(q_indvec, el%kmesh, 0_k8)
+             iq = mux_vector(q_indvec, el%wvmesh, 0_k8)
 
              !Calculate the fine mesh phonon.
              qlist(1, :) = q
-             !This could be very slow:
-             !call phonon_espresso(ph, crys, 1_k8, qlist, ph_ens_iq, ph_evecs_iq)
-             !This is much faster:
              call wann%ph_wann_epw(crys, 1_k8, qlist, ph_ens_iq, ph_evecs_iq)
           else !Original (coarser) mesh phonon
-             q_indvec = modulo(q_indvec/el%mesh_ref_array, ph%qmesh) !0-based index vector
-             q = q_indvec/dble(ph%qmesh) !crystal coords.
+             q_indvec = modulo(q_indvec/el%mesh_ref_array, ph%wvmesh) !0-based index vector
+             q = q_indvec/dble(ph%wvmesh) !crystal coords.
              !Muxed index of q
-             iq = mux_vector(q_indvec, ph%qmesh, 0_k8)
+             iq = mux_vector(q_indvec, ph%wvmesh, 0_k8)
           end if
           
           !Run over final electron bands
@@ -956,10 +953,10 @@ contains
 
                    !Evaulate delta function
                    if(num%tetrahedra) then
-                      delta = delta_fn_tetra(en_el + en_ph, ikp, n, el%kmesh, el%tetramap, &
+                      delta = delta_fn_tetra(en_el + en_ph, ikp, n, el%wvmesh, el%tetramap, &
                            el%tetracount, el%tetra_evals)
                    else
-                      delta = delta_fn_triang(en_el + en_ph, ikp, n, el%kmesh, el%triangmap, &
+                      delta = delta_fn_triang(en_el + en_ph, ikp, n, el%wvmesh, el%triangmap, &
                            el%triangcount, el%triang_evals)
                    end if
 
@@ -975,10 +972,10 @@ contains
 
                    !Evaulate delta function
                    if(num%tetrahedra) then
-                      delta = delta_fn_tetra(en_el - en_ph, ikp, n, el%kmesh, el%tetramap, &
+                      delta = delta_fn_tetra(en_el - en_ph, ikp, n, el%wvmesh, el%tetramap, &
                            el%tetracount, el%tetra_evals)
                    else
-                      delta = delta_fn_triang(en_el - en_ph, ikp, n, el%kmesh, el%triangmap, &
+                      delta = delta_fn_triang(en_el - en_ph, ikp, n, el%wvmesh, el%triangmap, &
                            el%triangcount, el%triang_evals)
                    end if
 
@@ -995,9 +992,9 @@ contains
                    if(needfinephon) then
                       !Write fine phonon index as negative so that the iterator
                       !knows to interpolate phonon quantities at this wave vector.
-                      istate_ph(count) = -mux_state(ph%numbranches, s, iq)
+                      istate_ph(count) = -mux_state(ph%numbands, s, iq)
                    else
-                      istate_ph(count) = mux_state(ph%numbranches, s, iq)
+                      istate_ph(count) = mux_state(ph%numbands, s, iq)
                    end if
                 end if
              end do !s
@@ -1099,7 +1096,7 @@ contains
     istate_el(:) = 0_k8
     
     !Total number of IBZ blocks states
-    nstates_irred = el%nk_irred*el%numbands
+    nstates_irred = el%nwv_irred*el%numbands
     
     call distribute_points(nstates_irred, chunk, start, end, num_active_images)
     
@@ -1122,25 +1119,25 @@ contains
        k = el%wavevecs_irred(ik, :)
 
        !Convert from crystal to 0-based index vector
-       k_indvec = nint(k*el%kmesh)
+       k_indvec = nint(k*el%wvmesh)
 
        !Initialize eligible process counter for this state
        count = 0
        
        !Run over final (FBZ blocks) electron wave vectors
-       do ikp = 1, el%nk
+       do ikp = 1, el%nwv
           !Final wave vector (crystal coords.)
           kp = el%wavevecs(ikp, :)
 
           !Convert from crystal to 0-based index vector
-          kp_indvec = nint(kp*el%kmesh)
+          kp_indvec = nint(kp*el%wvmesh)
 
           !Find interacting phonon wave vector
           !Note that q, k, and k' are all on the same mesh
           q_indvec = kp_indvec - k_indvec !0-based index vector
 
           !Calculate length of the wave vector
-          q_mag = qdist(q_indvec/dble(el%kmesh), crys%reclattvecs)
+          q_mag = qdist(q_indvec/dble(el%wvmesh), crys%reclattvecs)
 
           !Calculate matrix element
           g2 = gchimp2(el, crys, q_mag)
@@ -1155,10 +1152,10 @@ contains
              
              !Evaulate delta function
              if(num%tetrahedra) then
-                delta = delta_fn_tetra(en_el, ikp, n, el%kmesh, el%tetramap, &
+                delta = delta_fn_tetra(en_el, ikp, n, el%wvmesh, el%tetramap, &
                      el%tetracount, el%tetra_evals)
              else
-                delta = delta_fn_triang(en_el, ikp, n, el%kmesh, el%triangmap, &
+                delta = delta_fn_triang(en_el, ikp, n, el%wvmesh, el%triangmap, &
                      el%triangcount, el%triang_evals)
              end if
 
@@ -1217,7 +1214,7 @@ contains
     write(tag, "(E9.3)") crys%T
     
     !Total number of IBZ blocks states
-    nstates_irred = ph%nq_irred*ph%numbranches
+    nstates_irred = ph%nwv_irred*ph%numbands
 
     !Allocate start and end coarrays
     allocate(start[*], end[*])
@@ -1226,22 +1223,22 @@ contains
     call distribute_points(nstates_irred, chunk, start, end, num_active_images)
 
     !Allocate and initialize scattering rates coarrays
-    allocate(rta_rates_3ph_psum(ph%nq_irred, ph%numbranches)[*])
+    allocate(rta_rates_3ph_psum(ph%nwv_irred, ph%numbands)[*])
     rta_rates_3ph_psum(:, :) = 0.0_dp
     if(present(el)) then
-       allocate(rta_rates_phe_psum(ph%nq_irred, ph%numbranches)[*])
+       allocate(rta_rates_phe_psum(ph%nwv_irred, ph%numbands)[*])
        rta_rates_phe_psum(:, :) = 0.0_dp
     end if
     
     !Allocate and initialize scattering rates
-    allocate(rta_rates_3ph(ph%nq_irred, ph%numbranches), rta_rates_phe(ph%nq_irred, ph%numbranches))
+    allocate(rta_rates_3ph(ph%nwv_irred, ph%numbands), rta_rates_phe(ph%nwv_irred, ph%numbands))
     rta_rates_3ph(:, :) = 0.0_dp
     rta_rates_phe(:, :) = 0.0_dp
         
     !Run over first phonon IBZ states
     do istate = start, end
        !Demux state index into branch (s) and wave vector (iq) indices
-       call demux_state(istate, ph%numbranches, s, iq)
+       call demux_state(istate, ph%numbands, s, iq)
 
        !Set W+ filename
        write(tag, '(I9)') istate
@@ -1311,7 +1308,7 @@ contains
     write(tag, "(E9.3)") crys%T
 
     !Total number of IBZ blocks states
-    nstates_irred = el%nk_irred*el%numbands
+    nstates_irred = el%nwv_irred*el%numbands
     
     !Allocate start and end coarrays
     allocate(start[*], end[*])
@@ -1320,17 +1317,17 @@ contains
     call distribute_points(nstates_irred, chunk, start, end, num_active_images)
 
     !Allocate and initialize scattering rates coarrays
-    allocate(rta_rates_eph_psum(el%nk_irred, el%numbands)[*])
+    allocate(rta_rates_eph_psum(el%nwv_irred, el%numbands)[*])
     rta_rates_eph_psum(:, :) = 0.0_dp
     if(num%elchimp) then
-       allocate(rta_rates_echimp_psum(el%nk_irred, el%numbands)[*])
+       allocate(rta_rates_echimp_psum(el%nwv_irred, el%numbands)[*])
        rta_rates_echimp_psum(:, :) = 0.0_dp
     end if
     
     !Allocate and initialize scattering rates
-    allocate(rta_rates_eph(el%nk_irred, el%numbands))
+    allocate(rta_rates_eph(el%nwv_irred, el%numbands))
     rta_rates_eph(:, :) = 0.0_dp
-    allocate(rta_rates_echimp(el%nk_irred, el%numbands))
+    allocate(rta_rates_echimp(el%nwv_irred, el%numbands))
     rta_rates_echimp(:, :) = 0.0_dp
 
     do istate = start, end !over IBZ blocks states

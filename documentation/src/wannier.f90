@@ -210,6 +210,9 @@ contains
     complex(dp), allocatable :: work(:)
     complex(dp) :: caux, H(wann%numwannbands,wann%numwannbands), &
          dH(3,wann%numwannbands,wann%numwannbands)
+
+    !External procedures
+    external :: zheev
     
     !Catch error for optional velocity calculation
     if(present(velocities) .and. .not. present(evecs)) &
@@ -299,6 +302,9 @@ contains
     real(dp) :: omega2(wann%numbranches), massnorm
     complex(dp) :: dynmat(wann%numbranches, wann%numbranches)
 
+    !External procedures
+    external :: zheev
+    
     nwork = 1
     allocate(work(nwork))
     allocate(rwork(max(1, 9*crys%numatoms-2)))

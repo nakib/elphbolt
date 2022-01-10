@@ -56,12 +56,12 @@ contains
        call print_message("Calculating Thomas-Fermi screening...")
 
        do ib = 1, el%numbands
-          do ik = 1, el%nk
+          do ik = 1, el%nwv
              fFD = Fermi(el%ens(ik, ib), el%chempot, crys%T)
              crys%qTF = crys%qTF + fFD*(1.0_dp - fFD)
           end do
        end do
-       crys%qTF = sqrt(1.0e9_dp*crys%qTF*el%spindeg*beta*qe**2/product(el%kmesh)&
+       crys%qTF = sqrt(1.0e9_dp*crys%qTF*el%spindeg*beta*qe**2/product(el%wvmesh)&
             /crys%volume/perm0/crys%epsilon0) !nm^-1
 
        if(this_image() == 1) then
@@ -92,13 +92,13 @@ contains
     allocate(start[*], end[*])
     
     !Divide wave vectors among images
-    call distribute_points(el%nk_irred, chunk, start, end, num_active_images)
+    call distribute_points(el%nwv_irred, chunk, start, end, num_active_images)
 
     !Allocate small work variable chunk for each image
     allocate(dos_chunk(chunk, el%numbands)[*])
     
     !Allocate dos
-    allocate(el%dos(el%nk_irred, el%numbands))
+    allocate(el%dos(el%nwv_irred, el%numbands))
 
     !Initialize dos arrays
     el%dos(:,:) = 0.0_dp
@@ -112,14 +112,14 @@ contains
           !Grab sample energy from the IBZ
           e = el%ens_irred(ik, ib) 
 
-          do ikp = 1, el%nk !Sum over FBZ wave vectors
+          do ikp = 1, el%nwv !Sum over FBZ wave vectors
              do ibp = 1, el%numbands !Sum over wave vectors
                 if(usetetra) then
                    !Evaluate delta[E(iq,ib) - E(iq',ib')]
-                   delta = delta_fn_tetra(e, ikp, ibp, el%kmesh, el%tetramap, &
+                   delta = delta_fn_tetra(e, ikp, ibp, el%wvmesh, el%tetramap, &
                         el%tetracount, el%tetra_evals)
                 else
-                   delta = delta_fn_triang(e, ikp, ibp, el%kmesh, el%triangmap, &
+                   delta = delta_fn_triang(e, ikp, ibp, el%wvmesh, el%triangmap, &
                         el%triangcount, el%triang_evals)
                 end if
                 !Sum over delta function
@@ -177,17 +177,17 @@ contains
     allocate(start[*], end[*])
     
     !Divide wave vectors among images
-    call distribute_points(ph%nq_irred, chunk, start, end, num_active_images)
+    call distribute_points(ph%nwv_irred, chunk, start, end, num_active_images)
     
     !Allocate small work variable chunk for each image
-    allocate(dos_chunk(chunk, ph%numbranches)[*])
-    if(phiso) allocate(W_phiso_chunk(chunk, ph%numbranches)[*])
-    if(phsubs) allocate(W_phsubs_chunk(chunk, ph%numbranches)[*])
+    allocate(dos_chunk(chunk, ph%numbands)[*])
+    if(phiso) allocate(W_phiso_chunk(chunk, ph%numbands)[*])
+    if(phsubs) allocate(W_phsubs_chunk(chunk, ph%numbands)[*])
     
     !Allocate dos and W_phiso
-    allocate(ph%dos(ph%nq_irred, ph%numbranches))
-    allocate(W_phiso(ph%nq_irred, ph%numbranches))
-    allocate(W_phsubs(ph%nq_irred, ph%numbranches))
+    allocate(ph%dos(ph%nwv_irred, ph%numbands))
+    allocate(W_phiso(ph%nwv_irred, ph%numbands))
+    allocate(W_phsubs(ph%nwv_irred, ph%numbands))
 
     !Initialize arrays and coarrays
     ph%dos(:,:) = 0.0_dp
@@ -201,18 +201,18 @@ contains
     do iq = start, end !Run over IBZ wave vectors
        !Increase counter
        counter = counter + 1
-       do ib = 1, ph%numbranches !Run over wave vectors   
+       do ib = 1, ph%numbands !Run over wave vectors   
           !Grab sample energy from the IBZ
           e = ph%ens(ph%indexlist_irred(iq), ib) 
 
-          do iqp = 1, ph%nq !Sum over FBZ wave vectors
-             do ibp = 1, ph%numbranches !Sum over wave vectors
+          do iqp = 1, ph%nwv !Sum over FBZ wave vectors
+             do ibp = 1, ph%numbands !Sum over wave vectors
                 !Evaluate delta[E(iq,ib) - E(iq',ib')]
                 if(usetetra) then
-                   delta = delta_fn_tetra(e, iqp, ibp, ph%qmesh, ph%tetramap, &
+                   delta = delta_fn_tetra(e, iqp, ibp, ph%wvmesh, ph%tetramap, &
                         ph%tetracount, ph%tetra_evals)
                 else
-                   delta = delta_fn_triang(e, iqp, ibp, ph%qmesh, ph%triangmap, &
+                   delta = delta_fn_triang(e, iqp, ibp, ph%wvmesh, ph%triangmap, &
                         ph%triangcount, ph%triang_evals)
                 end if
                 !Sum over delta function
@@ -486,19 +486,19 @@ contains
              if(usetetra) then
                 select type(species)
                 class is(phonon)
-                   delta = delta_fn_tetra(en_grid(ie), ik, ib, species%qmesh, species%tetramap, &
+                   delta = delta_fn_tetra(en_grid(ie), ik, ib, species%wvmesh, species%tetramap, &
                         species%tetracount, species%tetra_evals)
                 class is(electron)
-                   delta = delta_fn_tetra(en_grid(ie), ik, ib, species%kmesh, species%tetramap, &
+                   delta = delta_fn_tetra(en_grid(ie), ik, ib, species%wvmesh, species%tetramap, &
                         species%tetracount, species%tetra_evals)
                 end select
              else
                 select type(species)
                 class is(phonon)
-                   delta = delta_fn_triang(en_grid(ie), ik, ib, species%qmesh, species%triangmap, &
+                   delta = delta_fn_triang(en_grid(ie), ik, ib, species%wvmesh, species%triangmap, &
                         species%triangcount, species%triang_evals)
                 class is(electron)
-                   delta = delta_fn_triang(en_grid(ie), ik, ib, species%kmesh, species%triangmap, &
+                   delta = delta_fn_triang(en_grid(ie), ik, ib, species%wvmesh, species%triangmap, &
                         species%triangcount, species%triang_evals)
                 end select
              end if
