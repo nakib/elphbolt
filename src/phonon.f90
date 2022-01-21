@@ -575,10 +575,10 @@ contains
     real(dp), intent(in) :: kpoints(nk, 3)
     real(dp), intent(out) :: omegas(nk, self%numbands)
     real(dp), optional, intent(out) :: velocities(nk, self%numbands, 3)
-    complex(kind=8), optional, intent(out) :: eigenvect(nk, self%numbands, self%numbands)
+    complex(dp), optional, intent(out) :: eigenvect(nk, self%numbands, self%numbands)
 
     ! QE's 2nd-order files are in Ryd units.
-    real(kind=8),parameter :: toTHz=20670.687,&
+    real(dp),parameter :: toTHz=20670.687,&
          massfactor=1.8218779*6.022e-4
 
     integer(k8) :: ir,nreq,ntype,nat,nbranches
@@ -834,7 +834,7 @@ contains
                 velocities(ik,i,j)=real(dot_product(dyn(:,i),&
                      matmul(ddyn(:,:,j),dyn(:,i))))
              end do
-             velocities(ik,i,:)=velocities(ik,i,:)/(2.*omegas(ik,i))
+             velocities(ik,i,:)=velocities(ik,i,:)/(2.0_dp*omegas(ik,i))
           end do
        end if
 
