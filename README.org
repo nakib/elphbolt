@@ -44,6 +44,10 @@ In the ~Makefiles~ directory you will find a few ~<title>.make~ files. Adapt the
 
 Once you have done the above, go into ~src/~ and simply say ~make~. This should build the executable ~elphbolt.x~ one directory above.
 
+** Container solutions
+
+An example ~Dockerfile~ is provided. I have not yet tested this on any HPC system.
+
 ** Tests
 
 A full example for cubic silicon is provided. More examples will be added over time.
