@@ -477,7 +477,7 @@ contains
     !! Swap sort list of reals
     
     real(dp), intent(inout) :: list(:)
-    real(kind=8) :: aux, tmp
+    real(dp) :: aux, tmp
     integer(k8) :: i, j, n
 
     n = size(list)

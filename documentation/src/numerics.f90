@@ -105,13 +105,13 @@ module numerics_module
 
 contains
 
-  subroutine read_input_and_setup(n, crys)
+  subroutine read_input_and_setup(self, crys)
     !! Read input file for information related to the numerics.
     !!
-    !! n Numerics object
+    !! self Numerics object
     !! crys Crytal object
 
-    class(numerics), intent(out) :: n
+    class(numerics), intent(out) :: self
     type(crystal), intent(in) :: crys
     
     !Local variables
@@ -171,134 +171,134 @@ contains
        call exit_with_message(&
             'Need to provide non-zero epsilon0 for e-ch. imp. interaction. Exiting.')
     end if
-    n%qmesh = qmesh
-    n%mesh_ref = mesh_ref
-    n%fsthick = fsthick
-    n%datadumpdir = trim(datadumpdir)
-    n%read_gq2 = read_gq2
-    n%read_gk2 = read_gk2
-    n%read_V = read_V
-    n%read_W = read_W
-    n%tetrahedra = tetrahedra
-    n%phe = phe
-    n%phiso = phiso
-    n%phsubs = phsubs
-    n%phbound = phbound
-    n%onlyphbte = onlyphbte
-    n%onlyebte = onlyebte
-    n%elchimp = elchimp
-    n%elbound = elbound
-    n%maxiter = maxiter
-    n%conv_thres = conv_thres
-    n%drag = drag
-    n%plot_along_path = plot_along_path
-    n%runlevel = runlevel
+    self%qmesh = qmesh
+    self%mesh_ref = mesh_ref
+    self%fsthick = fsthick
+    self%datadumpdir = trim(datadumpdir)
+    self%read_gq2 = read_gq2
+    self%read_gk2 = read_gk2
+    self%read_V = read_V
+    self%read_W = read_W
+    self%tetrahedra = tetrahedra
+    self%phe = phe
+    self%phiso = phiso
+    self%phsubs = phsubs
+    self%phbound = phbound
+    self%onlyphbte = onlyphbte
+    self%onlyebte = onlyebte
+    self%elchimp = elchimp
+    self%elbound = elbound
+    self%maxiter = maxiter
+    self%conv_thres = conv_thres
+    self%drag = drag
+    self%plot_along_path = plot_along_path
+    self%runlevel = runlevel
 
     if(runlevel == 2) then
-       n%ph_en_min = ph_en_min
-       n%ph_en_max = ph_en_max
-       n%ph_en_num = ph_en_num
-       n%el_en_min = el_en_min
-       n%el_en_max = el_en_max
-       n%el_en_num = el_en_num
+       self%ph_en_min = ph_en_min
+       self%ph_en_max = ph_en_max
+       self%ph_en_num = ph_en_num
+       self%el_en_min = el_en_min
+       self%el_en_max = el_en_max
+       self%el_en_num = el_en_num
     end if
     
-    if(crys%twod .and. n%qmesh(3) /= 1) then
+    if(crys%twod .and. self%qmesh(3) /= 1) then
        call exit_with_message('For 2d systems, qmesh(3) must be equal to 1.')
     end if
     
     !Set BTE solution type
-    if(n%onlyphbte) then
-       n%onlyebte = .false.
-       n%drag = .false.
+    if(self%onlyphbte) then
+       self%onlyebte = .false.
+       self%drag = .false.
     end if
-    if(n%onlyebte) then
-       n%onlyphbte = .false.
-       n%phiso = .false.
-       n%phsubs = .false.
-       n%drag = .false.
-       n%phe = .false.
+    if(self%onlyebte) then
+       self%onlyphbte = .false.
+       self%phiso = .false.
+       self%phsubs = .false.
+       self%drag = .false.
+       self%phe = .false.
     end if
-    if(n%drag) then
-       n%onlyebte = .false.
-       n%onlyphbte = .false.
-       n%phe = .true.
+    if(self%drag) then
+       self%onlyebte = .false.
+       self%onlyphbte = .false.
+       self%phe = .true.
     end if
     
     !Create data dump directory
-    if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(n%datadumpdir)))
+    if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(self%datadumpdir)))
 
     !Create matrix elements data directories
-    n%g2dir = trim(adjustl(n%datadumpdir))//'g2'
-    if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(n%g2dir)))
-    n%Vdir = trim(adjustl(n%datadumpdir))//'V2'
-    if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(n%Vdir)))
+    self%g2dir = trim(adjustl(self%datadumpdir))//'g2'
+    if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(self%g2dir)))
+    self%Vdir = trim(adjustl(self%datadumpdir))//'V2'
+    if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(self%Vdir)))
 
     !Create T dependent subdirectory
     write(tag, "(E9.3)") crys%T
-    n%datadumpdir_T = trim(adjustl(n%datadumpdir))//'T'//trim(adjustl(tag))
-    if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(n%datadumpdir_T)))
+    self%datadumpdir_T = trim(adjustl(self%datadumpdir))//'T'//trim(adjustl(tag))
+    if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(self%datadumpdir_T)))
 
     !Create T-dependent ph-ph transition probability directory
-    n%Wdir = trim(adjustl(n%datadumpdir_T))//'/W'
-    if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(n%Wdir)))
+    self%Wdir = trim(adjustl(self%datadumpdir_T))//'/W'
+    if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(self%Wdir)))
     
     !Close input file
     close(1)
 
     !Set current work directory.
-    call getcwd(n%cwd)
-    n%cwd = trim(n%cwd)
+    call getcwd(self%cwd)
+    self%cwd = trim(self%cwd)
 
     !Print out information.
     if(this_image() == 1) then
-       write(*, "(A, (3I5,x))") "q-mesh = ", n%qmesh
+       write(*, "(A, (3I5,x))") "q-mesh = ", self%qmesh
        if(crys%twod) then
-          write(*, "(A, (3I5,x))") "k-mesh = ", n%mesh_ref*n%qmesh(1), n%mesh_ref*n%qmesh(2), 1
+          write(*, "(A, (3I5,x))") "k-mesh = ", self%mesh_ref*self%qmesh(1), self%mesh_ref*self%qmesh(2), 1
        else
-          write(*, "(A, (3I5,x))") "k-mesh = ", n%mesh_ref*n%qmesh(1), n%mesh_ref*n%qmesh(2), &
-               n%mesh_ref*n%qmesh(3)
+          write(*, "(A, (3I5,x))") "k-mesh = ", self%mesh_ref*self%qmesh(1), self%mesh_ref*self%qmesh(2), &
+               self%mesh_ref*self%qmesh(3)
        end if
-       write(*, "(A, 1E16.8, A)") "Fermi window thickness (each side of reference energy) = ", n%fsthick, " eV"
-       write(*, "(A, A)") "Working directory = ", trim(n%cwd)
-       write(*, "(A, A)") "Data dump directory = ", trim(n%datadumpdir)
-       write(*, "(A, A)") "T-dependent data dump directory = ", trim(n%datadumpdir_T)
-       write(*, "(A, A)") "e-ph directory = ", trim(n%g2dir)
-       write(*, "(A, A)") "ph-ph directory = ", trim(n%Vdir)
-       write(*, "(A, L)") "Reuse e-ph matrix elements: ", n%read_gk2
-       write(*, "(A, L)") "Reuse ph-e matrix elements: ", n%read_gq2
-       write(*, "(A, L)") "Reuse ph-ph matrix elements: ", n%read_V
-       write(*, "(A, L)") "Reuse ph-ph transition probabilities: ", n%read_W
-       write(*, "(A, L)") "Use tetrahedron method: ", n%tetrahedra
-       write(*, "(A, L)") "Include ph-e interaction: ", n%phe
-       write(*, "(A, L)") "Include ph-isotope interaction: ", n%phiso       
-       write(*, "(A, L)") "Include ph-substitution interaction: ", n%phsubs
-       write(*, "(A, L)") "Include ph-boundary interaction: ", n%phbound
-       if(n%phbound) then
+       write(*, "(A, 1E16.8, A)") "Fermi window thickness (each side of reference energy) = ", self%fsthick, " eV"
+       write(*, "(A, A)") "Working directory = ", trim(self%cwd)
+       write(*, "(A, A)") "Data dump directory = ", trim(self%datadumpdir)
+       write(*, "(A, A)") "T-dependent data dump directory = ", trim(self%datadumpdir_T)
+       write(*, "(A, A)") "e-ph directory = ", trim(self%g2dir)
+       write(*, "(A, A)") "ph-ph directory = ", trim(self%Vdir)
+       write(*, "(A, L)") "Reuse e-ph matrix elements: ", self%read_gk2
+       write(*, "(A, L)") "Reuse ph-e matrix elements: ", self%read_gq2
+       write(*, "(A, L)") "Reuse ph-ph matrix elements: ", self%read_V
+       write(*, "(A, L)") "Reuse ph-ph transition probabilities: ", self%read_W
+       write(*, "(A, L)") "Use tetrahedron method: ", self%tetrahedra
+       write(*, "(A, L)") "Include ph-e interaction: ", self%phe
+       write(*, "(A, L)") "Include ph-isotope interaction: ", self%phiso       
+       write(*, "(A, L)") "Include ph-substitution interaction: ", self%phsubs
+       write(*, "(A, L)") "Include ph-boundary interaction: ", self%phbound
+       if(self%phbound) then
           write(*,"(A,(1E16.8,x),A)") 'Characteristic length for ph-boundary scattering =', &
                crys%bound_length, 'mm'
        end if
-       write(*, "(A, L)") "Include el-charged impurity interaction: ", n%elchimp
-       write(*, "(A, L)") "Include el-boundary interaction: ", n%elbound
-       if(n%elbound) then
+       write(*, "(A, L)") "Include el-charged impurity interaction: ", self%elchimp
+       write(*, "(A, L)") "Include el-boundary interaction: ", self%elbound
+       if(self%elbound) then
           write(*,"(A,(1E16.8,x),A)") 'Characteristic length for el-boundary scattering =', &
                crys%bound_length, 'mm'
        end if
-       if(n%onlyphbte) write(*, "(A, L)") "Calculate only phonon BTE: ", n%onlyphbte
-       if(n%onlyebte) write(*, "(A, L)") "Calculate only electron BTE: ", n%onlyebte
-       write(*, "(A, L)") "Include drag: ", n%drag
-       write(*, "(A, L)") "Plot quantities along path: ", n%plot_along_path
-       write(*, "(A, I5)") "Maximum number of BTE iterations = ", n%maxiter
-       write(*, "(A, 1E16.8)") "BTE convergence threshold = ", n%conv_thres
+       if(self%onlyphbte) write(*, "(A, L)") "Calculate only phonon BTE: ", self%onlyphbte
+       if(self%onlyebte) write(*, "(A, L)") "Calculate only electron BTE: ", self%onlyebte
+       write(*, "(A, L)") "Include drag: ", self%drag
+       write(*, "(A, L)") "Plot quantities along path: ", self%plot_along_path
+       write(*, "(A, I5)") "Maximum number of BTE iterations = ", self%maxiter
+       write(*, "(A, 1E16.8)") "BTE convergence threshold = ", self%conv_thres
     end if
     sync all
   end subroutine read_input_and_setup
 
-  subroutine create_chempot_dirs(n, chempot)
+  subroutine create_chempot_dirs(self, chempot)
     !! Subroutine to create data dump directory tagged by the chemical potential
     !! and subdirectories within.
     
-    class(numerics), intent(inout) :: n
+    class(numerics), intent(inout) :: self
     real(dp), intent(in) :: chempot
 
     !Local variables
@@ -306,16 +306,16 @@ contains
 
     !Create chemical potential dependent data dump directory
     write(tag, "(E14.8)") chempot
-    n%datadumpdir_T_chempot = trim(adjustl(n%datadumpdir_T)) // '/mu' // trim(adjustl(tag))
+    self%datadumpdir_T_chempot = trim(adjustl(self%datadumpdir_T)) // '/mu' // trim(adjustl(tag))
 
     !Create e-ph and ph-e transition probability data directories
-    n%Xdir = trim(adjustl(n%datadumpdir_T_chempot)) // '/X'
-    n%Ydir = trim(adjustl(n%datadumpdir_T_chempot)) // '/Y'
+    self%Xdir = trim(adjustl(self%datadumpdir_T_chempot)) // '/X'
+    self%Ydir = trim(adjustl(self%datadumpdir_T_chempot)) // '/Y'
     
     if(this_image() == 1) then
-       call system('mkdir -p ' // trim(adjustl(n%datadumpdir_T_chempot)))
-       call system('mkdir -p ' // trim(adjustl(n%Xdir)))
-       call system('mkdir -p ' // trim(adjustl(n%Ydir)))
+       call system('mkdir -p ' // trim(adjustl(self%datadumpdir_T_chempot)))
+       call system('mkdir -p ' // trim(adjustl(self%Xdir)))
+       call system('mkdir -p ' // trim(adjustl(self%Ydir)))
     end if
     sync all
   end subroutine create_chempot_dirs

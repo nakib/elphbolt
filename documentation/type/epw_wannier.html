@@ -614,7 +614,7 @@
           
     
     <h3>
-private subroutine plot_along_path(wann, crys, num)
+private subroutine plot_along_path(self, crys, num)
     
     
    
@@ -650,7 +650,7 @@ private subroutine plot_along_path(wann, crys, num)
   <td></td>
   
   <td></td><td>::</td>
-  <td><strong>wann</strong></td><td></td>
+  <td><strong>self</strong></td><td></td>
   
 </tr>
 
@@ -713,7 +713,7 @@ private subroutine plot_along_path(wann, crys, num)
           
     
     <h3>
-private subroutine deallocate_wannier(wann, num)
+private subroutine deallocate_wannier(self, num)
     
     
    
@@ -748,7 +748,7 @@ private subroutine deallocate_wannier(wann, num)
   <td></td>
   
   <td></td><td>::</td>
-  <td><strong>wann</strong></td><td></td>
+  <td><strong>self</strong></td><td></td>
   
 </tr>
 
@@ -796,7 +796,7 @@ private subroutine deallocate_wannier(wann, num)
           
     
     <h3>
-private function g2_epw(wann, crys, kvec, qvec, el_evec_k, el_evec_kp, ph_evec_q, ph_en, gmixed, wannspace)
+private function g2_epw(self, crys, kvec, qvec, el_evec_k, el_evec_kp, ph_evec_q, ph_en, gmixed, wannspace)
     
     
    
@@ -839,7 +839,7 @@ private function g2_epw(wann, crys, kvec, qvec, el_evec_k, el_evec_kp, ph_evec_q
   <td></td>
   
   <td></td><td>::</td>
-  <td><strong>wann</strong></td><td></td>
+  <td><strong>self</strong></td><td></td>
   
 </tr>
 
@@ -899,7 +899,7 @@ private function g2_epw(wann, crys, kvec, qvec, el_evec_k, el_evec_kp, ph_evec_q
   <td></td>
   
   <td></td><td>::</td>
-  <td><strong>el_evec_k</strong>(wann%numwannbands)</td><td></td>
+  <td><strong>el_evec_k</strong>(self%numwannbands)</td><td></td>
   
 </tr>
 
@@ -914,7 +914,7 @@ private function g2_epw(wann, crys, kvec, qvec, el_evec_k, el_evec_kp, ph_evec_q
   <td></td>
   
   <td></td><td>::</td>
-  <td><strong>el_evec_kp</strong>(wann%numwannbands)</td><td></td>
+  <td><strong>el_evec_kp</strong>(self%numwannbands)</td><td></td>
   
 </tr>
 
@@ -929,7 +929,7 @@ private function g2_epw(wann, crys, kvec, qvec, el_evec_k, el_evec_kp, ph_evec_q
   <td></td>
   
   <td></td><td>::</td>
-  <td><strong>ph_evec_q</strong>(wann%numbranches)</td><td></td>
+  <td><strong>ph_evec_q</strong>(self%numbranches)</td><td></td>
   
 </tr>
 
@@ -1016,7 +1016,7 @@ private function g2_epw(wann, crys, kvec, qvec, el_evec_k, el_evec_kp, ph_evec_q
           
     
     <h3>
-private subroutine gReq_epw(wann, num, iq, qvec)
+private subroutine gReq_epw(self, num, iq, qvec)
     
     
    
@@ -1053,7 +1053,7 @@ private subroutine gReq_epw(wann, num, iq, qvec)
   <td></td>
   
   <td></td><td>::</td>
-  <td><strong>wann</strong></td><td></td>
+  <td><strong>self</strong></td><td></td>
   
 </tr>
 
@@ -1131,7 +1131,7 @@ private subroutine gReq_epw(wann, num, iq, qvec)
           
     
     <h3>
-private subroutine gkRp_epw(wann, num, ik, kvec)
+private subroutine gkRp_epw(self, num, ik, kvec)
     
     
    
@@ -1168,7 +1168,7 @@ private subroutine gkRp_epw(wann, num, ik, kvec)
   <td></td>
   
   <td></td><td>::</td>
-  <td><strong>wann</strong></td><td></td>
+  <td><strong>self</strong></td><td></td>
   
 </tr>
 
@@ -1246,7 +1246,7 @@ private subroutine gkRp_epw(wann, num, ik, kvec)
           
     
     <h3>
-private subroutine ph_wann_epw(wann, crys, nq, qvecs, energies, evecs)
+private subroutine ph_wann_epw(self, crys, nq, qvecs, energies, evecs)
     
     
    
@@ -1281,7 +1281,7 @@ private subroutine ph_wann_epw(wann, crys, nq, qvecs, energies, evecs)
   <td></td>
   
   <td></td><td>::</td>
-  <td><strong>wann</strong></td><td></td>
+  <td><strong>self</strong></td><td></td>
   
 </tr>
 
@@ -1341,7 +1341,7 @@ private subroutine ph_wann_epw(wann, crys, nq, qvecs, energies, evecs)
   <td></td>
   
   <td></td><td>::</td>
-  <td><strong>energies</strong>(nq,wann%numbranches)</td><td></td>
+  <td><strong>energies</strong>(nq,self%numbranches)</td><td></td>
   
 </tr>
 
@@ -1356,7 +1356,7 @@ private subroutine ph_wann_epw(wann, crys, nq, qvecs, energies, evecs)
   <td>optional</td>
   
   <td></td><td>::</td>
-  <td><strong>evecs</strong>(nq,wann%numbranches,wann%numbranches)</td><td></td>
+  <td><strong>evecs</strong>(nq,self%numbranches,self%numbranches)</td><td></td>
   
 </tr>
 
@@ -1389,7 +1389,7 @@ private subroutine ph_wann_epw(wann, crys, nq, qvecs, energies, evecs)
           
     
     <h3>
-private subroutine el_wann_epw(wann, crys, nk, kvecs, energies, velocities, evecs)
+private subroutine el_wann_epw(self, crys, nk, kvecs, energies, velocities, evecs)
     
     
    
@@ -1424,7 +1424,7 @@ private subroutine el_wann_epw(wann, crys, nk, kvecs, energies, velocities, evec
   <td></td>
   
   <td></td><td>::</td>
-  <td><strong>wann</strong></td><td></td>
+  <td><strong>self</strong></td><td></td>
   
 </tr>
 
@@ -1484,7 +1484,7 @@ private subroutine el_wann_epw(wann, crys, nk, kvecs, energies, velocities, evec
   <td></td>
   
   <td></td><td>::</td>
-  <td><strong>energies</strong>(nk,wann%numwannbands)</td><td></td>
+  <td><strong>energies</strong>(nk,self%numwannbands)</td><td></td>
   
 </tr>
 
@@ -1499,7 +1499,7 @@ private subroutine el_wann_epw(wann, crys, nk, kvecs, energies, velocities, evec
   <td>optional</td>
   
   <td></td><td>::</td>
-  <td><strong>velocities</strong>(nk,wann%numwannbands,3)</td><td></td>
+  <td><strong>velocities</strong>(nk,self%numwannbands,3)</td><td></td>
   
 </tr>
 
@@ -1514,7 +1514,7 @@ private subroutine el_wann_epw(wann, crys, nk, kvecs, energies, velocities, evec
   <td>optional</td>
   
   <td></td><td>::</td>
-  <td><strong>evecs</strong>(nk,wann%numwannbands,wann%numwannbands)</td><td></td>
+  <td><strong>evecs</strong>(nk,self%numwannbands,self%numwannbands)</td><td></td>
   
 </tr>
 
@@ -1547,7 +1547,7 @@ private subroutine el_wann_epw(wann, crys, nk, kvecs, energies, velocities, evec
           
     
     <h3>
-private subroutine read_EPW_Wannier(wann, num)
+private subroutine read_EPW_Wannier(self, num)
     
     
    
@@ -1583,7 +1583,7 @@ private subroutine read_EPW_Wannier(wann, num)
   <td></td>
   
   <td></td><td>::</td>
-  <td><strong>wann</strong></td><td></td>
+  <td><strong>self</strong></td><td></td>
   
 </tr>
 
