@@ -43,31 +43,31 @@ module misc
   
 contains
 
-  subroutine start_timer(t, event)
+  subroutine start_timer(self, event)
     !! Start/Reset the timer. This is a blocking call.
     !! Only image 1 can modify timing information.
 
-    class(timer), intent(out) :: t
+    class(timer), intent(out) :: self
     character(len = *), intent(in) :: event
 
     sync all
     if(this_image() == 1) then
        !Set the clock rate
-       call system_clock(count_rate = t%rate)
+       call system_clock(count_rate = self%rate)
 
        !Clock in
-       call system_clock(count = t%start)
+       call system_clock(count = self%start)
 
        !(Re)set the event name
-       t%event = event
+       self%event = event
     end if
   end subroutine start_timer
 
-  subroutine end_timer(t, event)
+  subroutine end_timer(self, event)
     !! End the timer and print the elapsed time. This is a blocking call.
     !! Only image 1 can modify timing information.
 
-    class(timer), intent(inout) :: t
+    class(timer), intent(inout) :: self
     character(len = *), intent(in) :: event
 
     !Local variable
@@ -76,15 +76,15 @@ contains
     sync all
     if(this_image() == 1) then
        !Clock in
-       call system_clock(count = t%end)
+       call system_clock(count = self%end)
 
        !Check the event name and if clock-in happened
-       if((event /= t%event) .or. (t%start == -1_k8)) then
+       if((event /= self%event) .or. (self%start == -1_k8)) then
           call exit_with_message('Clock-in event does not match this clock-out event.')
        end if
 
        !Calculate and print time taken for this event
-       time_elapsed = dble(t%end - t%start)/t%rate/3600.0_dp !hours
+       time_elapsed = dble(self%end - self%start)/self%rate/3600.0_dp !hours
        !time_elapsed = dble(end - start)/rate/3600.0_dp*num_images() !cpu-hours
        write(*, "(A)") ".............."
        write(*, "(A, A, 1E16.8, A)") "| Timing info:", trim(event), time_elapsed, " hr"
