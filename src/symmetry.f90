@@ -62,12 +62,12 @@ module symmetry_module
 
 contains
 
-  subroutine calculate_symmetries(sym, crys, mesh)
+  subroutine calculate_symmetries(self, crys, mesh)
     !! Subroutine to generate the symmetry related data for a given crystal.
     !!
     !! This subroutine closely follows parts of config.f90 of the ShengBTE code.
 
-    class(symmetry), intent(out) :: sym
+    class(symmetry), intent(out) :: self
     type(crystal), intent(in) :: crys
     integer(k8), intent(in) :: mesh(3)
 
@@ -89,56 +89,56 @@ contains
     nq = product(mesh)
     
     !Number of crystal symmetries.
-    sym%nsymm = get_num_operations(crys%lattvecs,crys%numatoms,crys%atomtypes,crys%basis)
+    self%nsymm = get_num_operations(crys%lattvecs,crys%numatoms,crys%atomtypes,crys%basis)
     !Double the above to take time reversal symetry (TRS) into account.
-    sym%nsymm_rot = 2*sym%nsymm
+    self%nsymm_rot = 2*self%nsymm
 
-    allocate(sym%rotations(3,3,sym%nsymm_rot),sym%crotations(3,3,sym%nsymm_rot),&
-         sym%qrotations(3,3,sym%nsymm_rot),sym%rotations_orig(3,3,sym%nsymm),&
-         sym%crotations_orig(3,3,sym%nsymm),sym%qrotations_orig(3,3,sym%nsymm),&
-         translations(3,sym%nsymm),ctranslations(3,sym%nsymm))
+    allocate(self%rotations(3,3,self%nsymm_rot),self%crotations(3,3,self%nsymm_rot),&
+         self%qrotations(3,3,self%nsymm_rot),self%rotations_orig(3,3,self%nsymm),&
+         self%crotations_orig(3,3,self%nsymm),self%qrotations_orig(3,3,self%nsymm),&
+         translations(3,self%nsymm),ctranslations(3,self%nsymm))
 
     !Get symmetry operations.
     call get_operations(crys%lattvecs,crys%numatoms,crys%atomtypes,&
-         crys%basis,sym%nsymm,sym%rotations_orig,translations,sym%international)
-    sym%rotations(:,:,1:sym%nsymm) = sym%rotations_orig
+         crys%basis,self%nsymm,self%rotations_orig,translations,self%international)
+    self%rotations(:,:,1:self%nsymm) = self%rotations_orig
 
     if(this_image() == 1) then
        !This is a hacky fix to the problem of a trailing binary character
        !printing that happens on some machines.
-       nlen = len(trim(sym%international)) - 1
-       write(*, "(A, A)") "Crystal symmetry group = ", sym%international(1:nlen)
-       write(*, "(A, I5)") "Number of crystal symmetries (without time-reversal) = ", sym%nsymm
+       nlen = len(trim(self%international)) - 1
+       write(*, "(A, A)") "Crystal symmetry group = ", self%international(1:nlen)
+       write(*, "(A, I5)") "Number of crystal symmetries (without time-reversal) = ", self%nsymm
     end if
 
     !Get symmertry operations in Cartesian basis.
-    call get_cartesian_operations(crys%lattvecs,sym%nsymm,&
-         sym%rotations_orig,translations,&
-         sym%crotations_orig,ctranslations)
-    sym%crotations(:,:,1:sym%nsymm) = sym%crotations_orig
+    call get_cartesian_operations(crys%lattvecs,self%nsymm,&
+         self%rotations_orig,translations,&
+         self%crotations_orig,ctranslations)
+    self%crotations(:,:,1:self%nsymm) = self%crotations_orig
 
     !Transform the rotation matrices to the reciprocal-space basis.
-    do i = 1,sym%nsymm
+    do i = 1,self%nsymm
        tmp1 = matmul(transpose(crys%lattvecs),crys%lattvecs)
-       tmp2 = transpose(sym%rotations_orig(:, :, i))
+       tmp2 = transpose(self%rotations_orig(:, :, i))
        tmp3 = tmp1
        call dgesv(3,3,tmp1,3,P,tmp2,3,info)
-       sym%qrotations_orig(:,:,i) = transpose(matmul(tmp2,tmp3))
+       self%qrotations_orig(:,:,i) = transpose(matmul(tmp2,tmp3))
     end do
-    sym%qrotations(:,:,1:sym%nsymm) = sym%qrotations_orig
+    self%qrotations(:,:,1:self%nsymm) = self%qrotations_orig
 
     !Fill the second half of the rotation matrix list using TRS.
-    sym%rotations(:,:,sym%nsymm+1:2*sym%nsymm) = -sym%rotations_orig(:,:,1:sym%nsymm)
-    sym%qrotations(:,:,sym%nsymm+1:2*sym%nsymm) = -sym%qrotations_orig(:,:,1:sym%nsymm)
-    sym%crotations(:,:,sym%nsymm+1:2*sym%nsymm) = -sym%crotations_orig(:,:,1:sym%nsymm)
+    self%rotations(:,:,self%nsymm+1:2*self%nsymm) = -self%rotations_orig(:,:,1:self%nsymm)
+    self%qrotations(:,:,self%nsymm+1:2*self%nsymm) = -self%qrotations_orig(:,:,1:self%nsymm)
+    self%crotations(:,:,self%nsymm+1:2*self%nsymm) = -self%crotations_orig(:,:,1:self%nsymm)
 
     !Find rotations that are either duplicated or incompatible with mesh.
-    allocate(local_equiv_map(sym%nsymm_rot,nq))
-    call find_equiv_map(sym%nsymm_rot,local_equiv_map,mesh,sym%qrotations)
-    allocate(valid(sym%nsymm_rot))
+    allocate(local_equiv_map(self%nsymm_rot,nq))
+    call find_equiv_map(self%nsymm_rot,local_equiv_map,mesh,self%qrotations)
+    allocate(valid(self%nsymm_rot))
     valid = .true.
     jj = 0
-    do ii = 1,sym%nsymm_rot
+    do ii = 1,self%nsymm_rot
        if(valid(ii) .and. any(local_equiv_map(ii,:) == -1)) then
           valid(ii) = .false.
           jj = jj + 1
@@ -149,10 +149,10 @@ contains
             "Rotations are incompatible with the wave vector mesh and will be discarded."
     end if
     ll = 0
-    do ii = 2,sym%nsymm_rot
+    do ii = 2,self%nsymm_rot
        do i = 1,ii - 1
           if(.not. valid(i)) cycle
-          if(all(sym%rotations(:,:,ii) == sym%rotations(:,:,i))) then
+          if(all(self%rotations(:,:,ii) == self%rotations(:,:,i))) then
              valid(ii) = .false.
              ll = ll + 1
              exit
@@ -166,22 +166,22 @@ contains
     !Filter out those rotations through a series of move_alloc calls.
     !Arrays to take into account: rotations,crotations,qrotations.
     if(ll + jj /= 0) then
-       allocate(rtmp(3,3,sym%nsymm_rot - ll - jj))
-       allocate(crtmp(3,3,sym%nsymm_rot - ll - jj))
-       allocate(qrtmp(3,3,sym%nsymm_rot - ll - jj))
+       allocate(rtmp(3,3,self%nsymm_rot - ll - jj))
+       allocate(crtmp(3,3,self%nsymm_rot - ll - jj))
+       allocate(qrtmp(3,3,self%nsymm_rot - ll - jj))
        kk = 0
-       do ii = 1,sym%nsymm_rot
+       do ii = 1,self%nsymm_rot
           if(valid(ii)) then
              kk = kk + 1
-             rtmp(:,:,kk) = sym%rotations(:,:,ii)
-             crtmp(:,:,kk) = sym%crotations(:,:,ii)
-             qrtmp(:,:,kk) = sym%qrotations(:,:,ii)
+             rtmp(:,:,kk) = self%rotations(:,:,ii)
+             crtmp(:,:,kk) = self%crotations(:,:,ii)
+             qrtmp(:,:,kk) = self%qrotations(:,:,ii)
           end if
        end do
-       sym%nsymm_rot = sym%nsymm_rot - ll - jj
-       call move_alloc(rtmp,sym%rotations)
-       call move_alloc(crtmp,sym%crotations)
-       call move_alloc(qrtmp,sym%qrotations)
+       self%nsymm_rot = self%nsymm_rot - ll - jj
+       call move_alloc(rtmp,self%rotations)
+       call move_alloc(crtmp,self%crotations)
+       call move_alloc(qrtmp,self%qrotations)
     end if
   end subroutine calculate_symmetries
 
