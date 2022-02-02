@@ -8,5 +8,5 @@ proc_internals: false
 source: false
 graph: true
 search: true
-license: GNU gpl 3.0 
+license: GNU General Public License 3.0 
 warn: false
