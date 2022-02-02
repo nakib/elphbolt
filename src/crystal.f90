@@ -95,10 +95,10 @@ module crystal_module
 
 contains
 
-  subroutine read_input_and_setup_crystal(c)
+  subroutine read_input_and_setup_crystal(self)
     !! Read input file and initialize crystal data.
 
-    class(crystal), intent(out) :: c
+    class(crystal), intent(out) :: self
 
     !Local variables
     integer(k8) :: i, j, k, numelements, numatoms
@@ -130,18 +130,18 @@ contains
     if(numelements < 1 .or. numatoms < 1 .or. numatoms < numelements) then
        call exit_with_message('Bad input(s) in allocations.')
     end if
-    c%numelements = numelements
-    c%numatoms = numatoms
+    self%numelements = numelements
+    self%numatoms = numatoms
 
     !Allocate variables
     allocate(elements(numelements), atomtypes(numatoms), born(3,3,numatoms), &
          basis(3,numatoms), masses(numelements), basis_cart(3,numatoms), &
          subs_masses(numelements), subs_conc(numelements), subs_perc(numelements), &
          num_atomtypes(numelements))
-    allocate(c%elements(c%numelements), c%atomtypes(c%numatoms), c%born(3,3,c%numatoms), &
-         c%masses(c%numatoms), c%gfactors(c%numelements), c%basis(3,c%numatoms), &
-         c%basis_cart(3,c%numatoms), c%subs_masses(c%numelements), c%subs_conc(c%numelements), &
-         c%subs_gfactors(c%numelements))
+    allocate(self%elements(self%numelements), self%atomtypes(self%numatoms), self%born(3,3,self%numatoms), &
+         self%masses(self%numatoms), self%gfactors(self%numelements), self%basis(3,self%numatoms), &
+         self%basis_cart(3,self%numatoms), self%subs_masses(self%numelements), self%subs_conc(self%numelements), &
+         self%subs_gfactors(self%numelements))
     
     !Read crystal_info
     name = trim(adjustl('Crystal'))
@@ -176,137 +176,137 @@ contains
     !Close input file
     close(1)
     
-    c%name = name
-    c%elements = elements
-    c%atomtypes = atomtypes
-    c%born = born
-    c%epsilon = epsilon
-    c%basis = basis
-    c%polar = polar
-    c%read_epsiloninf = read_epsiloninf
-    c%epsilon0 = epsilon0
-    c%lattvecs = lattvecs
-    c%T = T
-    c%autoisotopes = autoisotopes
-    c%masses = masses
-    c%gfactors = 0.0_dp
-    c%twod = twod
-    c%subs_masses = subs_masses
-    c%subs_conc = subs_conc
-    c%bound_length = bound_length
+    self%name = name
+    self%elements = elements
+    self%atomtypes = atomtypes
+    self%born = born
+    self%epsilon = epsilon
+    self%basis = basis
+    self%polar = polar
+    self%read_epsiloninf = read_epsiloninf
+    self%epsilon0 = epsilon0
+    self%lattvecs = lattvecs
+    self%T = T
+    self%autoisotopes = autoisotopes
+    self%masses = masses
+    self%gfactors = 0.0_dp
+    self%twod = twod
+    self%subs_masses = subs_masses
+    self%subs_conc = subs_conc
+    self%bound_length = bound_length
     
-    if(c%twod) then
+    if(self%twod) then
        if(lattvecs(1,3) /= 0 .or. lattvecs(2,3) /= 0 .or. lattvecs(3,3) == 0) then
           call exit_with_message('For 2d systems, cross plane lattice vector must be &
                &of the for (0 0 h).')
        end if
-       c%thickness = lattvecs(3,3)
-       c%dim = 2.0_dp
+       self%thickness = lattvecs(3,3)
+       self%dim = 2.0_dp
     else
-       c%dim = 3.0_dp
+       self%dim = 3.0_dp
     end if
     
     !Set high-frequency dielectric constant
-    if(c%read_epsiloninf) then
-       c%epsiloninf = epsiloninf
+    if(self%read_epsiloninf) then
+       self%epsiloninf = epsiloninf
     else
-       c%epsiloninf = trace(c%epsilon)/3.0_dp
+       self%epsiloninf = trace(self%epsilon)/3.0_dp
     end if
     
     !If required, calculate isotopic average masses and g-factors
     if(autoisotopes) then
-       call calculate_mavg_and_g(c%elements, c%masses, c%gfactors)
+       call calculate_mavg_and_g(self%elements, self%masses, self%gfactors)
     end if
 
     !Calculate atomic basis in Cartesian coordinates
-    c%basis_cart(:,:) = matmul(c%lattvecs,c%basis)
+    self%basis_cart(:,:) = matmul(self%lattvecs,self%basis)
     
     !Calculate reciprocal lattice vectors and real and reciprocal cell volumes
     do i = 1, 3
        j = mod(i, 3) + 1
        k = mod(j, 3) + 1
-       c%reclattvecs(:,i) = &
-            cross_product(c%lattvecs(:, j), c%lattvecs(:, k))
+       self%reclattvecs(:,i) = &
+            cross_product(self%lattvecs(:, j), self%lattvecs(:, k))
     end do
-    c%volume = abs(dot_product(c%lattvecs(:, 1),c%reclattvecs(:, 1)))
-    c%volume_bz = twopi/c%volume
-    c%reclattvecs(:,:) = c%volume_bz*c%reclattvecs(:,:)
+    self%volume = abs(dot_product(self%lattvecs(:, 1),self%reclattvecs(:, 1)))
+    self%volume_bz = twopi/self%volume
+    self%reclattvecs(:,:) = self%volume_bz*self%reclattvecs(:,:)
 
     !Calculate the number of atoms of each type
     num_atomtypes(:) = 0_k8
-    do i = 1, c%numelements
-       do j = 1, c%numatoms
-          if(c%atomtypes(j) == i) num_atomtypes(i) = num_atomtypes(i) + 1 
+    do i = 1, self%numelements
+       do j = 1, self%numatoms
+          if(self%atomtypes(j) == i) num_atomtypes(i) = num_atomtypes(i) + 1 
        end do
     end do
     
     !Convert number concentration of substitutions to percentage
     !of replaced host atoms.
     if(twod) then
-       subs_perc = c%subs_conc*(1.0e-14_dp*c%volume/c%thickness)/num_atomtypes*100.0_dp
+       subs_perc = self%subs_conc*(1.0e-14_dp*self%volume/self%thickness)/num_atomtypes*100.0_dp
     else
-       subs_perc = c%subs_conc*(1.0e-21_dp*c%volume)/num_atomtypes*100.0_dp
+       subs_perc = self%subs_conc*(1.0e-21_dp*self%volume)/num_atomtypes*100.0_dp
     end if
         
     !Calculate the mass variance parameters for the substitutions
-    do i = 1, c%numelements
+    do i = 1, self%numelements
        !Impurity and host mixed mass
-       subs_mavg = (subs_perc(i)*c%subs_masses(i) + &
-            (100.0_dp - subs_perc(i))*c%masses(i))/100.0_dp
+       subs_mavg = (subs_perc(i)*self%subs_masses(i) + &
+            (100.0_dp - subs_perc(i))*self%masses(i))/100.0_dp
 
        !g-factor
-       c%subs_gfactors(i) = subs_perc(i)*(1.0_dp - c%subs_masses(i)/subs_mavg)**2 + &
-            (100.0_dp - subs_perc(i))*(1.0_dp - c%masses(i)/subs_mavg)**2
+       self%subs_gfactors(i) = subs_perc(i)*(1.0_dp - self%subs_masses(i)/subs_mavg)**2 + &
+            (100.0_dp - subs_perc(i))*(1.0_dp - self%masses(i)/subs_mavg)**2
     end do
-    c%subs_gfactors = c%subs_gfactors/100.0_dp
+    self%subs_gfactors = self%subs_gfactors/100.0_dp
     
     !Print out crystal and reciprocal lattice information.
     if(this_image() == 1) then
-       write(*, "(A, A)") 'Material: ', c%name
-       if(c%autoisotopes) write(*,"(A)") 'Isotopic average of masses will be used.'
-       do i = 1, c%numelements
-          write(*,"(A, A, 1E16.8, A)") trim(c%elements(i)), " mass = ", c%masses(i), " u"
+       write(*, "(A, A)") 'Material: ', self%name
+       if(self%autoisotopes) write(*,"(A)") 'Isotopic average of masses will be used.'
+       do i = 1, self%numelements
+          write(*,"(A, A, 1E16.8, A)") trim(self%elements(i)), " mass = ", self%masses(i), " u"
        end do
-       if(any(c%subs_conc /= 0.0_dp)) then
-          do i = 1, c%numelements
+       if(any(self%subs_conc /= 0.0_dp)) then
+          do i = 1, self%numelements
              write(*,"(A, A, 1E16.8, A)") &
-                  trim(c%elements(i)), " substitution mass = ", c%subs_masses(i), " u"
+                  trim(self%elements(i)), " substitution mass = ", self%subs_masses(i), " u"
           end do
-          do i = 1, c%numelements
+          do i = 1, self%numelements
              write(*,"(A, A, 1E16.8, A)") &
-                  trim(c%elements(i)), " substitution amount = ", subs_perc(i), " %"
+                  trim(self%elements(i)), " substitution amount = ", subs_perc(i), " %"
           end do
        end if
        write(*,"(A)") 'Lattice vectors [nm]:'
-       write(*,"(3(1E16.8,x))") c%lattvecs(:,1)
-       write(*,"(3(1E16.8,x))") c%lattvecs(:,2)
-       write(*,"(3(1E16.8,x))") c%lattvecs(:,3)
-       write(*,"(A,(1E16.8,x),A)") 'Primitive cell volume =', c%volume, 'nm^3'
+       write(*,"(3(1E16.8,x))") self%lattvecs(:,1)
+       write(*,"(3(1E16.8,x))") self%lattvecs(:,2)
+       write(*,"(3(1E16.8,x))") self%lattvecs(:,3)
+       write(*,"(A,(1E16.8,x),A)") 'Primitive cell volume =', self%volume, 'nm^3'
 
        write(*,"(A)") 'Reciprocal lattice vectors [1/nm]:'
-       write(*,"(3(1E16.8,x))") c%reclattvecs(:,1)
-       write(*,"(3(1E16.8,x))") c%reclattvecs(:,2)
-       write(*,"(3(1E16.8,x))") c%reclattvecs(:,3)
-       write(*,"(A,(1E16.8,x),A)") 'Brillouin zone volume =', c%volume_bz, '1/nm^3'
-       if(c%twod) write(*,"(A)") 'System is 2d.'
+       write(*,"(3(1E16.8,x))") self%reclattvecs(:,1)
+       write(*,"(3(1E16.8,x))") self%reclattvecs(:,2)
+       write(*,"(3(1E16.8,x))") self%reclattvecs(:,3)
+       write(*,"(A,(1E16.8,x),A)") 'Brillouin zone volume =', self%volume_bz, '1/nm^3'
+       if(self%twod) write(*,"(A)") 'System is 2d.'
        
-       if(c%polar) then
+       if(self%polar) then
           write(*,"(A)") 'System is polar.'
           write(*,"(A)") 'Dielectric tensor:'
           do i = 1, 3
-             write(*,"(3(1E16.8,x))") c%epsilon(:,i)
+             write(*,"(3(1E16.8,x))") self%epsilon(:,i)
           end do
           write(*,"(A)") 'Born effective charges:'
-          do i = 1, c%numatoms
-             write(*,"(A)") trim(c%elements(c%atomtypes(i)))
+          do i = 1, self%numatoms
+             write(*,"(A)") trim(self%elements(self%atomtypes(i)))
              do j = 1, 3
-                write(*,"(3(1E16.8,x))") c%born(:,j,i)
+                write(*,"(3(1E16.8,x))") self%born(:,j,i)
              end do
           end do
-          write(*,"(A,1E16.8)") 'Static dielectric (used for screening e-ch. imp. interactions) = ', c%epsilon0
-          write(*,"(A,1E16.8)") 'High-frequency dielectric = ', c%epsiloninf
+          write(*,"(A,1E16.8)") 'Static dielectric (used for screening e-ch. imp. interactions) = ', self%epsilon0
+          write(*,"(A,1E16.8)") 'High-frequency dielectric = ', self%epsiloninf
        end if
-       write(*,"(A, F7.2, A)") 'Crystal temperature = ', c%T, ' K'
+       write(*,"(A, F7.2, A)") 'Crystal temperature = ', self%T, ' K'
     end if
   end subroutine read_input_and_setup_crystal
 
