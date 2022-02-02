@@ -108,7 +108,7 @@ contains
   subroutine read_input_and_setup(self, crys)
     !! Read input file for information related to the numerics.
     !!
-    !! n Numerics object
+    !! self Numerics object
     !! crys Crytal object
 
     class(numerics), intent(out) :: self
