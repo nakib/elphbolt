@@ -526,7 +526,7 @@ contains
        UkpgUkuq = 0 !above quantity rotated by the phonon u(q) matrix
        gbloch = 0
 
-       !Create the <n'|m'> overlap matrix
+       !Create the overlap matrix
        do np = 1, self%numwannbands !over final electron band
           do mp = 1, self%numwannbands !over initial electron band
              overlap(mp,np) = conjg(el_evec_kp(np))*el_evec_k(mp)
@@ -564,7 +564,7 @@ contains
        end do
 
        if(crys%polar) then !Long-range correction
-          unm = dot_product(conjg(el_evec_k),el_evec_kp)
+          unm = dot_product(el_evec_kp,el_evec_k)
           call long_range_prefac(self, crys, &
                matmul(crys%reclattvecs,qvec)*bohr2nm,u,glprefac)
           gbloch = gbloch + glprefac*unm
