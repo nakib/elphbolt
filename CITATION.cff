@@ -9,6 +9,5 @@ authors:
     orcid: 'https://orcid.org/0000-0001-7839-9881'
 repository-code: 'https://github.com/nakib/elphbolt'
 license: GPL-3.0-or-later
-commit: '1480608'
 version: 1.0.1
-date-released: '2021-02-08'
+date-released: '2021-02-09'
