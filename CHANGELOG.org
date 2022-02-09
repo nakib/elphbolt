@@ -1,0 +1,5 @@
+* v1.0.1
+** Added
+   + New abstract data type (ADT) called "particle". The "phonon" and "electron" ADTs are now inherited from "particle".
+** Fixed
+   + Bug in the dipole correction of the e-ph matrix elements.

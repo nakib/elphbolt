@@ -37,7 +37,7 @@ RUN echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers && \
 USER $USERNAME
 WORKDIR /home/$USERNAME
 
-# Install some other packages from Ubuntu repo
+# Install some other packages from Debian repo
 RUN sudo apt-get install -yq git nano make cmake gfortran mpich  \
     liblapack-dev libsymspg-dev && \
     sudo apt-get clean -q

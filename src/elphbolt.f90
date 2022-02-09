@@ -17,7 +17,7 @@
 program elphbolt
   !! Author: Nakib Haider Protik
   !! Summary: Main driver program.
-  !! Version: 1.0.0
+  !! Version: 1.0.1
   !!
   !! elphbolt is a program for solving the coupled electron-phonon Boltzmann transport equations
   !! (e-ph BTEs) as formulated in https://arxiv.org/abs/2109.08547 (2021) with both the
