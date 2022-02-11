@@ -28,19 +28,6 @@ module wannier_module
 
   private
   public epw_wannier
-
-  !EPW File names
-  character(len=*), parameter :: filename_epwdata = "epwdata.fmt"
-  character(len=*), parameter :: filename_epwgwann = "epmatwp1"
-  character(len=*), parameter :: filename_elwscells = "rcells_k"
-  character(len=*), parameter :: filename_phwscells = "rcells_q"
-  character(len=*), parameter :: filename_gwscells = "rcells_g"
-  character(len=*), parameter :: filename_elwsdeg = "wsdeg_k"
-  character(len=*), parameter :: filename_phwsdeg = "wsdeg_q"
-  character(len=*), parameter :: filename_gwsdeg = "wsdeg_g"
-
-  !Unit conversion constant
-  real(dp), parameter :: g2unitfactor = Ryd2eV**3*Ryd2amu
   
   type epw_wannier
      !! Data and procedures related to Wannierization.
@@ -97,6 +84,15 @@ contains
     integer(k8) :: coarse_qmesh(3)
     real(dp) :: ef
     real(dp), allocatable :: dummy(:)
+    ! EPW File names:
+    character(len=*), parameter :: filename_epwdata = "epwdata.fmt"
+    character(len=*), parameter :: filename_epwgwann = "epmatwp1"
+    character(len=*), parameter :: filename_elwscells = "rcells_k"
+    character(len=*), parameter :: filename_phwscells = "rcells_q"
+    character(len=*), parameter :: filename_gwscells = "rcells_g"
+    character(len=*), parameter :: filename_elwsdeg = "wsdeg_k"
+    character(len=*), parameter :: filename_phwsdeg = "wsdeg_q"
+    character(len=*), parameter :: filename_gwsdeg = "wsdeg_g"
 
     namelist /wannier/ coarse_qmesh
 
@@ -260,6 +256,7 @@ contains
        call zheev("V", "U", self%numwannbands, H(:,:), self%numwannbands, energies(ik,:), &
             work, nwork, rwork, tmp)
 
+       !These quantities are U^dagger. See Eq. 31 or prb 76, 165108.
        if(present(evecs)) then
           evecs(ik,:,:)=transpose(H(:,:))
        end if
@@ -352,6 +349,8 @@ contains
        call zheev("V", "U", self%numbranches, dynmat(:, :), self%numbranches, omega2, work, nwork, rwork, aux)
 
        energies(iq, :) = sign(sqrt(abs(omega2)), omega2)
+
+       !These quantities are u. See Eq. 32 or prb 76, 165108.
        if(present(evecs)) then
           evecs(iq, :, :) = transpose(dynmat(:, :))
        end if
@@ -491,12 +490,13 @@ contains
          el_evec_kp(self%numwannbands), ph_evec_q(self%numbranches), &
          gmixed(:,:,:,:)
     character(len = 2) :: wannspace
+    real(dp), parameter :: g2unitfactor = Ryd2eV**3*Ryd2amu
     
     !Local variables
     integer(k8) :: ip, iws, nws, np, mp, sp, mtype
     complex(dp) :: caux, u(self%numbranches), gbloch, unm, &
          overlap(self%numwannbands,self%numwannbands), glprefac
-    complex(dp), allocatable :: UkpgUk(:, :), UkpgUkuq(:)
+    complex(dp), allocatable :: UkpgUkdag(:, :), UkpgUkdaguq(:)
     real(dp) :: g2_epw
 
     if(wannspace /= 'el' .and. wannspace /= 'ph') then
@@ -508,11 +508,11 @@ contains
     do ip = 1, self%numbranches ! d.o.f of basis atoms
        !demux atom type from d.o.f
        mtype = (ip - 1)/3 + 1 
-       !normalize and conjugate eigenvector
+       !normalize
        u(ip) = ph_evec_q(ip)/sqrt(crys%masses(crys%atomtypes(mtype)))
     end do
 
-    if(ph_en == 0) then !zero out matrix elements for energy phonons
+    if(ph_en == 0) then !zero out matrix elements for zero energy phonons
        g2_epw = 0
     else
        if(wannspace == 'ph') then
@@ -521,14 +521,16 @@ contains
           nws = self%nwsk
        end if
        
-       allocate(UkpgUk(self%numbranches, nws), UkpgUkuq(nws))
-       UkpgUk = 0 !g(k,Rp) or g(Re,q) rotated by the electron U(k), U(k') matrices
-       UkpgUkuq = 0 !above quantity rotated by the phonon u(q) matrix
+       allocate(UkpgUkdag(self%numbranches, nws), UkpgUkdaguq(nws))
+       !See Eq. 22 of prb 76, 165108.
+       UkpgUkdag = 0 !g(k,Rp) or g(Re,q) (un)rotated by the electron U^\dagger(k) and U(k') matrices
+       UkpgUkdaguq = 0 !above quantity (un)rotated by the phonon u(q) matrix
        gbloch = 0
 
-       !Create the overlap matrix
+       !Create the matrix U_nn'(k')U_m'm^\dagger(k)
        do np = 1, self%numwannbands !over final electron band
           do mp = 1, self%numwannbands !over initial electron band
+             !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
              overlap(mp,np) = conjg(el_evec_kp(np))*el_evec_k(mp)
           end do
        end do
@@ -542,28 +544,31 @@ contains
                    caux = caux + overlap(mp,np)*gmixed(np, mp, sp, iws)
                 end do
              end do
-             UkpgUk(sp, iws) = UkpgUk(sp, iws) + caux
+             UkpgUkdag(sp, iws) = UkpgUkdag(sp, iws) + caux
           end do
        end do
 
        do iws = 1, nws !over matrix elements WS cell
           !Apply phonon rotation
-          UkpgUkuq(iws) = UkpgUkuq(iws) + dot_product(conjg(u),UkpgUk(:, iws))
+          !(Recall that the phonon eigenvector *did not* come out pre-daggered from ph_wann_epw.)
+          UkpgUkdaguq(iws) = UkpgUkdaguq(iws) + dot_product(conjg(u),UkpgUkdag(:, iws))
        end do
 
        do iws = 1, nws !over matrix elements WS cell
+          !Fourier transform to reciprocal-space
           if(wannspace == 'ph') then
-             !Fourier transform to q-space
              caux = expi(twopi*dot_product(qvec, self%rcells_g(iws, :)))&
                   /self%gwsdeg(iws)
           else
              caux = expi(twopi*dot_product(kvec, self%rcells_k(iws,:)))&
                   /self%elwsdeg(iws)
           end if
-          gbloch = gbloch + caux*UkpgUkuq(iws)
+          gbloch = gbloch + caux*UkpgUkdaguq(iws)
        end do
 
        if(crys%polar) then !Long-range correction
+          !This is [U(k')U^\dagger(k)]_nm, the overlap factor in the dipole correction.
+          !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
           unm = dot_product(el_evec_kp,el_evec_k)
           call long_range_prefac(self, crys, &
                matmul(crys%reclattvecs,qvec)*bohr2nm,u,glprefac)
