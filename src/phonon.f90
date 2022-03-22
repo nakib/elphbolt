@@ -13,6 +13,8 @@
 !
 ! You should have received a copy of the GNU General Public License
 ! along with elphbolt. If not, see <http://www.gnu.org/licenses/>.
+!
+! 20220322 : Added support for reading d3q's sparse files (XC)
 
 module phonon_module
   !! Module containing type and procedures related to the phononic properties.
@@ -377,16 +379,18 @@ contains
     
     !Local variables
     real(dp) :: tmp(3,3), r(crys%numatoms, 3), celldm(6), at(3,3), &
-         mass(crys%numelements), zeff(crys%numatoms, 3, 3), eps(3, 3)
+         mass(crys%numelements), zeff(crys%numatoms, 3, 3), eps(3, 3), fc_
     real(dp), allocatable :: fc(:,:,:,:)
     integer(k8) :: ii, jj, ll, mm, nn, ltem, mtem, ntem, info, P(3), &
          na1, na2, na3, j1, j2, j3, na1_, na2_, na3_, j1_, j2_, j3_, &
          triplet_counter, nR, nR_, qscell(3), tipo(crys%numatoms), i, j, &
-         ibrav, ntype, nat, jn1, jn2, jn3
-    integer(k8), allocatable :: R2(:,:), R3(:,:)
+         ibrav, ntype, nat, jn1, jn2, jn3, ind
+    integer(k8), allocatable :: nind(:), R2tmp(:,:), R3tmp(:,:), &
+         R2(:,:), R3(:,:), triplet_map(:,:,:,:)
     character(len = 1) :: polar_key
-    character(len = 6) :: label(crys%numelements)
-    logical :: sheng_file_exists, d3q_file_exists, save_nR
+    character(len = 6) :: label(crys%numelements), sparse_header
+    logical :: sheng_file_exists, d3q_file_exists, &
+         d3q_sparse_file_exists, save_nR
 
     !External procedures
     external :: dgesv
@@ -394,17 +398,34 @@ contains
     !Check what force constants files have been provided
     sheng_file_exists = .False.
     d3q_file_exists = .False.
+    d3q_sparse_file_exists = .False.
     inquire(file = 'FORCE_CONSTANTS_3RD', exist = sheng_file_exists)
     inquire(file = 'mat3R', exist = d3q_file_exists)
+    inquire(file = 'mat3R.sparse', exist = d3q_sparse_file_exists)
 
-    if(sheng_file_exists .and. .not. d3q_file_exists) then
+    if(sheng_file_exists .and. (.not. d3q_file_exists) .and. (.not. d3q_sparse_file_exists)) then
        call print_message('Reading ShengBTE format third order force constants...')
-    else if(d3q_file_exists .and. .not. sheng_file_exists) then
+    else if(d3q_file_exists .and. (.not. sheng_file_exists) .and. (.not. d3q_sparse_file_exists)) then
        call print_message('Reading d3q format third order force constants...')
-    else if(d3q_file_exists .and. sheng_file_exists) then
+    else if(d3q_sparse_file_exists .and. (.not. sheng_file_exists) .and. (.not. d3q_file_exists)) then
+       call print_message('Reading d3q_sparse format third order force constants...')
+    else if(sheng_file_exists .and. d3q_file_exists .and. (.not. d3q_sparse_file_exists)) then
        call print_message(&
             'Both ShengBTE and d3q format third order force constants provided. Defaulting to ShengBTE format.')
        d3q_file_exists = .False.
+    else if(sheng_file_exists .and. (.not. d3q_file_exists) .and. d3q_sparse_file_exists) then
+       call print_message(&
+            'Both ShengBTE and d3q_sparse format third order force constants provided. Defaulting to ShengBTE format.')
+       d3q_sparse_file_exists = .False.
+    else if((.not. sheng_file_exists) .and. d3q_file_exists .and. d3q_sparse_file_exists) then
+       call print_message(&
+            'Both d3q and d3q_sparse format third order force constants provided. Defaulting to d3q_sparse format.')
+       d3q_file_exists = .False.
+    else if(sheng_file_exists .and. d3q_file_exists .and. d3q_sparse_file_exists) then
+       call print_message(&
+            'All ShengBTE, d3q and d3q_sparse format third order force constants provided. Defaulting to ShengBTE format.')
+       d3q_file_exists = .False.
+       d3q_sparse_file_exists = .False.
     else
        call exit_with_message('Third order force constant file not provided. Exiting.')
     end if
@@ -433,7 +454,7 @@ contains
        end do
        close(1)
        !IFC3 units are eV/Ang^3
-    else       
+    else if(d3q_file_exists) then
        !See SUBROUTINE read_fc3_grid of fc3_interp.f90 of the d3q code
        !for more information about the format.
        open(1, file = 'mat3R', status = "old")
@@ -552,6 +573,164 @@ contains
           end do
        end do
        self%ifc3 = self%ifc3*Ryd2eV/(bohr2nm*10.0_dp)**3 !eV/Ang^3
+    else if(d3q_sparse_file_exists) then
+       ! For debugging purposes
+       !read(*,*) ii
+
+       !See SUBROUTINE read_fc3_sparse of fc3_interp.f90 of the d3q code
+       !for more information about the format.
+       open(1, file = 'mat3R.sparse', status = "old")
+
+       !Check file really in sparse mode
+       read(1,*) sparse_header
+       if (sparse_header /= "sparse") then
+         call exit_with_message('Not really a d3q sparse file. Exiting.')
+       end if
+       !Read some stuff that will not be used in the code.
+       read(1,*) ntype, nat, ibrav, celldm(1:6)
+       if (ibrav==0) then
+          read(1,*) ((at(i,j),i=1,3),j=1,3)
+       end if
+
+       do i = 1, ntype
+          read(1, *) j, label(i), mass(i)
+       end do
+
+       do i = 1, nat
+          read(1, *) j, tipo(i), r(i, 1:3)
+       end do
+
+       read(1, *) polar_key
+       if(polar_key == "T") then
+          do i = 1, 3
+             read(1, *) eps(i, 1:3)
+          end do
+          do i = 1, nat
+             read(1, *)
+             do j = 1, 3
+                read(1, *) zeff(i, j, 1:3)
+             end do
+          end do
+       end if
+       read(1,*) qscell(1:3)
+
+       !Read number of unit cells in file.
+       read(1, *) nR
+       !Also, allocate the various quantities.
+       allocate(nind(nR), R2tmp(3,nR), R3tmp(3,nR))
+       allocate(triplet_map(crys%numatoms,crys%numatoms,crys%numatoms,nR))
+
+       do ii = 1, nR
+          ! Read how many (atom indices + components) at that position, and atom coordinates
+          read(1, *) nind(ii), R2tmp(:, ii), R3tmp(:, ii)
+       end do
+
+       ! Will need to make two passes on the rest of file
+       !  1st pass will give number of triplets
+       !  2nd pass will do the reading proper
+
+       !Number of triplets
+       triplet_map = 0
+       self%numtriplets = 0
+       do ii = 1, nR
+          do ind = 1, nind(ii)
+             read(1,*) jn1, jn2, jn3, fc_
+
+             ! Unwrap the indices
+             na1 = (jn1-1)/3 + 1
+             na2 = (jn2-1)/3 + 1
+             na3 = (jn3-1)/3 + 1
+
+             ! Compute atom_indices_visited index
+             if ( triplet_map(na1,na2,na3,ii)==0 ) then
+                self%numtriplets = self%numtriplets + 1
+                triplet_map(na1,na2,na3,ii) = self%numtriplets
+             end if
+
+          end do
+          read(1, *)
+       end do
+       
+       !Allocate quantities
+       allocate(self%Index_i(self%numtriplets), self%Index_j(self%numtriplets), self%Index_k(self%numtriplets))
+       allocate(self%ifc3(3, 3, 3, self%numtriplets), self%R_j(3, self%numtriplets), self%R_k(3,self%numtriplets))
+       allocate(R2(3, self%numtriplets), R3(3, self%numtriplets))
+       
+       ! Read the FC3s proper
+       rewind(1)
+       read(1,*) sparse_header
+       !Read some stuff that will not be used in the code.
+       read(1,*) ntype, nat, ibrav, celldm(1:6)
+       if (ibrav==0) then
+          read(1,*) ((at(i,j),i=1,3),j=1,3)
+       end if
+
+       do i = 1, ntype
+          read(1, *) j, label(i), mass(i)
+       end do
+
+       do i = 1, nat
+          read(1, *) j, tipo(i), r(i, 1:3)
+       end do
+
+       read(1, *) polar_key
+       if(polar_key == "T") then
+          do i = 1, 3
+             read(1, *) eps(i, 1:3)
+          end do
+          do i = 1, nat
+             read(1, *)
+             do j = 1, 3
+                read(1, *) zeff(i, j, 1:3)
+             end do
+          end do
+       end if
+       read(1,*) qscell(1:3)
+
+       !Read number of unit cells in file.
+       read(1, *) nR
+
+       do ii = 1, nR
+          ! Read how many (atom indices + components) at that position, and atom coordinates
+          read(1, *) nind(ii), tmp(:, 2), tmp(:, 3)
+       end do
+
+       self%ifc3 = 0._dp
+       do ii = 1, nR
+          do ind = 1, nind(ii)
+             read(1,*) jn1, jn2, jn3, fc_
+
+             ! Unwrap the indices
+             na1 = (jn1-1)/3 + 1
+             na2 = (jn2-1)/3 + 1
+             na3 = (jn3-1)/3 + 1
+             j1  = mod(jn1-1, 3) + 1
+             j2  = mod(jn2-1, 3) + 1
+             j3  = mod(jn3-1, 3) + 1
+
+             !Triplet
+             triplet_counter = triplet_map(na1,na2,na3,ii)
+             self%Index_i(triplet_counter) = na1
+             self%Index_j(triplet_counter) = na2
+             self%Index_k(triplet_counter) = na3
+             self%ifc3(j1, j2, j3, triplet_counter) = fc_
+             R2(:,triplet_counter) = R2tmp(:,ii)
+             R3(:,triplet_counter) = R3tmp(:,ii)
+
+          end do
+          read(1, *)
+       end do
+
+       ! Finish converting to the standard format.
+       do ii = 1, self%numtriplets
+          !Positions of the 2nd and 3rd atom in the triplet
+          !converted to Cartesian coordinates (Ang).
+          self%R_j(:, ii) = &
+               matmul(crys%lattvecs, R2(:, ii)*10.0_dp) !Ang
+          self%R_k(:, ii) = &
+               matmul(crys%lattvecs, R3(:, ii)*10.0_dp) !Ang
+       end do
+       self%ifc3 = self%ifc3*Ryd2eV/(bohr2nm*10.0_dp)**3 !eV/Ang^3
     end if
 
     !Each vector is rounded to the nearest lattice vector.
@@ -561,6 +740,9 @@ contains
     tmp = crys%lattvecs
     call dgesv(3, self%numtriplets, tmp, 3, P, self%R_k, 3, info)
     self%R_k = matmul(crys%lattvecs, anint(self%R_k/10.0_dp)) !nm
+
+    if(this_image() == 1) &
+       write(*, "(A, I10)") " Number triplets read in = ", self%numtriplets
   end subroutine read_ifc3
 
   subroutine phonon_espresso(self, crys, nk, kpoints, omegas, eigenvect, velocities)
