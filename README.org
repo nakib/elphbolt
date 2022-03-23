@@ -12,7 +12,7 @@ Using /ab initio/ electron-phonon and phonon-phonon interactions and a fully wav
 - phonon and electronic contributions to the thermopower; and
 - effect of the mutual electron-phonon drag on the transport coefficients listed above.
 
-Stylistically, it is designed to be simple, small, fast, and extensible. Object oriented programming concepts are combined with the procedural style, which allows fast development, while resulting in a rather compact source (~ 7500 lines of code, generated using David A. Wheeler's 'SLOCCount'). The symmetries of the crystal are fully exploited and the transport active Fermi window is used to allow the sampling of extremely fine wave vector meshes needed for an accurate solution of the BTEs. Parallelism is achieved through modern Fortran's intrinsic ~coarrays~ feature that is fully supported by recent versions of both the ~gcc~ and ~intel~ compilers.
+Stylistically, it is designed to be simple, small, fast, and extensible. Object oriented programming concepts are combined with the procedural style, which allows fast development, while resulting in a rather compact source (~ 7000 lines of code, generated using David A. Wheeler's 'SLOCCount'). The symmetries of the crystal are fully exploited and the transport active Fermi window is used to allow the sampling of extremely fine wave vector meshes needed for an accurate solution of the BTEs. Parallelism is achieved through modern Fortran's intrinsic ~coarrays~ feature that is fully supported by recent versions of both the ~gcc~ and ~intel~ compilers.
 
 ~elphbolt~ currently works with the ~Quantum Espresso~ (https://www.quantum-espresso.org/) suite and its core module ~EPW~ (https://epw-code.org/) for the phonon quantities and the Wannier space information, respectively.
 
@@ -68,9 +68,9 @@ This comes out of the usual ~ph.x~ and ~q2r.x~ calculation from ~Quantum Espress
 
 *** Third order interatomic force constants
 
-This file, which must be named ~FORCE_CONSTANTS_3RD~, is needed to calculate the 3-ph scattering rates. This is a required file if you seek a solution of the decoupled phonon BTE or the coupled electron-phonon BTEs.
+This code supports the ~thirdorder.py~, dense ~d3q~, and the sparse ~d3q~ formats of the third order force constants file. For the ~d3q~ interface, the sparse format is strongly recommended. Check out [[https://bitbucket.org/sousaw/thirdorder/src/master]] and [[https://anharmonic.github.io/d3q/]] to learn more.
 
-This must be provided for a solution to the phonon BTE or the coupled electron-phonon BTEs. See documentation for the code ~thirdorder.py~ ([[https://bitbucket.org/sousaw/thirdorder/src/master]]) for how to generate this file.
+If you seek a solution of the decoupled phonon BTE or the coupled electron-phonon BTEs, at least one of these files, named ~FORCE_CONSTANTS_3RD~, ~mat3R~, or ~mat3R.sparse~ for the three supported formats, respectively, must be provided.
 
 *** Wannier space information
 
