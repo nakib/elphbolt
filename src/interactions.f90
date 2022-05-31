@@ -524,9 +524,9 @@ contains
     real(dp) :: k(3), q(3), en_ph, en_el, en_elp, const, delta, &
          invboseplus1, fermi1, fermi2, occup_fac
     real(dp), allocatable :: g2_istate(:), Y_istate(:)
-    complex(dp) :: gReq_iq(wann%numwannbands, wann%numwannbands, wann%numbranches, wann%nwsk)
+    complex(dp), allocatable :: gReq_iq(:,:,:,:)
     character(len = 1024) :: filename
-
+    
     if(key /= 'g' .and. key /= 'Y') then
        call exit_with_message(&
             "Invalid value of key in call to calculate_eph_interaction_ibzq. Exiting.")
@@ -537,9 +537,11 @@ contains
     else
        call print_message("Calculating ph-e transition probabilities for all IBZ phonons...")
     end if
-        
-    !Allocate and initialize g2_istate
+    
+    !Allocate and initialize gReq_iq and g2_istate
     if(key == 'g') then
+       allocate(gReq_iq(wann%numwannbands, wann%numwannbands, wann%numbranches, wann%nwsk))
+       
        !Maximum length of g2_istate
        nprocs = el%nstates_inwindow*ph%numbands
        allocate(g2_istate(nprocs))
@@ -558,7 +560,7 @@ contains
        write(*, "(A, I10)") " #states = ", nstates_irred
        write(*, "(A, I10)") " #states/image = ", chunk
     end if
-
+    
     do istate = start, end !over IBZ blocks states
        !Demux state index into branch (s) and wave vector (iq) indices
        call demux_state(istate, ph%numbands, s, iq)
@@ -568,6 +570,7 @@ contains
           call chdir(trim(adjustl(num%g2dir)))
           write (filename, '(I6)') iq
           filename = 'gReq.iq'//trim(adjustl(filename))
+          
           open(1,file=filename,status="old",access='stream')
           read(1) gReq_iq
           close(1)
@@ -701,7 +704,7 @@ contains
              end do !n
           end do !m
        end do !ik
-
+       
        if(key == 'g') then
           !Change to data output directory
           call chdir(trim(adjustl(num%g2dir)))
@@ -782,11 +785,11 @@ contains
          const, bosefac, fermi_minus_fac, fermi_plus_fac, en_ph, en_el, delta, occup_fac
     real(dp), allocatable :: g2_istate(:), Xplus_istate(:), Xminus_istate(:)
     integer(k8), allocatable :: istate_el(:), istate_ph(:)
-    complex(dp) :: gkRp_ik(wann%numwannbands,wann%numwannbands,wann%numbranches,wann%nwsq), &
-         ph_evecs_iq(1, ph%numbands,ph%numbands)
+    complex(dp), allocatable :: gkRp_ik(:, :, :, :)
+    complex(dp) :: ph_evecs_iq(1, ph%numbands,ph%numbands)
     character(len = 1024) :: filename
     logical :: needfinephon
-
+    
     if(key /= 'g' .and. key /= 'X') then
        call exit_with_message(&
             "Invalid value of key in call to calculate_eph_interaction_ibzk. Exiting.")
@@ -798,8 +801,10 @@ contains
        call print_message("Calculating e-ph transition probabilities for all IBZ electrons...")
     end if
     
-    !Allocate and initialize g2_istate
+    !Allocate and initialize gkRp_ik and g2_istate
     if(key == 'g') then
+       allocate(gkRp_ik(wann%numwannbands,wann%numwannbands,wann%numbranches,wann%nwsq))
+       
        !Length of g2_istate
        nprocs = el%nstates_inwindow*wann%numbranches
        allocate(g2_istate(nprocs))
@@ -1089,7 +1094,7 @@ contains
     !Conversion factor in transition probability expression
     const = twopi/hbar_eVps
 
-    !Length of 
+    !Number of processes
     nprocs = el%nstates_inwindow
     allocate(Xchimp_istate(nprocs), istate_el(nprocs))
     Xchimp_istate(:) = 0.0_dp

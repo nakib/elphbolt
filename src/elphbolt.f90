@@ -132,7 +132,7 @@ program elphbolt
            
            !Calculate mixed Bloch-Wannier space e-ph vertex g(Re,q)
            call calculate_gReq(wann, ph, num)
-
+           
            !Calculate Bloch space e-ph vertex g(k,q) for IBZ q
            call calculate_eph_interaction_ibzq(wann, crys, el, ph, num, 'g')
 
