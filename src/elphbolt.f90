@@ -71,9 +71,6 @@ program elphbolt
      !Calculate electrons
      call el%initialize(wann, crys, sym, num)
   end if
-
-  !call exit
-  !DBG So far all e quantities np indep.
   
   call t_event%end_timer('Initialization')
   
@@ -123,9 +120,6 @@ program elphbolt
 
         call t_event%end_timer('Plots along path')
      end if
-
-     !call exit
-     !DBG So far all e quantities np indep.
      
      call subtitle("Calculating interactions...")
 
@@ -144,9 +138,6 @@ program elphbolt
 
            call t_event%end_timer('IBZ q e-ph interactions')
         end if
-
-        !call exit
-        !DBG So far all e quantities np indep. This includes the gq2 files.
         
         call t_event%start_timer('IBZ ph-e transition probilities')
         
@@ -154,9 +145,6 @@ program elphbolt
         call calculate_eph_interaction_ibzq(wann, crys, el, ph, num, 'Y')
         
         call t_event%end_timer('IBZ ph-e transition probilities')
-
-        !call exit
-        !DBG So far all e quantities np indep. This includes the Y files.
      end if
 
      if(num%onlyebte .or. num%drag) then
@@ -171,9 +159,6 @@ program elphbolt
 
            call t_event%end_timer('IBZ k e-ph interactions')
         end if
-
-        !call exit
-        !DBG So far all e quantities np indep. This includes the gk2 files!
         
         call t_event%start_timer('IBZ e-ph transition probabilities')
 
@@ -181,9 +166,6 @@ program elphbolt
         call calculate_eph_interaction_ibzk(wann, crys, el, ph, num, 'X')
         
         call t_event%end_timer('IBZ e-ph transition probabilities')
-
-        !call exit
-        !DBG So far all e quantities np indep. This includes the Xplus and Xminus files!
      end if
 
      if(num%onlyebte .or. num%drag .or. num%phe .or. num%drag &
@@ -232,9 +214,6 @@ program elphbolt
         !After this point the phonon eigenvectors and other quantities are not needed
         call ph%deallocate_phonon_quantities
      end if
-
-     !call exit
-     !DBG So far all e and p quantities np indep. This includes the Wm and Wp files!
      
      !Solve BTEs
      if(num%onlyphbte .and. .not. num%phe) then
