@@ -469,7 +469,6 @@ contains
 
     ! 11. Create FBZ blocks to IBZ blocks map
     call print_message("Calculating FBZ -> IBZ mappings...")
-    !call create_fbz2ibz_map
     call create_fbz2ibz_map(self%fbz2ibz_map,self%nwv,self%nwv_irred, &
          self%indexlist,self%nequiv,self%ibz2fbz_map)
     
@@ -512,7 +511,7 @@ contains
        call demux_state(istate, wann%numwannbands, ib, i)
        if(abs(self%ens_irred(i, ib) - self%enref) <= self%fsthick) then
           count = count + 1
-          self%IBZ_inwindow_states(count,:) = (/i, ib/)
+          self%IBZ_inwindow_states(count,:) = [i, ib]
        end if
     end do
 

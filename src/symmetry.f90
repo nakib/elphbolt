@@ -21,7 +21,7 @@ module symmetry_module
   use params, only: dp, k8
   use misc, only: mux_vector, demux_mesh, demux_vector, &
        exit_with_message, subtitle, distribute_points
-  use crystal_module !, only :: crystal
+  use crystal_module, only : crystal
   use spglib_wrapper, only: get_operations, get_cartesian_operations, get_num_operations
   
   implicit none
@@ -59,7 +59,7 @@ module symmetry_module
      procedure :: calculate_symmetries
      
   end type symmetry
-
+    
 contains
 
   subroutine calculate_symmetries(self, crys, mesh)
@@ -210,6 +210,7 @@ contains
     integer(k8), optional, intent(in) :: indexlist(:)
     integer(k8), intent(out) :: equiv_map(:,:)
 
+    !Local variables
     integer(k8) :: nmesh, chunk, counter, im, num_active_images
     integer(k8), allocatable :: index_mesh(:,:)
     integer(k8) :: i, isym, ivec(3), base
@@ -258,11 +259,22 @@ contains
        end do
     end do
     
-    !Collect equiv_map_chunks in equiv_map
+    !Gather equiv_map_chunks in equiv_map
     sync all
-    do im = 1, num_active_images
-       equiv_map(:, start[im]:end[im]) = equiv_map_chunk(:,:)[im]
-    end do
+    !This works for gcc+opencoarrays but not on intel:
+    !do im = 1, num_active_images
+    !   equiv_map(:, start[im]:end[im]) = equiv_map_chunk(:,:)[im]
+    !end do
+
+    !This works for both gcc+opencoarrays and intel:
+    ! First gather on the first image...
+    if(this_image() == 1) then
+       do im = 1, num_active_images
+          equiv_map(:, start[im]:end[im]) = equiv_map_chunk(:,:)[im]
+       end do
+    end if
+    ! ...and then broadcast
+    call co_broadcast(equiv_map, 1)
   end subroutine find_equiv_map
 
   subroutine find_irred_wedge(mesh,nwavevecs_irred,wavevecs_irred, &
@@ -294,10 +306,10 @@ contains
 
     !Local variables
     integer(k8) :: nwavevecs, i, imux, s, image, imagelist(nsymm_rot), &
-         nrunninglist, counter, ijk(3), aux, num_active_images, chunk
+         nrunninglist, counter, ijk(3), aux, num_active_images, chunk, check
     integer(k8), allocatable :: runninglist(:), &
          indexlist_irred_tmp(:), nequivalent_tmp(:), ibz2fbz_map_tmp(:,:,:), &
-         start[:], end[:], check[:]
+         start[:], end[:]
     logical :: in_list
 
     if(blocks .and. .not. present(indexlist)) &
@@ -321,13 +333,14 @@ contains
          runninglist(nwavevecs), ibz2fbz_map_tmp(nsymm_rot, nwavevecs, 2))
     
     !Allocate coarrays
-    allocate(start[*], end[*], check[*])
+    allocate(start[*], end[*])
     
     runninglist = 0
     nrunninglist = 0
     nwavevecs_irred = 0
     nequivalent_tmp = 0
     counter = 0
+    
     do i = 1, nwavevecs !Take a point from the FBZ
        !Get the muxed index of the wave vector
        if(blocks) then
@@ -341,7 +354,7 @@ contains
        if(nrunninglist > 0) then
           !Divide wave vectors among images
           call distribute_points(nrunninglist, chunk, start, end, num_active_images)
-
+          
           check = 0
           if(any(runninglist(start:end) == imux)) check = 1
           call co_sum(check)
@@ -373,7 +386,7 @@ contains
                 runninglist(nrunninglist) = image
                 !Save mapping of the irreducible point to its FBZ image
                 ibz2fbz_map_tmp(aux, &
-                     nwavevecs_irred, :) = (/s, image/)
+                     nwavevecs_irred, :) = [s, image]
              end if
           end do
           counter = counter + nequivalent_tmp(nwavevecs_irred)
@@ -383,8 +396,10 @@ contains
     !Check for error
     if(nwavevecs /= counter) call exit_with_message("Severe error: Could not find irreducible wedge.")
 
-    if(this_image() == 1) write(*, "(A, I10)") " Number of FBZ wave vectors = ", counter
-    if(this_image() == 1) write(*, "(A, I10)") " Number IBZ wave vectors = ", nwavevecs_irred
+    if(this_image() == 1) then
+       write(*, "(A, I10)") " Number of FBZ wave vectors = ", counter
+       write(*, "(A, I10)") " Number IBZ wave vectors = ", nwavevecs_irred
+    end if
 
     !Deallocate some internal data
     deallocate(runninglist)

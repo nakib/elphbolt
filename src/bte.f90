@@ -259,7 +259,7 @@ contains
        call calculate_field_term('el', 'E', el%nequiv, el%ibz2fbz_map, &
             crys%T, el%chempot, el%ens, el%vels, self%el_rta_rates_ibz, &
             self%el_field_term_E, el%indexlist)
-
+       
        ! Symmetrize field term
        do ik = 1, el%nwv
           self%el_field_term_E(ik,:,:)=transpose(&
@@ -716,7 +716,6 @@ contains
     integer(k8) :: ik_ibz, ik_fbz, ieq, ib, nk_ibz, nk, nbands, pow, &
          chunk, num_active_images
     integer(k8), allocatable :: start[:], end[:]
-    real(dp), allocatable :: field_term_reduce(:,:,:)[:]
     real(dp) :: A
     logical :: trivial_case
 
@@ -764,10 +763,6 @@ contains
        !Divide IBZ states among images
        call distribute_points(nk_ibz, chunk, start, end, num_active_images)
 
-       !Allocate and initialize field term coarrays
-       allocate(field_term_reduce(nk, nbands, 3)[*])
-       field_term_reduce(:,:,:) = 0.0_dp
-
        !Work the active images only:
        do ik_ibz = start, end
           do ieq = 1, nequiv(ik_ibz)
@@ -779,20 +774,19 @@ contains
              end if
              do ib = 1, nbands
                 if(rta_rates_ibz(ik_ibz, ib) /= 0.0_dp) then
-                   field_term_reduce(ik_fbz, ib, :) = A*vels(ik_fbz, ib, :)*&
+                   field_term(ik_fbz, ib, :) = A*vels(ik_fbz, ib, :)*&
                         (ens(ik_fbz, ib) - chempot)**pow/rta_rates_ibz(ik_ibz, ib)
                 end if
              end do
           end do
        end do
        
-       !Reduce field term coarrays
+       !Reduce field term
        !Units:
        ! nm.eV/K for phonons, gradT-field
        ! nm.eV/K for electrons, gradT-field
        ! nm.C for electrons, E-field
-       call co_sum(field_term_reduce)
-       field_term = field_term_reduce
+       call co_sum(field_term)
     end if
   end subroutine calculate_field_term
 
