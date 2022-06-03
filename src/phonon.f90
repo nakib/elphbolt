@@ -151,17 +151,22 @@ contains
     call phonon_espresso(self, crys, chunk, self%wavevecs(start:end, :), &
          ens_chunk, evecs_chunk, vels_chunk)
 
-    !Gather the chunks from the images
+    !Gather the chunks from the images and broadcast to all
     allocate(self%ens(self%nwv, self%numbands))
     allocate(self%vels(self%nwv, self%numbands, 3))
     allocate(self%evecs(self%nwv, self%numbands, self%numbands))
     sync all
-    do im = 1, num_active_images
-       self%ens(start[im]:end[im], :) = ens_chunk(:,:)[im]
-       self%vels(start[im]:end[im], :, :) = vels_chunk(:,:,:)[im]
-       self%evecs(start[im]:end[im], :, :) = evecs_chunk(:,:,:)[im]
-    end do
-    sync all
+    if(this_image() == 1) then
+       do im = 1, num_active_images
+          self%ens(start[im]:end[im], :) = ens_chunk(:,:)[im]
+          self%vels(start[im]:end[im], :, :) = vels_chunk(:,:,:)[im]
+          self%evecs(start[im]:end[im], :, :) = evecs_chunk(:,:,:)[im]
+       end do
+    end if
+    call co_broadcast(self%ens, 1)
+    call co_broadcast(self%vels, 1)
+    call co_broadcast(self%evecs, 1)
+    
     deallocate(ens_chunk, vels_chunk, evecs_chunk)
     
     !Calculate IBZ mesh
@@ -191,13 +196,17 @@ contains
                symmetrizers_chunk(:, :, iq - start + 1)/kk
        end if
     end do
-    
+
+    !Gather from images and broadcast to all
     allocate(self%symmetrizers(3, 3, self%nwv))
     sync all
-    do im = 1, num_active_images
-       self%symmetrizers(:, :, start[im]:end[im]) = symmetrizers_chunk(:,:,:)[im]
-    end do
-    sync all
+    if(this_image() == 1) then
+       do im = 1, num_active_images
+          self%symmetrizers(:, :, start[im]:end[im]) = symmetrizers_chunk(:,:,:)[im]
+       end do
+    end if
+    call co_broadcast(self%symmetrizers, 1)
+    
     deallocate(symmetrizers_chunk)
     
     !Symmetrize phonon energies and velocities.
@@ -574,9 +583,6 @@ contains
        end do
        self%ifc3 = self%ifc3*Ryd2eV/(bohr2nm*10.0_dp)**3 !eV/Ang^3
     else if(d3q_sparse_file_exists) then
-       ! For debugging purposes
-       !read(*,*) ii
-
        !See SUBROUTINE read_fc3_sparse of fc3_interp.f90 of the d3q code
        !for more information about the format.
        open(1, file = 'mat3R.sparse', status = "old")

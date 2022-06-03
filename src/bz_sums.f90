@@ -130,13 +130,15 @@ contains
     end do
     !Multiply with spin degeneracy factor
     dos_chunk(:,:) = el%spindeg*dos_chunk(:,:)
-    sync all
     
-    !Collect dos_chunks into dos
-    do im = 1, num_active_images
-       el%dos(start[im]:end[im], :) = dos_chunk(:,:)[im]
-    end do
+    !Gather from images and broadcast to all
     sync all
+    if(this_image() == 1) then
+       do im = 1, num_active_images
+          el%dos(start[im]:end[im], :) = dos_chunk(:,:)[im]
+       end do
+    end if
+    call co_broadcast(el%dos, 1)
 
     !Write dos to file
     call write2file_rank2_real(el%prefix // '.dos', el%dos)
@@ -244,15 +246,19 @@ contains
     end do
     if(phiso) W_phiso_chunk = W_phiso_chunk*0.5_dp*pi/hbar_eVps !THz
     if(phsubs) W_phsubs_chunk = W_phsubs_chunk*0.5_dp*pi/hbar_eVps !THz
-    sync all
     
-    !Collect chunks into full array
-    do im = 1, num_active_images
-       ph%dos(start[im]:end[im], :) = dos_chunk(:,:)[im]
-       if(phiso) W_phiso(start[im]:end[im], :) = W_phiso_chunk(:,:)[im]
-       if(phsubs) W_phsubs(start[im]:end[im], :) = W_phsubs_chunk(:,:)[im]
-    end do
+    !Gather from images and broadcast to all
     sync all
+    if(this_image() == 1) then
+       do im = 1, num_active_images
+          ph%dos(start[im]:end[im], :) = dos_chunk(:,:)[im]
+          if(phiso) W_phiso(start[im]:end[im], :) = W_phiso_chunk(:,:)[im]
+          if(phsubs) W_phsubs(start[im]:end[im], :) = W_phsubs_chunk(:,:)[im]
+       end do
+    end if
+    call co_broadcast(ph%dos, 1)
+    call co_broadcast(W_phiso, 1)
+    call co_broadcast(W_phsubs, 1)
 
     !Write to file
     call write2file_rank2_real(ph%prefix // '.dos', ph%dos)

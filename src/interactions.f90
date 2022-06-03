@@ -1209,10 +1209,8 @@ contains
 
     !Local variables
     integer(k8) :: nstates_irred, istate, nprocs_3ph_plus, nprocs_3ph_minus, &
-         nprocs_phe, iproc, chunk, s, iq, num_active_images
-    integer(k8), allocatable :: start[:], end[:]
-    real(dp), allocatable :: rta_rates_3ph_psum(:,:)[:], rta_rates_phe_psum(:,:)[:], &
-         W(:), Y(:)
+         nprocs_phe, iproc, chunk, s, iq, num_active_images, start, end
+    real(dp), allocatable :: W(:), Y(:)
     character(len = 1024) :: filepath_Wm, filepath_Wp, filepath_Y, tag
     
     !Set output directory of transition probilities
@@ -1220,20 +1218,9 @@ contains
     
     !Total number of IBZ blocks states
     nstates_irred = ph%nwv_irred*ph%numbands
-
-    !Allocate start and end coarrays
-    allocate(start[*], end[*])
     
     !Divide phonon states among images
     call distribute_points(nstates_irred, chunk, start, end, num_active_images)
-
-    !Allocate and initialize scattering rates coarrays
-    allocate(rta_rates_3ph_psum(ph%nwv_irred, ph%numbands)[*])
-    rta_rates_3ph_psum(:, :) = 0.0_dp
-    if(present(el)) then
-       allocate(rta_rates_phe_psum(ph%nwv_irred, ph%numbands)[*])
-       rta_rates_phe_psum(:, :) = 0.0_dp
-    end if
     
     !Allocate and initialize scattering rates
     allocate(rta_rates_3ph(ph%nwv_irred, ph%numbands), rta_rates_phe(ph%nwv_irred, ph%numbands))
@@ -1254,7 +1241,7 @@ contains
        call read_transition_probs_e(trim(adjustl(filepath_Wp)), nprocs_3ph_plus, W)
 
        do iproc = 1, nprocs_3ph_plus
-          rta_rates_3ph_psum(iq, s) = rta_rates_3ph_psum(iq, s) + W(iproc) 
+          rta_rates_3ph(iq, s) = rta_rates_3ph(iq, s) + W(iproc) 
        end do
 
        !Set W- filename
@@ -1265,7 +1252,7 @@ contains
        call read_transition_probs_e(trim(adjustl(filepath_Wm)), nprocs_3ph_minus, W)
 
        do iproc = 1, nprocs_3ph_minus
-          rta_rates_3ph_psum(iq, s) = rta_rates_3ph_psum(iq, s) + 0.5_dp*W(iproc)
+          rta_rates_3ph(iq, s) = rta_rates_3ph(iq, s) + 0.5_dp*W(iproc)
        end do
 
        if(present(el)) then
@@ -1277,17 +1264,15 @@ contains
           call read_transition_probs_e(trim(adjustl(filepath_Y)), nprocs_phe, Y)
 
           do iproc = 1, nprocs_phe
-             rta_rates_phe_psum(iq, s) = rta_rates_phe_psum(iq, s) + el%spindeg*Y(iproc)
+             rta_rates_phe(iq, s) = rta_rates_phe(iq, s) + el%spindeg*Y(iproc)
           end do
        end if
     end do
 
-    !Reduce coarray partial sums
-    call co_sum(rta_rates_3ph_psum)
-    rta_rates_3ph = rta_rates_3ph_psum
+    !Reduce partial sums
+    call co_sum(rta_rates_3ph)
     if(present(el)) then
-       call co_sum(rta_rates_phe_psum)
-       rta_rates_phe = rta_rates_phe_psum
+       call co_sum(rta_rates_phe)
     end if
   end subroutine calculate_ph_rta_rates
 
@@ -1303,10 +1288,8 @@ contains
     
     !Local variables
     integer(k8) :: nstates_irred, istate, nprocs_eph, &
-         iproc, chunk, m, ik, num_active_images
-    integer(k8), allocatable :: start[:], end[:]
-    real(dp), allocatable :: rta_rates_eph_psum(:,:)[:], &
-         rta_rates_echimp_psum(:,:)[:], X(:)
+         iproc, chunk, m, ik, num_active_images, start, end
+    real(dp), allocatable :: X(:)
     character(len = 1024) :: filepath_Xp, filepath_Xm, tag
 
     !Set output directory of transition probilities
@@ -1314,20 +1297,9 @@ contains
 
     !Total number of IBZ blocks states
     nstates_irred = el%nwv_irred*el%numbands
-    
-    !Allocate start and end coarrays
-    allocate(start[*], end[*])
 
     !Divide phonon states among images
     call distribute_points(nstates_irred, chunk, start, end, num_active_images)
-
-    !Allocate and initialize scattering rates coarrays
-    allocate(rta_rates_eph_psum(el%nwv_irred, el%numbands)[*])
-    rta_rates_eph_psum(:, :) = 0.0_dp
-    if(num%elchimp) then
-       allocate(rta_rates_echimp_psum(el%nwv_irred, el%numbands)[*])
-       rta_rates_echimp_psum(:, :) = 0.0_dp
-    end if
     
     !Allocate and initialize scattering rates
     allocate(rta_rates_eph(el%nwv_irred, el%numbands))
@@ -1351,7 +1323,7 @@ contains
        call read_transition_probs_e(trim(adjustl(filepath_Xp)), nprocs_eph, X)
        
        do iproc = 1, nprocs_eph
-          rta_rates_eph_psum(ik, m) = rta_rates_eph_psum(ik, m) + X(iproc) 
+          rta_rates_eph(ik, m) = rta_rates_eph(ik, m) + X(iproc) 
        end do
 
        !Set X- filename
@@ -1363,7 +1335,7 @@ contains
        call read_transition_probs_e(trim(adjustl(filepath_Xm)), nprocs_eph, X)
 
        do iproc = 1, nprocs_eph
-          rta_rates_eph_psum(ik, m) = rta_rates_eph_psum(ik, m) + X(iproc) 
+          rta_rates_eph(ik, m) = rta_rates_eph(ik, m) + X(iproc) 
        end do
 
        if(num%elchimp) then
@@ -1376,19 +1348,16 @@ contains
           call read_transition_probs_e(trim(adjustl(filepath_Xm)), nprocs_eph, X)
 
           do iproc = 1, nprocs_eph
-             rta_rates_echimp_psum(ik, m) = rta_rates_echimp_psum(ik, m) + X(iproc) 
+             rta_rates_echimp(ik, m) = rta_rates_echimp(ik, m) + X(iproc) 
           end do
        end if
     end do
 
-    !Reduce coarray partial sums
-    call co_sum(rta_rates_eph_psum)
-    rta_rates_eph = rta_rates_eph_psum
+    !Reduce partial sums
+    call co_sum(rta_rates_eph)
     if(num%elchimp) then
-       call co_sum(rta_rates_echimp_psum)
-       rta_rates_echimp = rta_rates_echimp_psum
-    end if
-    
+       call co_sum(rta_rates_echimp)
+    end if    
   end subroutine calculate_el_rta_rates
   
   subroutine read_transition_probs_e(filepath, N, TP, istate1, istate2)

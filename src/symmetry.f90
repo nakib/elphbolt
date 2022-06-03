@@ -259,21 +259,13 @@ contains
        end do
     end do
     
-    !Gather equiv_map_chunks in equiv_map
+    !Gather equiv_map_chunks in equiv_map and broadcast to all
     sync all
-    !This works for gcc+opencoarrays but not on intel:
-    !do im = 1, num_active_images
-    !   equiv_map(:, start[im]:end[im]) = equiv_map_chunk(:,:)[im]
-    !end do
-
-    !This works for both gcc+opencoarrays and intel:
-    ! First gather on the first image...
     if(this_image() == 1) then
        do im = 1, num_active_images
           equiv_map(:, start[im]:end[im]) = equiv_map_chunk(:,:)[im]
        end do
     end if
-    ! ...and then broadcast
     call co_broadcast(equiv_map, 1)
   end subroutine find_equiv_map
 

@@ -714,8 +714,7 @@ contains
 
     !Local variables
     integer(k8) :: ik_ibz, ik_fbz, ieq, ib, nk_ibz, nk, nbands, pow, &
-         chunk, num_active_images
-    integer(k8), allocatable :: start[:], end[:]
+         chunk, num_active_images, start, end
     real(dp) :: A
     logical :: trivial_case
 
@@ -757,9 +756,6 @@ contains
     trivial_case = species == 'ph' .and. field == 'E'
 
     if(.not. trivial_case) then
-       !Allocate start and end coarrays
-       allocate(start[*], end[*])
-
        !Divide IBZ states among images
        call distribute_points(nk_ibz, chunk, start, end, num_active_images)
 
@@ -814,12 +810,11 @@ contains
     integer(k8) :: nstates_irred, chunk, istate1, numbranches, s1, &
          iq1_ibz, ieq, iq1_sym, iq1_fbz, iproc, iq2, s2, iq3, s3, nq, &
          num_active_images, numbands, ik, ikp, m, n, nprocs_phe, aux1, aux2, &
-         nprocs_3ph_plus, nprocs_3ph_minus
+         nprocs_3ph_plus, nprocs_3ph_minus, start, end
     integer(k8), allocatable :: istate2_plus(:), istate3_plus(:), &
-         istate2_minus(:), istate3_minus(:), istate_el1(:), istate_el2(:), &
-         start[:], end[:]
+         istate2_minus(:), istate3_minus(:), istate_el1(:), istate_el2(:)
     real(dp) :: tau_ibz
-    real(dp), allocatable :: Wp(:), Wm(:), Y(:), response_ph_reduce(:,:,:)[:]
+    real(dp), allocatable :: Wp(:), Wm(:), Y(:), response_ph_reduce(:,:,:)
     character(len = 1024) :: filepath_Wm, filepath_Wp, filepath_Y, tag
 
     !Set output directory of transition probilities
@@ -843,11 +838,8 @@ contains
     !Total number of IBZ states
     nstates_irred = size(rta_rates_ibz(:,1))*numbranches
     
-    !Allocate coarrays
-    allocate(start[*], end[*])
-    allocate(response_ph_reduce(nq, numbranches, 3)[*])
-
-    !Initialize coarray
+    !Allocate and initialize response reduction array
+    allocate(response_ph_reduce(nq, numbranches, 3))
     response_ph_reduce(:,:,:) = 0.0_dp
     
     !Divide phonon states among images
@@ -984,10 +976,11 @@ contains
 
     !Local variables
     integer(k8) :: nstates_irred, nprocs, chunk, istate, numbands, numbranches, &
-         ik_ibz, m, ieq, ik_sym, ik_fbz, iproc, ikp, n, nk, num_active_images, aux
-    integer(k8), allocatable :: istate_el(:), istate_ph(:), start[:], end[:]
+         ik_ibz, m, ieq, ik_sym, ik_fbz, iproc, ikp, n, nk, num_active_images, aux, &
+         start, end
+    integer(k8), allocatable :: istate_el(:), istate_ph(:)
     real(dp) :: tau_ibz
-    real(dp), allocatable :: Xplus(:), Xminus(:), response_el_reduce(:,:,:)[:]
+    real(dp), allocatable :: Xplus(:), Xminus(:), response_el_reduce(:,:,:)
     character(1024) :: filepath_Xminus, filepath_Xplus, tag
 
     !Set output directory of transition probilities
@@ -1008,15 +1001,11 @@ contains
 
     if(drag) then
        !Number of phonon branches
-       !numbranches = size(response_ph(1,:,1))
        numbranches = size(ph_drag_term(1,:,1))
     end if
 
-    !Allocate coarrays
-    allocate(start[*], end[*])
-    allocate(response_el_reduce(nk, numbands, 3)[*])
-
-    !Initialize coarray
+    !Allocate and initialize response reduction array
+    allocate(response_el_reduce(nk, numbands, 3))
     response_el_reduce(:,:,:) = 0.0_dp
     
     !Divide electron states among images
@@ -1114,10 +1103,10 @@ contains
     !Local variables
     integer(k8) :: nstates_irred, nprocs, chunk, istate, numbands, numbranches, &
          ik_ibz, m, ieq, ik_sym, ik_fbz, iproc, iq, s, nk, num_active_images, &
-         ipol, fineq_indvec(3)
-    integer(k8), allocatable :: istate_el(:), istate_ph(:), start[:], end[:]
+         ipol, fineq_indvec(3), start, end
+    integer(k8), allocatable :: istate_el(:), istate_ph(:)
     real(dp) :: tau_ibz, ForG(3)
-    real(dp), allocatable :: Xplus(:), Xminus(:), ph_drag_term_reduce(:,:,:)[:]
+    real(dp), allocatable :: Xplus(:), Xminus(:), ph_drag_term_reduce(:,:,:)
     character(1024) :: filepath_Xminus, filepath_Xplus, tag
     
     !Number of electron bands
@@ -1132,11 +1121,8 @@ contains
     !Number of phonon branches
     numbranches = ph%numbands
 
-    !Allocate coarrays
-    allocate(start[*], end[*])
-    allocate(ph_drag_term_reduce(nk, numbands, 3)[*])
-    
-    !Initialize coarray
+    !Allocate and initialize response reduction array
+    allocate(ph_drag_term_reduce(nk, numbands, 3))
     ph_drag_term_reduce(:,:,:) = 0.0_dp
 
     !Divide electron states among images
