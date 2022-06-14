@@ -53,6 +53,8 @@ module numerics_module
      !! Directory for e-ph transition rates.
      character(len = 1024) :: Ydir
      !! Directory for ph-e transition rates.
+     character(len = 1024) :: scdir
+     !! Directory for the superconductivity temporary data.
      logical :: read_gq2
      !! Choose if earlier e-ph (IBZ q) vertices are to be used.
      logical :: read_gk2
@@ -94,9 +96,9 @@ module numerics_module
      integer(k8) :: ph_en_num
      !! Number of equidistant phonon energy mesh points.
      real(dp) :: el_en_min, el_en_max
-     !! Bounds of equidistant phonon energy mesh.
+     !! Bounds of equidistant electron energy mesh.
      integer(k8) :: el_en_num
-     !! Number of equidistant phonon energy mesh points.
+     !! Number of equidistant electron energy mesh points.
    contains
 
      procedure :: initialize=>read_input_and_setup, create_chempot_dirs
@@ -233,6 +235,10 @@ contains
     if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(self%g2dir)))
     self%Vdir = trim(adjustl(self%datadumpdir))//'V2'
     if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(self%Vdir)))
+
+    !Create superconductivity data dump directory
+    self%scdir = trim(adjustl(self%datadumpdir))//'sc'
+    if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(self%scdir)))
 
     !Create T dependent subdirectory
     write(tag, "(E9.3)") crys%T
