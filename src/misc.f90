@@ -541,6 +541,56 @@ contains
        mid = array(m)
     end do
   end subroutine binsearch
+
+  subroutine compsimps(f, h, s)
+    !! Composite Simpson's rule for real function
+    !! f integrand
+    !! h integration variable spacing
+    !! s result
+
+    real(dp), intent(in) :: h, f(:)
+    real(dp), intent(out) :: s
+
+    !Local variables
+    integer(kind=4) :: i, numint, n
+    real(dp) :: a, b
+
+    n = size(f)
+    
+    s = 0.0_dp
+
+    a = f(1)
+
+    !If n is odd then number of intervals is even, carry on.
+    !Otherwise, do trapezoidal rule in the last interval.
+    if(mod(n, 2) /= 0) then
+       numint = n - 1
+       b = f(n)
+    else
+       !Note: Number of sample points is even, so
+       !I will do trapezoidal rule in the last interval.
+       numint = n - 2
+       b = f(n - 1)
+    end if
+
+    s = s + a + b
+
+    !even sites
+    do i = 2, numint, 2
+       s = s + 4.0_dp*f(i)
+    end do
+
+    !odd sites
+    do i = 3, numint, 2
+       s = s + 2.0_dp*f(i)
+    end do
+    s = s*h/3.0_dp
+
+    if(mod(n, 2) == 0) then
+       !trapezoidal rule
+       s = s + 0.5_dp*(f(n) + f(n - 1))*h
+    end if
+  end subroutine compsimps
   
   function mux_vector(v, mesh, base)
     !! Multiplex index of a single wave vector.
