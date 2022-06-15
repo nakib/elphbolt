@@ -95,6 +95,10 @@ module electron_module
      !! Number of temperature points. This is needed for runlevel 0 only.
      real(dp), allocatable :: Tlist(:)
      !! List of temperatures. This is needed for runlevel 0 only.
+     real(dp) :: spinnormed_dos_fermi
+     !! Spin-normalized density of states at the Fermi level
+     real(dp), allocatable :: Ws_irred(:, :), Ws(:, :)
+     !! Electron delta functions normalized by spinnormed_dos_fermi
      
    contains
 

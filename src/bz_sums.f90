@@ -28,7 +28,8 @@ module bz_sums
 
   implicit none
 
-  public calculate_dos, calculate_transport_coeff, calculate_qTF
+  public calculate_dos, calculate_transport_coeff, calculate_qTF, &
+       calculate_el_dos_fermi, calculate_el_Ws
   private calculate_el_dos, calculate_ph_dos_iso
 
   interface calculate_dos
@@ -69,6 +70,95 @@ contains
        end if
     end if
   end subroutine calculate_qTF
+
+  subroutine calculate_el_dos_Fermi(el, usetetra)
+    !! Calculate spin-normalized electron density of states at the Fermi level
+    !!
+    !! el Electron data type
+    !! usetetra Use the tetrahedron method for delta functions?
+    
+    type(electron), intent(inout) :: el
+    logical, intent(in) :: usetetra
+    
+    !Local variables
+    integer(k8) :: ikp, ibp
+    real(dp) :: delta
+
+    call print_message("Calculating spin-normalized electronic density of states at Fermi level...")
+
+    el%spinnormed_dos_fermi = 0.0_dp
+    do ikp = 1, el%nwv !over FBZ blocks
+       do ibp = 1, el%numbands !just need transport active bands
+          if(usetetra) then
+             !Evaluate delta[E(iq',ib') - E_Fermi]
+             delta = delta_fn_tetra(el%chempot, ikp, ibp, el%wvmesh, el%tetramap, &
+                  el%tetracount, el%tetra_evals)
+          else
+             delta = delta_fn_triang(el%chempot, ikp, ibp, el%wvmesh, el%triangmap, &
+                  el%triangcount, el%triang_evals)
+          end if
+          el%spinnormed_dos_fermi = el%spinnormed_dos_fermi + delta
+       end do
+    end do
+
+    if(this_image() == 1) then
+       write(*, "(A, 1E16.8, A)") ' Spin-normalized DOS(Ef) = ', el%spinnormed_dos_fermi, ' 1/eV/spin'
+    end if
+
+    sync all
+  end subroutine calculate_el_dos_Fermi
+
+  subroutine calculate_el_Ws(el, usetetra)
+    !! Calculate all electron delta functions scaled by spin-normalized DOS(Ef)
+    !! W_mk = delta[E_mk - Ef]/DOS(Ef)
+    !
+    !Note that here the delta function weights are already supercell normalized. 
+
+    type(electron), intent(inout) :: el
+    logical, intent(in) :: usetetra
+    
+    !Local variables
+    integer(k8) :: ik, ib
+    real(dp) :: delta, e
+    
+    call print_message("Calculating DOS(Ef) electron delta functions...")
+
+    allocate(el%Ws_irred(el%nwv_irred, el%numbands))
+    do ik = 1, el%nwv_irred !over IBZ blocks
+       do ib = 1, el%numbands
+          e = el%ens_irred(ik, ib)
+          if(usetetra) then
+             !Evaluate delta[E(ik,ib) - E_Fermi]
+             delta = delta_fn_tetra(e, ik, ib, el%wvmesh, el%tetramap, &
+                  el%tetracount, el%tetra_evals)
+          else
+             delta = delta_fn_triang(e, ik, ib, el%wvmesh, el%triangmap, &
+                  el%triangcount, el%triang_evals)
+          end if
+          el%Ws_irred(ik, ib) = delta
+       end do
+    end do
+    el%Ws_irred = el%Ws_irred/el%spinnormed_dos_fermi
+
+    allocate(el%Ws(el%nwv, el%numbands))
+    do ik = 1, el%nwv !over FBZ blocks
+       do ib = 1, el%numbands
+          e = el%ens(ik, ib)
+          if(usetetra) then
+             !Evaluate delta[E(ik,ib) - E_Fermi]
+             delta = delta_fn_tetra(e, ik, ib, el%wvmesh, el%tetramap, &
+                  el%tetracount, el%tetra_evals)
+          else
+             delta = delta_fn_triang(e, ik, ib, el%wvmesh, el%triangmap, &
+                  el%triangcount, el%triang_evals)
+          end if
+          el%Ws(ik, ib) = delta
+       end do
+    end do
+    el%Ws = el%Ws/el%spinnormed_dos_fermi
+
+    sync all
+  end subroutine calculate_el_Ws
   
   subroutine calculate_el_dos(el, usetetra)
     !! Calculate the density of states (DOS) in units of 1/energy. 

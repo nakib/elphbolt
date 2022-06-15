@@ -134,7 +134,27 @@ contains
 
     if(this_image() == 1) write(*, "(A)") trim(message)
   end subroutine print_message
+  
+  subroutine write2file_rank1_real(filename, data)
+    !! Write rank-1 data to file.
 
+    character(len = *), intent(in) :: filename
+    real(dp), intent(in) :: data(:)
+
+    integer(k8) :: ik, nk
+
+    nk = size(data(:))
+
+    if(this_image() == 1) then
+       open(1, file = trim(filename), status = "replace")
+       do ik = 1, nk
+          write(1, "(E20.10)") data(ik)
+       end do
+       close(1)
+    end if
+    sync all
+  end subroutine write2file_rank1_real
+  
   subroutine write2file_rank2_real(filename, data)
     !! Write rank-2 data to file.
 

@@ -20,7 +20,7 @@ module eliashberg
   
   use params, only: k8, dp
   use misc, only: exit_with_message, print_message, distribute_points, &
-       demux_state, mux_vector
+       demux_state, mux_vector, write2file_rank1_real, write2file_rank2_real
   use wannier_module, only: epw_wannier
   use electron_module, only: electron
   use phonon_module, only: phonon
@@ -29,7 +29,7 @@ module eliashberg
 
   implicit none
 
-  private
+  private !calculate_a2F_iso
   public calculate_a2F
 
 contains
@@ -57,8 +57,9 @@ contains
          iq, start, end, chunk, k_indvec(3), kp_indvec(3), &
          q_indvec(3), count, nprocs, num_active_images, &
          iomega, numomega
-    real(dp) :: k(3), kp(3), en_el
-    real(dp), allocatable :: ph_deltas(:, :, :), g2_istate(:), a2F_istate(:, :)
+    real(dp) :: k(3), kp(3), en_el, WWp
+    real(dp), allocatable :: ph_deltas(:, :, :), g2_istate(:), a2F_istate(:, :), &
+         iso_a2F_branches(:, :)
     character(len = 1024) :: filename
     
     call print_message("Calculating a2F for all IBZ electrons...")
@@ -97,6 +98,10 @@ contains
        write(*, "(A, I10)") " #states/image = ", chunk
     end if
 
+    !Allocate and initialize isotropic a2F
+    allocate(iso_a2F_branches(numomega, wann%numbranches))
+    iso_a2F_branches = 0.0_dp
+    
     do istate = start, end !over IBZ blocks states
        !Demux state index into band (m) and wave vector (ik) indices
        call demux_state(istate, wann%numwannbands, m, ik)
@@ -143,7 +148,7 @@ contains
           
           !Find interacting phonon wave vector
           ! Note that q, k, and k' are all on the same mesh
-          q_indvec = kp_indvec - k_indvec
+          q_indvec = modulo(kp_indvec - k_indvec, el%wvmesh)
 
           ! Muxed index of q
           iq = mux_vector(q_indvec, ph%wvmesh, 0_k8)
@@ -152,6 +157,9 @@ contains
           do n = 1, wann%numwannbands
              !Apply energy window to final electron
              if(abs(el%ens(ikp, n) - el%enref) > el%fsthick) cycle
+
+             !Delta function contributions and k-point weight
+             WWp = el%Ws_irred(ik, m)*el%Ws(ikp, n)*el%nequiv(ik)
              
              !Run over phonon branches
              do s = 1, wann%numbranches
@@ -160,6 +168,10 @@ contains
 
                 !Note that the phonon branch index iterates last for a2F_istate
                 a2F_istate(count, :) = g2_istate(count)*ph_deltas(s, iq, :)
+
+                !Sum contribuion to the isotropic a2F
+                iso_a2F_branches(:, s) = iso_a2F_branches(:, s) + &
+                     a2F_istate(count, :)*WWp
              end do !s
           end do !n
        end do !ikp
@@ -167,24 +179,35 @@ contains
        !Multiply with electron DOS at Fermi level
        a2F_istate = a2F_istate*dos_ef
 
-       !Change to data output directory
-       call chdir(trim(adjustl(num%scdir)))
-
-       !Write data in binary format
-       !Note: this will overwrite existing data!
-       write (filename, '(I9)') istate
-       filename = 'a2F.istate'//trim(adjustl(filename))
-       open(1, file = trim(filename), status = 'replace', access = 'stream')
-       write(1) count
-       write(1) a2F_istate
-       close(1)
-
-       !Change back to working directory
-       call chdir(num%cwd)
+!!$       !Change to data output directory
+!!$       call chdir(trim(adjustl(num%scdir)))
+!!$
+!!$       !Write data in binary format
+!!$       !Note: this will overwrite existing data!
+!!$       write (filename, '(I9)') istate
+!!$       filename = 'a2F.istate'//trim(adjustl(filename))
+!!$       open(1, file = trim(filename), status = 'replace', access = 'stream')
+!!$       write(1) count
+!!$       write(1) a2F_istate
+!!$       close(1)
+!!$
+!!$       !Change back to working directory
+!!$       call chdir(num%cwd)
 
        deallocate(g2_istate, a2F_istate)
     end do
+
+    !Multiply with electron DOS at Fermi level
+    iso_a2F_branches = iso_a2F_branches*dos_ef
+    
+    !Reduce iso_a2F_branches
+    call co_sum(iso_a2F_branches)
+
+    !Write isotropic a2F to file
+    call chdir(num%cwd)
+    call write2file_rank2_real('a2F_iso_branch_resolved', iso_a2F_branches)
+    call write2file_rank1_real('a2F_iso', sum(iso_a2F_branches, dim = 2))
+    
     sync all
-  end subroutine calculate_a2F
-  
+  end subroutine calculate_a2F  
 end module eliashberg
