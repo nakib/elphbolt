@@ -839,9 +839,6 @@ contains
           call chdir(num%cwd)
        end if
 
-       !Get the muxed index of FBZ wave vector from the IBZ blocks index list
-       !ik_fbz = el%indexlist_irred(ik)
-
        !Electron energy
        en_el = el%ens_irred(ik, m)
 

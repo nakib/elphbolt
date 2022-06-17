@@ -19,7 +19,7 @@ module bz_sums
 
   use params, only: dp, k8, kB, qe, pi, hbar_eVps, perm0
   use misc, only: exit_with_message, print_message, write2file_rank2_real, &
-       distribute_points, Bose, Fermi
+       distribute_points, Bose, Fermi, binsearch
   use phonon_module, only: phonon
   use electron_module, only: electron
   use crystal_module, only: crystal
@@ -88,7 +88,7 @@ contains
 
     el%spinnormed_dos_fermi = 0.0_dp
     do ikp = 1, el%nwv !over FBZ blocks
-       do ibp = 1, el%numbands !just need transport active bands
+       do ibp = 1, el%numbands
           if(usetetra) then
              !Evaluate delta[E(iq',ib') - E_Fermi]
              delta = delta_fn_tetra(el%chempot, ikp, ibp, el%wvmesh, el%tetramap, &
@@ -118,45 +118,38 @@ contains
     logical, intent(in) :: usetetra
     
     !Local variables
-    integer(k8) :: ik, ib
-    real(dp) :: delta, e
+    integer(k8) :: ik_ibz, ik_fbz, ieq, ib
+    real(dp) :: delta
     
-    call print_message("Calculating DOS(Ef) electron delta functions...")
-
-    allocate(el%Ws_irred(el%nwv_irred, el%numbands))
-    do ik = 1, el%nwv_irred !over IBZ blocks
-       do ib = 1, el%numbands
-          e = el%ens_irred(ik, ib)
-          if(usetetra) then
-             !Evaluate delta[E(ik,ib) - E_Fermi]
-             delta = delta_fn_tetra(e, ik, ib, el%wvmesh, el%tetramap, &
-                  el%tetracount, el%tetra_evals)
-          else
-             delta = delta_fn_triang(e, ik, ib, el%wvmesh, el%triangmap, &
-                  el%triangcount, el%triang_evals)
-          end if
-          el%Ws_irred(ik, ib) = delta
-       end do
-    end do
-    el%Ws_irred = el%Ws_irred/el%spinnormed_dos_fermi
+    call print_message("Calculating DOS(Ef) normalized electron delta functions...")
 
     allocate(el%Ws(el%nwv, el%numbands))
-    do ik = 1, el%nwv !over FBZ blocks
+    allocate(el%Ws_irred(el%nwv_irred, el%numbands))
+    
+    do ik_fbz = 1, el%nwv !over FBZ blocks
        do ib = 1, el%numbands
-          e = el%ens(ik, ib)
           if(usetetra) then
              !Evaluate delta[E(ik,ib) - E_Fermi]
-             delta = delta_fn_tetra(e, ik, ib, el%wvmesh, el%tetramap, &
+             delta = delta_fn_tetra(el%chempot, ik_fbz, ib, el%wvmesh, el%tetramap, &
                   el%tetracount, el%tetra_evals)
           else
-             delta = delta_fn_triang(e, ik, ib, el%wvmesh, el%triangmap, &
+             delta = delta_fn_triang(el%chempot, ik_fbz, ib, el%wvmesh, el%triangmap, &
                   el%triangcount, el%triang_evals)
           end if
-          el%Ws(ik, ib) = delta
+          el%Ws(ik_fbz, ib) = delta
        end do
     end do
     el%Ws = el%Ws/el%spinnormed_dos_fermi
 
+    !Generate Ws on the irreducible mesh
+    do ik_ibz = 1, el%nwv_irred
+       !Find index of an equivalent k-point in FBZ blocks indexlist
+       ieq = 1 !It is safe to choose the first equivalent image
+       call binsearch(el%indexlist, el%ibz2fbz_map(ieq, ik_ibz, 2), ik_fbz)
+
+       el%Ws_irred(ik_ibz, :) = el%Ws(ik_fbz, :)
+    end do
+    
     sync all
   end subroutine calculate_el_Ws
   
