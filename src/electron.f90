@@ -33,6 +33,8 @@ module electron_module
   private
   public electron
 
+  external chdir
+
   type, extends (particle) :: electron
      !! Data and procedures related to the electronic properties.
 

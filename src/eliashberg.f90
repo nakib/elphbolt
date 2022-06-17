@@ -18,7 +18,7 @@ module eliashberg
   !! Module containing the procedures related to the computation of the Eliashberg
   !! spectral function a2F and the e-ph coupling factor lambda.
   
-  use params, only: k8, dp!, twopi
+  use params, only: k8, dp
   use misc, only: exit_with_message, print_message, distribute_points, &
        demux_state, mux_vector, write2file_rank1_real, write2file_rank2_real, &
        compsimps
@@ -32,6 +32,8 @@ module eliashberg
 
   private
   public calculate_a2F, calculate_lambda
+
+  external chdir
 
 contains
 
@@ -73,8 +75,6 @@ contains
     do iomega = 1, numomega
        do s = 1, wann%numbranches
           do iq = 1, ph%nwv
-!!$             ph_deltas(s, iq, iomega) = &
-!!$                  delta_gauss(ph%ens(iq, s) - omegas(iomega), 0.0005_dp)
              if(num%tetrahedra) then
                 ph_deltas(s, iq, iomega) = &
                      delta_fn_tetra(omegas(iomega), iq, s, ph%wvmesh, ph%tetramap, &
@@ -419,17 +419,4 @@ contains
     
     sync all
   end subroutine calculate_lambda
-
-!!$  !TEST:
-!!$  pure function delta_gauss(energy, smear)
-!!$    !! Gaussian rep of delta function
-!!$
-!!$    real(dp), intent(in) :: energy, smear
-!!$    real(dp) :: delta_gauss
-!!$
-!!$    delta_gauss = exp(-0.5_dp*(energy/smear)**2)&
-!!$         /sqrt(twopi)/smear
-!!$
-!!$    if(delta_gauss < 1.0e-40_dp) delta_gauss = 0.0_dp
-!!$  end function delta_gauss
 end module eliashberg

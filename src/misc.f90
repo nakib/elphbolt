@@ -87,8 +87,8 @@ contains
        time_elapsed = dble(self%end - self%start)/self%rate/3600.0_dp !hours
        !time_elapsed = dble(end - start)/rate/3600.0_dp*num_images() !cpu-hours
        write(*, "(A)") ".............."
-       write(*, "(A, A, 1E16.8, A)") "| Timing info:", trim(event), time_elapsed, " hr"
-       !write(*, "(A, A, 1E16.8, A)") "| Timing info:", trim(event), time_elapsed, " cpu-hrs"
+       write(*, "(A, A, 1E16.8, A)") "| Timing info: ", trim(event), time_elapsed, " hr"
+       !write(*, "(A, A, 1E16.8, A)") "| Timing info: ", trim(event), time_elapsed, " cpu-hrs"
        write(*, "(A)") ".............."
     end if
   end subroutine end_timer

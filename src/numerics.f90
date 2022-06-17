@@ -26,6 +26,8 @@ module numerics_module
   private
   public numerics
 
+  external system, getcwd
+  
   type numerics
      !! Data and procedures related to the numerics.
 

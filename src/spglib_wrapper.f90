@@ -33,6 +33,8 @@ module spglib_wrapper
 
   public
 
+  external dgesv
+  
   ! Tolerance parameter passed to spglib.
   real(kind=C_DOUBLE),parameter :: symprec=1d-5
 
