@@ -86,9 +86,9 @@ module numerics_module
      logical :: drag
      !! Choose if the drag effect will be included.
      integer(k8) :: maxiter
-     !! Maximum number of iterations in the BTE solver.
+     !! Maximum number of iterations in the BTE/Migdal-Eliashberg equations solver.
      real(dp) :: conv_thres
-     !! BTE iteration convergence criterion.
+     !! BTE/Migdal-Eliashberg euqations iteration convergence criterion.
      logical :: plot_along_path
      !! Plot Wannierized quantities along high symmetry wave vectors?
      integer(k8) :: runlevel

@@ -31,14 +31,17 @@ module eliashberg
   implicit none
 
   private
-  public calculate_a2F, calculate_lambda
+  public calculate_a2F, calculate_isotropic_lambda
 
   external chdir
 
 contains
 
-  subroutine calculate_a2F(wann, el, ph, num, omegas, dos_ef)
+  subroutine calculate_a2F(wann, el, ph, num, omegas, iso_lambda0, omegalog)
     !! Parallel driver of a2F_mk(nk'|sq) over IBZ electron states.
+    !! Other zero temperature quantities such as the isotropic electron-phonon
+    !! coupling (lambda0) and the log-averaged boson energy (omegalog) are
+    !! also calculated here.
     !!
     !! This subroutine will calculate the anisotropic Eliashberg spectral function for
     !! all the energy window restricted electron-phonon processes for a given
@@ -53,22 +56,26 @@ contains
     type(electron), intent(in) :: el
     type(phonon), intent(in) :: ph
     type(numerics), intent(in) :: num
-    real(dp), intent(in) :: omegas(:), dos_ef
+    real(dp), intent(in) :: omegas(:)
+    real(dp), intent(out) :: iso_lambda0, omegalog
 
     !Local variables
     integer(k8) :: nstates_irred, istate, m, ik, n, ikp, s, &
          iq, start, end, chunk, k_indvec(3), kp_indvec(3), &
          q_indvec(3), count, nprocs, num_active_images, &
          iomega, numomega
-    real(dp) :: k(3), kp(3), en_el, WWp
+    real(dp) :: k(3), kp(3), en_el, WWp, aux, domega
     real(dp), allocatable :: ph_deltas(:, :, :), g2_istate(:), a2F_istate(:, :), &
-         iso_a2F_branches(:, :)
+         iso_a2F_branches(:, :), cum_iso_lambda_branches(:, :)
     character(len = 1024) :: filename
     
     call print_message("Calculating a2F for all IBZ electrons...")
 
     !Number of equidistant Boson energy points
     numomega = size(omegas)
+
+    !Boson energy difference
+    domega = omegas(2) - omegas(1)
     
     !Precalculate the phonon delta functions.
     allocate(ph_deltas(wann%numbranches, ph%nwv, numomega))
@@ -96,7 +103,7 @@ contains
     end if
 
     !Absorb DOS(Ef) in the definition of ph_deltas
-    ph_deltas = ph_deltas*dos_ef
+    ph_deltas = ph_deltas*el%spinnormed_dos_fermi
 
     !Total number of IBZ blocks states
     nstates_irred = el%nwv_irred*wann%numwannbands
@@ -211,67 +218,6 @@ contains
     call chdir(num%cwd)
     call write2file_rank2_real('a2F_iso_branch_resolved', iso_a2F_branches)
     call write2file_rank1_real('a2F_iso', sum(iso_a2F_branches, dim = 2))
-    
-    sync all
-  end subroutine calculate_a2F
-
-  subroutine calculate_lambda(wann, el, num, omegas, iso_lambda0, omegalog, &
-       bose_matsubara_ens, isotropic)
-    !! Parallel driver of lambda_mk(nk'|sq, l) over IBZ electron states.
-    !! Here l is the Bosonic Matsubara energy index. 
-    !!
-    !! This subroutine will calculate the anisotropic e-ph coupling function for
-    !! all the energy window restricted electron-phonon processes for a given
-    !! irreducible initial electron state = (band, wave vector). 
-    !! This list will be written to disk in files tagged with the muxed state index.
-    !!
-    !! If bose_matsubara_ens is not passed, then calculate the isotropic theory.
-    !
-    !In the FBZ and IBZ blocks a wave vector was retained when at least one
-    !band belonged within the energy window. Here the bands outside the energy
-    !window will be skipped in the calculation as they are irrelevant for transport.
-    
-    type(epw_wannier), intent(in) :: wann
-    type(electron), intent(in) :: el
-    type(numerics), intent(in) :: num
-    real(dp), intent(in) :: omegas(:), bose_matsubara_ens(:)
-    real(dp), intent(out) :: iso_lambda0, omegalog
-    logical, intent(in) :: isotropic
-
-    !Local variables
-    integer(k8) :: nstates_irred, istate, m, ik, n, ikp, s, l, &
-         iomega, start, end, chunk, count, nprocs, &
-         num_active_images, numomega, nummatsubara
-    real(dp) :: en_el, aux, domega
-    real(dp), allocatable :: a2F_istate(:, :), matsubara_lambda_istate(:, :), &
-         iso_a2F_branches(:, :), cum_iso_lambda_branches(:, :), &
-         matsubara_iso_lambda(:)
-    character(len = 1024) :: filename
-    
-    call print_message("Calculating lambda for all IBZ electrons...")
-    
-    !Number of equidistant Boson energy points
-    numomega = size(omegas)
-
-    !Boson energy difference
-    domega = omegas(2) - omegas(1)
-
-    !Number of Bosonic Matsubara energy points
-    nummatsubara = size(bose_matsubara_ens)
-
-    !Calculate standard, isotropic lambda and friends
-    ! Read iso_a2F_branches from file
-    allocate(iso_a2F_branches(numomega, wann%numbranches))
-    if(this_image() == 1) then
-       call chdir(num%cwd)
-       filename = 'a2F_iso_branch_resolved'
-       open(1, file=trim(filename), status='old')
-       do iomega = 1, numomega
-          read(1, *) iso_a2F_branches(iomega, :)
-       end do
-       close(1)
-    end if
-    call co_broadcast(iso_a2F_branches, 1)
 
     ! Calculate cumulative lambda
     allocate(cum_iso_lambda_branches(numomega, wann%numbranches))
@@ -303,120 +249,228 @@ contains
 
     ! Print cumulative lambda to file
     call write2file_rank2_real('cum_lambda_iso_branch_resolved', cum_iso_lambda_branches)
-
-    ! Don't need this anymore
-    deallocate(cum_iso_lambda_branches)
-
-    !Isotropic theory
-    if(isotropic) then
-       allocate(matsubara_iso_lambda(nummatsubara))
-       matsubara_iso_lambda = 0.0_dp
-       
-       !Sum over phonon branches
-       do s = 1, wann%numbranches
-          !Run over Matsubara frequencies
-          do l = 1, nummatsubara
-             call compsimps(&
-                  iso_a2F_branches(:, s)*2.0_dp*omegas(:)/ &
-                  (omegas(:)**2 + bose_matsubara_ens(l)**2), domega, aux)
-             matsubara_iso_lambda(l) = matsubara_iso_lambda(l) + aux
-          end do
-       end do !s
-
-       !Write to file
-       call write2file_rank1_real('matsubara_lambda_iso', matsubara_iso_lambda)
-    end if
-
-    !Don't need this anymore
-    deallocate(iso_a2F_branches)
-
-    !Anisotropic theory
-    if(.not. isotropic) then
-       !Total number of IBZ blocks states
-       nstates_irred = el%nwv_irred*wann%numwannbands
-
-       call distribute_points(nstates_irred, chunk, start, end, num_active_images)
-
-       if(this_image() == 1) then
-          write(*, "(A, I10)") " #states = ", nstates_irred
-          write(*, "(A, I10)") " #states/image = ", chunk
-       end if
-
-       do istate = start, end !over IBZ blocks states
-          !Demux state index into band (m) and wave vector (ik) indices
-          call demux_state(istate, wann%numwannbands, m, ik)
-
-          !Electron energy
-          en_el = el%ens_irred(ik, m)
-
-          !Apply energy window to initial (IBZ blocks) electron
-          if(abs(en_el - el%enref) > el%fsthick) cycle
-
-          !Load a2F_istate from disk for matsubara_lambda_istate calculation
-          ! Change to data output directory
-          call chdir(trim(adjustl(num%scdir)))
-
-          ! Read data in binary format
-          write (filename, '(I9)') istate
-          filename = 'a2F.istate'//trim(adjustl(filename))
-          open(1, file = trim(filename), status = 'old', access = 'stream')
-          read(1) nprocs
-          if(allocated(a2F_istate)) deallocate(a2F_istate, matsubara_lambda_istate)
-          allocate(a2F_istate(nprocs, numomega), matsubara_lambda_istate(nprocs, nummatsubara))
-          if(nprocs > 0) read(1) a2F_istate
-          close(1)
-
-          ! Change back to working directory
-          call chdir(num%cwd)
-
-          !Initialize eligible process counter for this state
-          count = 0
-
-          !Run over final (FBZ blocks) electron wave vectors
-          do ikp = 1, el%nwv
-             !Run over final electron bands
-             do n = 1, wann%numwannbands
-                !Apply energy window to final electron
-                if(abs(el%ens(ikp, n) - el%enref) > el%fsthick) cycle
-
-                !Run over phonon branches
-                do s = 1, wann%numbranches
-                   !Increment g2 processes counter
-                   count = count + 1
-
-                   !Note that the phonon branch index iterates last for a2F_istate
-                   !and matsubara_lambda_istate is similarly phonon branch resolved.
-                   !
-                   !Calculate lambda for each Matsubara energy
-                   do l = 1, nummatsubara
-                      call compsimps(&
-                           a2F_istate(count, :)*2.0_dp*omegas(:)/ &
-                           (omegas(:)**2 + bose_matsubara_ens(l)**2), domega, aux)
-                      matsubara_lambda_istate(count, l) = aux
-                   end do
-                end do !s
-             end do !n
-          end do !ikp
-
-          !Change to data output directory
-          call chdir(trim(adjustl(num%scdir)))
-
-          !Write data in binary format
-          !Note: this will overwrite existing data!
-          write (filename, '(I9)') istate
-          filename = 'lambda.istate'//trim(adjustl(filename))
-          open(1, file = trim(filename), status = 'replace', access = 'stream')
-          write(1) count
-          write(1) matsubara_lambda_istate
-          close(1)
-
-          !Change back to working directory
-          call chdir(num%cwd)
-
-          deallocate(a2F_istate, matsubara_lambda_istate)
-       end do
-    end if
     
     sync all
-  end subroutine calculate_lambda
+  end subroutine calculate_a2F
+
+  subroutine calculate_isotropic_lambda(wann, num, omegas, bose_matsubara_ens, iso_matsubara_lambda)
+    !! Calculate the isotropic Matsubara electron-phonon coupling, lambda(l).
+    !! Here l is the Bosonic Matsubara energy index. 
+    
+    type(epw_wannier), intent(in) :: wann
+    type(numerics), intent(in) :: num
+    real(dp), intent(in) :: omegas(:), bose_matsubara_ens(:)
+    real(dp), intent(out) :: iso_matsubara_lambda(:)
+
+    !Local variables
+    integer(k8) :: s, l, iomega, numomega, nummatsubara
+    real(dp) :: aux, domega
+    real(dp), allocatable :: iso_a2F_branches(:, :)
+    character(len = 1024) :: filename
+    
+    !Number of equidistant Boson energy points
+    numomega = size(omegas)
+
+    !Boson energy difference
+    domega = omegas(2) - omegas(1)
+
+    !Number of Bosonic Matsubara energy points
+    nummatsubara = size(bose_matsubara_ens)
+
+    call print_message("   Calculating isotropic Matsubara lambda...")
+
+    ! Read iso_a2F_branches from file
+    allocate(iso_a2F_branches(numomega, wann%numbranches))
+    if(this_image() == 1) then
+       call chdir(num%cwd)
+       filename = 'a2F_iso_branch_resolved'
+       open(1, file=trim(filename), status='old')
+       do iomega = 1, numomega
+          read(1, *) iso_a2F_branches(iomega, :)
+       end do
+       close(1)
+    end if
+    call co_broadcast(iso_a2F_branches, 1)
+
+    !Isotropic theory
+    iso_matsubara_lambda = 0.0_dp
+
+    !Sum over phonon branches
+    do s = 1, wann%numbranches
+       !Run over Matsubara frequencies
+       do l = 1, nummatsubara
+          call compsimps(&
+               iso_a2F_branches(:, s)*2.0_dp*omegas(:)/ &
+               (omegas(:)**2 + bose_matsubara_ens(l)**2), domega, aux)
+          iso_matsubara_lambda(l) = iso_matsubara_lambda(l) + aux
+       end do
+    end do !s
+
+    !Write to file
+    !call write2file_rank1_real('matsubara_lambda_iso', matsubara_iso_lambda)
+  end subroutine calculate_isotropic_lambda
+
+!!$  subroutine calculate_lambda(wann, el, num, omegas, bose_matsubara_ens, isotropic)
+!!$    !! Parallel driver of lambda_mk(nk'|sq, l) over IBZ electron states.
+!!$    !! Here l is the Bosonic Matsubara energy index. 
+!!$    !!
+!!$    !! This subroutine will calculate the anisotropic e-ph coupling function for
+!!$    !! all the energy window restricted electron-phonon processes for a given
+!!$    !! irreducible initial electron state = (band, wave vector). 
+!!$    !! This list will be written to disk in files tagged with the muxed state index.
+!!$    !!
+!!$    !! If bose_matsubara_ens is not passed, then calculate the isotropic theory.
+!!$    !
+!!$    !In the FBZ and IBZ blocks a wave vector was retained when at least one
+!!$    !band belonged within the energy window. Here the bands outside the energy
+!!$    !window will be skipped in the calculation as they are irrelevant for transport.
+!!$    
+!!$    type(epw_wannier), intent(in) :: wann
+!!$    type(electron), intent(in) :: el
+!!$    type(numerics), intent(in) :: num
+!!$    real(dp), intent(in) :: omegas(:), bose_matsubara_ens(:)
+!!$    logical, intent(in) :: isotropic
+!!$
+!!$    !Local variables
+!!$    integer(k8) :: nstates_irred, istate, m, ik, n, ikp, s, l, &
+!!$         iomega, start, end, chunk, count, nprocs, &
+!!$         num_active_images, numomega, nummatsubara
+!!$    real(dp) :: en_el, aux, domega
+!!$    real(dp), allocatable :: a2F_istate(:, :), matsubara_lambda_istate(:, :), &
+!!$         matsubara_iso_lambda(:),iso_a2F_branches(:, :)
+!!$    character(len = 1024) :: filename
+!!$    
+!!$    call print_message("Calculating lambda for all IBZ electrons...")
+!!$    
+!!$    !Number of equidistant Boson energy points
+!!$    numomega = size(omegas)
+!!$
+!!$    !Boson energy difference
+!!$    domega = omegas(2) - omegas(1)
+!!$
+!!$    !Number of Bosonic Matsubara energy points
+!!$    nummatsubara = size(bose_matsubara_ens)
+!!$
+!!$    ! Read iso_a2F_branches from file
+!!$    allocate(iso_a2F_branches(numomega, wann%numbranches))
+!!$    if(this_image() == 1) then
+!!$       call chdir(num%cwd)
+!!$       filename = 'a2F_iso_branch_resolved'
+!!$       open(1, file=trim(filename), status='old')
+!!$       do iomega = 1, numomega
+!!$          read(1, *) iso_a2F_branches(iomega, :)
+!!$       end do
+!!$       close(1)
+!!$    end if
+!!$    call co_broadcast(iso_a2F_branches, 1)
+!!$
+!!$    !Isotropic theory
+!!$    if(isotropic) then
+!!$       allocate(matsubara_iso_lambda(nummatsubara))
+!!$       matsubara_iso_lambda = 0.0_dp
+!!$       
+!!$       !Sum over phonon branches
+!!$       do s = 1, wann%numbranches
+!!$          !Run over Matsubara frequencies
+!!$          do l = 1, nummatsubara
+!!$             call compsimps(&
+!!$                  iso_a2F_branches(:, s)*2.0_dp*omegas(:)/ &
+!!$                  (omegas(:)**2 + bose_matsubara_ens(l)**2), domega, aux)
+!!$             matsubara_iso_lambda(l) = matsubara_iso_lambda(l) + aux
+!!$          end do
+!!$       end do !s
+!!$
+!!$       !Write to file
+!!$       call write2file_rank1_real('matsubara_lambda_iso', matsubara_iso_lambda)
+!!$    end if
+!!$
+!!$    !Anisotropic theory
+!!$    if(.not. isotropic) then
+!!$       !Total number of IBZ blocks states
+!!$       nstates_irred = el%nwv_irred*wann%numwannbands
+!!$
+!!$       call distribute_points(nstates_irred, chunk, start, end, num_active_images)
+!!$
+!!$       if(this_image() == 1) then
+!!$          write(*, "(A, I10)") " #states = ", nstates_irred
+!!$          write(*, "(A, I10)") " #states/image = ", chunk
+!!$       end if
+!!$
+!!$       do istate = start, end !over IBZ blocks states
+!!$          !Demux state index into band (m) and wave vector (ik) indices
+!!$          call demux_state(istate, wann%numwannbands, m, ik)
+!!$
+!!$          !Electron energy
+!!$          en_el = el%ens_irred(ik, m)
+!!$
+!!$          !Apply energy window to initial (IBZ blocks) electron
+!!$          if(abs(en_el - el%enref) > el%fsthick) cycle
+!!$
+!!$          !Load a2F_istate from disk for matsubara_lambda_istate calculation
+!!$          ! Change to data output directory
+!!$          call chdir(trim(adjustl(num%scdir)))
+!!$
+!!$          ! Read data in binary format
+!!$          write (filename, '(I9)') istate
+!!$          filename = 'a2F.istate'//trim(adjustl(filename))
+!!$          open(1, file = trim(filename), status = 'old', access = 'stream')
+!!$          read(1) nprocs
+!!$          if(allocated(a2F_istate)) deallocate(a2F_istate, matsubara_lambda_istate)
+!!$          allocate(a2F_istate(nprocs, numomega), matsubara_lambda_istate(nprocs, nummatsubara))
+!!$          if(nprocs > 0) read(1) a2F_istate
+!!$          close(1)
+!!$
+!!$          ! Change back to working directory
+!!$          call chdir(num%cwd)
+!!$
+!!$          !Initialize eligible process counter for this state
+!!$          count = 0
+!!$
+!!$          !Run over final (FBZ blocks) electron wave vectors
+!!$          do ikp = 1, el%nwv
+!!$             !Run over final electron bands
+!!$             do n = 1, wann%numwannbands
+!!$                !Apply energy window to final electron
+!!$                if(abs(el%ens(ikp, n) - el%enref) > el%fsthick) cycle
+!!$
+!!$                !Run over phonon branches
+!!$                do s = 1, wann%numbranches
+!!$                   !Increment g2 processes counter
+!!$                   count = count + 1
+!!$
+!!$                   !Note that the phonon branch index iterates last for a2F_istate
+!!$                   !and matsubara_lambda_istate is similarly phonon branch resolved.
+!!$                   !
+!!$                   !Calculate lambda for each Matsubara energy
+!!$                   do l = 1, nummatsubara
+!!$                      call compsimps(&
+!!$                           a2F_istate(count, :)*2.0_dp*omegas(:)/ &
+!!$                           (omegas(:)**2 + bose_matsubara_ens(l)**2), domega, aux)
+!!$                      matsubara_lambda_istate(count, l) = aux
+!!$                   end do
+!!$                end do !s
+!!$             end do !n
+!!$          end do !ikp
+!!$
+!!$          !Change to data output directory
+!!$          call chdir(trim(adjustl(num%scdir)))
+!!$
+!!$          !Write data in binary format
+!!$          !Note: this will overwrite existing data!
+!!$          write (filename, '(I9)') istate
+!!$          filename = 'lambda.istate'//trim(adjustl(filename))
+!!$          open(1, file = trim(filename), status = 'replace', access = 'stream')
+!!$          write(1) count
+!!$          write(1) matsubara_lambda_istate
+!!$          close(1)
+!!$
+!!$          !Change back to working directory
+!!$          call chdir(num%cwd)
+!!$
+!!$          deallocate(a2F_istate, matsubara_lambda_istate)
+!!$       end do
+!!$    end if
+!!$    
+!!$    sync all
+!!$  end subroutine calculate_lambda
 end module eliashberg
