@@ -22,7 +22,7 @@ module misc
   implicit none
   
   public
-  private :: sort_int, sort_real
+  private :: sort_int, sort_real, Pade_coeffs
 
   type timer
      !! Container for timing related data and procedures.
@@ -851,6 +851,78 @@ contains
     
     interpolation = aux
   end subroutine interpolate
+
+  pure function Pade_coeffs(iomegas, us)
+    !! Evaluate eqs. A2 from the following article: 
+    !! Solving the Eliashberg equations by means of N-point Pade' approximants
+    !! Vidberg and Serene Journal of Low Temperature Physics, Vol. 29, Nos. 3/4, 1977
+
+    complex(dp), intent(in) :: iomegas(:)
+    real(dp), intent(in) :: us(:)
+    complex(dp) :: Pade_coeffs(size(iomegas))
+
+    !Local variables
+    integer(k8) :: N, p, i
+    complex(dp), allocatable :: g(:, :)
+    
+    N = size(iomegas)
+
+    allocate(g(N, N))
+
+    !Base condition
+    g(1, :) = us(:)
+    Pade_coeffs(1) = g(1, 1)
+
+    do p = 2, N
+       do i = p, N
+          g(p, i) = (g(p - 1, p - 1)/g(p - 1, i) - 1.0_dp)/ &
+               (iomegas(i) - iomegas(p - 1))
+       end do
+       Pade_coeffs(p) = g(p, p)
+    end do
+  end function Pade_coeffs
+
+  pure function Pade_continued(iomegas, us, xs)
+    !! Analytically continue from the upper imaginary plane to
+    !! the positive real axis by solving equation A3 of the following article:
+    !! Solving the Eliashberg equations by means of N-point Pade' approximants
+    !! Vidberg and Serene Journal of Low Temperature Physics, Vol. 29, Nos. 3/4, 1977
+
+    complex(dp), intent(in) :: iomegas(:)
+    real(dp), intent(in) :: us(:)
+    real(dp), intent(in) :: xs(:)
+    complex(dp) :: Pade_continued(size(xs))
+
+    !Local variables
+    integer(k8) :: N_matsubara, N_real, i, n
+    real(dp) :: xi
+    complex(dp), allocatable :: A(:), B(:), as(:)
+
+    N_matsubara = size(iomegas)
+    N_real = size(xs)
+
+    allocate(as(N_matsubara))
+    allocate(A(0:N_matsubara), B(0:N_matsubara))
+
+    as = Pade_coeffs(iomegas, us)
+    
+    !Base conditions
+    A(0) = 0.0_dp
+    A(1) = as(1)
+    B(0) = 1.0_dp
+    B(1) = 1.0_dp
+
+    do i = 1, N_real
+       xi = xs(i)
+
+       do n = 1, N_matsubara - 1
+          A(n + 1) = A(n) + (xi - iomegas(n))*as(n + 1)*A(n - 1)
+          B(n + 1) = B(n) + (xi - iomegas(n))*as(n + 1)*B(n - 1)
+       end do
+
+       Pade_continued(i) = A(N_matsubara)/B(N_matsubara)
+    end do
+  end function Pade_continued
 
   subroutine welcome
     !! Subroutine to print a pretty banner.

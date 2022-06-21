@@ -18,15 +18,17 @@ module MigEl_sc_module
   !! Module containing types and procedures related to the
   !! Migdal-Eliashberg (MigEl) solver environment.
   
-  use params, only: dp, k8, pi, kB
+  use params, only: dp, k8, pi, kB, oneI
   use misc, only: subtitle, print_message, exit_with_message, write2file_rank1_real, &
-       twonorm, distribute_points
+       twonorm, distribute_points, Pade_continued
   use numerics_module, only: numerics
   use electron_module, only: electron
   use wannier_module, only: epw_wannier
   use eliashberg, only: calculate_isotropic_lambda
   
   implicit none
+
+  external chdir
 
   private
   public MigEl_sc
@@ -173,10 +175,11 @@ contains
     !Local variables
     logical :: in_T_bracket
     real(dp) :: T, norm_Z, norm_Zold, norm_Delta, norm_Deltaold
-    real(dp), allocatable :: &
-         iso_quasi_Delta(:), iso_quasi_Z(:), iso_quasi_dos(:), &
+    real(dp), allocatable :: iso_quasi_dos(:), &
          iso_matsubara_lambda(:), iso_matsubara_Delta(:), iso_matsubara_Z(:)
-    integer(k8) :: iter, nstates_irred
+    complex(dp), allocatable :: iso_quasi_Delta(:), iso_quasi_Z(:)
+    integer(k8) :: iter, nstates_irred, i
+    character(len = 1024) :: filename, numcols
     
     !Total number of IBZ blocks states
     nstates_irred = el%nwv_irred*wann%numwannbands
@@ -259,11 +262,50 @@ contains
              exit
           end if
        end do !iteration number
+
+       !Announce phase
+       if(this_image() == 1) then
+          if(norm_Delta > 1.0e-6_dp) then ! > 1e-3 meV
+             write(*, "(A)") "  <<SUPERCONDUCTING PHASE>>"
+          end if
+       end if
        
-       !write(*, "(A)") "  Performing analytical continuation..."
-       !TODO Perform analytic continuation
+       !Perform analytic continuation to positive real energies
+       if(this_image() == 1) &
+            write(*, "(A)") "  Performing analytical continuation..."
+       iso_quasi_Delta = Pade_continued(&
+            oneI*self%fermi_matsubara_ens(self%nummatsubara_upper:self%nummatsubara), &
+            iso_matsubara_Delta(self%nummatsubara_upper:self%nummatsubara), self%qp_ens)
        
-       !TODO Check phase
+       !Reduced quasiparticle density of states
+       !Eq. 11 of H.J. Choi et al. Physica C 385 (2003) 66–74
+       iso_quasi_dos = real((self%qp_ens + oneI*5.0e-5_dp)/ &
+            sqrt((self%qp_ens + oneI*5.0e-5_dp)**2 - iso_quasi_Delta**2))
+
+       !Write quasiparticle Delta and reduced DOS as text data to file
+       if(this_image() == 1) then
+          call chdir(num%cwd)
+          write (filename, '(f10.3)') T
+          filename = 'iso_quasiparticle_Delta.T' // trim(adjustl(filename))
+          write(numcols, "(I0)") 3
+          open(1,file = trim(filename), status = 'replace')
+          do i = 1, self%numqp
+             write(1, "("//trim(adjustl(numcols))//"E20.10)") self%qp_ens(i), &
+                  iso_quasi_Delta(i)
+          end do
+          close(1)
+
+          write (filename, '(f10.3)') T
+          filename = 'iso_quasiparticle_DOS.T' // trim(adjustl(filename))
+          write(numcols, "(I0)") 2
+          open(1,file = trim(filename), status = 'replace')
+          do i = 1, self%numqp
+             write(1, "("//trim(adjustl(numcols))//"E20.10)") self%qp_ens(i), &
+                  iso_quasi_dos(i)
+          end do
+          close(1)
+       end if
+       sync all
        
        !Next temperature
        T = T + self%dT
