@@ -20,11 +20,11 @@ module MigEl_sc_module
   
   use params, only: dp, k8, pi, kB, oneI
   use misc, only: subtitle, print_message, exit_with_message, write2file_rank1_real, &
-       twonorm, distribute_points, Pade_continued
+       twonorm, distribute_points, Pade_continued, demux_state, mux_state
   use numerics_module, only: numerics
   use electron_module, only: electron
   use wannier_module, only: epw_wannier
-  use eliashberg, only: calculate_isotropic_lambda
+  use eliashberg, only: calculate_iso_Matsubara_lambda, calculate_aniso_Matsubara_lambda
   
   implicit none
 
@@ -42,15 +42,15 @@ module MigEl_sc_module
      !! Uniform quasiparticle energy mesh
      integer(k8) :: qp_cutoff
      !! Quasiparticle energy cutoff (factor that multiplies the highest phonon energy)
-     integer(k8) :: nummatsubara !*
+     integer(k8) :: nummatsubara
      !! Number of points on Matsubara mesh
-     integer(k8) :: nummatsubara_upper !*
+     integer(k8) :: nummatsubara_upper
      !! Number of points on upper plane Matsubara mesh
      integer(k8) :: matsubara_cutoff
      !! Matsubara energy cutoff (factor of highest phonon energy)
-     real(dp), allocatable :: bose_matsubara_ens(:) !*
+     real(dp), allocatable :: bose_matsubara_ens(:)
      !! Uniform Bosonic Matsubara mesh
-     real(dp), allocatable :: fermi_matsubara_ens(:) !*
+     real(dp), allocatable :: fermi_matsubara_ens(:)
      !! Number of point on phonon energy grid
      real(dp), allocatable :: omegas(:)
      !! Uniform Fermionic Matsubara mesh
@@ -66,15 +66,15 @@ module MigEl_sc_module
      !! Temperature sweep: start, end, difference
      real(dp) :: mustar
      !! Dimensionless Coulomb pseudopotential parameter
-     real(dp) :: MAD_Tc !*
+     real(dp) :: MAD_Tc
      !! Superconducting transition temperature in the McMillan-Allen-Dynes (MAD) theory
-     real(dp) :: BCS_delta !*
+     real(dp) :: BCS_delta
      !! Superconducting gap from the BCS theory using the MAD Tc
      logical :: isotropic
      !! Use isotropic approximation?
 
    contains
-     procedure, public :: initialize, calculate_MAD_theory, calculate_iso_MigEl_theory
+     procedure, public :: initialize, calculate_MAD_theory, calculate_MigEl_theory
      procedure, private :: generate_real_ens_meshes, generate_matsubara_meshes
   end type MigEl_sc
 
@@ -163,8 +163,8 @@ contains
     end if
   end subroutine calculate_MAD_theory
 
-  subroutine calculate_iso_MigEl_theory(self, el, wann, num, max_ph_en)
-    !! Solver for the isotropic Migdal-Eliashberg equations.
+  subroutine calculate_MigEl_theory(self, el, wann, num, max_ph_en)
+    !! Solve the Migdal-Eliashberg equations.
 
     class(MigEl_sc), intent(inout) :: self
     type(electron), intent(in) :: el
@@ -174,24 +174,29 @@ contains
 
     !Local variables
     logical :: in_T_bracket
-    real(dp) :: T, norm_Z, norm_Zold, norm_Delta, norm_Deltaold
-    real(dp), allocatable :: iso_quasi_dos(:), &
-         iso_matsubara_lambda(:), iso_matsubara_Delta(:), iso_matsubara_Z(:)
-    complex(dp), allocatable :: iso_quasi_Delta(:), iso_quasi_Z(:)
-    integer(k8) :: iter, nstates_irred, i
+    real(dp) :: T, norm_Z, norm_Zold, norm_Delta, norm_Deltaold, aux
+    real(dp), allocatable :: quasi_dos(:), &
+         iso_matsubara_lambda(:), iso_matsubara_Delta(:), iso_matsubara_Z(:), &
+         aniso_matsubara_Delta(:, :), aniso_matsubara_Z(:, :)
+    complex(dp), allocatable :: iso_quasi_Delta(:), iso_quasi_Z(:), &
+         aniso_quasi_Delta(:, :), aniso_quasi_Z(:, :)
+    integer(k8) :: iter, nstates_irred, i, istate, m, ik
     character(len = 1024) :: filename, numcols
     
     !Total number of IBZ blocks states
     nstates_irred = el%nwv_irred*wann%numwannbands
+
+    allocate(quasi_dos(self%numqp))
     
     if(self%isotropic) then
        call print_message("Solving the isotropic Migdal-Eliashberg equations...")
        
-       allocate(iso_quasi_Delta(self%numqp), &
-            iso_quasi_Z(self%numqp), iso_quasi_dos(self%numqp))
+       allocate(iso_quasi_Delta(self%numqp), iso_quasi_Z(self%numqp))
     else
-       !Place holder.
-       !call print_message("Solving the anisotropic Migdal-Eliashberg equations...")
+       call print_message("Solving the anisotropic Migdal-Eliashberg equations...")
+
+       allocate(aniso_quasi_Delta(nstates_irred, self%numqp), &
+            aniso_quasi_Z(nstates_irred, self%numqp))
     end if
 
     !Calculate for all temperatures in the provided bracket
@@ -222,9 +227,23 @@ contains
           norm_Z = twonorm(iso_matsubara_Z)
 
           !Calculate isotropic lambda function
-          call calculate_isotropic_lambda(wann, num, self%omegas, self%bose_matsubara_ens, iso_matsubara_lambda)
+          call calculate_iso_matsubara_lambda(wann, num, self%omegas, self%bose_matsubara_ens, iso_matsubara_lambda)
        else
-          !Place holder.
+          if(allocated(aniso_matsubara_Delta)) deallocate(aniso_matsubara_Delta)
+          if(allocated(aniso_matsubara_Z)) deallocate(aniso_matsubara_Z)
+
+          allocate(aniso_matsubara_Delta(nstates_irred, self%nummatsubara))
+          allocate(aniso_matsubara_Z(nstates_irred, self%nummatsubara))
+
+          !Approximate initial gap to start off the iterator
+          aniso_matsubara_Delta(:, :) = self%BCS_delta
+          norm_Delta = twonorm(aniso_matsubara_Delta)
+
+          aniso_matsubara_Z = 1.0_dp !For the sake of non-zero initial norm
+          norm_Z = twonorm(aniso_matsubara_Z)
+
+          !Calculate anisotropic lambda function
+          call calculate_aniso_matsubara_lambda(wann, num, el, self%omegas, self%bose_matsubara_ens)
        end if
 
        if(this_image() == 1) write(*, "(A)") "   Iterating..."
@@ -235,7 +254,10 @@ contains
              call iterate_iso_matsubara_Delta(iso_matsubara_lambda, self%fermi_matsubara_ens, &
                   iso_matsubara_Delta, iso_matsubara_Z, T, self%mustar)
           else
-             !Place holder.
+             call iterate_aniso_matsubara_Z(el, wann, num, self%fermi_matsubara_ens, &
+                  aniso_matsubara_Delta, aniso_matsubara_Z, T)
+             call iterate_aniso_matsubara_Delta(el, wann, num, self%fermi_matsubara_ens, &
+                  aniso_matsubara_Delta, aniso_matsubara_Z, T, self%mustar)
           end if
 
           norm_Zold = norm_Z
@@ -245,8 +267,8 @@ contains
              norm_Z = twonorm(iso_matsubara_Z)
              norm_Delta = twonorm(iso_matsubara_Delta)
           else
-             !norm_Z = norm_tensor(Z)
-             !norm_Delta = norm_tensor(Delta)
+             norm_Z = twonorm(aniso_matsubara_Z)
+             norm_Delta = twonorm(aniso_matsubara_Delta)
           end if
 
           !Output norms every 100 iterations
@@ -272,54 +294,293 @@ contains
        
        !Perform analytic continuation to positive real energies
        if(this_image() == 1) &
-            write(*, "(A)") "  Performing analytical continuation..."
-       iso_quasi_Delta = Pade_continued(&
-            oneI*self%fermi_matsubara_ens(self%nummatsubara_upper:self%nummatsubara), &
-            iso_matsubara_Delta(self%nummatsubara_upper:self%nummatsubara), self%qp_ens)
-       
-       !Reduced quasiparticle density of states
-       !Eq. 11 of H.J. Choi et al. Physica C 385 (2003) 66–74
-       iso_quasi_dos = real((self%qp_ens + oneI*5.0e-5_dp)/ &
-            sqrt((self%qp_ens + oneI*5.0e-5_dp)**2 - iso_quasi_Delta**2))
+            write(*, "(A)") "  Performing analytic continuation..."
 
-       !Write quasiparticle Delta and reduced DOS as text data to file
-       if(this_image() == 1) then
-          call chdir(num%cwd)
-          write (filename, '(f10.3)') T
-          filename = 'iso_quasiparticle_Delta.T' // trim(adjustl(filename))
-          write(numcols, "(I0)") 3
-          open(1,file = trim(filename), status = 'replace')
-          do i = 1, self%numqp
-             write(1, "("//trim(adjustl(numcols))//"E20.10)") self%qp_ens(i), &
-                  iso_quasi_Delta(i)
-          end do
-          close(1)
+       if(self%isotropic) then
+          iso_quasi_Delta = Pade_continued(&
+               oneI*self%fermi_matsubara_ens(self%nummatsubara_upper:self%nummatsubara), &
+               iso_matsubara_Delta(self%nummatsubara_upper:self%nummatsubara), self%qp_ens)
 
-          write (filename, '(f10.3)') T
-          filename = 'iso_quasiparticle_DOS.T' // trim(adjustl(filename))
-          write(numcols, "(I0)") 2
-          open(1,file = trim(filename), status = 'replace')
-          do i = 1, self%numqp
-             write(1, "("//trim(adjustl(numcols))//"E20.10)") self%qp_ens(i), &
-                  iso_quasi_dos(i)
+          !Reduced quasiparticle density of states
+          !Eq. 11 of H.J. Choi et al. Physica C 385 (2003) 66–74
+          quasi_dos = real((self%qp_ens + oneI*5.0e-5_dp)/ &
+               sqrt((self%qp_ens + oneI*5.0e-5_dp)**2 - iso_quasi_Delta**2))
+
+          !Write quasiparticle Delta and reduced DOS as text data to file
+          if(this_image() == 1) then
+             call chdir(num%cwd)
+             write (filename, '(f10.3)') T
+             filename = 'iso_quasiparticle_Delta.T' // trim(adjustl(filename))
+             write(numcols, "(I0)") 3
+             open(1,file = trim(filename), status = 'replace')
+             do i = 1, self%numqp
+                write(1, "("//trim(adjustl(numcols))//"E20.10)") self%qp_ens(i), &
+                     iso_quasi_Delta(i)
+             end do
+             close(1)
+
+             write (filename, '(f10.3)') T
+             filename = 'iso_quasiparticle_DOS.T' // trim(adjustl(filename))
+             write(numcols, "(I0)") 2
+             open(1,file = trim(filename), status = 'replace')
+             do i = 1, self%numqp
+                write(1, "("//trim(adjustl(numcols))//"E20.10)") self%qp_ens(i), &
+                     quasi_dos(i)
+             end do
+             close(1)
+          end if
+          sync all
+       else
+          do istate = 1, nstates_irred
+             !Demux state index into band (m) and wave vector (ik) indices
+             call demux_state(istate, wann%numwannbands, m, ik)
+
+             !Apply energy window to IBZ blocks electron
+             if(abs(el%ens_irred(ik, m) - el%enref) > el%fsthick) cycle
+
+             aniso_quasi_Delta(istate, :) = Pade_continued(&
+                  oneI*self%fermi_matsubara_ens(self%nummatsubara_upper:self%nummatsubara), &
+                  aniso_matsubara_Delta(istate, self%nummatsubara_upper:self%nummatsubara), self%qp_ens)
           end do
-          close(1)
+
+          !TODO Need to decide if this should be printed out since it can be a pretty large file
+          
+          !Reduced quasiparticle density of states
+          !Eq. 11 of H.J. Choi et al. Physica C 385 (2003) 66–74
+          do i = 1, self%numqp
+             aux = 0.0_dp
+             do istate = 1, nstates_irred
+                !Demux state index into band (m) and wave vector (ik) indices
+                call demux_state(istate, wann%numwannbands, m, ik)
+
+                !Apply energy window to IBZ blocks electron
+                if(abs(el%ens_irred(ik, m) - el%enref) > el%fsthick) cycle
+
+                aux = aux + el%nequiv(ik)*el%Ws_irred(ik, m)*&
+                     real((self%qp_ens(i) + oneI*5.0e-5_dp)/ &
+                     sqrt((self%qp_ens(i) + oneI*5.0e-5_dp)**2 - aniso_quasi_Delta(istate, i)**2))
+             end do
+             quasi_dos(i) = aux
+          end do
+
+          !Write quasiparticle reduced DOS as text data to file
+          if(this_image() == 1) then
+             call chdir(num%cwd)
+             write (filename, '(f10.3)') T
+             filename = 'aniso_quasiparticle_DOS.T' // trim(adjustl(filename))
+             write(numcols, "(I0)") 2
+             open(1,file = trim(filename), status = 'replace')
+             do i = 1, self%numqp
+                write(1, "("//trim(adjustl(numcols))//"E20.10)") self%qp_ens(i), &
+                     quasi_dos(i)
+             end do
+             close(1)
+          end if
+          sync all
        end if
-       sync all
-       
+              
        !Next temperature
        T = T + self%dT
 
        !Check temperature bracket
        if(T > self%Tend .or. T < self%Tstart) in_T_bracket = .false.
     end do
-  end subroutine calculate_iso_MigEl_theory
+  end subroutine calculate_MigEl_theory
 
+  subroutine iterate_aniso_matsubara_Z(el, wann, num, fermi_matsubara_ens, &
+       Delta, Z, T)
+    !! Iterate the anisotropic Matsubara mass renormalization function for
+    !! a given gap (Delta) at a given temperature (T) in K.
+
+    type(electron), intent(in) :: el
+    type(epw_wannier), intent(in) :: wann
+    type(numerics), intent(in) :: num
+    real(dp), intent(in) :: Delta(:, :), fermi_matsubara_ens(:), T
+    real(dp), intent(out) :: Z(:, :)
+
+    !Internal variables
+    integer(k8) :: j, jp, nstates_irred, nummatsubara, nprocs, start, end, chunk, &
+         num_active_images, istate, count, m, n, s, ik, ikp, ikp_ibz, istatep_ibz
+    real(dp) :: aux, pikBT
+    real(dp), allocatable :: lambda(:), lambda_istate(:, :)
+    character(len = 1024) :: filename
+
+    nstates_irred = size(Delta(:, 1))
+    nummatsubara = size(Delta(1, :))
+
+    pikBT = pi*T*kB !eV
+
+    allocate(lambda(nummatsubara))
+    
+    call distribute_points(nstates_irred, chunk, start, end, num_active_images)
+
+    Z = 0.0_dp
+    !Run over IBZ blocks states
+    do istate = start, end
+       !Initialize eligible process counter for this state
+       count = 0
+
+       !Demux state index into band (m) and wave vector (ik) indices
+       call demux_state(istate, wann%numwannbands, m, ik)
+
+       !Apply energy window to initial (IBZ blocks) electron
+       if(abs(el%ens_irred(ik, m) - el%enref) > el%fsthick) cycle
+
+       !Read anisotropic lambda_istate from file
+       call chdir(trim(adjustl(num%scdir)))
+       write (filename, '(I9)') istate
+       filename = 'lambda.istate'//trim(adjustl(filename))
+       open(1, file = trim(filename), status = 'old', access = 'stream')
+       read(1) nprocs
+       if(allocated(lambda_istate)) deallocate(lambda_istate)
+       allocate(lambda_istate(nprocs, nummatsubara))
+       if(nprocs > 0) read(1) lambda_istate
+       close(1)
+
+       !Sum over final (FBZ blocks) electron wave vectors
+       do ikp = 1, el%nwv
+          !Grab IBZ vector index, ikp_ibz, corresponding to this FBZ vector
+          ikp_ibz = el%fbz2ibz_map(ikp)
+
+          !Sum over final electron bands
+          do n = 1, wann%numwannbands
+             !Apply energy window to final electron
+             if(abs(el%ens(ikp, n) - el%enref) > el%fsthick) cycle
+             
+             !Mux primed state index
+             istatep_ibz = mux_state(wann%numwannbands, n, ikp_ibz)
+
+             !Branch summed lambda
+             lambda = 0.0_dp
+             do s = 1, wann%numbranches
+                !Increment anisotropic lambda_istate processes counter
+                count = count + 1
+                lambda(:) = lambda(:) + lambda_istate(count, :)
+             end do
+
+             !Run over Matsubara axis
+             do j = 1, nummatsubara
+                !Sum over Matsubara axis
+                aux = 0.0_dp
+                do jp = 1, nummatsubara
+                   aux = aux + el%Ws(ikp, n)* &
+                        lambda(abs(j - jp) + 1)*fermi_matsubara_ens(jp)/ &
+                        sqrt(fermi_matsubara_ens(jp)**2 + Delta(istatep_ibz, jp)**2)
+                end do
+                Z(istate, j) = Z(istate, j) + aux/fermi_matsubara_ens(j) 
+             end do
+          end do
+       end do
+    end do
+
+    call co_sum(Z)
+
+    Z = 1.0_dp + Z*pikBT
+    sync all
+  end subroutine iterate_aniso_matsubara_Z
+
+  subroutine iterate_aniso_matsubara_Delta(el, wann, num, fermi_matsubara_ens, &
+       Delta, Z, T, mustar)
+    !! Iterate the isotropic Matsubara gap function, Delta.
+    !! This will take Delta^(tau) -> Delta^(tau + 1) for a given mass enhancement, Z^(tau),
+    !! tau being the "time" in the iterator sense.
+
+    type(electron), intent(in) :: el
+    type(epw_wannier), intent(in) :: wann
+    type(numerics), intent(in) :: num
+    real(dp), intent(in) :: Z(:, :), fermi_matsubara_ens(:), T, mustar
+    real(dp), intent(inout) :: Delta(:, :)
+
+    !Internal variables
+    integer(k8) :: j, jp, nstates_irred, nummatsubara, nprocs, start, end, chunk, &
+         num_active_images, istate, count, m, n, s, ik, ikp, ikp_ibz, istatep_ibz
+    real(dp) :: aux, pikBT
+    real(dp), allocatable :: lambda(:), lambda_istate(:, :), old_Delta(:, :)
+    character(len = 1024) :: filename
+
+    nstates_irred = size(Delta(:, 1))
+    nummatsubara = size(Delta(1, :))
+
+    pikBT = pi*T*kB !eV
+
+    allocate(lambda(nummatsubara))
+
+    allocate(old_Delta(nstates_irred, nummatsubara))
+    
+    call distribute_points(nstates_irred, chunk, start, end, num_active_images)
+
+    old_Delta = Delta
+    Delta = 0.0_dp
+    
+    !Run over IBZ blocks states
+    do istate = start, end
+       !Initialize eligible process counter for this state
+       count = 0
+
+       !Demux state index into band (m) and wave vector (ik) indices
+       call demux_state(istate, wann%numwannbands, m, ik)
+
+       !Apply energy window to initial (IBZ blocks) electron
+       if(abs(el%ens_irred(ik, m) - el%enref) > el%fsthick) cycle
+
+       !Read anisotropic lambda_istate from file
+       call chdir(trim(adjustl(num%scdir)))
+       write (filename, '(I9)') istate
+       filename = 'lambda.istate'//trim(adjustl(filename))
+       open(1, file = trim(filename), status = 'old', access = 'stream')
+       read(1) nprocs
+       if(allocated(lambda_istate)) deallocate(lambda_istate)
+       allocate(lambda_istate(nprocs, nummatsubara))
+       if(nprocs > 0) read(1) lambda_istate
+       close(1)
+
+       !Sum over final (FBZ blocks) electron wave vectors
+       do ikp = 1, el%nwv
+          !Grab IBZ vector index, ikp_ibz, corresponding to this FBZ vector
+          ikp_ibz = el%fbz2ibz_map(ikp)
+
+          !Sum over final electron bands
+          do n = 1, wann%numwannbands
+             !Apply energy window to final electron
+             if(abs(el%ens(ikp, n) - el%enref) > el%fsthick) cycle
+             
+             !Mux primed state index
+             istatep_ibz = mux_state(wann%numwannbands, n, ikp_ibz)
+
+             !Branch summed lambda
+             lambda = 0.0_dp
+             do s = 1, wann%numbranches
+                !Increment anisotropic lambda_istate processes counter
+                count = count + 1
+                lambda(:) = lambda(:) + lambda_istate(count, :)
+             end do 
+
+             !Run over Matsubara axis
+             do j = 1, nummatsubara
+                !Sum over Matsubara axis
+                aux = 0.0_dp
+                do jp = 1, nummatsubara
+                   aux = aux + el%Ws(ikp, n)* &
+                        (lambda(abs(j - jp) + 1) - mustar)*old_Delta(istatep_ibz, jp)/ &
+                        sqrt(fermi_matsubara_ens(jp)**2 + old_Delta(istatep_ibz, jp)**2)
+                end do
+                Delta(istate, j) = Delta(istate, j) + aux 
+             end do
+          end do
+       end do
+    end do
+
+    call co_sum(Delta)
+
+    Delta = pikBT*Delta/Z
+    sync all
+  end subroutine iterate_aniso_matsubara_Delta
+  
   subroutine iterate_iso_matsubara_Z(iso_matsubara_lambda, fermi_matsubara_ens, &
        Delta, Z, T)
     !! Iterate the isotropic Matsubara mass renormalization function for
     !! a given gap (Delta) at a given temperature (T) in K.
-
+    
     real(dp), intent(in) :: iso_matsubara_lambda(:), Delta(:), &
          fermi_matsubara_ens(:), T
     real(dp), intent(out) :: Z(:)
@@ -335,6 +596,7 @@ contains
     call distribute_points(nummatsubara, chunk, start, end, num_active_images)
     
     Z = 0.0_dp
+    
     !Run over Matsubara energies
     do j = start, end
        !Sum over Matsubara energies
@@ -356,7 +618,7 @@ contains
 
   subroutine iterate_iso_matsubara_Delta(iso_matsubara_lambda, fermi_matsubara_ens, &
        Delta, Z, T, mustar)
-    !! Iterates the isotropic Matsubara gap function, Delta.
+    !! Iterate the isotropic Matsubara gap function, Delta.
     !! This will take Delta^(tau) -> Delta^(tau + 1) for a given mass enhancement, Z^(tau),
     !! tau being the "time" in the iterator sense.
 
@@ -379,6 +641,7 @@ contains
     
     old_Delta = Delta
     Delta = 0.0_dp
+    
     !Run over Matsubara energies
     do j = start, end
        !Sum over Matsubara energies

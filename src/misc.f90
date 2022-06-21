@@ -22,7 +22,7 @@ module misc
   implicit none
   
   public
-  private :: sort_int, sort_real, Pade_coeffs
+  private :: sort_int, sort_real, Pade_coeffs, twonorm_real_rank1, twonorm_real_rank2
 
   type timer
      !! Container for timing related data and procedures.
@@ -40,6 +40,10 @@ module misc
   interface sort
      module procedure :: sort_int, sort_real
   end interface sort
+
+  interface twonorm
+     module procedure :: twonorm_real_rank1, twonorm_real_rank2
+  end interface twonorm
   
 contains
 
@@ -444,19 +448,37 @@ contains
     expi = cmplx(cos(x), sin(x), dp)
   end function expi
 
-  pure real(dp) function twonorm(v)
-    !! 2-norm of a vector
+  pure real(dp) function twonorm_real_rank1(v)
+    !! 2-norm of a rank-1 real vector
 
     real(dp), intent(in) :: v(:)
     integer(k8) :: i, s
 
     s = size(v)
-    twonorm = 0.0_dp
+    twonorm_real_rank1 = 0.0_dp
     do i = 1, s
-       twonorm = v(i)**2 + twonorm
+       twonorm_real_rank1 = v(i)**2 + twonorm_real_rank1
     end do
-    twonorm = sqrt(twonorm)
-  end function twonorm
+    twonorm_real_rank1 = sqrt(twonorm_real_rank1)
+  end function twonorm_real_rank1
+
+  pure real(dp) function twonorm_real_rank2(T)
+    !! Custom 2-norm of a rank-2 real tensor
+
+    real(dp), intent(in) :: T(:, :)
+    integer(k8) :: i, j, s1, s2
+
+    s1 = size(T(:, 1))
+    s2 = size(T(1, :))
+    
+    twonorm_real_rank2 = 0.0_dp
+    do i = 1, s1
+       do j = 1, s2
+          twonorm_real_rank2 = T(i, j)**2 + twonorm_real_rank2
+       end do
+    end do
+    twonorm_real_rank2 = sqrt(twonorm_real_rank2)
+  end function twonorm_real_rank2
 
   pure real(dp) function trace(mat)
     !! Trace of square matrix
