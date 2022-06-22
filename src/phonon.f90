@@ -92,7 +92,7 @@ contains
     !Calculate harmonic properties
     call calculate_phonons(self, crys, sym, num)
 
-    if(.not. num%onlyebte) then
+    if(.not. num%onlyebte .and. num%runlevel /= 3) then
        !Read ifc3s and related quantities
        call read_ifc3(self, crys)
     end if

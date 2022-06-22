@@ -23,7 +23,6 @@ program elphbolt
   !! (e-ph BTEs) as formulated in https://arxiv.org/abs/2109.08547 (2021) with both the
   !! electron-phonon and phonon-phonon interactions computed ab initio.
 
-  use params, only: k8, dp
   use misc, only: welcome, print_message, subtitle, timer
   use numerics_module, only: numerics
   use crystal_module, only: crystal
@@ -31,11 +30,13 @@ program elphbolt
   use electron_module, only: electron
   use phonon_module, only: phonon
   use wannier_module, only: epw_wannier
+  use MigEl_sc_module, only: migel_sc
   use bte_module, only: bte
-  use bz_sums, only: calculate_dos, calculate_qTF
+  use bz_sums, only: calculate_dos, calculate_qTF, calculate_el_dos_fermi, calculate_el_Ws
   use interactions, only: calculate_gReq, calculate_gkRp, calculate_3ph_interaction, &
        calculate_eph_interaction_ibzq, calculate_eph_interaction_ibzk, &
        calculate_echimp_interaction_ibzk, calculate_bound_scatt_rates
+  use eliashberg, only: calculate_a2F
   
   implicit none
   
@@ -46,6 +47,7 @@ program elphbolt
   type(electron) :: el
   type(phonon) :: ph
   type(bte) :: bt
+  type(MigEl_sc) :: migel
   type(timer) :: t_all, t_event
   
   !Print banner and other information
@@ -64,7 +66,8 @@ program elphbolt
   !Calculate crystal and BZ symmetries
   call sym%calculate_symmetries(crys, num%qmesh)
 
-  if(num%onlyebte .or. num%drag .or. num%phe .or. num%plot_along_path) then
+  if(num%onlyebte .or. num%drag .or. num%phe &
+       .or. num%plot_along_path .or. num%runlevel == 3) then
      !Read EPW Wannier data
      call wann%read(num)
 
@@ -82,7 +85,7 @@ program elphbolt
   call t_event%end_timer('Phonons')
   
   select case(num%runlevel)
-  case(1) !BTE solving case
+  case(1) !BTE workflow
      call t_event%start_timer('Density of states and one-particle scattering rates')
 
      call subtitle("Calculating density of states...")
@@ -221,7 +224,7 @@ program elphbolt
      else
         call bt%solve_bte(num, crys, sym, ph, el)
      end if
-  case(2) !Post-processing case
+  case(2) !BTE Post-processing case
      call subtitle("Post-processing...")
         
      !Read RTA response functions from finished calculation
@@ -230,6 +233,66 @@ program elphbolt
      else
         call bt%post_process(num, crys, sym, ph, el)
      end if
+  case(3) !Superconductivity mode worklflow
+     call t_event%start_timer('Migdal-Eliashberg setup')
+
+     !Initialize Migdal-Eliashberg environment
+     call migel%initialize(maxval(ph%ens(:,:)))
+
+     call t_event%end_timer('Migdal-Eliashberg setup')
+     
+     call t_event%start_timer('Density of states')
+     
+     call subtitle("Calculating density of states...")
+     
+     !Calculate electron density of states at the Fermi level
+     call calculate_el_dos_Fermi(el, num%tetrahedra)
+     
+     !Calculate the scaled electron delta functions
+     call calculate_el_Ws(el, num%tetrahedra)
+     
+     call t_event%end_timer('Density of states')
+
+     if(.not. num%read_gk2) then
+        call t_event%start_timer('IBZ k e-ph interactions')
+
+        call subtitle("Calculating e-ph interactions...")
+
+        !Calculate mixed Bloch-Wannier space e-ph vertex g(k,Rp)
+        call calculate_gkRp(wann, el, num)
+
+        !Calculate Bloch space e-ph vertex g(k,q) for IBZ k
+        call calculate_eph_interaction_ibzk(wann, crys, el, ph, num, 'g')
+
+        call t_event%end_timer('IBZ k e-ph interactions')
+     end if
+
+     !Deallocate Wannier quantities
+     call wann%deallocate_wannier(num)
+
+     !After this point the electron eigenvectors are not needed
+     call el%deallocate_eigenvecs
+
+     call t_event%start_timer('IBZ a2F')
+
+     call subtitle("Calculating a2F for all IBZ states...")
+
+     !Calculate anisotropic a2F for all IBZ states
+     call calculate_a2F(wann, el, ph, num, migel%omegas, migel%iso_lambda0, migel%omegalog)
+
+     call t_event%end_timer('IBZ a2F')
+
+     call t_event%start_timer('Superconductivity')
+
+     call subtitle("Solving Migdal-Eliashberg equations...")
+
+     !Calculate McMillan-Allen-Dynes theory
+     call migel%calculate_MAD_theory
+
+     !Calculate Migdal-Eliashberg theory
+     call migel%calculate_MigEl_theory(el, wann, num, maxval(ph%ens(:,:)))
+     
+     call t_event%end_timer('Superconductivity')   
   end select
 
   call t_all%end_timer('elphbolt')

@@ -176,27 +176,35 @@ contains
             'Need to provide non-zero epsilon0 for e-ch. imp. interaction. Exiting.')
     end if
     self%qmesh = qmesh
-    self%mesh_ref = mesh_ref
+    self%runlevel = runlevel
+    !Runlevels:
+    !1 BTE
+    !2 BTE postproc
+    !3 Superconductivity
+    if(self%runlevel /= 3) then !Non-superconductivity mode
+       self%mesh_ref = mesh_ref
+       self%read_gq2 = read_gq2
+       self%read_V = read_V
+       self%read_W = read_W
+       self%phe = phe
+       self%phiso = phiso
+       self%phsubs = phsubs
+       self%phbound = phbound
+       self%onlyphbte = onlyphbte
+       self%onlyebte = onlyebte
+       self%elchimp = elchimp
+       self%elbound = elbound
+       self%drag = drag
+    else
+       self%mesh_ref = 1 !Enforce this for superconductivity mode
+    end if
+    self%read_gk2 = read_gk2
     self%fsthick = fsthick
     self%datadumpdir = trim(datadumpdir)
-    self%read_gq2 = read_gq2
-    self%read_gk2 = read_gk2
-    self%read_V = read_V
-    self%read_W = read_W
     self%tetrahedra = tetrahedra
-    self%phe = phe
-    self%phiso = phiso
-    self%phsubs = phsubs
-    self%phbound = phbound
-    self%onlyphbte = onlyphbte
-    self%onlyebte = onlyebte
-    self%elchimp = elchimp
-    self%elbound = elbound
     self%maxiter = maxiter
     self%conv_thres = conv_thres
-    self%drag = drag
     self%plot_along_path = plot_along_path
-    self%runlevel = runlevel
 
     if(runlevel == 2) then
        self%ph_en_min = ph_en_min
@@ -272,32 +280,34 @@ contains
        write(*, "(A, A)") "Data dump directory = ", trim(self%datadumpdir)
        write(*, "(A, A)") "T-dependent data dump directory = ", trim(self%datadumpdir_T)
        write(*, "(A, A)") "e-ph directory = ", trim(self%g2dir)
-       write(*, "(A, A)") "ph-ph directory = ", trim(self%Vdir)
+       if(self%runlevel /= 3) write(*, "(A, A)") "ph-ph directory = ", trim(self%Vdir)
        write(*, "(A, L)") "Reuse e-ph matrix elements: ", self%read_gk2
-       write(*, "(A, L)") "Reuse ph-e matrix elements: ", self%read_gq2
-       write(*, "(A, L)") "Reuse ph-ph matrix elements: ", self%read_V
-       write(*, "(A, L)") "Reuse ph-ph transition probabilities: ", self%read_W
+       if(self%runlevel /= 3) then
+          write(*, "(A, L)") "Reuse ph-e matrix elements: ", self%read_gq2
+          write(*, "(A, L)") "Reuse ph-ph matrix elements: ", self%read_V
+          write(*, "(A, L)") "Reuse ph-ph transition probabilities: ", self%read_W
+          write(*, "(A, L)") "Include ph-e interaction: ", self%phe
+          write(*, "(A, L)") "Include ph-isotope interaction: ", self%phiso       
+          write(*, "(A, L)") "Include ph-substitution interaction: ", self%phsubs
+          write(*, "(A, L)") "Include ph-boundary interaction: ", self%phbound
+          if(self%phbound) then
+             write(*,"(A,(1E16.8,x),A)") 'Characteristic length for ph-boundary scattering =', &
+                  crys%bound_length, 'mm'
+          end if
+          write(*, "(A, L)") "Include el-charged impurity interaction: ", self%elchimp
+          write(*, "(A, L)") "Include el-boundary interaction: ", self%elbound
+          if(self%elbound) then
+             write(*,"(A,(1E16.8,x),A)") 'Characteristic length for el-boundary scattering =', &
+                  crys%bound_length, 'mm'
+          end if
+          if(self%onlyphbte) write(*, "(A, L)") "Calculate only phonon BTE: ", self%onlyphbte
+          if(self%onlyebte) write(*, "(A, L)") "Calculate only electron BTE: ", self%onlyebte
+          write(*, "(A, L)") "Include drag: ", self%drag
+       end if
        write(*, "(A, L)") "Use tetrahedron method: ", self%tetrahedra
-       write(*, "(A, L)") "Include ph-e interaction: ", self%phe
-       write(*, "(A, L)") "Include ph-isotope interaction: ", self%phiso       
-       write(*, "(A, L)") "Include ph-substitution interaction: ", self%phsubs
-       write(*, "(A, L)") "Include ph-boundary interaction: ", self%phbound
-       if(self%phbound) then
-          write(*,"(A,(1E16.8,x),A)") 'Characteristic length for ph-boundary scattering =', &
-               crys%bound_length, 'mm'
-       end if
-       write(*, "(A, L)") "Include el-charged impurity interaction: ", self%elchimp
-       write(*, "(A, L)") "Include el-boundary interaction: ", self%elbound
-       if(self%elbound) then
-          write(*,"(A,(1E16.8,x),A)") 'Characteristic length for el-boundary scattering =', &
-               crys%bound_length, 'mm'
-       end if
-       if(self%onlyphbte) write(*, "(A, L)") "Calculate only phonon BTE: ", self%onlyphbte
-       if(self%onlyebte) write(*, "(A, L)") "Calculate only electron BTE: ", self%onlyebte
-       write(*, "(A, L)") "Include drag: ", self%drag
        write(*, "(A, L)") "Plot quantities along path: ", self%plot_along_path
-       write(*, "(A, I5)") "Maximum number of BTE iterations = ", self%maxiter
-       write(*, "(A, 1E16.8)") "BTE convergence threshold = ", self%conv_thres
+       write(*, "(A, I5)") "Maximum number of BTE/Migdal-Eliashberg equations iterations = ", self%maxiter
+       write(*, "(A, 1E16.8)") "BTE/Migdal-Eliashberg equations convergence threshold = ", self%conv_thres
     end if
     sync all
   end subroutine read_input_and_setup

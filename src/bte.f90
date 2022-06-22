@@ -34,6 +34,8 @@ module bte_module
 
   implicit none
 
+  external system, chdir
+  
   private
   public bte
 
@@ -396,15 +398,15 @@ contains
           ph_alphabyT = ph_alphabyT/crys%T
 
           !Calculate phonon drag term for the current phBTE iteration.
-          call calculate_phonon_drag(crys%T, num, el, ph, sym, self%el_rta_rates_ibz, &
+          call calculate_phonon_drag(num, el, ph, sym, self%el_rta_rates_ibz, &
                self%ph_response_E, ph_drag_term_E)
-          call calculate_phonon_drag(crys%T, num, el, ph, sym, self%el_rta_rates_ibz, &
+          call calculate_phonon_drag(num, el, ph, sym, self%el_rta_rates_ibz, &
                self%ph_response_T, ph_drag_term_T)
           
           !Iterate electron response all the way
           do it_el = 1, num%maxiter
              !E field:
-             call iterate_bte_el(crys%T, .True., num, el, ph, sym, &
+             call iterate_bte_el(crys%T, .True., num, el, &
                   self%el_rta_rates_ibz, self%el_field_term_E, self%el_response_E, ph_drag_term_E)
 
              !Calculate electron transport coefficients
@@ -414,7 +416,7 @@ contains
              el_alphabyT = el_alphabyT/crys%T
 
              !delT field:
-             call iterate_bte_el(crys%T, .True., num, el, ph, sym, &
+             call iterate_bte_el(crys%T, .True., num, el, &
                   self%el_rta_rates_ibz, self%el_field_term_T, self%el_response_T, ph_drag_term_T)
              !Enforce Kelvin-Onsager relation:
              !Fix "diffusion" part
@@ -584,7 +586,7 @@ contains
 
        do it_el = 1, num%maxiter
           !E field:
-          call iterate_bte_el(crys%T, .False., num, el, ph, sym,&
+          call iterate_bte_el(crys%T, .False., num, el, &
                self%el_rta_rates_ibz, self%el_field_term_E, self%el_response_E)
 
           !Calculate electron transport coefficients
@@ -594,7 +596,7 @@ contains
           el_alphabyT = el_alphabyT/crys%T
 
           !delT field:
-          call iterate_bte_el(crys%T, .False., num, el, ph, sym,&
+          call iterate_bte_el(crys%T, .False., num, el, &
                self%el_rta_rates_ibz, self%el_field_term_T, self%el_response_T, self%ph_response_T)
           !Enforce Kelvin-Onsager relation
           do icart = 1, 3
@@ -951,14 +953,13 @@ contains
     end do
   end subroutine iterate_bte_ph
 
-  subroutine iterate_bte_el(T, drag, num, el, ph, sym, rta_rates_ibz, field_term, &
+  subroutine iterate_bte_el(T, drag, num, el, rta_rates_ibz, field_term, &
        response_el, ph_drag_term)
     !! Subroutine to iterate the electron BTE one step.
     !! 
     !! T Temperature in K
     !! drag Is drag included?
     !! el Electron object
-    !! ph Phonon object
     !! sym Symmetry
     !! rta_rates_ibz Electron RTA scattering rates
     !! field_term Electron field coupling term
@@ -966,9 +967,7 @@ contains
     !! ph_drag_term Phonon drag term
     
     type(electron), intent(in) :: el
-    type(phonon), intent(in) :: ph
     type(numerics), intent(in) :: num
-    type(symmetry), intent(in) :: sym
     logical, intent(in) :: drag
     real(dp), intent(in) :: T, rta_rates_ibz(:,:), field_term(:,:,:)
     real(dp), intent(in), optional :: ph_drag_term(:,:,:)
@@ -1081,10 +1080,9 @@ contains
     end do
   end subroutine iterate_bte_el
 
-  subroutine calculate_phonon_drag(T, num, el, ph, sym, rta_rates_ibz, response_ph, ph_drag_term)
+  subroutine calculate_phonon_drag(num, el, ph, sym, rta_rates_ibz, response_ph, ph_drag_term)
     !! Subroutine to calculate the phonon drag term.
     !! 
-    !! T Temperature in K
     !! num Numerics object
     !! el Electron object
     !! ph Phonon object
@@ -1097,7 +1095,7 @@ contains
     type(phonon), intent(in) :: ph
     type(numerics), intent(in) :: num
     type(symmetry), intent(in) :: sym
-    real(dp), intent(in) :: T, rta_rates_ibz(:,:), response_ph(:,:,:)
+    real(dp), intent(in) :: rta_rates_ibz(:,:), response_ph(:,:,:)
     real(dp), intent(out) :: ph_drag_term(:,:,:)
 
     !Local variables

@@ -304,7 +304,7 @@ contains
                (omegas(:)**2 + bose_matsubara_ens(l)**2), domega, aux)
           iso_matsubara_lambda(l) = iso_matsubara_lambda(l) + aux
        end do
-    end do !s
+    end do
 
     !Write to file
     !call write2file_rank1_real('matsubara_lambda_iso', matsubara_iso_lambda)
@@ -334,7 +334,7 @@ contains
     integer(k8) :: nstates_irred, istate, m, ik, n, ikp, s, l, &
          start, end, chunk, count, nprocs, &
          num_active_images, numomega, nummatsubara
-    real(dp) :: en_el, aux, domega
+    real(dp) :: aux, domega
     real(dp), allocatable :: a2F_istate(:, :), matsubara_lambda_istate(:, :)
     character(len = 1024) :: filename
     
@@ -364,11 +364,8 @@ contains
        !Demux state index into band (m) and wave vector (ik) indices
        call demux_state(istate, wann%numwannbands, m, ik)
 
-       !Electron energy
-       en_el = el%ens_irred(ik, m)
-
        !Apply energy window to initial (IBZ blocks) electron
-       if(abs(en_el - el%enref) > el%fsthick) cycle
+       if(abs(el%ens_irred(ik, m) - el%enref) > el%fsthick) cycle
 
        !Load a2F_istate from disk for matsubara_lambda_istate calculation
        ! Change to data output directory

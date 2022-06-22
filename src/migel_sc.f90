@@ -87,9 +87,8 @@ contains
     real(dp), intent(in) :: max_ph_en
 
     !Local variables
-    integer(k8) :: qp_cutoff, matsubara_cutoff
     real(dp) :: domega, Tstart, Tend, &
-         dT, mustar
+         dT, mustar, qp_cutoff, matsubara_cutoff
     logical(dp) :: isotropic
     
     namelist /superconductivity/ domega, matsubara_cutoff, qp_cutoff, &
@@ -101,8 +100,8 @@ contains
     open(1, file = 'input.nml', status = 'old')
 
     !Read superconductivity-related information
-    qp_cutoff = 0_k8
-    matsubara_cutoff = 0_k8
+    qp_cutoff = 0_dp
+    matsubara_cutoff = 0_dp
     domega = 0.0_dp
     Tstart = 0.0_dp
     Tend = 0.0_dp
@@ -114,8 +113,8 @@ contains
          Tend*dT == 0) then
        call exit_with_message('Bad input(s) provided for superconductivity solver.')
     end if
-    self%qp_cutoff = qp_cutoff
-    self%matsubara_cutoff = matsubara_cutoff
+    self%qp_cutoff = nint(qp_cutoff)
+    self%matsubara_cutoff = nint(matsubara_cutoff)
     self%domega = domega
     self%Tstart = Tstart
     self%Tend = Tend
@@ -131,9 +130,9 @@ contains
        write(*, "(A, 1E16.8, A)") "Matsubara energy cut-off = ", self%matsubara_cutoff*max_ph_en, " eV"
        write(*, "(A, 1E16.8, A)") "Quasiparticle energy cut-off = ", self%qp_cutoff*max_ph_en, " eV"
        write(*, "(A, 1E16.8, A)") "Bosonic energy mesh spacing = ", self%domega, " eV"
-       write(*, "(A, 1E16.8, A)") "Migdal-Eliashberg solver first temperature = ", self%Tstart, " K"
-       write(*, "(A, 1E16.8, A)") "Migdal-Eliashberg solver last temperature = ", self%Tend, " K"
-       write(*, "(A, 1E16.8, A)") "Migdal-Eliashberg solver temperature difference = ", self%dT, " K"
+       write(*, "(A, 1E16.8, A)") "First temperature = ", self%Tstart, " K"
+       write(*, "(A, 1E16.8, A)") "Last temperature = ", self%Tend, " K"
+       write(*, "(A, 1E16.8, A)") "Temperature step = ", self%dT, " K"
        write(*, "(A, 1E16.8)") "Coulomb pseudopotential parameter = ", self%mustar
        write(*, "(A, L)") "Use isotropic Migdal-Eliashberg theory: ", self%isotropic
     end if
@@ -156,9 +155,9 @@ contains
     self%BCS_Delta = 1.72_dp*kB*self%MAD_Tc
 
     if(this_image() == 1) then
-       write(*,"(A, (1E16.8, x), A)") ' McMillan-Allen-Dynes Tc =', &
+       write(*,"(A, (1E16.8, x), A)") 'McMillan-Allen-Dynes Tc =', &
             self%MAD_Tc, ' K'
-       write(*,"(A, (1E16.8, x), A)") ' BCS gap =', &
+       write(*,"(A, (1E16.8, x), A)") 'BCS gap =', &
             self%BCS_delta*1.0e3_dp, ' meV'
     end if
   end subroutine calculate_MAD_theory
@@ -204,6 +203,7 @@ contains
     in_T_bracket = .true.
     do while(in_T_bracket)
        if(this_image() == 1) then
+          write(*, "(A)") "---->"
           write(*, "(A, 1E16.8, A)") " Temperature = ", T, " K"
        end if
        
@@ -271,6 +271,9 @@ contains
              norm_Delta = twonorm(aniso_matsubara_Delta)
           end if
 
+          !Zero out norm_Delata if it is smaller 1 micro eV 
+          if(norm_Delta < 1.0e-6_dp) norm_Delta = 0.0_dp
+
           !Output norms every 100 iterations
           if(this_image() == 1 .and. mod(iter, 100) == 0) then
              write(*, "(A, (1E16.8, x, 1E16.8))") "   ||Z||, ||Delta|| = ", norm_Z, norm_Delta
@@ -278,7 +281,8 @@ contains
 
           !Iteration breaker
           if((abs(norm_Z - norm_Zold)/norm_Zold < num%conv_thres) .and. &
-               (abs(norm_Delta - norm_Deltaold)/norm_Deltaold < num%conv_thres)) then
+               ((abs(norm_Delta - norm_Deltaold)/norm_Deltaold < num%conv_thres) &
+               .or. norm_Delta == 0.0_dp)) then
              if(this_image() == 1) write(*, "(A, (I5))") "   Convergence reached after iter", iter
              if(this_image() == 1) write(*, "(A, (1E16.8))") "   ||Delta|| = ", norm_Delta
              exit
@@ -287,8 +291,10 @@ contains
 
        !Announce phase
        if(this_image() == 1) then
-          if(norm_Delta > 1.0e-6_dp) then ! > 1e-3 meV
+          if(norm_Delta > 1.0e-4_dp) then ! > 1e-1 meV
              write(*, "(A)") "  <<SUPERCONDUCTING PHASE>>"
+          else
+             write(*, "(A)") "  <<NORMAL PHASE>>"
           end if
        end if
        
@@ -303,8 +309,8 @@ contains
 
           !Reduced quasiparticle density of states
           !Eq. 11 of H.J. Choi et al. Physica C 385 (2003) 66–74
-          quasi_dos = real((self%qp_ens + oneI*5.0e-5_dp)/ &
-               sqrt((self%qp_ens + oneI*5.0e-5_dp)**2 - iso_quasi_Delta**2))
+          quasi_dos = real((self%qp_ens + oneI*1.0e-6_dp)/ &
+               sqrt((self%qp_ens + oneI*1.0e-6_dp)**2 - iso_quasi_Delta**2))
 
           !Write quasiparticle Delta and reduced DOS as text data to file
           if(this_image() == 1) then
@@ -357,8 +363,8 @@ contains
                 if(abs(el%ens_irred(ik, m) - el%enref) > el%fsthick) cycle
 
                 aux = aux + el%nequiv(ik)*el%Ws_irred(ik, m)*&
-                     real((self%qp_ens(i) + oneI*5.0e-5_dp)/ &
-                     sqrt((self%qp_ens(i) + oneI*5.0e-5_dp)**2 - aniso_quasi_Delta(istate, i)**2))
+                     real((self%qp_ens(i) + oneI*1.0e-6_dp)/ &
+                     sqrt((self%qp_ens(i) + oneI*1.0e-6_dp)**2 - aniso_quasi_Delta(istate, i)**2))
              end do
              quasi_dos(i) = aux
           end do
@@ -383,7 +389,11 @@ contains
        T = T + self%dT
 
        !Check temperature bracket
-       if(T > self%Tend .or. T < self%Tstart) in_T_bracket = .false.
+       if(self%dT > 0) then
+          if(T > self%Tend .or. T < self%Tstart) in_T_bracket = .false.
+       else
+          if(T < self%Tend .or. T > self%Tstart) in_T_bracket = .false.
+       end if
     end do
   end subroutine calculate_MigEl_theory
 
