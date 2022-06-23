@@ -358,10 +358,7 @@ contains
              do istate = 1, nstates_irred
                 !Demux state index into band (m) and wave vector (ik) indices
                 call demux_state(istate, wann%numwannbands, m, ik)
-
-                !Apply energy window to IBZ blocks electron
-                if(abs(el%ens_irred(ik, m) - el%enref) > el%fsthick) cycle
-
+                
                 aux = aux + el%nequiv(ik)*el%Ws_irred(ik, m)*&
                      real((self%qp_ens(i) + oneI*1.0e-6_dp)/ &
                      sqrt((self%qp_ens(i) + oneI*1.0e-6_dp)**2 - aniso_quasi_Delta(istate, i)**2))

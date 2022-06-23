@@ -125,30 +125,30 @@ contains
 
     allocate(el%Ws(el%nwv, el%numbands))
     allocate(el%Ws_irred(el%nwv_irred, el%numbands))
-    
-    do ik_fbz = 1, el%nwv !over FBZ blocks
-       do ib = 1, el%numbands
-          if(usetetra) then
-             !Evaluate delta[E(ik,ib) - E_Fermi]
-             delta = delta_fn_tetra(el%chempot, ik_fbz, ib, el%wvmesh, el%tetramap, &
-                  el%tetracount, el%tetra_evals)
-          else
-             delta = delta_fn_triang(el%chempot, ik_fbz, ib, el%wvmesh, el%triangmap, &
-                  el%triangcount, el%triang_evals)
-          end if
-          el%Ws(ik_fbz, ib) = delta
+
+    el%Ws_irred = 0.0_dp
+    do ik_ibz = 1, el%nwv_irred
+       do ieq = 1, el%nequiv(ik_ibz)
+          call binsearch(el%indexlist, el%ibz2fbz_map(ieq, ik_ibz, 2), ik_fbz)
+          do ib =1, el%numbands
+             if(usetetra) then
+                !Evaluate delta[E(ik,ib) - E_Fermi]
+                delta = delta_fn_tetra(el%chempot, ik_fbz, ib, el%wvmesh, el%tetramap, &
+                     el%tetracount, el%tetra_evals)
+             else
+                delta = delta_fn_triang(el%chempot, ik_fbz, ib, el%wvmesh, el%triangmap, &
+                     el%triangcount, el%triang_evals)
+             end if
+             el%Ws(ik_fbz, ib) = delta
+          end do
+          el%Ws_irred(ik_ibz, :) = el%Ws_irred(ik_ibz, :) + &
+               el%Ws(ik_fbz, :)
        end do
+       !Get the irreducible quantities as an average over all FBZ images
+       el%Ws_irred(ik_ibz, :) = el%Ws_irred(ik_ibz, :)/el%nequiv(ik_ibz)
     end do
     el%Ws = el%Ws/el%spinnormed_dos_fermi
-
-    !Generate Ws on the irreducible mesh
-    do ik_ibz = 1, el%nwv_irred
-       !Find index of an equivalent k-point in FBZ blocks indexlist
-       ieq = 1 !It is safe to choose the first equivalent image
-       call binsearch(el%indexlist, el%ibz2fbz_map(ieq, ik_ibz, 2), ik_fbz)
-
-       el%Ws_irred(ik_ibz, :) = el%Ws(ik_fbz, :)
-    end do
+    el%Ws_irred = el%Ws_irred/el%spinnormed_dos_fermi
     
     sync all
   end subroutine calculate_el_Ws
