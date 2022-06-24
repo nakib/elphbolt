@@ -68,8 +68,6 @@ contains
     real(dp), allocatable :: ph_deltas(:, :, :), g2_istate(:), a2F_istate(:, :), &
          iso_a2F_branches(:, :), cum_iso_lambda_branches(:, :)
     character(len = 1024) :: filename
-    
-    call print_message("Calculating a2F for all IBZ electrons...")
 
     !Number of equidistant Boson energy points
     numomega = size(omegas)
@@ -78,33 +76,53 @@ contains
     domega = omegas(2) - omegas(1)
     
     !Precalculate the phonon delta functions.
+    call print_message("Precalculating FBZ phonon delta functions...")
+    
+    ! Allocate and initialize
     allocate(ph_deltas(wann%numbranches, ph%nwv, numomega))
-    do iomega = 1, numomega
-       do s = 1, wann%numbranches
+    ph_deltas = 0.0_dp
+
+    call distribute_points(numomega, chunk, start, end, num_active_images)
+
+    ! Handle tetrahedron vs triangle choice.
+    if(num%tetrahedra) then !tetrahedron method
+       do iomega = start, end
           do iq = 1, ph%nwv
-             if(num%tetrahedra) then
+             do s = 1, wann%numbranches
                 ph_deltas(s, iq, iomega) = &
                      delta_fn_tetra(omegas(iomega), iq, s, ph%wvmesh, ph%tetramap, &
                      ph%tetracount, ph%tetra_evals)
-             else
+             end do
+          end do
+       end do
+    else !triangle method
+       do iomega = start, end
+          do iq = 1, ph%nwv
+             do s = 1, wann%numbranches
                 ph_deltas(s, iq, iomega) = &
                      delta_fn_triang(omegas(iomega), iq, s, ph%wvmesh, ph%triangmap, &
                      ph%triangcount, ph%triang_evals)
-             end if
+             end do
           end do
        end do
-    end do
-    !The delta weights above were supercell number normalized.
-    !Taking this fact into account here:
+    end if
+
+    ! The delta weights above were supercell number normalized.
+    ! Taking this fact into account here:
     if(num%tetrahedra) then
        ph_deltas = ph_deltas*product(ph%wvmesh)
     else
        ph_deltas = ph_deltas*product(ph%wvmesh)
     end if
 
-    !Absorb DOS(Ef) in the definition of ph_deltas
+    ! Absorb DOS(Ef) in the definition of ph_deltas
     ph_deltas = ph_deltas*el%spinnormed_dos_fermi
+    
+    ! Reduce ph_deltas
+    call co_sum(ph_deltas)
 
+    call print_message("Calculating a2F for all IBZ electrons...")
+    
     !Total number of IBZ blocks states
     nstates_irred = el%nwv_irred*wann%numwannbands
 
