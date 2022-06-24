@@ -103,8 +103,16 @@ contains
 
     class(phonon), intent(inout) :: self
 
-    deallocate(self%evecs, self%ifc2, self%ifc3, self%Index_i, self%Index_j, self%Index_k, &
-         self%mm, self%rr)
+    if(allocated(self%evecs)) deallocate(self%evecs) 
+    if(allocated(self%ifc2)) deallocate(self%ifc2)
+    if(allocated(self%ifc3)) deallocate(self%ifc3) 
+    if(allocated(self%Index_i)) deallocate(self%Index_i) 
+    if(allocated(self%Index_j)) deallocate(self%Index_j) 
+    if(allocated(self%Index_k)) deallocate(self%Index_k) 
+    if(allocated(self%mm)) deallocate(self%mm) 
+    if(allocated(self%rr)) deallocate(self%rr)
+
+    sync all
   end subroutine deallocate_phonon_quantities
   
   subroutine calculate_phonons(self, crys, sym, num)

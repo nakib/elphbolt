@@ -786,5 +786,7 @@ contains
     class(electron), intent(inout) :: self
 
     deallocate(self%evecs, self%evecs_irred)
+
+    sync all
   end subroutine deallocate_eigenvecs
 end module electron_module

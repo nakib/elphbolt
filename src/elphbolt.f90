@@ -273,6 +273,9 @@ program elphbolt
      !After this point the electron eigenvectors are not needed
      call el%deallocate_eigenvecs
 
+     !After this point we can release some of the phonon quantities
+     call ph%deallocate_phonon_quantities
+
      call t_event%start_timer('IBZ a2F')
 
      call subtitle("Calculating a2F for all IBZ states...")
