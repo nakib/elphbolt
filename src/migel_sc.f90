@@ -247,7 +247,7 @@ contains
        end if
 
        if(this_image() == 1) write(*, "(A)") "   Iterating..."
-       do iter = 1, num%maxiter
+       do iter = 1, max(500, num%maxiter) !At least 500 iterations.
           if(self%isotropic) then
              call iterate_iso_matsubara_Z(iso_matsubara_lambda, self%fermi_matsubara_ens, &
                   iso_matsubara_Delta, iso_matsubara_Z, T)
@@ -288,15 +288,6 @@ contains
              exit
           end if
        end do !iteration number
-
-       !Announce phase
-       if(this_image() == 1) then
-          if(norm_Delta > 1.0e-4_dp) then ! > 1e-1 meV
-             write(*, "(A)") "  <<SUPERCONDUCTING PHASE>>"
-          else
-             write(*, "(A)") "  <<NORMAL PHASE>>"
-          end if
-       end if
        
        !Perform analytic continuation to positive real energies
        if(this_image() == 1) &
@@ -749,9 +740,5 @@ contains
     !Set number of fermionic Matsubara points on upper half plane
     !j = 0, 1, 2, ...
     self%nummatsubara_upper = self%nummatsubara/2 + 1
-
-    !Write energy meshes to file
-    !call write2file_rank1_real('bose_matsubara_ens', self%bose_matsubara_ens)
-    !call write2file_rank1_real('fermi_matsubara_ens', self%fermi_matsubara_ens)
   end subroutine generate_matsubara_meshes
 end module MigEl_sc_module

@@ -323,9 +323,6 @@ contains
           iso_matsubara_lambda(l) = iso_matsubara_lambda(l) + aux
        end do
     end do
-
-    !Write to file
-    !call write2file_rank1_real('matsubara_lambda_iso', matsubara_iso_lambda)
   end subroutine calculate_iso_Matsubara_lambda
 
   subroutine calculate_aniso_Matsubara_lambda(wann, num, el, omegas, bose_matsubara_ens)
@@ -336,8 +333,6 @@ contains
     !! all the energy window restricted electron-phonon processes for a given
     !! irreducible initial electron state = (band, wave vector). 
     !! This list will be written to disk in files tagged with the muxed state index.
-    !!
-    !! If bose_matsubara_ens is not passed, then calculate the isotropic theory.
     !
     !In the FBZ and IBZ blocks a wave vector was retained when at least one
     !band belonged within the energy window. Here the bands outside the energy
