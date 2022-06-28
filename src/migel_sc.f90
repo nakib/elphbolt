@@ -72,6 +72,8 @@ module MigEl_sc_module
      !! Superconducting gap from the BCS theory using the MAD Tc
      logical :: isotropic
      !! Use isotropic approximation?
+     logical :: use_external_eps
+     !! Use user generated |epsilon|^2 to screen a2F?
 
    contains
      procedure, public :: initialize, calculate_MAD_theory, calculate_MigEl_theory
@@ -89,10 +91,10 @@ contains
     !Local variables
     real(dp) :: domega, Tstart, Tend, &
          dT, mustar, qp_cutoff, matsubara_cutoff
-    logical(dp) :: isotropic
+    logical(dp) :: isotropic, use_external_eps
     
     namelist /superconductivity/ domega, matsubara_cutoff, qp_cutoff, &
-         Tstart, Tend, dT, mustar, isotropic
+         Tstart, Tend, dT, mustar, isotropic, use_external_eps
 
     call subtitle("Setting up Migdal-Eliashberg solver environment...")
 
@@ -108,6 +110,7 @@ contains
     dT = 0.0_dp
     mustar = 0.0_dp
     isotropic = .false.
+    use_external_eps = .false.
     read(1, nml = superconductivity)
     if(domega*qp_cutoff*matsubara_cutoff*Tstart* &
          Tend*dT == 0) then
@@ -121,6 +124,7 @@ contains
     self%dT = dT
     self%mustar = mustar
     self%isotropic = isotropic
+    self%use_external_eps = use_external_eps
     
     !Set up meshes
     call generate_real_ens_meshes(self, max_ph_en)
@@ -135,6 +139,7 @@ contains
        write(*, "(A, 1E16.8, A)") "Temperature step = ", self%dT, " K"
        write(*, "(A, 1E16.8)") "Coulomb pseudopotential parameter = ", self%mustar
        write(*, "(A, L)") "Use isotropic Migdal-Eliashberg theory: ", self%isotropic
+       write(*, "(A, L)") "Use user generated |epsilon|^2 to screen a2F: ", self%use_external_eps
     end if
 
     sync all

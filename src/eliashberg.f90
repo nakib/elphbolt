@@ -37,7 +37,7 @@ module eliashberg
 
 contains
 
-  subroutine calculate_a2F(wann, el, ph, num, omegas, iso_lambda0, omegalog)
+  subroutine calculate_a2F(wann, el, ph, num, omegas, iso_lambda0, omegalog, external_eps_switch)
     !! Parallel driver of a2F_mk(nk'|sq) over IBZ electron states.
     !! Other zero temperature quantities such as the isotropic electron-phonon
     !! coupling (lambda0) and the log-averaged boson energy (omegalog) are
@@ -58,6 +58,7 @@ contains
     type(numerics), intent(in) :: num
     real(dp), intent(in) :: omegas(:)
     real(dp), intent(out) :: iso_lambda0, omegalog
+    logical, intent(in), optional :: external_eps_switch
 
     !Local variables
     integer(k8) :: nstates_irred, istate, m, ik, n, ikp, s, &
@@ -66,8 +67,9 @@ contains
          iomega, numomega
     real(dp) :: k(3), kp(3), en_el, WWp, aux, domega
     real(dp), allocatable :: ph_deltas(:, :, :), g2_istate(:), a2F_istate(:, :), &
-         iso_a2F_branches(:, :), cum_iso_lambda_branches(:, :)
+         iso_a2F_branches(:, :), cum_iso_lambda_branches(:, :), eps_squared(:)
     character(len = 1024) :: filename
+    logical :: use_external_eps = .false.
 
     !Number of equidistant Boson energy points
     numomega = size(omegas)
@@ -122,6 +124,25 @@ contains
     call co_sum(ph_deltas)
 
     call print_message("Calculating a2F for all IBZ electrons...")
+
+    if(present(external_eps_switch) .and. external_eps_switch) then
+       use_external_eps = .true.
+       call print_message(" Externally generated screening will be used...")
+
+       allocate(eps_squared(numomega))
+
+       !Read |epsilon|^2 from file
+       if(this_image() == 1) then
+          call chdir(num%cwd)
+          filename = 'eps_squared'
+          open(1, file=trim(filename), status='old')
+          do iomega = 1, numomega
+             read(1, *) eps_squared(iomega)
+          end do
+          close(1)
+       end if
+       call co_broadcast(eps_squared, 1)
+    end if
     
     !Total number of IBZ blocks states
     nstates_irred = el%nwv_irred*wann%numwannbands
@@ -211,6 +232,13 @@ contains
           end do !n
        end do !ikp
 
+       !Screen, if desired
+       if(use_external_eps) then
+          do s = 1, wann%numbranches
+             a2F_istate(:, s) = a2F_istate(:, s)/eps_squared(:)
+          end do
+       end if
+       
        !Change to data output directory
        call chdir(trim(adjustl(num%scdir)))
 
@@ -228,6 +256,13 @@ contains
 
        deallocate(g2_istate, a2F_istate)
     end do
+
+    !Screen, if desired.
+    if(use_external_eps) then
+       do s = 1, wann%numbranches
+          iso_a2F_branches(:, s) = iso_a2F_branches(:, s)/eps_squared(:)
+       end do
+    end if
     
     !Reduce iso_a2F_branches
     call co_sum(iso_a2F_branches)
@@ -271,7 +306,8 @@ contains
     sync all
   end subroutine calculate_a2F
 
-  subroutine calculate_iso_Matsubara_lambda(wann, num, omegas, bose_matsubara_ens, iso_matsubara_lambda)
+  subroutine calculate_iso_Matsubara_lambda(wann, num, omegas, bose_matsubara_ens, &
+       iso_matsubara_lambda)
     !! Calculate the isotropic Matsubara electron-phonon coupling, lambda(l).
     !! Here l is the Bosonic Matsubara energy index. 
     
@@ -297,7 +333,7 @@ contains
 
     call print_message("   Calculating isotropic Matsubara lambda...")
 
-    ! Read iso_a2F_branches from file
+    !Read iso_a2F_branches from file
     allocate(iso_a2F_branches(numomega, wann%numbranches))
     if(this_image() == 1) then
        call chdir(num%cwd)
@@ -309,7 +345,7 @@ contains
        close(1)
     end if
     call co_broadcast(iso_a2F_branches, 1)
-
+    
     !Isotropic theory
     iso_matsubara_lambda = 0.0_dp
 

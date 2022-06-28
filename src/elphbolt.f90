@@ -281,7 +281,8 @@ program elphbolt
      call subtitle("Calculating a2F for all IBZ states...")
 
      !Calculate anisotropic a2F for all IBZ states
-     call calculate_a2F(wann, el, ph, num, migel%omegas, migel%iso_lambda0, migel%omegalog)
+     call calculate_a2F(wann, el, ph, num, migel%omegas, migel%iso_lambda0, migel%omegalog, &
+          migel%use_external_eps)
 
      call t_event%end_timer('IBZ a2F')
 
