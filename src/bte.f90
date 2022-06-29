@@ -34,7 +34,7 @@ module bte_module
 
   implicit none
 
-  external system, chdir
+  !external system, chdir
   
   private
   public bte

@@ -28,7 +28,7 @@ module MigEl_sc_module
   
   implicit none
 
-  external chdir
+  !external chdir
 
   private
   public MigEl_sc

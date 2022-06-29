@@ -33,7 +33,7 @@ module eliashberg
   private
   public calculate_a2F, calculate_iso_Matsubara_lambda, calculate_aniso_Matsubara_lambda
 
-  external chdir
+  !external chdir
 
 contains
 

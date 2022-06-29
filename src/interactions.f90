@@ -37,7 +37,7 @@ module interactions
        calculate_echimp_interaction_ibzk, calculate_el_rta_rates, &
        calculate_bound_scatt_rates
 
-  external chdir, system
+  !external chdir, system
   
 contains
 

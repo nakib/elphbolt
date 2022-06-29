@@ -29,7 +29,7 @@ module wannier_module
   private
   public epw_wannier
 
-  external chdir
+  !external chdir
   
   type epw_wannier
      !! Data and procedures related to Wannierization.
