@@ -397,14 +397,17 @@ contains
     deallocate(runninglist)
 
     !Copy the tmp data into (much) smaller sized global data holders
-    allocate(indexlist_irred(nwavevecs_irred), nequivalent(nwavevecs_irred), &
-         ibz2fbz_map(nsymm_rot, nwavevecs_irred, 2))
+    allocate(indexlist_irred(nwavevecs_irred))
     indexlist_irred(1:nwavevecs_irred) = indexlist_irred_tmp(1:nwavevecs_irred)
-    nequivalent(1:nwavevecs_irred) = nequivalent_tmp(1:nwavevecs_irred)
-    ibz2fbz_map(:, 1:nwavevecs_irred, :) = ibz2fbz_map_tmp(:, 1:nwavevecs_irred, :)
+    deallocate(indexlist_irred_tmp)
 
-    !Deallocate some internal data
-    deallocate(indexlist_irred_tmp, nequivalent_tmp, ibz2fbz_map_tmp)
+    allocate(nequivalent(nwavevecs_irred))
+    nequivalent(1:nwavevecs_irred) = nequivalent_tmp(1:nwavevecs_irred)
+    deallocate(nequivalent_tmp)
+
+    allocate(ibz2fbz_map(nsymm_rot, nwavevecs_irred, 2))
+    ibz2fbz_map(:, 1:nwavevecs_irred, :) = ibz2fbz_map_tmp(:, 1:nwavevecs_irred, :)
+    deallocate(ibz2fbz_map_tmp)
     
     !Create crystal coords IBZ wave vectors
     allocate(wavevecs_irred(nwavevecs_irred,3))
