@@ -574,7 +574,7 @@ contains
     real(dp), intent(out) :: s
 
     !Local variables
-    integer(kind=4) :: i, numint, n
+    integer(k8) :: i, numint, n
     real(dp) :: a, b
 
     n = size(f)
