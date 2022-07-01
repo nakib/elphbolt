@@ -23,7 +23,7 @@ program elphbolt
   !! (e-ph BTEs) as formulated in https://arxiv.org/abs/2109.08547 (2021) with both the
   !! electron-phonon and phonon-phonon interactions computed ab initio.
 
-  use misc, only: welcome, print_message, subtitle, timer
+  use misc, only: welcome, print_message, subtitle, timer, exit_with_message
   use numerics_module, only: numerics
   use crystal_module, only: crystal
   use symmetry_module, only: symmetry
@@ -296,7 +296,9 @@ program elphbolt
      !Calculate Migdal-Eliashberg theory
      call migel%calculate_MigEl_theory(el, wann, num, maxval(ph%ens(:,:)))
      
-     call t_event%end_timer('Superconductivity')   
+     call t_event%end_timer('Superconductivity')
+  case default
+     call exit_with_message('Unknown runlevel. Exiting.')
   end select
 
   call t_all%end_timer('elphbolt')
