@@ -22,7 +22,8 @@ module misc
   implicit none
   
   public
-  private :: sort_int, sort_real, Pade_coeffs, twonorm_real_rank1, twonorm_real_rank2
+  private :: sort_int, sort_real, Pade_coeffs, twonorm_real_rank1, twonorm_real_rank2, &
+       invert_complex_square
 
   type timer
      !! Container for timing related data and procedures.
@@ -44,6 +45,10 @@ module misc
   interface twonorm
      module procedure :: twonorm_real_rank1, twonorm_real_rank2
   end interface twonorm
+
+  interface invert
+     module procedure :: invert_complex_square
+  end interface invert
   
 contains
 
@@ -945,6 +950,33 @@ contains
        Pade_continued(i) = A(N_matsubara)/B(N_matsubara)
     end do
   end function Pade_continued
+
+  subroutine invert_complex_square(mat)
+    !! Wrapper for lapack complex matrix inversion
+
+    complex(dp), intent(inout) :: mat(:, :)
+
+    !Local variables
+    integer :: N, info, lwork
+    complex(dp), allocatable :: work(:), ipivot(:)
+
+    !Size of matrix
+    N = size(mat(:, 1))
+
+    if(N /= size(mat(1, :))) &
+         call exit_with_message("invert_complex_square called with non-zquare matrix. Exiting.")
+
+    allocate(work(N), ipivot(N))
+
+    call zgetrf(N, N, mat, N, ipivot, info)
+    if(info /= 0) &
+         call exit_with_message("Matrix is singular in invert_complex_square. Exiting.")
+    
+    call zgetri(N, mat, N, ipivot, work, lwork, info)
+    if(info /= 0) &
+         call exit_with_message("Matrix inversion failed in invert_complex_square. Exiting.")
+    
+  end subroutine invert_complex_square
 
   subroutine welcome
     !! Subroutine to print a pretty banner.

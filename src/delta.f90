@@ -25,7 +25,7 @@ module delta
 
   private
   public form_tetrahedra_3d, fill_tetrahedra_3d, delta_fn_tetra, &
-       form_triangles, fill_triangles, delta_fn_triang
+       form_triangles, fill_triangles, delta_fn_triang, real_tetra
   
 contains
 
