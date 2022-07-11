@@ -55,18 +55,18 @@ contains
     resolvent = Re_resolvent + oneI*Im_resolvent
   end function resolvent
 
-  !subroutine calculate_retarded_phonon_D0(ph, def)
-  subroutine calculate_retarded_phonon_D0(ph, def_numcells, def_supercell_atompos, pcell_equiv_atom_label)
+  subroutine calculate_retarded_phonon_D0(ph, def_numcells, def_supercell_atom_pos, pcell_equiv_atom_label)
     !! Parallel driver of the retarded, bare phonon Green's function, D0, over
     !! the IBZ states.
     !!
-    !! TODO Description of the subroutine
-    !!
+    !! ph Phonon objects
+    !! def_numcell Number of primitive unit cells in the defective supercell
+    !! def_supercell_atom_pos Positions of atoms (integer 3 vector) in the defective supercell
+    !! pcell_equiv_atom_label Primitive cell equivalence of atom labels in the defective supercell
 
     type(phonon), intent(in) :: ph
-    !type(defect), intent(inout) :: def !TODO have to define this
     integer(k8), intent(in) :: def_numcells
-    integer(k8), intent(in) :: def_supercell_atompos(def_numcells, 3)
+    integer(k8), intent(in) :: def_supercell_atom_pos(def_numcells, 3)
     integer(k8), intent(in) :: pcell_equiv_atom_label(def_numcells)
     
     !Local variables
@@ -96,7 +96,7 @@ contains
        do tau_sc = 1, def_numcells !Atoms in defective supercell
           !Phase factor
           phase = expi( &
-               twopi*dot_product(ph%wavevecs(iq, :), def_supercell_atompos(tau_sc, :)) )
+               twopi*dot_product(ph%wavevecs(iq, :), def_supercell_atom_pos(tau_sc, :)) )
 
           !Get primitive cell equivalent atom of supercell atom
           tau_uc = pcell_equiv_atom_label(tau_sc)
