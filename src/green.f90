@@ -164,7 +164,7 @@ contains
   end subroutine calculate_retarded_phonon_D0
 
   subroutine calculate_phonon_Tmatrix(D0, V, T, approx)
-    !! Calculates the scattering T-matrix for phonons for a given approximation.
+    !! Parallel calculator of the scattering T-matrix for phonons for a given approximation.
     !!
     !! D0 Retarded, bare Green's function
     !! V Scattering potential
@@ -216,7 +216,7 @@ contains
           T(:, :, istate) = V + matmul(matmul(V, D0(:, :, istate)), V)
        case('full Born')
           ! Full Born approximation:
-          ! T = V + V.D0.T = [I - VD0]^-1 . T
+          ! T = V + V.D0.T = [I - VD0]^-1 . V
           !                              _                                      _
           !    *             *          |    *         *            *            |
           !    |            /           |    |        / \          /|\           |
