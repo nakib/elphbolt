@@ -125,6 +125,9 @@ contains
     self%mustar = mustar
     self%isotropic = isotropic
     self%use_external_eps = use_external_eps
+
+    if(.not. self%isotropic .and. self%use_external_eps) &
+         call exit_with_message('External screening for the anisotropic case is not supported. Exiting.')
     
     !Set up meshes
     call generate_real_ens_meshes(self, max_ph_en)
