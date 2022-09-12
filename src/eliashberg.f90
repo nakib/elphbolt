@@ -231,13 +231,6 @@ contains
              end do !s
           end do !n
        end do !ikp
-
-       !Screen, if desired
-       if(use_external_eps) then
-          do s = 1, wann%numbranches
-             a2F_istate(:, s) = a2F_istate(:, s)/eps_squared(:)
-          end do
-       end if
        
        !Change to data output directory
        call chdir(trim(adjustl(num%scdir)))

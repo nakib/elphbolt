@@ -286,17 +286,21 @@ program elphbolt
 
      call t_event%end_timer('IBZ a2F')
 
-     call t_event%start_timer('Superconductivity')
+     if(migel%iso_lambda0 <= migel%mustar) then
+        call print_message("There is no superconductivity since e-ph coupling <= Coulomb pseudopotential.")
+     else
+        call t_event%start_timer('Superconductivity')
 
-     call subtitle("Solving Migdal-Eliashberg equations...")
+        call subtitle("Solving Migdal-Eliashberg equations...")
 
-     !Calculate McMillan-Allen-Dynes theory
-     call migel%calculate_MAD_theory
+        !Calculate McMillan-Allen-Dynes theory
+        call migel%calculate_MAD_theory
 
-     !Calculate Migdal-Eliashberg theory
-     call migel%calculate_MigEl_theory(el, wann, num, maxval(ph%ens(:,:)))
-     
-     call t_event%end_timer('Superconductivity')
+        !Calculate Migdal-Eliashberg theory
+        call migel%calculate_MigEl_theory(el, wann, num, maxval(ph%ens(:,:)))
+
+        call t_event%end_timer('Superconductivity')
+     end if
   case default
      call exit_with_message('Unknown runlevel. Exiting.')
   end select
