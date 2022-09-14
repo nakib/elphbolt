@@ -17,16 +17,17 @@
 module Green_function
   !! Module containing Green's function related procedures.
 
-  use params, only: k8, dp, twopi, pi, oneI
+  use params, only: k8, dp, pi, oneI
   use electron_module, only: electron
   use phonon_module, only: phonon
+  use crystal_module, only: crystal
   use delta, only: delta_fn_tetra, real_tetra
   use misc, only: exit_with_message, distribute_points, expi, demux_state, invert
   
   implicit none
 
   private
-  public calculate_retarded_phonon_D0
+  public calculate_retarded_phonon_D0, calculate_phonon_Tmatrix
   
 contains
   
@@ -71,7 +72,7 @@ contains
     resolvent = Re_resolvent + oneI*Im_resolvent
   end function resolvent
 
-  subroutine calculate_retarded_phonon_D0(ph, def_numcells, def_supercell_atom_pos, pcell_equiv_atom_label)
+  subroutine calculate_retarded_phonon_D0(ph, crys, def_numcells, def_supercell_atom_pos, pcell_equiv_atom_label)
     !! Parallel driver of the retarded, bare phonon Green's function, D0, over
     !! the IBZ states.
     !!
@@ -81,15 +82,16 @@ contains
     !! pcell_equiv_atom_label Primitive cell equivalence of atom labels in the defective supercell
 
     type(phonon), intent(in) :: ph
+    type(crystal), intent(in) :: crys
     integer(k8), intent(in) :: def_numcells
-    integer(k8), intent(in) :: def_supercell_atom_pos(def_numcells, 3)
+    real(k8), intent(in) :: def_supercell_atom_pos(3, def_numcells) !Cartesian
     integer(k8), intent(in) :: pcell_equiv_atom_label(def_numcells)
     
     !Local variables
     integer(k8) :: nstates, nstates_irred, chunk, start, end, num_active_images, &
          istate1, s1, iq1_ibz, iq1, s2, iq2, i, j, num_dof_def, a, dof_counter, iq, &
          tau_sc, tau_uc
-    real(dp) :: en1_sq
+    real(dp) :: en1_sq, q_cart(3)
     complex(dp) :: d0_istate, phase
     complex(dp), allocatable :: phi(:, :, :), phi_internal(:), D0(:, :, :)
    
@@ -108,11 +110,14 @@ contains
 
     !Precompute the defective supercell eigenfunctions
     do iq = 1, ph%nwv
+       !Calculate wave vector in Cartesian coordinates
+       q_cart = matmul(crys%reclattvecs, ph%wavevecs(iq, :))
+       
        dof_counter = 0
        do tau_sc = 1, def_numcells !Atoms in defective supercell
           !Phase factor
           phase = expi( &
-               twopi*dot_product(ph%wavevecs(iq, :), def_supercell_atom_pos(tau_sc, :)) )
+               dot_product(q_cart, def_supercell_atom_pos(:, tau_sc)) )
 
           !Get primitive cell equivalent atom of supercell atom
           tau_uc = pcell_equiv_atom_label(tau_sc)
@@ -213,6 +218,7 @@ contains
           !  V |     +     /   \              
           !    |          /_____\
           !                 D0
+          !
           T(:, :, istate) = V + matmul(matmul(V, D0(:, :, istate)), V)
        case('full Born')
           ! Full Born approximation:
@@ -235,5 +241,8 @@ contains
 
     !Reduce T 
     call co_sum(T)
+
+    !TODO
+    !! Calculate T in reciprocal space.
   end subroutine calculate_phonon_Tmatrix
 end module Green_function
