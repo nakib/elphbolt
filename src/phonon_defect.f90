@@ -34,16 +34,18 @@ module phonon_defect_module
      !! Radius of the defect in nm. This defines a block of cells in the defective supercell.
      integer(k8) :: numcells
      !! Number of cells in the defective supercell block.
-     integer(k8), allocatable :: supercell_cell_pos_intvec(:, :)
+     integer(k8), allocatable :: cell_pos_intvec(:, :)
      !! Unitcell positions as 0-based integer triplets in the defective supercell block.  
-     real(dp), allocatable :: supercell_atom_pos(:, :, :)
+     real(dp), allocatable :: atom_pos(:, :, :)
      !! Cartesian positions of atoms in the defective supercell block.
+     integer(k8), allocatable :: pcell_atom_label(:, :)
+     !! Primitive cell equivalence (integer label) of atoms in the defective supercell block.
      real(dp), allocatable :: V_onsite_mass(:)
      !! On-site mass defect potential.
      real(dp), allocatable :: V_extended(:, :)
      !! General space-dependent, pairwise defect potential.
      logical mass_defect
-     !! Choose is mass defect is going to be used.
+     !! Choose if mass defect is going to be used.
 
    contains
      
@@ -62,8 +64,8 @@ contains
     !Local variables
     real(dp) :: range, supercell_lattvecs(3, 3)
     logical :: mass_defect
-    integer(k8) :: cell, atom, cell_count, cell_intvec(3), i
-    integer(k8) :: supercell_cell_pos_intvec(3, product(ph%scell))
+    integer(k8) :: cell, atom, cell_count, cell_intvec(3), i, &
+         supercell_numatoms, supercell_cell_pos_intvec(3, product(ph%scell))
 
     namelist /phonon_defect/ mass_defect, range
     
@@ -99,22 +101,29 @@ contains
        end if
     end do
     self%numcells = cell_count
-    allocate(self%supercell_cell_pos_intvec(3, self%numcells))
-    self%supercell_cell_pos_intvec(:, 1:self%numcells) = &
+    allocate(self%cell_pos_intvec(3, self%numcells))
+    self%cell_pos_intvec(:, 1:self%numcells) = &
          supercell_cell_pos_intvec(:, 1:self%numcells)
 
     !Calculate supercell lattice vectors
     do i = 1, 3
        supercell_lattvecs(:, i) = ph%scell(i)*crys%lattvecs(:, i)
     end do
+
+    !Number of atoms in the defective block of the supercell
+    supercell_numatoms = self%numcells*crys%numatoms
     
-    !Calculate defective supercell block atomic positions.
-    allocate(self%supercell_atom_pos(3, crys%numatoms, self%numcells))
+    !Calculate defective supercell block atomic positions and
+    !primitive cell equivalent atom labels.
+    allocate(self%atom_pos(3, crys%numatoms, self%numcells))
+    allocate(self%pcell_atom_label(crys%numatoms, self%numcells))
     do cell = 1, self%numcells
        do atom = 1, crys%numatoms
-          self%supercell_atom_pos(:, atom, cell) = &
+          self%atom_pos(:, atom, cell) = &
                matmul(supercell_lattvecs, &
-               self%supercell_cell_pos_intvec(:, cell) + crys%basis(:, atom))
+               self%cell_pos_intvec(:, cell) + crys%basis(:, atom))
+
+          self%pcell_atom_label(atom, cell) = crys%atomtypes(atom)
        end do
     end do
     

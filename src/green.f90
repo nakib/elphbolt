@@ -90,17 +90,20 @@ contains
     !Local variables
     integer(k8) :: nstates, nstates_irred, chunk, start, end, num_active_images, &
          istate1, s1, iq1_ibz, iq1, s2, iq2, i, j, num_dof_def, a, dof_counter, iq, &
-         tau_sc, tau_uc
+         tau_sc, tau_uc, def_numatoms
     real(dp) :: en1_sq, q_cart(3)
     complex(dp) :: d0_istate, phase
     complex(dp), allocatable :: phi(:, :, :), phi_internal(:), D0(:, :, :)
-   
+
+    !Total number of atoms in the defective block of the supercell
+    def_numatoms = def_numcells*crys%numatoms
+    
     !Total number of IBZ and FBZ blocks states
     nstates_irred = ph%nwv_irred*ph%numbands
     nstates = ph%nwv*ph%numbands
 
     !Total number of degrees of freedom in defective supercell
-    num_dof_def = def_numcells*3
+    num_dof_def = def_numatoms*3
     
     !Divide phonon states among images
     call distribute_points(nstates_irred, chunk, start, end, num_active_images)
@@ -114,7 +117,7 @@ contains
        q_cart = matmul(crys%reclattvecs, ph%wavevecs(iq, :))
        
        dof_counter = 0
-       do tau_sc = 1, def_numcells !Atoms in defective supercell
+       do tau_sc = 1, def_numatoms !Atoms in defective supercell
           !Phase factor
           phase = expi( &
                dot_product(q_cart, def_supercell_atom_pos(:, tau_sc)) )
@@ -168,31 +171,43 @@ contains
     call co_sum(D0)
   end subroutine calculate_retarded_phonon_D0
 
-  subroutine calculate_phonon_Tmatrix(D0, V, T, approx)
+  subroutine calculate_phonon_Tmatrix(ph, crys, D0, V, def_supercell_atom_pos, pcell_equiv_atom_label, &
+       diagT, approx)
     !! Parallel calculator of the scattering T-matrix for phonons for a given approximation.
     !!
-    !! D0 Retarded, bare Green's function
-    !! V Scattering potential
-    !! T Scattering T-matrix
-    !! approx Approximation
+    !! D0 Retarded, bare Green's function in real space
+    !! V Scattering potential in real space
+    !! diagT Diagonoal of the scattering T-matrix in reciprocal space
+    !! approx Approximation for the scattering theory
 
+    type(phonon), intent(in) :: ph
+    type(crystal), intent(in) :: crys
     complex(dp), intent(in) :: D0(:, :, :)
     real(dp), intent(in) :: V(:, :)
+    real(k8), intent(in) :: def_supercell_atom_pos(:, :) !Cartesian
+    integer(k8), intent(in) :: pcell_equiv_atom_label(:)
     character(len=*), intent(in) :: approx
-    complex(dp), allocatable, intent(out) :: T(:, :, :)
+    complex(dp), allocatable, intent(out) :: diagT(:)
 
     !Local variables
-    integer(k8) :: num_def_dof, numstates_irred, istate, nstates_irred, &
-         chunk, start, end, num_active_images
-    complex(dp), allocatable :: inv_one_minus_VD0(:, :)
+    integer(k8) :: num_dof_def, numstates_irred, istate, nstates_irred, &
+         chunk, start, end, num_active_images, i, j, a, def_numatoms, &
+         dof_counter, iq, s, tau_sc, tau_uc
+    complex(dp), allocatable :: inv_one_minus_VD0(:, :), T(:, :, :), &
+         phi(:, :)
+    complex(dp) :: phase
+    real(dp) :: q_cart(3)
 
     !Displacement degrees of freedom in the defective supercell 
-    num_def_dof = size(D0(:, 1, 1))
+    num_dof_def = size(D0(:, 1, 1))
+
+    !Number of atoms in the defective block of the supercell
+    def_numatoms = num_dof_def/3
 
     !Number of irreducible phonon states
     numstates_irred = size(D0(1, 1, :))
 
-    allocate(T(num_def_dof, num_def_dof, numstates_irred))
+    allocate(T(num_dof_def, num_dof_def, numstates_irred))
 
     !Divide phonon states among images
     call distribute_points(nstates_irred, chunk, start, end, num_active_images)
@@ -230,7 +245,7 @@ contains
           !    |          /_____        |_   |      /_____\      /__|__\        _|
           !                 D0           
           !
-          allocate(inv_one_minus_VD0(num_def_dof, num_def_dof))
+          allocate(inv_one_minus_VD0(num_dof_def, num_dof_def))
           inv_one_minus_VD0 = 1.0_dp - matmul(V, D0(:, :, istate))
           call invert(inv_one_minus_VD0)
           T(:, :, istate) = matmul(inv_one_minus_VD0, V)
@@ -242,7 +257,42 @@ contains
     !Reduce T 
     call co_sum(T)
 
-    !TODO
-    !! Calculate T in reciprocal space.
+    !Calculate diagonal T in reciprocal space.
+    allocate(phi(ph%numbands, num_dof_def))
+    allocate(diagT(numstates_irred))
+    do istate = start, end
+       !Demux state index into branch (s) and wave vector (iq) indices
+       call demux_state(istate, ph%numbands, s, iq)
+
+       !Calculate wave vector in Cartesian coordinates
+       q_cart = matmul(crys%reclattvecs, ph%wavevecs_irred(iq, :))
+
+       !Precompute the eigenfunctions
+       dof_counter = 0
+       do tau_sc = 1, def_numatoms !Atoms in defective supercell
+          !Phase factor
+          phase = expi( &
+               dot_product(q_cart, def_supercell_atom_pos(:, tau_sc)) )
+
+          !Get primitive cell equivalent atom of supercell atom
+          tau_uc = pcell_equiv_atom_label(tau_sc)
+
+          !Run over Cartesian directions
+          do a = 1, 3
+             dof_counter = dof_counter + 1
+             phi(:, dof_counter) = phase*ph%evecs(iq, :, (tau_uc - 1)*3 + a)
+          end do
+       end do
+
+       !Fourier transform
+       do i = 1, num_dof_def
+          do j = 1, num_dof_def
+             diagT(istate) = T(i, j, istate) + conjg(phi(s, i))*phi(s, j)
+          end do
+       end do
+    end do
+
+    !Reduce T
+    call co_sum(diagT)
   end subroutine calculate_phonon_Tmatrix
 end module Green_function
