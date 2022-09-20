@@ -23,6 +23,9 @@ program elphbolt
   !! (e-ph BTEs) as formulated in https://arxiv.org/abs/2109.08547 (2021) with both the
   !! electron-phonon and phonon-phonon interactions computed ab initio.
 
+  !TEST
+  use params, only: dp
+  
   use misc, only: welcome, print_message, subtitle, timer, exit_with_message
   use numerics_module, only: numerics
   use crystal_module, only: crystal
@@ -35,8 +38,11 @@ program elphbolt
   use bz_sums, only: calculate_dos, calculate_qTF, calculate_el_dos_fermi, calculate_el_Ws
   use interactions, only: calculate_gReq, calculate_gkRp, calculate_3ph_interaction, &
        calculate_eph_interaction_ibzq, calculate_eph_interaction_ibzk, &
-       calculate_echimp_interaction_ibzk, calculate_bound_scatt_rates
+       calculate_echimp_interaction_ibzk, calculate_bound_scatt_rates, &
+       calculate_defect_scatt_rates
   use eliashberg, only: calculate_a2F
+  use phonon_defect_module, only: phonon_defect
+  use Green_function, only: calculate_retarded_phonon_D0, calculate_phonon_Tmatrix
   
   implicit none
   
@@ -48,6 +54,7 @@ program elphbolt
   type(phonon) :: ph
   type(bte) :: bt
   type(MigEl_sc) :: migel
+  type(phonon_defect) :: ph_def
   type(timer) :: t_all, t_event
   
   !Print banner and other information
@@ -83,6 +90,9 @@ program elphbolt
   call ph%initialize(crys, sym, num)
 
   call t_event%end_timer('Phonons')
+
+  !Create phonon defect
+  if(num%phdef_Tmat) call ph_def%initialize(ph, crys)
   
   select case(num%runlevel)
   case(1) !BTE workflow
@@ -129,6 +139,28 @@ program elphbolt
      !Set chemical potential dependent directory
      call num%create_chempot_dirs(el%chempot)
 
+     !
+     if(num%phdef_Tmat) then
+        !Calculate phonon-defect interactions
+        call t_event%start_timer("Phonon-defect transition rates")
+
+        !Calculate phonon Green's function on defective space
+        call calculate_retarded_phonon_D0(ph, crys, ph_def%atom_pos, ph_def%pcell_atom_label, ph_def%D0)
+
+        !TODO Calculate phonon-mass defect scattering T-matrix
+        call calculate_phonon_Tmatrix(ph, crys, ph_def%D0, ph_def%V_mass, ph_def%V_bond, &
+             ph_def%atom_pos, ph_def%pcell_atom_label, ph_def%irred_diagT, '1st Born')
+
+
+!!$        !TEST
+!!$        call calculate_defect_scatt_rates(ph%prefix, crys%volume, 0.1_dp, ph%ens_irred, &
+!!$             ph_def%irred_diagT)
+        
+        call t_event%end_timer("Phonon-defect transition rates")
+     end if
+     call exit
+     !!
+     
      if(num%onlyphbte .and. num%phe .or. num%drag) then
         if(.not. num%read_gq2) then
            call t_event%start_timer('IBZ q e-ph interactions')
@@ -146,7 +178,7 @@ program elphbolt
         
         !Calculate ph-e transition probabilities
         call calculate_eph_interaction_ibzq(wann, crys, el, ph, num, 'Y')
-        
+                
         call t_event%end_timer('IBZ ph-e transition probilities')
      end if
 

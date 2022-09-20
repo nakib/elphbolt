@@ -22,7 +22,8 @@ module Green_function
   use phonon_module, only: phonon
   use crystal_module, only: crystal
   use delta, only: delta_fn_tetra, real_tetra
-  use misc, only: exit_with_message, distribute_points, expi, demux_state, invert
+  use misc, only: exit_with_message, distribute_points, expi, demux_state, invert, &
+       write2file_rank2_real
   
   implicit none
 
@@ -72,31 +73,36 @@ contains
     resolvent = Re_resolvent + oneI*Im_resolvent
   end function resolvent
 
-  subroutine calculate_retarded_phonon_D0(ph, crys, def_numcells, def_supercell_atom_pos, pcell_equiv_atom_label)
+  subroutine calculate_retarded_phonon_D0(ph, crys, def_supercell_atom_pos, pcell_equiv_atom_label, &
+       D0)
     !! Parallel driver of the retarded, bare phonon Green's function, D0, over
     !! the IBZ states.
     !!
-    !! ph Phonon objects
-    !! def_numcell Number of primitive unit cells in the defective supercell
+    !! ph Phonon object
+    !! crys Crystal object
     !! def_supercell_atom_pos Positions of atoms (integer 3 vector) in the defective supercell
     !! pcell_equiv_atom_label Primitive cell equivalence of atom labels in the defective supercell
+    !! D0 Green's function
 
     type(phonon), intent(in) :: ph
     type(crystal), intent(in) :: crys
-    integer(k8), intent(in) :: def_numcells
-    real(k8), intent(in) :: def_supercell_atom_pos(3, def_numcells) !Cartesian
-    integer(k8), intent(in) :: pcell_equiv_atom_label(def_numcells)
+    real(dp), intent(in) :: def_supercell_atom_pos(:, :) !Cartesian
+    integer(k8), intent(in) :: pcell_equiv_atom_label(:)
+    complex(dp), allocatable, intent(out) :: D0(:, :, :)
     
     !Local variables
     integer(k8) :: nstates, nstates_irred, chunk, start, end, num_active_images, &
          istate1, s1, iq1_ibz, iq1, s2, iq2, i, j, num_dof_def, a, dof_counter, iq, &
-         tau_sc, tau_uc, def_numatoms
+         tau_sc, tau_uc, def_numatoms, def_numcells
     real(dp) :: en1_sq, q_cart(3)
     complex(dp) :: d0_istate, phase
-    complex(dp), allocatable :: phi(:, :, :), phi_internal(:), D0(:, :, :)
+    complex(dp), allocatable :: phi(:, :, :), phi_internal(:)
 
     !Total number of atoms in the defective block of the supercell
-    def_numatoms = def_numcells*crys%numatoms
+    def_numatoms = size(pcell_equiv_atom_label)
+    
+    !Number of primitive unit cells in the defective supercell    
+    def_numcells = def_numcells/crys%numatoms
     
     !Total number of IBZ and FBZ blocks states
     nstates_irred = ph%nwv_irred*ph%numbands
@@ -109,7 +115,7 @@ contains
     call distribute_points(nstates_irred, chunk, start, end, num_active_images)
 
     allocate(phi(ph%nwv, ph%numbands, num_dof_def), phi_internal(num_dof_def), &
-         D0(nstates_irred, num_dof_def, num_dof_def))
+         D0(num_dof_def, num_dof_def, nstates_irred))
 
     !Precompute the defective supercell eigenfunctions
     do iq = 1, ph%nwv
@@ -171,8 +177,8 @@ contains
     call co_sum(D0)
   end subroutine calculate_retarded_phonon_D0
 
-  subroutine calculate_phonon_Tmatrix(ph, crys, D0, V, def_supercell_atom_pos, pcell_equiv_atom_label, &
-       diagT, approx)
+  subroutine calculate_phonon_Tmatrix(ph, crys, D0, V_mass, V_bond, &
+       def_supercell_atom_pos, pcell_equiv_atom_label, diagT, approx)
     !! Parallel calculator of the scattering T-matrix for phonons for a given approximation.
     !!
     !! D0 Retarded, bare Green's function in real space
@@ -183,11 +189,12 @@ contains
     type(phonon), intent(in) :: ph
     type(crystal), intent(in) :: crys
     complex(dp), intent(in) :: D0(:, :, :)
-    real(dp), intent(in) :: V(:, :)
+    real(dp), intent(in) :: V_mass(:)
+    real(dp), intent(in) :: V_bond(:, :)
     real(k8), intent(in) :: def_supercell_atom_pos(:, :) !Cartesian
     integer(k8), intent(in) :: pcell_equiv_atom_label(:)
     character(len=*), intent(in) :: approx
-    complex(dp), allocatable, intent(out) :: diagT(:)
+    complex(dp), allocatable, intent(out) :: diagT(:, :)
 
     !Local variables
     integer(k8) :: num_dof_def, numstates_irred, istate, nstates_irred, &
@@ -195,24 +202,48 @@ contains
          dof_counter, iq, s, tau_sc, tau_uc
     complex(dp), allocatable :: inv_one_minus_VD0(:, :), T(:, :, :), &
          phi(:, :)
+    real(dp), allocatable :: V(:, :)
     complex(dp) :: phase
-    real(dp) :: q_cart(3)
+    real(dp) :: q_cart(3), en_sq
 
     !Displacement degrees of freedom in the defective supercell 
-    num_dof_def = size(D0(:, 1, 1))
+    num_dof_def = size(D0, 1)
 
     !Number of atoms in the defective block of the supercell
     def_numatoms = num_dof_def/3
 
     !Number of irreducible phonon states
-    numstates_irred = size(D0(1, 1, :))
+    numstates_irred = size(D0, 3)
 
     allocate(T(num_dof_def, num_dof_def, numstates_irred))
-
+    allocate(V(num_dof_def, num_dof_def))
+    V = 0.0_dp
+    
     !Divide phonon states among images
     call distribute_points(nstates_irred, chunk, start, end, num_active_images)
     
     do istate = start, end
+       !Demux state index into branch (s) and wave vector (iq) indices
+       call demux_state(istate, ph%numbands, s, iq)
+       
+       !Squared energy of phonon 1
+       en_sq = ph%ens(ph%indexlist_irred(iq), s)**2
+       
+       !Add energy scaling to mass perturbation.
+       !Since on-site mass perturbation is in the unit cell,
+       !only these elements of V gets a contribution.
+       dof_counter = 0
+       do a = 1, crys%numatoms !Number of atoms in the unit cell
+          do i = 1, 3 !Cartesian directions
+             dof_counter = dof_counter + 1
+             V(dof_counter, dof_counter) = en_sq*V_mass(a)
+          end do
+       end do
+
+       !TODO Need to have calculated V_bond earlier. 
+       !Combine mass and bond perturbations
+       !V = V + V_bond
+       
        select case(approx)
        case('lowest order')
           ! Lowest order:
@@ -259,7 +290,8 @@ contains
 
     !Calculate diagonal T in reciprocal space.
     allocate(phi(ph%numbands, num_dof_def))
-    allocate(diagT(numstates_irred))
+    allocate(diagT(ph%nwv_irred, ph%numbands))
+    diagT = 0.0_dp
     do istate = start, end
        !Demux state index into branch (s) and wave vector (iq) indices
        call demux_state(istate, ph%numbands, s, iq)
@@ -287,7 +319,8 @@ contains
        !Fourier transform
        do i = 1, num_dof_def
           do j = 1, num_dof_def
-             diagT(istate) = T(i, j, istate) + conjg(phi(s, i))*phi(s, j)
+             diagT(iq, s) = diagT(iq, s) + &
+                  conjg(phi(s, i))*phi(s, j)*T(i, j, istate)
           end do
        end do
     end do

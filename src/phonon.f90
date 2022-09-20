@@ -265,6 +265,10 @@ contains
        call form_tetrahedra_3d(self%nwv, self%wvmesh, self%tetra, self%tetracount, &
             self%tetramap, .false.)
        call fill_tetrahedra_3d(self%tetra, self%ens, self%tetra_evals)
+
+       if(num%phdef_Tmat) then
+          call fill_tetrahedra_3d(self%tetra, self%ens**2, self%tetra_squared_evals)
+       end if
     else
        call print_message("Calculating phonon mesh triangles...")
        call form_triangles(self%nwv, self%wvmesh, self%triang, self%triangcount, &

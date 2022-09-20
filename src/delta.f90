@@ -59,7 +59,7 @@ contains
     
     !Grab number of tetrahedra in which wave vector belongs
     num = tetracount(ik)
-
+    
     do itk = 1, num !Run over tetrahedra
        it = tetramap(1, ik, itk) !Grab tetrahedron
        iv = tetramap(2, ik, itk) !Grab vertex

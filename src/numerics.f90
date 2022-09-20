@@ -75,6 +75,8 @@ module numerics_module
      !! Use phonon-substitution scattering?
      logical :: phbound
      !! Use phonon-boundary scattering?
+     logical :: phdef_Tmat
+     !! Calculate phonon-defect scattering T-matrix?
      logical :: onlyphbte
      !! Choose if only phonon BTE will be solved.
      logical :: onlyebte
@@ -123,12 +125,12 @@ contains
     real(dp) :: fsthick, conv_thres, ph_en_min, ph_en_max, el_en_min, el_en_max
     character(len = 1024) :: datadumpdir, tag
     logical :: read_gq2, read_gk2, read_V, read_W, tetrahedra, phe, phiso, phsubs, &
-         phbound, onlyphbte, onlyebte, elchimp, elbound, drag, plot_along_path
+         phbound, phdef_Tmat, onlyphbte, onlyebte, elchimp, elbound, drag, plot_along_path
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
          read_V, read_W, tetrahedra, phe, phiso, phsubs, onlyphbte, onlyebte, maxiter, &
          conv_thres, drag, elchimp, plot_along_path, runlevel, ph_en_min, ph_en_max, &
-         ph_en_num, el_en_min, el_en_max, el_en_num, phbound, elbound
+         ph_en_num, el_en_min, el_en_max, el_en_num, phbound, elbound, phdef_Tmat
 
     call subtitle("Reading numerics information...")
     
@@ -149,6 +151,7 @@ contains
     phiso = .false.
     phsubs = .false.
     phbound = .false.
+    phdef_Tmat = .false.
     onlyphbte = .false.
     onlyebte = .false.
     elchimp = .false.
@@ -190,6 +193,7 @@ contains
        self%phiso = phiso
        self%phsubs = phsubs
        self%phbound = phbound
+       self%phdef_Tmat = phdef_Tmat
        self%onlyphbte = onlyphbte
        self%onlyebte = onlyebte
        self%elchimp = elchimp
@@ -235,6 +239,11 @@ contains
        self%onlyebte = .false.
        self%onlyphbte = .false.
        self%phe = .true.
+    end if
+
+    !Check if T-matrix and tetrahedron method consistency
+    if(self%phdef_Tmat .and. .not. self%tetrahedra) then
+       call exit_with_message("Currently T-matrix method is only supported with tetrahedron method. Exiting.")
     end if
     
     !Create data dump directory
@@ -290,6 +299,7 @@ contains
           write(*, "(A, L)") "Include ph-isotope interaction: ", self%phiso       
           write(*, "(A, L)") "Include ph-substitution interaction: ", self%phsubs
           write(*, "(A, L)") "Include ph-boundary interaction: ", self%phbound
+          write(*, "(A, L)") "Include ph-defect interaction using the T-matrix: ", self%phdef_Tmat
           if(self%phbound) then
              write(*,"(A,(1E16.8,x),A)") 'Characteristic length for ph-boundary scattering =', &
                   crys%bound_length, 'mm'

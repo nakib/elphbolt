@@ -35,7 +35,7 @@ module interactions
        calculate_ph_rta_rates, read_transition_probs_e, &
        calculate_eph_interaction_ibzq, calculate_eph_interaction_ibzk, &
        calculate_echimp_interaction_ibzk, calculate_el_rta_rates, &
-       calculate_bound_scatt_rates
+       calculate_bound_scatt_rates, calculate_defect_scatt_rates
 
   !external chdir, system
   
@@ -1429,4 +1429,44 @@ contains
     !Write to file
     call write2file_rank2_real(prefix // '.W_rta_'//prefix//'bound', scatt_rates)
   end subroutine calculate_bound_scatt_rates
+
+  subroutine calculate_defect_scatt_rates(prefix, vol, def_frac, ens, diagT)!, scatt_rates)
+    !! Subroutine to calculate the phonon/electron-defect scattering rate given
+    !! the diagonal of the scattering T-matrix.
+    !!
+    !! prefix Particle type label
+    !! vol Unitcell volume
+    !! def_frac Atomic fraction of defects
+    !! ens IBZ energies
+    !! diagT Diagonal of the IBZ T-matrix
+    !! scatt_rates IBZ Scattering rates
+
+    character(len = 2), intent(in) :: prefix
+    real(dp), intent(in) :: vol
+    real(dp), intent(in) :: def_frac
+    real(dp), intent(in) :: ens(:, :)
+    complex(dp), intent(in) :: diagT(:, :)
+    !real(dp), allocatable, intent(out) :: scatt_rates(:, :)
+
+    !Local variables
+    integer(k8) :: nk, nbands, ik, ib
+    real(dp), allocatable :: scatt_rates(:, :)
+
+    nk = size(diagT, 1)
+    nbands = size(diagT, 2)
+
+    print*, nk, nbands
+    
+    allocate(scatt_rates(nk, nbands))
+
+    do ib = 1, nbands
+       do ik = 1, nk
+          scatt_rates(ik, ib) = imag(diagT(ik, ib))/ens(ik, ib)
+       end do
+    end do
+    scatt_rates = -def_frac*vol*scatt_rates
+
+    !Write to file
+    call write2file_rank2_real(prefix // '.W_rta_'//prefix//'defect', scatt_rates)
+  end subroutine calculate_defect_scatt_rates
 end module interactions

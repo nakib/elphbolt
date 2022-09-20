@@ -36,20 +36,25 @@ module phonon_defect_module
      !! Number of cells in the defective supercell block.
      integer(k8), allocatable :: cell_pos_intvec(:, :)
      !! Unitcell positions as 0-based integer triplets in the defective supercell block.  
-     real(dp), allocatable :: atom_pos(:, :, :)
+     real(dp), allocatable :: atom_pos(:, :)
      !! Cartesian positions of atoms in the defective supercell block.
-     integer(k8), allocatable :: pcell_atom_label(:, :)
+     integer(k8), allocatable :: pcell_atom_label(:)
      !! Primitive cell equivalence (integer label) of atoms in the defective supercell block.
-     real(dp), allocatable :: V_onsite_mass(:)
+     real(dp), allocatable :: V_mass(:)
      !! On-site mass defect potential.
-     real(dp), allocatable :: V_extended(:, :)
+     real(dp), allocatable :: V_bond(:, :)
      !! General space-dependent, pairwise defect potential.
+     complex(dp), allocatable :: D0(:, :, :)
+     !! Retarded, bare Green's function defined on the defect space.
+     complex(dp), allocatable :: irred_diagT(:, :)
+     !! Diagonal of T-matrix for irreducible phonons.
      logical mass_defect
      !! Choose if mass defect is going to be used.
 
    contains
-     
-     procedure, private :: generate_V_onsite_mass
+
+     procedure, public :: initialize
+     procedure, private :: generate_V_mass
   end type phonon_defect
 
 contains
@@ -65,7 +70,8 @@ contains
     real(dp) :: range, supercell_lattvecs(3, 3)
     logical :: mass_defect
     integer(k8) :: cell, atom, cell_count, cell_intvec(3), i, &
-         supercell_numatoms, supercell_cell_pos_intvec(3, product(ph%scell))
+         supercell_numatoms, supercell_cell_pos_intvec(3, product(ph%scell)), &
+         atom_count
 
     namelist /phonon_defect/ mass_defect, range
     
@@ -91,7 +97,7 @@ contains
     do cell = 1, product(ph%scell)
        !Demultiplex cell index into an 0-based integer triplet
        !giving the coordinates of a cell in the supercell.
-       call demux_vector(cell_count, cell_intvec, ph%scell, 0_k8)
+       call demux_vector(cell, cell_intvec, ph%scell, 0_k8)
        
        !If position of cell is within range, then keep it.
        if(distance_from_origin(cell_intvec, ph%scell, crys%lattvecs) <= range) then
@@ -115,23 +121,26 @@ contains
     
     !Calculate defective supercell block atomic positions and
     !primitive cell equivalent atom labels.
-    allocate(self%atom_pos(3, crys%numatoms, self%numcells))
-    allocate(self%pcell_atom_label(crys%numatoms, self%numcells))
+    allocate(self%atom_pos(3, supercell_numatoms))
+    allocate(self%pcell_atom_label(supercell_numatoms))
+    atom_count = 0
     do cell = 1, self%numcells
        do atom = 1, crys%numatoms
-          self%atom_pos(:, atom, cell) = &
+          atom_count = atom_count + 1
+          
+          self%atom_pos(:, atom_count) = &
                matmul(supercell_lattvecs, &
                self%cell_pos_intvec(:, cell) + crys%basis(:, atom))
 
-          self%pcell_atom_label(atom, cell) = crys%atomtypes(atom)
+          self%pcell_atom_label(atom_count) = crys%atomtypes(atom)
        end do
     end do
     
     !Create on-site mass perturbation
-    if(self%mass_defect) call generate_V_onsite_mass(self, crys)
+    if(self%mass_defect) call generate_V_mass(self, crys)
   end subroutine initialize
   
-  subroutine generate_V_onsite_mass(self, crys)
+  subroutine generate_V_mass(self, crys)
     !! Create a single, on-site defect potential.
     !! The defect is always taken to be in the central unit cell.
     !
@@ -142,12 +151,9 @@ contains
     class(phonon_defect), intent(inout) :: self
     type(crystal), intent(in) :: crys
 
-    !Local variables
-    integer(k8) :: elem, cell
-
-    allocate(self%V_onsite_mass(crys%numelements))
-    self%V_onsite_mass = (1.0_dp - crys%subs_masses/crys%masses)
-  end subroutine generate_V_onsite_mass
+    allocate(self%V_mass(crys%numelements))
+    self%V_mass = (1.0_dp - crys%subs_masses/crys%masses)
+  end subroutine generate_V_mass
 
   pure real(dp) function distance_from_origin(cell_intvec, scell, lattvecs)
     !! Function to calculate the minimum distance (nm) of a vector measured from
@@ -157,7 +163,7 @@ contains
     real(dp), intent(in) :: lattvecs(3, 3)
 
     !Local variables
-    real(dp) :: distance_from_origins(3**3), supercell_lattvecs(3, 3)
+    real(dp) :: distance_from_origins(27), supercell_lattvecs(3, 3)
     integer(k8) :: i, j, k, count
     
     !Calculate supercell lattice vectors
@@ -166,17 +172,17 @@ contains
     end do
 
     !Calculate the distance in the images of the central supercell
-    count = 1
+    count = 0
     do i = -1, 1
        do j = -1, 1
           do k = -1, 1
-             distance_from_origins(count) = twonorm(&
-                  matmul(supercell_lattvecs, cell_intvec - [i, j, k]*scell))
              count = count + 1
+             distance_from_origins(count) = twonorm(&
+                  matmul(supercell_lattvecs, cell_intvec/dble(scell) - [i, j, k]))
           end do
        end do
     end do
-
+    
     !Return the minimum distance
     distance_from_origin = minval(distance_from_origins)
   end function distance_from_origin
