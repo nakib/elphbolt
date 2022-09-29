@@ -124,7 +124,7 @@ contains
     sync all
 
     if(.not. num%onlyebte) then
-       call t%start_timer('RTA e BTE')
+       call t%start_timer('RTA ph BTE')
        
        !Allocate phonon transport coefficients
        allocate(ph_kappa(ph%numbands, 3, 3), ph_alphabyT(ph%numbands, 3, 3), &
@@ -216,11 +216,11 @@ contains
        ! Change back to cwd
        call chdir(trim(adjustl(num%cwd)))
 
-       call t%end_timer('RTA e BTE')
+       call t%end_timer('RTA ph BTE')
     end if
 
     if(.not. num%onlyphbte) then
-       call t%start_timer('RTA ph BTE')
+       call t%start_timer('RTA e BTE')
        
        !Allocate electron transport coefficients
        allocate(el_sigma(el%numbands, 3, 3), el_sigmaS(el%numbands, 3, 3), &
@@ -327,7 +327,7 @@ contains
        ! Change back to cwd
        call chdir(trim(adjustl(num%cwd)))
 
-       call t%end_timer('RTA ph BTE')
+       call t%end_timer('RTA e BTE')
     end if
     
     if(num%drag) then !Coupled BTEs
