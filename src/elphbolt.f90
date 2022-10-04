@@ -158,7 +158,7 @@ program elphbolt
         
         call t_event%end_timer("Phonon-defect transition rates")
      end if
-     call exit
+     !call exit
      !!
      
      if(num%onlyphbte .and. num%phe .or. num%drag) then
