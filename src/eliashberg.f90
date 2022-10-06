@@ -111,11 +111,7 @@ contains
 
     ! The delta weights above were supercell number normalized.
     ! Taking this fact into account here:
-    if(num%tetrahedra) then
-       ph_deltas = ph_deltas*product(ph%wvmesh)
-    else
-       ph_deltas = ph_deltas*product(ph%wvmesh)
-    end if
+    ph_deltas = ph_deltas*product(ph%wvmesh)
 
     ! Absorb DOS(Ef) in the definition of ph_deltas
     ph_deltas = ph_deltas*el%spinnormed_dos_fermi
