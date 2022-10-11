@@ -254,10 +254,18 @@ contains
        e23 = e2 - e3
 
        !Precalculate all the log(abs(e - e_vertex))
-       logabs_ee0 = log(abs(ee0))
-       logabs_ee1 = log(abs(ee1))
-       logabs_ee2 = log(abs(ee2))
-       logabs_ee3 = log(abs(ee3))
+       logabs_ee0 = 0.0_dp
+       if(ee0 /= 0.0_dp) logabs_ee0 = log(abs(ee0))
+
+       logabs_ee1 = 0.0_dp
+       if(ee1 /= 0.0_dp) logabs_ee1 = log(abs(ee1))
+
+       logabs_ee2 = 0.0_dp
+       if(ee2 /= 0.0_dp) logabs_ee2 = log(abs(ee2))
+
+       logabs_ee3 = 0.0_dp
+       if(ee3 /= 0.0_dp) logabs_ee3 = log(abs(ee3))
+       
 
        !Evaluate the seven cases
        c1 = e0 < e1 .and. e1 < e2 .and. e2 < e3
@@ -268,111 +276,109 @@ contains
        c6 = e0 == e1 .and. e1 < e2 .and. e2 == e3
        c7 = e0 < e1 .and. e1 == e2 .and. e2 == e3
 
-       if(.not. (e < e0 .or. e > e3)) then
-          !Evaluate the expressions for the seven cases
-          select case(iv)
-          case(1)
-             if(c1) then !Eq. 9.5.124
-                tmp = -ee0**2/(e01*e02*e03) &
-                     *( 1.0_dp + (ee1/e01 + ee2/e02 + ee3/e03)*logabs_ee0 ) &
-                     + ee1**3/(e01**2*e12*e13)*logabs_ee1 &
-                     - ee2**3/(e02**2*e12*e23)*logabs_ee2 &
-                     + ee3**3/(e03**2*e13*e23)*logabs_ee3
-             else if(c2) then !Eq. 9.5.130
-                tmp = eval_Eq9_5_130()
-             else if(c3) then !Eq. 9.5.133
-                tmp = -ee0**2/(e01**2*e03)*( 1.0_dp + (2.0_dp*ee1/e01 + ee3/e03)*logabs_ee0 ) &
-                     - ee1**2/(e01**2*e13)*( 1.0_dp + (-2.0_dp*ee0/e01 + ee3/e13)*logabs_ee1 ) &
-                     + ee3**3/(e03*e13)**2*logabs_ee3
-             else if(c4) then !Eq. 9.5.136
-                tmp = -ee0**2/(e02**2*e01)*( 1.0_dp + (2.0_dp*ee2/e02 + ee1/e01)*logabs_ee0 ) &
-                     + ee2**2/(e02**2*e12)*( 1.0_dp - (2.0_dp*ee0/e02 + ee1/e12)*logabs_ee2 ) &
-                     + ee1**3/(e01*e12)**2*logabs_ee1
-             else if(c5) then !Eq. 9.5.139
-                tmp = eval_Eq9_5_139()
-             else if(c6) then  !Eq. 9.5.141
-                tmp = eval_Eq9_5_141()
-             else if(c7) then !Eq. 9.5.143
-                tmp = 3.0_dp*ee0**2*ee1/e01**4*(logabs_ee1 - logabs_ee0) &
-                     - 1.5_dp*ee1*(2.0_dp*ee0 - e01)/e01**3 &
-                     - 1.0_dp/e01
-             end if
-          case(2)
-             if(c1) then !Eq. 9.5.125
-                tmp = ee1**2/(e01*e12*e13) &
-                     *( 1.0_dp + (-ee0/e01 + ee2/e12 + ee3/e13)*logabs_ee1 ) &
-                     + ee0**3/(e01**2*e02*e03)*logabs_ee0 &
-                     - ee2**3/(e02*e12**2*e23)*logabs_ee2 &
-                     + ee3**3/(e03*e13**2*e23)*logabs_ee3
-             else if(c2) then !Eq. 9.5.130
-                tmp = eval_Eq9_5_130()
-             else if(c3) then !Eq. 9.5.134
-                tmp = eval_Eq9_5_134()
-             else if(c4) then !Eq. 9.5.137
-                tmp = ee1**2/(e12**2*e01)*( 1.0_dp + (2.0_dp*ee2/e12 - ee0/e01)*logabs_ee1 ) &
-                     + ee2**2/(e12**2*e02)*( 1.0_dp - (2.0_dp*ee1/e12 + ee0/e02)*logabs_ee2 ) &
-                     + ee0**3/(e01*e02)**2*logabs_ee0
-             else if(c5) then !Eq. 9.5.139
-                tmp = eval_Eq9_5_139()
-             else if(c6) then  !Eq. 9.5.141
-                tmp = eval_Eq9_5_141()
-             else if(c7) then !Eq. 9.5.144
-                tmp = eval_Eq9_5_144()
-             end if
-          case(3)
-             if(c1) then !Eq. 9.5.126
-                tmp = -ee2**2/(e02*e12*e23) &
-                     *( 1.0_dp + (-ee0/e02 - ee1/e12 + ee3/e23)*logabs_ee2 ) &
-                     + ee0**3/(e01*e02**2*e03)*logabs_ee0 &
-                     - ee1**3/(e01*e12**2*e13)*logabs_ee1 &
-                     + ee3**3/(e03*e13*e23**2)*logabs_ee3
-             else if(c2) then !Eq. 9.5.131
-                tmp = -ee2**2/(e02**2*e23)*( 1.0_dp + (-2.0_dp*ee0/e02 + ee3/e23)*logabs_ee2 ) &
-                     - ee0**2/(e02**2*e03)*( 1.0_dp + (2.0_dp*ee2/e02 + ee3/e03)*logabs_ee0 ) &
-                     + ee3**3/(e23*e03)**2*logabs_ee3
-             else if(c3) then !Eq. 9.5.134
-                tmp = eval_Eq9_5_134()
-             else if(c4) then !Eq. 9.5.138
-                tmp = eval_Eq9_5_138()
-             else if(c5) then !Eq. 9.5.139
-                tmp = eval_Eq9_5_139()
-             else if(c6) then !Eq. 9.5.142
-                tmp = eval_Eq9_5_142()
-             else if(c7) then !Eq. 9.5.144
-                tmp = eval_Eq9_5_144()
-             end if
-          case(4)
-             if(c1) then !Eq. 9.5.127
-                tmp = ee3**2/(e03*e13*e23) &
-                     *( 1.0_dp + (-ee0/e03 - ee1/e13 - ee2/e23)*logabs_ee3 ) &
-                     + ee0**3/(e01*e02*e03**2)*logabs_ee0 &
-                     - ee1**3/(e01*e12*e13**2)*logabs_ee1 &
-                     + ee2**3/(e02*e12*e23**2)*logabs_ee2
-             else if(c2) then !Eq. 9.5.132
-                tmp = ee3**2/(e03**2*e23)*( 1.0_dp - (2.0_dp*ee0/e03 + ee2/e23)*logabs_ee3 ) &
-                     - ee0**2/(e03**2*e02)*( 1.0_dp + (2.0_dp*ee3/e03 + ee2/e02)*logabs_ee0 ) &
-                     + ee2**3/(e23*e02)**2*logabs_ee2
-             else if(c3) then !Eq. 9.5.135
-                tmp = ee3**2/(e13**2*e03)*( 1.0_dp - (2.0_dp*ee1/e13 + ee0/e03)*logabs_ee3 ) &
-                     + ee1**2/(e13**2*e01)*( 1.0_dp + (2.0_dp*ee3/e13 - ee0/e01)*logabs_ee1 ) &
-                     + ee0**3/(e03*e01)**2*logabs_ee0
-             else if(c4) then !Eq. 9.5. 138
-                tmp = eval_Eq9_5_138()
-             else if(c5) then !Eq. 9.5. 140
-                tmp =  3.0_dp*ee0*ee3**2/e03**4*(logabs_ee0 - logabs_ee3) &
-                     + 1.5_dp*ee0*(2.0_dp*ee3 + e03)/e03**3 &
-                     + 1.0_dp/e03
-             else if(c6) then !Eq. 9.5.142
-                tmp = eval_Eq9_5_142()
-             else if(c7) then !Eq. 9.5.144
-                tmp = eval_Eq9_5_144()
-             end if
-          end select
+       !Evaluate the expressions for the seven cases
+       select case(iv) !tetrahedron vertex number
+       case(1)
+          if(c1) then !Eq. 9.5.124 [x]
+             tmp = -ee0**2/(e01*e02*e03) &
+                  *( 1.0_dp + (ee1/e01 + ee2/e02 + ee3/e03)*logabs_ee0 ) &
+                  + ee1**3/(e01**2*e12*e13)*logabs_ee1 &
+                  - ee2**3/(e02**2*e12*e23)*logabs_ee2 &
+                  + ee3**3/(e03**2*e13*e23)*logabs_ee3
+          else if(c2) then !Eq. 9.5.130 [x]
+             tmp = eval_Eq9_5_130()
+          else if(c3) then !Eq. 9.5.133 [x]
+             tmp = -ee0**2/(e01**2*e03)*( 1.0_dp + (2.0_dp*ee1/e01 + ee3/e03)*logabs_ee0 ) &
+                  - ee1**2/(e01**2*e13)*( 1.0_dp + (-2.0_dp*ee0/e01 + ee3/e13)*logabs_ee1 ) &
+                  + ee3**3/(e03*e13)**2*logabs_ee3
+          else if(c4) then !Eq. 9.5.136 [x]
+             tmp = -ee0**2/(e02**2*e01)*( 1.0_dp + (2.0_dp*ee2/e02 + ee1/e01)*logabs_ee0 ) &
+                  + ee2**2/(e02**2*e12)*( 1.0_dp - (2.0_dp*ee0/e02 + ee1/e12)*logabs_ee2 ) &
+                  + ee1**3/(e01*e12)**2*logabs_ee1
+          else if(c5) then !Eq. 9.5.139 [x]
+             tmp = eval_Eq9_5_139()
+          else if(c6) then  !Eq. 9.5.141 [x]
+             tmp = eval_Eq9_5_141()
+          else if(c7) then !Eq. 9.5.143 [x]
+             tmp = 3.0_dp*ee0**2*ee1/e01**4*(logabs_ee1 - logabs_ee0) &
+                  - 1.5_dp*ee1*(2.0_dp*ee0 - e01)/e01**3 &
+                  - 1.0_dp/e01
+          end if
+       case(2)
+          if(c1) then !Eq. 9.5.125 [x]
+             tmp = ee1**2/(e01*e12*e13) &
+                  *( 1.0_dp + (-ee0/e01 + ee2/e12 + ee3/e13)*logabs_ee1 ) &
+                  + ee0**3/(e01**2*e02*e03)*logabs_ee0 &
+                  - ee2**3/(e02*e12**2*e23)*logabs_ee2 &
+                  + ee3**3/(e03*e13**2*e23)*logabs_ee3
+          else if(c2) then !Eq. 9.5.130 [x]
+             tmp = eval_Eq9_5_130()
+          else if(c3) then !Eq. 9.5.134 [x]
+             tmp = eval_Eq9_5_134()
+          else if(c4) then !Eq. 9.5.137 [x]
+             tmp = ee1**2/(e12**2*e01)*( 1.0_dp + (2.0_dp*ee2/e12 - ee0/e01)*logabs_ee1 ) &
+                  + ee2**2/(e12**2*e02)*( 1.0_dp - (2.0_dp*ee1/e12 + ee0/e02)*logabs_ee2 ) &
+                  + ee0**3/(e01*e02)**2*logabs_ee0
+          else if(c5) then !Eq. 9.5.139 [x]
+             tmp = eval_Eq9_5_139()
+          else if(c6) then  !Eq. 9.5.141 [x]
+             tmp = eval_Eq9_5_141()
+          else if(c7) then !Eq. 9.5.144 [x]
+             tmp = eval_Eq9_5_144()
+          end if
+       case(3)
+          if(c1) then !Eq. 9.5.126 [x]
+             tmp = -ee2**2/(e02*e12*e23) &
+                  *( 1.0_dp + (-ee0/e02 - ee1/e12 + ee3/e23)*logabs_ee2 ) &
+                  + ee0**3/(e01*e02**2*e03)*logabs_ee0 &
+                  - ee1**3/(e01*e12**2*e13)*logabs_ee1 &
+                  + ee3**3/(e03*e13*e23**2)*logabs_ee3
+          else if(c2) then !Eq. 9.5.131 [x] 
+             tmp = -ee2**2/(e02**2*e23)*( 1.0_dp + (-2.0_dp*ee0/e02 + ee3/e23)*logabs_ee2 ) &
+                  - ee0**2/(e02**2*e03)*( 1.0_dp + (2.0_dp*ee2/e02 + ee3/e03)*logabs_ee0 ) &
+                  + ee3**3/(e23*e03)**2*logabs_ee3
+          else if(c3) then !Eq. 9.5.134 [x]
+             tmp = eval_Eq9_5_134()
+          else if(c4) then !Eq. 9.5.138 [x]
+             tmp = eval_Eq9_5_138()
+          else if(c5) then !Eq. 9.5.139 [x]
+             tmp = eval_Eq9_5_139()
+          else if(c6) then !Eq. 9.5.142 [x]
+             tmp = eval_Eq9_5_142()
+          else if(c7) then !Eq. 9.5.144 [x]
+             tmp = eval_Eq9_5_144()
+          end if
+       case(4)
+          if(c1) then !Eq. 9.5.127 [x]
+             tmp = ee3**2/(e03*e13*e23) &
+                  *( 1.0_dp + (-ee0/e03 - ee1/e13 - ee2/e23)*logabs_ee3 ) &
+                  + ee0**3/(e01*e02*e03**2)*logabs_ee0 &
+                  - ee1**3/(e01*e12*e13**2)*logabs_ee1 &
+                  + ee2**3/(e02*e12*e23**2)*logabs_ee2
+          else if(c2) then !Eq. 9.5.132 [x]
+             tmp = ee3**2/(e03**2*e23)*( 1.0_dp - (2.0_dp*ee0/e03 + ee2/e23)*logabs_ee3 ) &
+                  - ee0**2/(e03**2*e02)*( 1.0_dp + (2.0_dp*ee3/e03 + ee2/e02)*logabs_ee0 ) &
+                  + ee2**3/(e23*e02)**2*logabs_ee2
+          else if(c3) then !Eq. 9.5.135 [x]
+             tmp = ee3**2/(e13**2*e03)*( 1.0_dp - (2.0_dp*ee1/e13 + ee0/e03)*logabs_ee3 ) &
+                  + ee1**2/(e13**2*e01)*( 1.0_dp + (2.0_dp*ee3/e13 - ee0/e01)*logabs_ee1 ) &
+                  + ee0**3/(e03*e01)**2*logabs_ee0
+          else if(c4) then !Eq. 9.5. 138 [x]
+             tmp = eval_Eq9_5_138()
+          else if(c5) then !Eq. 9.5. 140 [x]
+             tmp =  3.0_dp*ee0*ee3**2/e03**4*(logabs_ee0 - logabs_ee3) &
+                  + 1.5_dp*ee0*(2.0_dp*ee3 + e03)/e03**3 &
+                  + 1.0_dp/e03
+          else if(c6) then !Eq. 9.5.142 [x]
+             tmp = eval_Eq9_5_142()
+          else if(c7) then !Eq. 9.5.144 [x]
+             tmp = eval_Eq9_5_144()
+          end if
+       end select
 
-          if(e0 == e1 .and. e1 == e2 .and. e2 == e3) tmp = 0.25_dp/ee0
+       if(e0 == e1 .and. e1 == e2 .and. e2 == e3) tmp = 0.25_dp/ee0
 
-          real_tetra = real_tetra + tmp
-       end if ! .not. (e <= e1 .or. e >= e4)
+       real_tetra = real_tetra + tmp
     end do !itk
 
     if(real_tetra < 1.0e-12_dp) real_tetra = 0.0_dp
@@ -382,6 +388,7 @@ contains
 
   contains
 
+    ![x]
     pure real(dp) function eval_Eq9_5_130()
       !! Right hand side of Eq. 9.5.130 of
       !! V. Eyert The Augmented Spherical Wave Method DOI 10.1007/978-3-642-25864-0.
@@ -392,16 +399,18 @@ contains
            + ((ee2/e02)**2 + (ee3/e03)**2 + ee2*ee3/(e02*e03))*logabs_ee0 )
     end function eval_Eq9_5_130
 
+    ![x]
     pure real(dp) function eval_Eq9_5_134()
       !! Right hand side of Eq. 9.5.134 of
       !! V. Eyert The Augmented Spherical Wave Method DOI 10.1007/978-3-642-25864-0.
 
       eval_Eq9_5_134 = ee0**3/(e03*e01**3)*logabs_ee0 &
            + ee3**3/(e03*e13**3)*logabs_ee3 &
-           - ee1/e01*e13*( 0.5_dp - ee0/e01 + ee3/e13 + &
+           - ee1/(e01*e13)*( 0.5_dp - ee0/e01 + ee3/e13 + &
            ((ee0/e01)**2 + (ee3/e13)**2 - ee0*ee3/(e01*e13))*logabs_ee1 )
     end function eval_Eq9_5_134
 
+    ![x]
     pure real(dp) function eval_Eq9_5_138()
       !! Right hand side of Eq. 9.5.138 of
       !! V. Eyert The Augmented Spherical Wave Method DOI 10.1007/978-3-642-25864-0.
@@ -412,6 +421,7 @@ contains
            ((ee0/e02)**2 + (ee1/e12)**2 + ee0*ee1/(e02*e12))*logabs_ee2 )
     end function eval_Eq9_5_138
 
+    ![x]
     pure real(dp) function eval_Eq9_5_139()
       !! Right hand side of Eq. 9.5.139 of
       !! V. Eyert The Augmented Spherical Wave Method DOI 10.1007/978-3-642-25864-0.
@@ -420,6 +430,7 @@ contains
            - (ee3**2 + 0.5_dp*ee3*e03 + e03**2/3.0_dp)/e03**3
     end function eval_Eq9_5_139
 
+    ![x]
     pure real(dp) function eval_Eq9_5_141()
       !! Right hand side of Eq. 9.5.141 of
       !! V. Eyert The Augmented Spherical Wave Method DOI 10.1007/978-3-642-25864-0.
@@ -428,7 +439,7 @@ contains
            + 1.5_dp*ee0*(2.0_dp*ee2 + e02)/e02**3 &
            + 1.0_dp/e02
     end function eval_Eq9_5_141
-
+    ![x]
     pure real(dp) function eval_Eq9_5_142()
       !! Right hand side of Eq. 9.5.142 of
       !! V. Eyert The Augmented Spherical Wave Method DOI 10.1007/978-3-642-25864-0.
@@ -438,6 +449,7 @@ contains
            - 1.0_dp/e02
     end function eval_Eq9_5_142
 
+    ![x]
     pure real(dp) function eval_Eq9_5_144()
       !! Right hand side of Eq. 9.5.144 of
       !! V. Eyert The Augmented Spherical Wave Method DOI 10.1007/978-3-642-25864-0.

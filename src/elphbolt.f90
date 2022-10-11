@@ -152,13 +152,14 @@ program elphbolt
              ph_def%atom_pos, ph_def%pcell_atom_label, ph_def%irred_diagT, '1st Born')
 
 
-!!$        !TEST
-!!$        call calculate_defect_scatt_rates(ph%prefix, crys%volume, 0.1_dp, ph%ens_irred, &
-!!$             ph_def%irred_diagT)
-        
         call t_event%end_timer("Phonon-defect transition rates")
+        
+        !TEST
+        call calculate_defect_scatt_rates(ph%prefix, crys%volume, crys%gfactors(1), ph%indexlist_irred, &
+             ph%ens, ph_def%irred_diagT)
+
+        call exit
      end if
-     !call exit
      !!
      
      if(num%onlyphbte .and. num%phe .or. num%drag) then

@@ -961,9 +961,9 @@ contains
     complex(dp), allocatable :: work(:), ipivot(:)
 
     !Size of matrix
-    N = size(mat(:, 1))
+    N = size(mat, 1)
 
-    if(N /= size(mat(1, :))) &
+    if(N /= size(mat, 2)) &
          call exit_with_message("invert_complex_square called with non-zquare matrix. Exiting.")
 
     allocate(work(N), ipivot(N))

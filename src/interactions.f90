@@ -1430,8 +1430,8 @@ contains
     call write2file_rank2_real(prefix // '.W_rta_'//prefix//'bound', scatt_rates)
   end subroutine calculate_bound_scatt_rates
 
-  subroutine calculate_defect_scatt_rates(prefix, vol, def_frac, ens, diagT)!, scatt_rates)
-    !! Subroutine to calculate the phonon/electron-defect scattering rate given
+  subroutine calculate_defect_scatt_rates(prefix, vol, def_frac, indexlist_ibz, ens_fbz, diagT)!, scatt_rates)
+    !! Subroutine to calculate the phonon-defect scattering rate given
     !! the diagonal of the scattering T-matrix.
     !!
     !! prefix Particle type label
@@ -1444,28 +1444,32 @@ contains
     character(len = 2), intent(in) :: prefix
     real(dp), intent(in) :: vol
     real(dp), intent(in) :: def_frac
-    real(dp), intent(in) :: ens(:, :)
+    real(dp), intent(in) :: ens_fbz(:, :)
+    integer(k8), intent(in) :: indexlist_ibz(:)
     complex(dp), intent(in) :: diagT(:, :)
     !real(dp), allocatable, intent(out) :: scatt_rates(:, :)
-
+    
     !Local variables
-    integer(k8) :: nk, nbands, ik, ib
+    integer(k8) :: nk_ibz, nbands, ik
     real(dp), allocatable :: scatt_rates(:, :)
 
-    nk = size(diagT, 1)
+    nk_ibz = size(diagT, 1)
     nbands = size(diagT, 2)
 
-    print*, nk, nbands
+    !print*, 'def_frac = ', def_frac
     
-    allocate(scatt_rates(nk, nbands))
+    allocate(scatt_rates(nk_ibz, nbands))
 
-    do ib = 1, nbands
-       do ik = 1, nk
-          scatt_rates(ik, ib) = imag(diagT(ik, ib))/ens(ik, ib)
-       end do
+    do ik = 1, nk_ibz
+       scatt_rates(ik, :) = imag(diagT(ik, :))/ens_fbz(indexlist_ibz(ik), :)
     end do
-    scatt_rates = -def_frac*vol*scatt_rates
 
+    !scatt_rates = -def_frac*vol*scatt_rates
+    scatt_rates = -def_frac*scatt_rates/hbar_eVps
+
+    !Deal with Gamma point acoustic phonons
+    scatt_rates(1, 1:3) = 0.0_dp
+    
     !Write to file
     call write2file_rank2_real(prefix // '.W_rta_'//prefix//'defect', scatt_rates)
   end subroutine calculate_defect_scatt_rates

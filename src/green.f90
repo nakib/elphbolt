@@ -197,12 +197,12 @@ contains
     complex(dp), allocatable, intent(out) :: diagT(:, :)
 
     !Local variables
-    integer(k8) :: num_dof_def, numstates_irred, istate, nstates_irred, &
+    integer(k8) :: num_dof_def, numstates_irred, istate, &
          chunk, start, end, num_active_images, i, j, a, def_numatoms, &
          dof_counter, iq, s, tau_sc, tau_uc
     complex(dp), allocatable :: inv_one_minus_VD0(:, :), T(:, :, :), &
          phi(:, :)
-    real(dp), allocatable :: V(:, :)
+    real(dp), allocatable :: V(:, :), identity(:, :)
     complex(dp) :: phase
     real(dp) :: q_cart(3), en_sq
 
@@ -217,10 +217,19 @@ contains
 
     allocate(T(num_dof_def, num_dof_def, numstates_irred))
     allocate(V(num_dof_def, num_dof_def))
+    T = 0.0_dp
     V = 0.0_dp
+
+    allocate(identity(num_dof_def, num_dof_def))
+    identity = 0.0_dp
+    do i = 1, num_dof_def
+       identity(i, i) = 1.0_dp
+    end do
+
+    if(approx == 'full Born') allocate(inv_one_minus_VD0(num_dof_def, num_dof_def))
     
     !Divide phonon states among images
-    call distribute_points(nstates_irred, chunk, start, end, num_active_images)
+    call distribute_points(numstates_irred, chunk, start, end, num_active_images)
     
     do istate = start, end
        !Demux state index into branch (s) and wave vector (iq) indices
@@ -236,7 +245,7 @@ contains
        do a = 1, crys%numatoms !Number of atoms in the unit cell
           do i = 1, 3 !Cartesian directions
              dof_counter = dof_counter + 1
-             V(dof_counter, dof_counter) = en_sq*V_mass(a)
+             V(dof_counter, dof_counter) = en_sq*V_mass(crys%atomtypes(a))
           end do
        end do
 
@@ -276,8 +285,7 @@ contains
           !    |          /_____        |_   |      /_____\      /__|__\        _|
           !                 D0           
           !
-          allocate(inv_one_minus_VD0(num_dof_def, num_dof_def))
-          inv_one_minus_VD0 = 1.0_dp - matmul(V, D0(:, :, istate))
+          inv_one_minus_VD0 = identity - matmul(V, D0(:, :, istate))
           call invert(inv_one_minus_VD0)
           T(:, :, istate) = matmul(inv_one_minus_VD0, V)
        case default
