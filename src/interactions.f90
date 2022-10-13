@@ -1430,19 +1430,17 @@ contains
     call write2file_rank2_real(prefix // '.W_rta_'//prefix//'bound', scatt_rates)
   end subroutine calculate_bound_scatt_rates
 
-  subroutine calculate_defect_scatt_rates(prefix, vol, def_frac, indexlist_ibz, ens_fbz, diagT)!, scatt_rates)
+  subroutine calculate_defect_scatt_rates(prefix, def_frac, indexlist_ibz, ens_fbz, diagT)!, scatt_rates)
     !! Subroutine to calculate the phonon-defect scattering rate given
     !! the diagonal of the scattering T-matrix.
     !!
     !! prefix Particle type label
-    !! vol Unitcell volume
-    !! def_frac Atomic fraction of defects
+    !! def_frac Elemental fraction of defects
     !! ens IBZ energies
     !! diagT Diagonal of the IBZ T-matrix
     !! scatt_rates IBZ Scattering rates
 
     character(len = 2), intent(in) :: prefix
-    real(dp), intent(in) :: vol
     real(dp), intent(in) :: def_frac
     real(dp), intent(in) :: ens_fbz(:, :)
     integer(k8), intent(in) :: indexlist_ibz(:)
@@ -1456,7 +1454,7 @@ contains
     nk_ibz = size(diagT, 1)
     nbands = size(diagT, 2)
 
-    !print*, 'def_frac = ', def_frac
+    print*, 'def_frac = ', def_frac
     
     allocate(scatt_rates(nk_ibz, nbands))
 
@@ -1464,10 +1462,9 @@ contains
        scatt_rates(ik, :) = imag(diagT(ik, :))/ens_fbz(indexlist_ibz(ik), :)
     end do
 
-    !scatt_rates = -def_frac*vol*scatt_rates
     scatt_rates = -def_frac*scatt_rates/hbar_eVps
 
-    !Deal with Gamma point acoustic phonons
+    !Deal with Gamma point acoustic phonons! and zero-velocity optic phonons
     scatt_rates(1, 1:3) = 0.0_dp
     
     !Write to file

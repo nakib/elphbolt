@@ -434,7 +434,7 @@ contains
     end if
   end subroutine distribute_points
   
-  function cross_product(A, B)
+  pure function cross_product(A, B)
     !! Cross product of A and B.
 
     real(dp), intent(in) :: A(3), B(3)
@@ -445,6 +445,15 @@ contains
     cross_product(3) = A(1)*B(2) - A(2)*B(1)
   end function cross_product
 
+  pure integer(k8) function kronecker(i, j)
+    !! Kronecker delta
+
+    integer(k8), intent(in) :: i, j
+    
+    kronecker = 0
+    if(i == j) kronecker = 1
+  end function kronecker
+  
   pure complex(dp) function expi(x)
     !! Calculate exp(i*x) = cos(x) + isin(x)
 

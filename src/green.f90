@@ -23,12 +23,12 @@ module Green_function
   use crystal_module, only: crystal
   use delta, only: delta_fn_tetra, real_tetra
   use misc, only: exit_with_message, distribute_points, expi, demux_state, invert, &
-       write2file_rank2_real
+       write2file_rank2_real, kronecker
   
   implicit none
 
   private
-  public calculate_retarded_phonon_D0, calculate_phonon_Tmatrix
+  public calculate_retarded_phonon_D0
   
 contains
   
@@ -111,9 +111,6 @@ contains
     !Total number of degrees of freedom in defective supercell
     num_dof_def = def_numatoms*3
     
-    !Divide phonon states among images
-    call distribute_points(nstates_irred, chunk, start, end, num_active_images)
-
     allocate(phi(ph%nwv, ph%numbands, num_dof_def), phi_internal(num_dof_def), &
          D0(num_dof_def, num_dof_def, nstates_irred))
 
@@ -139,6 +136,9 @@ contains
        end do
     end do
 
+    !Divide phonon states among images
+    call distribute_points(nstates_irred, chunk, start, end, num_active_images)
+    
     !Initialize D0
     D0 = 0.0_dp
     
@@ -161,7 +161,7 @@ contains
           do s2 = 1, ph%numbands
              phi_internal(:) = phi(iq2, s2, :)
 
-             d0_istate = resolvent(ph, s2, iq2, en1_sq) 
+             d0_istate = resolvent(ph, s2, iq2, en1_sq)
 
              do j = 1, num_dof_def
                 do i = 1, num_dof_def
@@ -176,164 +176,4 @@ contains
     !Reduce D0
     call co_sum(D0)
   end subroutine calculate_retarded_phonon_D0
-
-  subroutine calculate_phonon_Tmatrix(ph, crys, D0, V_mass, V_bond, &
-       def_supercell_atom_pos, pcell_equiv_atom_label, diagT, approx)
-    !! Parallel calculator of the scattering T-matrix for phonons for a given approximation.
-    !!
-    !! D0 Retarded, bare Green's function in real space
-    !! V Scattering potential in real space
-    !! diagT Diagonoal of the scattering T-matrix in reciprocal space
-    !! approx Approximation for the scattering theory
-
-    type(phonon), intent(in) :: ph
-    type(crystal), intent(in) :: crys
-    complex(dp), intent(in) :: D0(:, :, :)
-    real(dp), intent(in) :: V_mass(:)
-    real(dp), intent(in) :: V_bond(:, :)
-    real(k8), intent(in) :: def_supercell_atom_pos(:, :) !Cartesian
-    integer(k8), intent(in) :: pcell_equiv_atom_label(:)
-    character(len=*), intent(in) :: approx
-    complex(dp), allocatable, intent(out) :: diagT(:, :)
-
-    !Local variables
-    integer(k8) :: num_dof_def, numstates_irred, istate, &
-         chunk, start, end, num_active_images, i, j, a, def_numatoms, &
-         dof_counter, iq, s, tau_sc, tau_uc
-    complex(dp), allocatable :: inv_one_minus_VD0(:, :), T(:, :, :), &
-         phi(:, :)
-    real(dp), allocatable :: V(:, :), identity(:, :)
-    complex(dp) :: phase
-    real(dp) :: q_cart(3), en_sq
-
-    !Displacement degrees of freedom in the defective supercell 
-    num_dof_def = size(D0, 1)
-
-    !Number of atoms in the defective block of the supercell
-    def_numatoms = num_dof_def/3
-
-    !Number of irreducible phonon states
-    numstates_irred = size(D0, 3)
-
-    allocate(T(num_dof_def, num_dof_def, numstates_irred))
-    allocate(V(num_dof_def, num_dof_def))
-    T = 0.0_dp
-    V = 0.0_dp
-
-    allocate(identity(num_dof_def, num_dof_def))
-    identity = 0.0_dp
-    do i = 1, num_dof_def
-       identity(i, i) = 1.0_dp
-    end do
-
-    if(approx == 'full Born') allocate(inv_one_minus_VD0(num_dof_def, num_dof_def))
-    
-    !Divide phonon states among images
-    call distribute_points(numstates_irred, chunk, start, end, num_active_images)
-    
-    do istate = start, end
-       !Demux state index into branch (s) and wave vector (iq) indices
-       call demux_state(istate, ph%numbands, s, iq)
-       
-       !Squared energy of phonon 1
-       en_sq = ph%ens(ph%indexlist_irred(iq), s)**2
-       
-       !Add energy scaling to mass perturbation.
-       !Since on-site mass perturbation is in the unit cell,
-       !only these elements of V gets a contribution.
-       dof_counter = 0
-       do a = 1, crys%numatoms !Number of atoms in the unit cell
-          do i = 1, 3 !Cartesian directions
-             dof_counter = dof_counter + 1
-             V(dof_counter, dof_counter) = en_sq*V_mass(crys%atomtypes(a))
-          end do
-       end do
-
-       !TODO Need to have calculated V_bond earlier. 
-       !Combine mass and bond perturbations
-       !V = V + V_bond
-       
-       select case(approx)
-       case('lowest order')
-          ! Lowest order:
-          ! T = V
-          !                            
-          !    *                     
-          !    |                        
-          !  V |                         
-          !    |
-          !                
-          T(:, :, istate) = V
-       case('1st Born')
-          ! 1st Born approximation:
-          ! T = V + V.D0.V
-          !                            
-          !    *             *            
-          !    |            / \              
-          !  V |     +     /   \              
-          !    |          /_____\
-          !                 D0
-          !
-          T(:, :, istate) = V + matmul(matmul(V, D0(:, :, istate)), V)
-       case('full Born')
-          ! Full Born approximation:
-          ! T = V + V.D0.T = [I - VD0]^-1 . V
-          !                              _                                      _
-          !    *             *          |    *         *            *            |
-          !    |            /           |    |        / \          /|\           |
-          !  V |     +     /       x    |    |   +   /   \   +    / | \  +  ...  |
-          !    |          /_____        |_   |      /_____\      /__|__\        _|
-          !                 D0           
-          !
-          inv_one_minus_VD0 = identity - matmul(V, D0(:, :, istate))
-          call invert(inv_one_minus_VD0)
-          T(:, :, istate) = matmul(inv_one_minus_VD0, V)
-       case default
-          call exit_with_message("T-matrix approximation not recognized.")
-       end select
-    end do
-
-    !Reduce T 
-    call co_sum(T)
-
-    !Calculate diagonal T in reciprocal space.
-    allocate(phi(ph%numbands, num_dof_def))
-    allocate(diagT(ph%nwv_irred, ph%numbands))
-    diagT = 0.0_dp
-    do istate = start, end
-       !Demux state index into branch (s) and wave vector (iq) indices
-       call demux_state(istate, ph%numbands, s, iq)
-
-       !Calculate wave vector in Cartesian coordinates
-       q_cart = matmul(crys%reclattvecs, ph%wavevecs_irred(iq, :))
-
-       !Precompute the eigenfunctions
-       dof_counter = 0
-       do tau_sc = 1, def_numatoms !Atoms in defective supercell
-          !Phase factor
-          phase = expi( &
-               dot_product(q_cart, def_supercell_atom_pos(:, tau_sc)) )
-
-          !Get primitive cell equivalent atom of supercell atom
-          tau_uc = pcell_equiv_atom_label(tau_sc)
-
-          !Run over Cartesian directions
-          do a = 1, 3
-             dof_counter = dof_counter + 1
-             phi(:, dof_counter) = phase*ph%evecs(iq, :, (tau_uc - 1)*3 + a)
-          end do
-       end do
-
-       !Fourier transform
-       do i = 1, num_dof_def
-          do j = 1, num_dof_def
-             diagT(iq, s) = diagT(iq, s) + &
-                  conjg(phi(s, i))*phi(s, j)*T(i, j, istate)
-          end do
-       end do
-    end do
-
-    !Reduce T
-    call co_sum(diagT)
-  end subroutine calculate_phonon_Tmatrix
 end module Green_function

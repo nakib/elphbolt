@@ -79,6 +79,8 @@ module crystal_module
      !! Concentration of the substitutional atoms in cm^-3
      real(dp), allocatable :: subs_gfactors(:)
      !! g-factors for the substitutional defects.
+     integer(k8), allocatable :: defect_hosts(:)
+     !! Basis atom sites that can be a host for an impurity, one for each unique element.
      logical :: twod
      !! Is the system 2d?
      real(dp) :: dim
@@ -102,7 +104,7 @@ contains
 
     !Local variables
     integer(k8) :: i, j, k, numelements, numatoms
-    integer(k8), allocatable :: atomtypes(:), num_atomtypes(:)
+    integer(k8), allocatable :: atomtypes(:), num_atomtypes(:), defect_hosts(:)
     real(dp), allocatable :: masses(:), born(:,:,:), basis(:,:), &
          basis_cart(:,:), subs_perc(:), subs_masses(:), subs_conc(:)
     real(dp) :: epsilon(3,3), lattvecs(3,3), T, &
@@ -114,7 +116,8 @@ contains
     namelist /allocations/ numelements, numatoms
     namelist /crystal_info/ name, elements, atomtypes, basis, lattvecs, &
          polar, born, epsilon, read_epsiloninf, epsilon0, epsiloninf, &
-         masses, T, autoisotopes, twod, subs_masses, subs_conc, bound_length
+         masses, T, autoisotopes, twod, subs_masses, subs_conc, bound_length, &
+         defect_hosts
 
     call subtitle("Setting up crystal...")
 
@@ -137,11 +140,11 @@ contains
     allocate(elements(numelements), atomtypes(numatoms), born(3,3,numatoms), &
          basis(3,numatoms), masses(numelements), basis_cart(3,numatoms), &
          subs_masses(numelements), subs_conc(numelements), subs_perc(numelements), &
-         num_atomtypes(numelements))
+         num_atomtypes(numelements), defect_hosts(numelements))
     allocate(self%elements(self%numelements), self%atomtypes(self%numatoms), self%born(3,3,self%numatoms), &
          self%masses(self%numatoms), self%gfactors(self%numelements), self%basis(3,self%numatoms), &
          self%basis_cart(3,self%numatoms), self%subs_masses(self%numelements), self%subs_conc(self%numelements), &
-         self%subs_gfactors(self%numelements))
+         self%subs_gfactors(self%numelements), self%defect_hosts(self%numelements))
     
     !Read crystal_info
     name = trim(adjustl('Crystal'))
@@ -161,6 +164,7 @@ contains
     twod = .false.
     subs_masses = 0.0_dp
     subs_conc = 0.0_dp
+    defect_hosts = -1_k8
     bound_length = 1.e12_dp !mm, practically inifinity
     read(1, nml = crystal_info)
     if(any(atomtypes < 1) .or. T < 0.0_dp) then
@@ -194,7 +198,8 @@ contains
     self%subs_masses = subs_masses
     self%subs_conc = subs_conc
     self%bound_length = bound_length
-    
+    self%defect_hosts = defect_hosts
+     
     if(self%twod) then
        if(lattvecs(1,3) /= 0 .or. lattvecs(2,3) /= 0 .or. lattvecs(3,3) == 0) then
           call exit_with_message('For 2d systems, cross plane lattice vector must be &
@@ -263,10 +268,17 @@ contains
     !Print out crystal and reciprocal lattice information.
     if(this_image() == 1) then
        write(*, "(A, A)") 'Material: ', self%name
+
+       write(*, "(A)") "Basis atom sites ready to host a substitution:"
+       do i = 1, self%numelements
+          write(*, '(A, A, A, I5)') " ", self%elements(i), " at site ", self%defect_hosts(i)
+       end do
+       
        if(self%autoisotopes) write(*,"(A)") 'Isotopic average of masses will be used.'
        do i = 1, self%numelements
           write(*,"(A, A, 1E16.8, A)") trim(self%elements(i)), " mass = ", self%masses(i), " u"
        end do
+
        if(any(self%subs_conc /= 0.0_dp)) then
           do i = 1, self%numelements
              write(*,"(A, A, 1E16.8, A)") &
@@ -277,6 +289,7 @@ contains
                   trim(self%elements(i)), " substitution amount = ", subs_perc(i), " %"
           end do
        end if
+       
        write(*,"(A)") 'Lattice vectors [nm]:'
        write(*,"(3(1E16.8,x))") self%lattvecs(:,1)
        write(*,"(3(1E16.8,x))") self%lattvecs(:,2)

@@ -24,7 +24,7 @@ program elphbolt
   !! electron-phonon and phonon-phonon interactions computed ab initio.
 
   !TEST
-  use params, only: dp
+  use params, only: dp, k8
   
   use misc, only: welcome, print_message, subtitle, timer, exit_with_message
   use numerics_module, only: numerics
@@ -42,7 +42,7 @@ program elphbolt
        calculate_defect_scatt_rates
   use eliashberg, only: calculate_a2F
   use phonon_defect_module, only: phonon_defect
-  use Green_function, only: calculate_retarded_phonon_D0, calculate_phonon_Tmatrix
+  use Green_function, only: calculate_retarded_phonon_D0 !, calculate_phonon_Tmatrix
   
   implicit none
   
@@ -147,17 +147,10 @@ program elphbolt
         !Calculate phonon Green's function on defective space
         call calculate_retarded_phonon_D0(ph, crys, ph_def%atom_pos, ph_def%pcell_atom_label, ph_def%D0)
 
-        !TODO Calculate phonon-mass defect scattering T-matrix
-        call calculate_phonon_Tmatrix(ph, crys, ph_def%D0, ph_def%V_mass, ph_def%V_bond, &
-             ph_def%atom_pos, ph_def%pcell_atom_label, ph_def%irred_diagT, '1st Born')
-
+        call ph_def%calculate_phonon_Tmatrix(ph, crys, '1st Born')
 
         call t_event%end_timer("Phonon-defect transition rates")
         
-        !TEST
-        call calculate_defect_scatt_rates(ph%prefix, crys%volume, crys%gfactors(1), ph%indexlist_irred, &
-             ph%ens, ph_def%irred_diagT)
-
         call exit
      end if
      !!
