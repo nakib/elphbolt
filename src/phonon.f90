@@ -50,7 +50,7 @@ module phonon_module
      integer(k8) :: numtriplets
      !! Number of triplets in the ifc3 file.
      real(dp), allocatable :: R_j(:,:), R_k(:,:)
-     !! Position of the 2nd and 3rd atoms in supercell for an ifc3 triplet.
+     !! Position of the 2nd and 3rd unitcell in supercell for an ifc3 triplet.
      integer(k8), allocatable :: Index_i(:), Index_j(:), Index_k(:)
      !! Label of primitive cell atoms in the ifc3 triplet.
      real(dp), allocatable :: tetra_squared_evals(:,:,:)
@@ -575,7 +575,7 @@ contains
                    self%Index_j(triplet_counter) = na2
                    self%Index_k(triplet_counter) = na3
 
-                   !Positions of the 2nd and 3rd atom in the triplet
+                   !Positions of the 2nd and 3rd unitcell in the triplet
                    !converted to Cartesian coordinates (Ang).
                    self%R_j(:, triplet_counter) = &
                         matmul(crys%lattvecs, R2(:, ii)*10.0_dp) !Ang
@@ -744,7 +744,7 @@ contains
 
        ! Finish converting to the standard format.
        do ii = 1, self%numtriplets
-          !Positions of the 2nd and 3rd atom in the triplet
+          !Positions of the 2nd and 3rd unitcell in the triplet
           !converted to Cartesian coordinates (Ang).
           self%R_j(:, ii) = &
                matmul(crys%lattvecs, R2(:, ii)*10.0_dp) !Ang
