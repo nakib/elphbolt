@@ -117,8 +117,10 @@ contains
     ph_deltas = ph_deltas*el%spinnormed_dos_fermi
     
     ! Reduce ph_deltas
+    sync all
     call co_sum(ph_deltas)
-
+    sync all
+    
     call print_message("Calculating a2F for all IBZ electrons...")
 
     if(present(external_eps_switch) .and. external_eps_switch) then
@@ -137,7 +139,9 @@ contains
           end do
           close(1)
        end if
+       sync all
        call co_broadcast(eps_squared, 1)
+       sync all
     end if
     
     !Total number of IBZ blocks states
@@ -254,8 +258,10 @@ contains
     end if
     
     !Reduce iso_a2F_branches
+    sync all
     call co_sum(iso_a2F_branches)
-
+    sync all
+    
     !Write isotropic a2F to file
     call chdir(num%cwd)
     call write2file_rank2_real('a2F_iso_branch_resolved', iso_a2F_branches)
@@ -333,7 +339,9 @@ contains
        end do
        close(1)
     end if
+    sync all
     call co_broadcast(iso_a2F_branches, 1)
+    sync all
     
     !Isotropic theory
     iso_matsubara_lambda = 0.0_dp

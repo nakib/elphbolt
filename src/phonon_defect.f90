@@ -19,7 +19,7 @@ module phonon_defect_module
 
   use params, only: k8, dp, hbar_eVps
   use misc, only: exit_with_message, subtitle, demux_vector, twonorm, write2file_rank2_real, &
-       kronecker, expi, demux_state, invert, distribute_points
+       kronecker, expi, demux_state, invert, distribute_points, mux_state
   use crystal_module, only: crystal
   use phonon_module, only: phonon
 
@@ -114,14 +114,17 @@ contains
     self%cell_pos_intvec(:, 1:self%numcells) = &
          supercell_cell_pos_intvec(:, 1:self%numcells)
 
-    !Calculate supercell lattice vectors
-    do i = 1, 3
-       supercell_lattvecs(:, i) = ph%scell(i)*crys%lattvecs(:, i)
-    end do
+!!$    !TODO Check if these are needed
+!!$    !Calculate supercell lattice vectors
+!!$    do i = 1, 3
+!!$       supercell_lattvecs(:, i) = ph%scell(i)*crys%lattvecs(:, i)
+!!$    end do
 
     !Number of atoms in the defective block of the supercell
     supercell_numatoms = self%numcells*crys%numatoms
-    
+
+    !TODO Check if atom_pos is even needed anywhere!
+    !
     !Calculate defective supercell block atomic positions and
     !primitive cell equivalent atom labels.
     allocate(self%atom_pos(3, supercell_numatoms))
@@ -130,14 +133,21 @@ contains
     do cell = 1, self%numcells
        do atom = 1, crys%numatoms
           atom_count = atom_count + 1
-          
+
+          !DBG
           self%atom_pos(:, atom_count) = &
-               matmul(supercell_lattvecs, &
-               self%cell_pos_intvec(:, cell) + crys%basis(:, atom))
+               matmul(crys%lattvecs, self%cell_pos_intvec(:, cell)) + &
+               crys%basis_cart(:, atom)
 
           self%pcell_atom_label(atom_count) = atom
        end do
     end do
+    
+    print*, 'Number of cells in defective supercell:', self%numcells
+    print*, self%atom_pos(:, 1)
+    print*, self%atom_pos(:, 2)
+    print*, self%atom_pos(:, 3)
+    print*, self%atom_pos(:, 4)
     
     !Create on-site mass perturbation
     if(self%mass_defect) call generate_V_mass(self, crys)
@@ -180,6 +190,7 @@ contains
        do j = -1, 1
           do k = -1, 1
              count = count + 1
+             !TODO Check this calculation
              distance_from_origins(count) = twonorm(&
                   matmul(supercell_lattvecs, cell_intvec/dble(scell) - [i, j, k]))
           end do
@@ -211,7 +222,8 @@ contains
     scatt_rates = 0.0_dp
     
     do host = 1, numhosts
-       call self%calculate_phonon_Tmatrix_host(ph, crys, approx, crys%defect_hosts(host), irred_diagT(:, :, host))
+       call self%calculate_phonon_Tmatrix_host(ph, crys, approx, crys%defect_hosts(host), &
+            irred_diagT(:, :, host))
 
        def_frac = crys%subs_conc(crys%atomtypes(crys%defect_hosts(host)))*(1.0e-21_dp*crys%volume)
        
@@ -222,11 +234,13 @@ contains
 
        if(this_image() == 1) then
           print*, 'Calculating ph-defect scattering rates at host site', crys%defect_hosts(host)
+          print*, 'Host atom type', crys%atomtypes(crys%defect_hosts(host))
+          print*, 'Defect conc', crys%subs_conc(crys%atomtypes(crys%defect_hosts(host)))
        end if
     end do
     scatt_rates = -scatt_rates/hbar_eVps
 
-    !Deal with Gamma point acoustic phonons! and zero-velocity optic phonons
+    !Deal with Gamma point acoustic phonons!
     scatt_rates(1, 1:3) = 0.0_dp
     
     !Write to file
@@ -251,11 +265,10 @@ contains
     !Local variables
     integer(k8) :: num_dof_def, numstates_irred, istate, &
          chunk, start, end, num_active_images, i, j, a, def_numatoms, &
-         dof_counter, iq, s, tau_sc, tau_uc
-    complex(dp), allocatable :: inv_one_minus_VD0(:, :), T(:, :, :), &
-         phi(:, :)
+         dof_counter, iq, s, tau_sc, tau_uc, cell, atom
+    complex(dp), allocatable :: inv_one_minus_VD0(:, :), T(:, :, :), phi(:)
     real(dp), allocatable :: V(:, :), identity(:, :)
-    complex(dp) :: phase
+    complex(dp) :: phase, ev(ph%numbands, ph%numbands)
     real(dp) :: q_cart(3), en_sq, val
 
     !Displacement degrees of freedom in the defective supercell 
@@ -291,7 +304,7 @@ contains
        en_sq = ph%ens(ph%indexlist_irred(iq), s)**2
 
        !Scale the mass perturbation with squared energy.
-       !Since on-site mass perturbation is in the unit cell,
+       !Since on-site mass perturbation is forced to be in the unit cell,
        !only these elements of V get a contribution.
        dof_counter = 0
        do a = 1, crys%numatoms !Number of atoms in the unit cell
@@ -323,7 +336,8 @@ contains
           !    |          /_____\
           !                 D0
           !
-          T(:, :, istate) = V + matmul(matmul(V, self%D0(:, :, istate)), V)
+          !T(:, :, istate) = V + matmul(matmul(V, self%D0(:, :, istate)), V)
+          T(:, :, istate) = matmul(V, matmul(self%D0(:, :, istate), V))
        case('full Born')
           ! Full Born approximation:
           ! T = V + V.D0.T = [I - VD0]^-1 . V
@@ -342,46 +356,68 @@ contains
        end select
     end do
 
-    !Reduce T 
+    !Reduce T
+    sync all
     call co_sum(T)
-
+    sync all
+    
+    !Release some memory
+    deallocate(V, identity)
+    if(allocated(inv_one_minus_VD0)) deallocate(inv_one_minus_VD0)
+    
     !Calculate diagonal T in reciprocal space.
-    allocate(phi(ph%numbands, num_dof_def))
+    allocate(phi(num_dof_def))
     diagT = 0.0_dp
     do istate = start, end
        !Demux state index into branch (s) and wave vector (iq) indices
        call demux_state(istate, ph%numbands, s, iq)
 
+       !This phonon eigenvector
+       ev = ph%evecs(ph%indexlist_irred(iq), :, :)
+       !ev = ph%evecs(iq, :, :)
+       !ev = conjg(ph%evecs(ph%indexlist_irred(iq), :, :))
+       !ev = transpose(conjg(ph%evecs(ph%indexlist_irred(iq), :, :)))
+       !ev = transpose(ph%evecs(ph%indexlist_irred(iq), :, :))
+       !ev = ph%evecs(ph%indexlist_irred(iq), :, :)/ph%nequiv(iq)
+       !ev = ph%evecs(ph%indexlist_irred(iq), :, :)*ph%nequiv(iq)
+       
        !Calculate wave vector in Cartesian coordinates
        q_cart = matmul(crys%reclattvecs, ph%wavevecs_irred(iq, :))
 
-       !Precompute the eigenfunctions
+       !TODO this should be done in a separate subroutine.
+       !Precompute the eigenfunction at (q, s)
        dof_counter = 0
-       do tau_sc = 1, def_numatoms !Atoms in defective supercell
+       do cell = 1, self%numcells
           !Phase factor
-          phase = expi( &
-               dot_product(q_cart, self%atom_pos(:, tau_sc)) )
+          !DBG
+          !TODO Check units below. def_supercell_cell_pos is in integer triplet form.
+          phase = 1.0_dp !expi( &
+               !dot_product(q_cart, def_supercell_cell_pos(:, cell)) )
+          
+          do atom = 1, crys%numatoms
+             tau_sc = mux_state(crys%numatoms, atom, cell) 
 
-          !Get primitive cell equivalent atom of supercell atom
-          tau_uc = self%pcell_atom_label(tau_sc)
-
-          !Run over Cartesian directions
-          do a = 1, 3
-             dof_counter = dof_counter + 1
-             phi(:, dof_counter) = phase*ph%evecs(iq, :, (tau_uc - 1)*3 + a)
+             !phase = expi( &
+             !     dot_product(q_cart, self%atom_pos(:, tau_sc)) )
+             
+             !Get primitive cell equivalent atom of supercell atom
+             tau_uc = self%pcell_atom_label(tau_sc)
+             
+             !Run over Cartesian directions
+             do a = 1, 3
+                dof_counter = dof_counter + 1
+                phi(dof_counter) = phase*ev(s, mux_state(3_k8, a, tau_uc))
+             end do
           end do
        end do
 
        !Fourier transform
-       do i = 1, num_dof_def
-          do j = 1, num_dof_def
-             diagT(iq, s) = diagT(iq, s) + &
-                  conjg(phi(s, i))*phi(s, j)*T(i, j, istate)
-          end do
-       end do
+       diagT(iq, s) = dot_product(phi, matmul(T(:, :, istate), phi))
     end do
 
     !Reduce T
+    sync all
     call co_sum(diagT)
+    sync all
   end subroutine calculate_phonon_Tmatrix_host
 end module phonon_defect_module

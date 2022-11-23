@@ -1269,9 +1269,13 @@ contains
     end do
 
     !Reduce partial sums
+    sync all
     call co_sum(rta_rates_3ph)
+    sync all
     if(present(el)) then
+       sync all
        call co_sum(rta_rates_phe)
+       sync all
     end if
   end subroutine calculate_ph_rta_rates
 
@@ -1353,9 +1357,13 @@ contains
     end do
 
     !Reduce partial sums
+    sync all
     call co_sum(rta_rates_eph)
+    sync all
     if(num%elchimp) then
+       sync all
        call co_sum(rta_rates_echimp)
+       sync all
     end if    
   end subroutine calculate_el_rta_rates
   

@@ -145,6 +145,7 @@ program elphbolt
         call t_event%start_timer("Phonon-defect transition rates")
 
         !Calculate phonon Green's function on defective space
+        !call calculate_retarded_phonon_D0(ph, crys, ph_def%cell_pos_intvec, ph_def%pcell_atom_label, ph_def%D0)
         call calculate_retarded_phonon_D0(ph, crys, ph_def%atom_pos, ph_def%pcell_atom_label, ph_def%D0)
 
         call ph_def%calculate_phonon_Tmatrix(ph, crys, '1st Born')

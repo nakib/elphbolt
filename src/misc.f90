@@ -450,8 +450,11 @@ contains
 
     integer(k8), intent(in) :: i, j
     
-    kronecker = 0
-    if(i == j) kronecker = 1
+    if(i == j) then
+       kronecker = 1
+    else
+       kronecker = 0
+    end if
   end function kronecker
   
   pure complex(dp) function expi(x)

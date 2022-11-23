@@ -479,8 +479,10 @@ contains
        end do
     end do
 
+    sync all
     call co_sum(Z)
-
+    sync all
+    
     Z = 1.0_dp + Z*pikBT
     sync all
   end subroutine iterate_aniso_matsubara_Z
@@ -576,8 +578,10 @@ contains
        end do
     end do
 
+    sync all
     call co_sum(Delta)
-
+    sync all
+    
     Delta = pikBT*Delta/Z
     sync all
   end subroutine iterate_aniso_matsubara_Delta
@@ -616,8 +620,10 @@ contains
     end do
 
     !Reduce Z
+    sync all
     call co_sum(Z)
-
+    sync all
+    
     Z = 1.0_dp + pikBT*Z
     sync all
   end subroutine iterate_iso_matsubara_Z
@@ -662,8 +668,10 @@ contains
     end do
 
     !Reduce Delta
+    sync all
     call co_sum(Delta)
-
+    sync all
+    
     Delta = Delta*pikBT/Z
     sync all
   end subroutine iterate_iso_matsubara_Delta

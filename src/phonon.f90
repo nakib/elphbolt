@@ -174,9 +174,11 @@ contains
           self%evecs(start[im]:end[im], :, :) = evecs_chunk(:,:,:)[im]
        end do
     end if
+    sync all
     call co_broadcast(self%ens, 1)
     call co_broadcast(self%vels, 1)
     call co_broadcast(self%evecs, 1)
+    sync all
     
     deallocate(ens_chunk, vels_chunk, evecs_chunk)
     
@@ -216,7 +218,9 @@ contains
           self%symmetrizers(:, :, start[im]:end[im]) = symmetrizers_chunk(:,:,:)[im]
        end do
     end if
+    sync all
     call co_broadcast(self%symmetrizers, 1)
+    sync all
     
     deallocate(symmetrizers_chunk)
     

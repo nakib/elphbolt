@@ -266,7 +266,9 @@ contains
           equiv_map(:, start[im]:end[im]) = equiv_map_chunk(:,:)[im]
        end do
     end if
+    sync all
     call co_broadcast(equiv_map, 1)
+    sync all
   end subroutine find_equiv_map
 
   subroutine find_irred_wedge(mesh,nwavevecs_irred,wavevecs_irred, &
@@ -349,7 +351,9 @@ contains
           
           check = 0
           if(any(runninglist(start:end) == imux)) check = 1
+          sync all
           call co_sum(check)
+          sync all
 
           if(check > 0) in_list = .true.
        end if

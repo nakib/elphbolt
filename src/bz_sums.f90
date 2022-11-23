@@ -221,8 +221,10 @@ contains
           el%dos(start[im]:end[im], :) = dos_chunk(:,:)[im]
        end do
     end if
+    sync all
     call co_broadcast(el%dos, 1)
-
+    sync all
+    
     !Write dos to file
     call write2file_rank2_real(el%prefix // '.dos', el%dos)
 
@@ -339,10 +341,12 @@ contains
           if(phsubs) W_phsubs(start[im]:end[im], :) = W_phsubs_chunk(:,:)[im]
        end do
     end if
+    sync all
     call co_broadcast(ph%dos, 1)
     call co_broadcast(W_phiso, 1)
     call co_broadcast(W_phsubs, 1)
-
+    sync all
+    
     !Write to file
     call write2file_rank2_real(ph%prefix // '.dos', ph%dos)
     call write2file_rank2_real(ph%prefix // '.W_rta_phiso', W_phiso)

@@ -23,7 +23,7 @@ module Green_function
   use crystal_module, only: crystal
   use delta, only: delta_fn_tetra, real_tetra
   use misc, only: exit_with_message, distribute_points, expi, demux_state, invert, &
-       write2file_rank2_real, kronecker
+       write2file_rank2_real, kronecker, mux_state
   
   implicit none
 
@@ -73,65 +73,84 @@ contains
     resolvent = Re_resolvent + oneI*Im_resolvent
   end function resolvent
 
-  subroutine calculate_retarded_phonon_D0(ph, crys, def_supercell_atom_pos, pcell_equiv_atom_label, &
-       D0)
+!!$  subroutine calculate_retarded_phonon_D0(ph, crys, def_supercell_cell_pos_intvec, &
+!!$       pcell_atom_label, D0)
+  subroutine calculate_retarded_phonon_D0(ph, crys, def_atom_pos, &
+       pcell_atom_label, D0)
     !! Parallel driver of the retarded, bare phonon Green's function, D0, over
     !! the IBZ states.
     !!
     !! ph Phonon object
     !! crys Crystal object
-    !! def_supercell_atom_pos Positions of atoms (integer 3 vector) in the defective supercell
-    !! pcell_equiv_atom_label Primitive cell equivalence of atom labels in the defective supercell
+    !! def_supercell_cell_pos_intvec Positions of unitcells (integer 3 vector) in the defective supercell
+    !! pcell_atom_label Primitive cell equivalence of atom labels in the defective supercell
     !! D0 Green's function
 
     type(phonon), intent(in) :: ph
     type(crystal), intent(in) :: crys
-    real(dp), intent(in) :: def_supercell_atom_pos(:, :) !Cartesian
-    integer(k8), intent(in) :: pcell_equiv_atom_label(:)
+    !integer(k8), intent(in) :: def_supercell_cell_pos_intvec(:, :) !Cartesian
+    real(dp), intent(in) :: def_atom_pos(:, :)
+    integer(k8), intent(in) :: pcell_atom_label(:)
     complex(dp), allocatable, intent(out) :: D0(:, :, :)
     
     !Local variables
-    integer(k8) :: nstates, nstates_irred, chunk, start, end, num_active_images, &
+    integer(k8) :: nstates_irred, chunk, start, end, num_active_images, &
          istate1, s1, iq1_ibz, iq1, s2, iq2, i, j, num_dof_def, a, dof_counter, iq, &
-         tau_sc, tau_uc, def_numatoms, def_numcells
+         tau_sc, tau_uc, def_numatoms, def_numcells, atom, cell
     real(dp) :: en1_sq, q_cart(3)
-    complex(dp) :: d0_istate, phase
+    complex(dp) :: d0_istate, phase, ev(ph%numbands, ph%numbands)
     complex(dp), allocatable :: phi(:, :, :), phi_internal(:)
 
     !Total number of atoms in the defective block of the supercell
-    def_numatoms = size(pcell_equiv_atom_label)
-    
-    !Number of primitive unit cells in the defective supercell    
-    def_numcells = def_numcells/crys%numatoms
+    def_numatoms = size(pcell_atom_label)
     
     !Total number of IBZ and FBZ blocks states
     nstates_irred = ph%nwv_irred*ph%numbands
-    nstates = ph%nwv*ph%numbands
 
     !Total number of degrees of freedom in defective supercell
     num_dof_def = def_numatoms*3
+
+    !Number of primitive unit cells in the defective supercell    
+    !def_numcells = size(def_supercell_cell_pos_intvec, 2)
+    def_numcells = num_dof_def/def_numatoms/3
     
-    allocate(phi(ph%nwv, ph%numbands, num_dof_def), phi_internal(num_dof_def), &
+    allocate(phi(num_dof_def, ph%numbands, ph%nwv), phi_internal(num_dof_def), &
          D0(num_dof_def, num_dof_def, nstates_irred))
 
     !Precompute the defective supercell eigenfunctions
     do iq = 1, ph%nwv
        !Calculate wave vector in Cartesian coordinates
        q_cart = matmul(crys%reclattvecs, ph%wavevecs(iq, :))
+
+       !This phonon eigenvector
+       ev = ph%evecs(iq, :, :)
        
+       !TODO this should be done in a separate subroutine.
        dof_counter = 0
-       do tau_sc = 1, def_numatoms !Atoms in defective supercell
-          !Phase factor
-          phase = expi( &
-               dot_product(q_cart, def_supercell_atom_pos(:, tau_sc)) )
+       do cell = 1, def_numcells
+          !TODO Check units below. def_supercell_cell_pos_intvec is in integer triplet form.
+          !DBG
+          phase = 1.0_dp !expi( &
+          !dot_product(q_cart, def_supercell_cell_pos_intvec(:, cell)) )
 
-          !Get primitive cell equivalent atom of supercell atom
-          tau_uc = pcell_equiv_atom_label(tau_sc)
+          do atom = 1, crys%numatoms
+             !Index of basis atom in supercell
+             tau_sc = mux_state(crys%numatoms, atom, cell)
 
-          !Run over Cartesian directions
-          do a = 1, 3
-             dof_counter = dof_counter + 1
-             phi(iq, :, dof_counter) = phase*ph%evecs(iq, :, (tau_uc - 1)*3 + a)
+             !phase = expi( &
+             !     dot_product(q_cart, def_atom_pos(:, tau_sc)) )
+             
+             !Get primitive cell equivalent atom of supercell atom
+             tau_uc = pcell_atom_label(tau_sc)
+
+             !print*, tau_uc, (tau_uc - 1)*3 + 1, (tau_uc - 1)*3 + 3
+             
+             !Run over Cartesian directions
+             do a = 1, 3
+                dof_counter = dof_counter + 1
+                phi(dof_counter, :, iq) = &
+                     phase*ev(:, mux_state(3_k8, a, tau_uc))
+             end do
           end do
        end do
     end do
@@ -159,21 +178,21 @@ contains
        do iq2 = 1, ph%nwv
           !Sum over internal phonon bands
           do s2 = 1, ph%numbands
-             phi_internal(:) = phi(iq2, s2, :)
+             phi_internal(:) = phi(:, s2, iq2)
 
              d0_istate = resolvent(ph, s2, iq2, en1_sq)
 
              do j = 1, num_dof_def
-                do i = 1, num_dof_def
-                   D0(i, j, istate1) = D0(i, j, istate1) + &
-                        d0_istate*conjg(phi_internal(i))*phi_internal(j)
-                end do
+                D0(:, j, istate1) = D0(:, j, istate1) + &
+                     d0_istate*conjg(phi_internal(j))*phi_internal(:)
              end do
           end do
        end do
     end do
 
     !Reduce D0
+    sync all
     call co_sum(D0)
+    sync all
   end subroutine calculate_retarded_phonon_D0
 end module Green_function

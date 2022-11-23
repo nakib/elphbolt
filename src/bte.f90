@@ -784,7 +784,9 @@ contains
        ! nm.eV/K for phonons, gradT-field
        ! nm.eV/K for electrons, gradT-field
        ! nm.C for electrons, E-field
+       sync all
        call co_sum(field_term)
+       sync all
     end if
   end subroutine calculate_field_term
 
@@ -943,7 +945,9 @@ contains
     end do
 
     !Update the response function
+    sync all
     call co_sum(response_ph_reduce)
+    sync all
     response_ph = response_ph_reduce
 
     !Symmetrize response function
@@ -1065,7 +1069,9 @@ contains
     end do
 
     !Update the response function
+    sync all
     call co_sum(response_el_reduce)
+    sync all
     response_el = response_el_reduce
 
     if(drag) then
@@ -1198,7 +1204,9 @@ contains
     end do
 
     !Reduce from all images
+    sync all
     call co_sum(ph_drag_term_reduce)
+    sync all
     ph_drag_term = ph_drag_term_reduce
   end subroutine calculate_phonon_drag
 
