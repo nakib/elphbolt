@@ -1423,6 +1423,7 @@ contains
                   /twonorm(ph%vels(ik, ib, :))
           end do
        end do
+       ph_scalar_mfps = ph_scalar_mfps/kB !nm
 
        !  Calculate phonon mfp sampling grid [T-dependent quantity]
        call linspace(ph_mfp_sampling_grid, 0.0_dp, maxval(ph_scalar_mfps), num%ph_mfp_npts)
