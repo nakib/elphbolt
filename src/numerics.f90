@@ -103,6 +103,8 @@ module numerics_module
      !! Bounds of equidistant electron energy mesh.
      integer(k8) :: el_en_num
      !! Number of equidistant electron energy mesh points.
+     integer(k8) :: ph_mfp_npts
+     !! Number of equidistant phonon mean-free-path mesh points.
    contains
 
      procedure :: initialize=>read_input_and_setup, create_chempot_dirs
@@ -121,7 +123,7 @@ contains
     type(crystal), intent(in) :: crys
     
     !Local variables
-    integer(k8) :: mesh_ref, qmesh(3), maxiter, runlevel, el_en_num, ph_en_num
+    integer(k8) :: mesh_ref, qmesh(3), maxiter, runlevel, el_en_num, ph_en_num, ph_mfp_npts
     real(dp) :: fsthick, conv_thres, ph_en_min, ph_en_max, el_en_min, el_en_max
     character(len = 1024) :: datadumpdir, tag
     logical :: read_gq2, read_gk2, read_V, read_W, tetrahedra, phe, phiso, phsubs, &
@@ -130,7 +132,8 @@ contains
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
          read_V, read_W, tetrahedra, phe, phiso, phsubs, onlyphbte, onlyebte, maxiter, &
          conv_thres, drag, elchimp, plot_along_path, runlevel, ph_en_min, ph_en_max, &
-         ph_en_num, el_en_min, el_en_max, el_en_num, phbound, elbound, phdef_Tmat
+         ph_en_num, el_en_min, el_en_max, el_en_num, phbound, elbound, phdef_Tmat, &
+         ph_mfp_npts
 
     call subtitle("Reading numerics information...")
     
@@ -167,6 +170,7 @@ contains
     el_en_min = -10.0_dp
     el_en_max = 10.0_dp
     el_en_num = 100
+    ph_mfp_npts = 100
     read(1, nml = numerics)
     if(any(qmesh <= 0) .or. mesh_ref < 1 .or. fsthick < 0) then
        call exit_with_message('Bad input(s) in numerics.')
@@ -217,6 +221,7 @@ contains
        self%el_en_min = el_en_min
        self%el_en_max = el_en_max
        self%el_en_num = el_en_num
+       self%ph_mfp_npts = ph_mfp_npts
     end if
     
     if(crys%twod .and. self%qmesh(3) /= 1) then

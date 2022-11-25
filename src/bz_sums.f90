@@ -29,7 +29,7 @@ module bz_sums
   implicit none
 
   public calculate_dos, calculate_transport_coeff, calculate_qTF, &
-       calculate_el_dos_fermi, calculate_el_Ws
+       calculate_el_dos_fermi, calculate_el_Ws, calculate_mfp_cumulative_transport_coeff
   private calculate_el_dos, calculate_ph_dos_iso
 
   interface calculate_dos
@@ -624,4 +624,131 @@ contains
        end do
     end do
   end subroutine calculate_spectral_transport_coeff
+
+  subroutine calculate_mfp_cumulative_transport_coeff(species_prefix, field, T, deg, chempot, &
+       ens, vels, mesh, volume, response, mfp_grid_sampling, mfps, sym, trans_coeff_hc)!, trans_coeff_cc)
+    !! Subroutine to calculate the mean-free-path cumulative transport coefficients.
+    !!
+    !! species_prefix Prefix of particle type
+    !! field Type of field
+    !! T Temperature in K
+    !! deg Degeneracy
+    !! chempot Chemical potential in eV
+    !! ens FBZ energies in eV
+    !! vels FBZ velocities in Km/s
+    !! volume Primitive cell volume in nm^3
+    !! mesh Wave vector mesh
+    !! response Response function (units depend of the specieas and the field type)
+    !! mfp_grid Scalar mean-free-path sampling grid
+    !! mfps Mode resolved mean-free-path
+    !! sym Symmery object
+    !! trans_coeff_hc Heat current coefficient
+    !! trans_coeff_cc Charge current coefficient
+
+    character(len = 2), intent(in) :: species_prefix
+    character(len = 1), intent(in) :: field    
+    integer(k8), intent(in) :: deg, mesh(3)
+    real(dp), intent(in) :: T, chempot, ens(:,:), mfps(:, :), vels(:,:,:), volume, &
+         response(:,:,:), mfp_grid_sampling(:)
+    type(symmetry), intent(in) :: sym
+    real(dp), intent(out) :: trans_coeff_hc(:,:,:,:)!, trans_coeff_cc(:,:,:,:)
+
+    !Local variables
+    ! Above, h(c)c = heat(charge) current
+    integer(k8) :: ik, ib, imfp, icart, nmfp, nk, nbands, pow_hc!, pow_cc
+    real(dp) :: dist_factor, e, v, fac, A_hc!, A_cc
+    
+    nk = size(ens(:,1))
+    nbands = size(ens(1,:))
+    nmfp = size(mfp_grid_sampling)
+
+    !Common multiplicative factor
+    fac = 1.0e21/kB/T/volume/product(mesh) 
+
+    !Do checks related to particle and field type
+    if(species_prefix == 'ph') then
+       if(chempot /= 0.0_dp) then
+          call exit_with_message(&
+               "Phonon chemical potential non-zero in calculate_mfp_cumulative_transport_coeff. Exiting.")
+       end if
+       if(field == 'T') then
+          A_hc = qe*fac
+          pow_hc = 1
+!!$          A_cc = 0.0_dp
+!!$          pow_cc = 0
+       else if(field == 'E') then
+!!$          A_hc = -fac
+!!$          pow_hc = 1
+!!$          A_cc = 0.0_dp
+!!$          pow_cc = 0
+          call exit_with_message("Not supported yet. Exiting.")
+       else
+          call exit_with_message("Unknown field type in calculate_mfp_cumulative_transport_coeff. Exiting.")
+       end if
+    else if(species_prefix == 'el') then       
+!!$       if(field == 'T') then
+!!$          A_cc = -deg*qe*fac
+!!$          pow_cc = 0
+!!$          A_hc = deg*qe*fac
+!!$          pow_hc = 1
+!!$       else if(field == 'E') then
+!!$          A_cc = deg*fac
+!!$          pow_cc = 0
+!!$          A_hc = -A_cc
+!!$          pow_hc = 1
+!!$       else
+!!$          call exit_with_message("Unknown field type in calculate_mfp_cumulative_transport_coeff. Exiting.")
+!!$       end if
+       call exit_with_message("Not supported yet. Exiting.")
+    else
+       call exit_with_message("Unknown particle species in calculate_mfp_cumulative_transport_coeff. Exiting.")
+    end if
+
+    trans_coeff_hc = 0.0_dp
+!!$    trans_coeff_cc = 0.0_dp
+    do imfp = 1, nmfp
+       do ik = 1, nk
+          do ib = 1, nbands
+             !Theta(mfp(ik, ib) - mfp_sampling) condition
+             if(mfps(ik, ib) <= mfp_grid_sampling(imfp)) then
+
+                e = ens(ik, ib)
+                if(species_prefix == 'ph') then
+                   if(e == 0.0_dp) cycle !Ignore zero energies phonons
+                   dist_factor = Bose(e, T)
+                   dist_factor = dist_factor*(1.0_dp + dist_factor)
+                else
+!!$             dist_factor = Fermi(e, chempot, T)
+!!$             dist_factor = dist_factor*(1.0_dp - dist_factor)
+                   call exit_with_message("Not supported yet. Exiting.")
+                end if
+                do icart = 1, 3
+                   v = vels(ik, ib, icart)
+                   trans_coeff_hc(ib, icart, :, imfp) = trans_coeff_hc(ib, icart, :, imfp) + &
+                        (e - chempot)**pow_hc*dist_factor*v*response(ik, ib, :)
+!!$                if(A_cc /= 0.0_dp) then
+!!$                   trans_coeff_cc(ib, icart, :) = trans_coeff_cc(ib, icart, :) + &
+!!$                        (e - chempot)**pow_cc*dist_factor*v*response(ik, ib, :)
+!!$                end if
+                end do
+             end if
+          end do
+       end do
+    end do
+    !Units:
+    ! W/m/K for thermal conductivity
+    ! 1/Omega/m for charge conductivity
+    ! V/K for thermopower
+    ! A/m/K for alpha/T
+    trans_coeff_hc = A_hc*trans_coeff_hc
+!!$    if(A_cc /= 0.0_dp) trans_coeff_cc = A_cc*trans_coeff_cc
+
+    !Symmetrize transport tensor
+    do imfp = 1, nmfp
+       do ib = 1, nbands
+          call symmetrize_3x3_tensor(trans_coeff_hc(ib, :, :, imfp), sym%crotations)
+!!$          if(A_cc /= 0.0_dp) call symmetrize_3x3_tensor(trans_coeff_cc(ib, :, :, imfp), sym%crotations)
+       end do
+    end do
+  end subroutine calculate_mfp_cumulative_transport_coeff
 end module bz_sums

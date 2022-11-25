@@ -22,7 +22,8 @@ module bte_module
   use misc, only: print_message, exit_with_message, write2file_rank2_real, &
        distribute_points, demux_state, binsearch, interpolate, demux_vector, &
        trace, subtitle, append2file_transport_tensor, write2file_response, &
-       linspace, readfile_response, write2file_spectral_tensor, subtitle, timer
+       linspace, readfile_response, write2file_spectral_tensor, subtitle, timer, &
+       twonorm, write2file_rank1_real
   use numerics_module, only: numerics
   use crystal_module, only: crystal
   use symmetry_module, only: symmetry
@@ -30,7 +31,8 @@ module bte_module
   use electron_module, only: electron
   use interactions, only: calculate_ph_rta_rates, read_transition_probs_e, &
        calculate_el_rta_rates
-  use bz_sums, only: calculate_transport_coeff, calculate_spectral_transport_coeff
+  use bz_sums, only: calculate_transport_coeff, calculate_spectral_transport_coeff, &
+       calculate_mfp_cumulative_transport_coeff
 
   implicit none
 
@@ -1237,33 +1239,36 @@ contains
     !Local variables
     real(dp), allocatable :: ph_en_grid(:), el_en_grid(:), ph_kappa(:,:,:,:), dummy(:,:,:,:), &
          el_kappa0(:,:,:,:), el_sigmaS(:,:,:,:), el_sigma(:,:,:,:), el_alphabyT(:,:,:,:), &
-         ph_alphabyT(:,:,:,:)
+         ph_alphabyT(:,:,:,:), ph_scalar_mfps(:, :), ph_mfp_sampling_grid(:), &
+         ph_kappa_cumulative_mfp(:, :, :, :)
     character(len = 1024) :: tag, Tdir
-    integer(k8) :: ie
+    integer(k8) :: ik, ib
 
     !Calculate electron and/or phonon sampling energy grid
     call linspace(ph_en_grid, num%ph_en_min, num%ph_en_max, num%ph_en_num)
     call linspace(el_en_grid, num%el_en_min, num%el_en_max, num%el_en_num)
 
     !Write energy grids to file
-    if(this_image() == 1) then
-       open(1, file = "ph.en_grid", status = "replace")
-       do ie = 1, num%ph_en_num
-          write(1, "(E20.10)") ph_en_grid(ie)
-       end do
-       close(1)
-       open(1, file = "el.en_grid", status = "replace")
-       do ie = 1, num%el_en_num
-          write(1, "(E20.10)") el_en_grid(ie)
-       end do
-       close(1)
-    end if
+    call write2file_rank1_real("ph.en_grid", ph_en_grid)
+    call write2file_rank1_real("el.en_grid", el_en_grid)
+!!$    if(this_image() == 1) then
+!!$       open(1, file = "ph.en_grid", status = "replace")
+!!$       do ie = 1, num%ph_en_num
+!!$          write(1, "(E20.10)") ph_en_grid(ie)
+!!$       end do
+!!$       close(1)
+!!$       open(1, file = "el.en_grid", status = "replace")
+!!$       do ie = 1, num%el_en_num
+!!$          write(1, "(E20.10)") el_en_grid(ie)
+!!$       end do
+!!$       close(1)
+!!$    end if
 
     !Change to T-dependent directory
     write(tag, "(E9.3)") crys%T
     Tdir = trim(adjustl(num%cwd))//'/T'//trim(adjustl(tag))
     call chdir(trim(adjustl(Tdir)))
-
+        
     !Decoupled electron BTE
     if(.not. num%onlyphbte) then
        call print_message("Decoupled electron BTE:")
@@ -1409,8 +1414,36 @@ contains
        !  Write spectral phonon kappa
        call write2file_spectral_tensor('nodrag_iterated_ph_kappa_spectral_', ph_kappa)
 
+       !  Calculate scalar phonon mean-free-paths(mfps) for the grad-T field [T-dependent quantity]
+       allocate(ph_scalar_mfps(ph%nwv, ph%numbands))
+       do ib = 1, ph%numbands
+          do ik = 1, ph%nwv
+             ph_scalar_mfps(ik, ib) = &
+                  dot_product(self%ph_response_T(ik, ib, :), ph%vels(ik, ib, :)) &
+                  /twonorm(ph%vels(ik, ib, :))
+          end do
+       end do
+
+       !  Calculate phonon mfp sampling grid [T-dependent quantity]
+       call linspace(ph_mfp_sampling_grid, 0.0_dp, maxval(ph_scalar_mfps), num%ph_mfp_npts)
+
+       !  Write the mfp quantities to file
+       call write2file_rank1_real("ph.mfps_sampling", ph_mfp_sampling_grid)
+       !call write2file_rank2_real("ph.mfps", ph_scalar_mfps)
+
+       !  Allocate phonon mfp
+       allocate(ph_kappa_cumulative_mfp(ph%numbands, 3, 3, num%ph_mfp_npts))
+
+       !  Calculate culumative phonon kappa vs scalar mean-free-path (mfp)
+       call calculate_mfp_cumulative_transport_coeff(ph%prefix, 'T', crys%T, 1_k8, 0.0_dp, &
+            ph%ens, ph%vels, ph%wvmesh, crys%volume, self%ph_response_T, ph_mfp_sampling_grid, &
+            ph_scalar_mfps, sym, ph_kappa_cumulative_mfp)!, dummy)
+
+       !  Write scalar mfp cumulative phonon kappa
+       call write2file_spectral_tensor('nodrag_iterated_ph_kappa_mfp_cumulative_', ph_kappa_cumulative_mfp)
+       
        !  Release memory
-       deallocate(self%ph_response_T, ph_kappa, dummy)
+       deallocate(self%ph_response_T, ph_kappa, dummy, ph_kappa_cumulative_mfp)
     end if
 
     !Partially decoupled electron BTE
