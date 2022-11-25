@@ -1,10 +1,7 @@
-include hu_office_intel.make
-#include hu_office_gcc.make
-#include thinkpad_gcc.make
-#include thinkpad_intel.make
-#include msi_intel.make
+include hu_office_gcc.make
+#include hu_office_intel.make
 
-objects:= params.o misc.o spglib_wrapper.o numerics.o migel_sc.o crystal.o symmetry.o wannier.o delta.o particle.o electron.o phonon.o bz_sums.o interactions.o eliashberg.o bte.o elphbolt.o
+objects:= params.o misc.o spglib_wrapper.o numerics.o migel_sc.o crystal.o symmetry.o wannier.o delta.o particle.o electron.o phonon.o bz_sums.o phonon_defect.o green.o interactions.o eliashberg.o bte.o elphbolt.o
 
 all: ../elphbolt.x
 ../elphbolt.x: $(objects)
@@ -19,12 +16,14 @@ symmetry.o symmetry.mod: params.mod misc.mod numerics.mod crystal.mod spglib_wra
 wannier.o wannier.mod: params.mod misc.mod crystal.mod numerics.mod
 electron.o electron.mod: params.mod particle.mod misc.mod numerics.mod crystal.mod symmetry.mod wannier.mod delta.mod
 phonon.o phonon.mod: params.mod particle.mod misc.mod numerics.mod crystal.mod symmetry.mod wannier.mod delta.mod
-bz_sums.mod bz_sums.mod: params.mod misc.mod crystal.mod electron.mod phonon.mod symmetry.mod
+bz_sums.o bz_sums.mod: params.mod misc.mod crystal.mod delta.mod electron.mod phonon.mod symmetry.mod
+phonon_defect.o phonon_defect.mod: params.mod misc.mod crystal.mod phonon.mod
+green.o green.mod: params.mod misc.mod electron.mod phonon.mod
 interactions.o interactions.mod: params.mod misc.mod wannier.mod crystal.mod electron.mod phonon.mod numerics.mod delta.mod
 eliashberg.o eliashberg.mod: params.mod misc.mod wannier.mod crystal.mod electron.mod phonon.mod numerics.mod delta.mod
 migel_sc.o migel_sc.mod: params.mod misc.mod numerics.mod wannier.mod electron.mod eliashberg.mod
 bte.o bte.mod: params.mod misc.mod numerics.mod crystal.mod symmetry.mod phonon.mod electron.mod interactions.mod bz_sums.mod
-elphbolt.o elphbolt.mod: misc.mod params.mod numerics.mod crystal.mod wannier.mod symmetry.mod electron.mod phonon.mod bz_sums.mod migel_sc.o eliashberg.o interactions.mod bte.mod
+elphbolt.o elphbolt.mod: misc.mod params.mod numerics.mod crystal.mod wannier.mod symmetry.mod electron.mod phonon.mod bz_sums.mod migel_sc.o eliashberg.o interactions.mod green.mod phonon_defect.mod bte.mod
 
 %.o %.mod: %.f90
 	$(FC) $(FFLAGS) -c -o $*.o $<

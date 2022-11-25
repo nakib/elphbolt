@@ -4,7 +4,7 @@ objects:= params.o misc.o spglib_wrapper.o numerics.o migel_sc.o crystal.o symme
 
 all: ../elphbolt.x
 ../elphbolt.x: $(objects)
-	$(FC) $(FFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)
+        $(FC) $(FFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)
 misc.o misc.mod: params.mod
 particle.o particle.mod: params.mod
 delta.o delta.mod: params.mod misc.mod
@@ -24,7 +24,8 @@ bte.o bte.mod: params.mod misc.mod numerics.mod crystal.mod symmetry.mod phonon.
 elphbolt.o elphbolt.mod: misc.mod params.mod numerics.mod crystal.mod wannier.mod symmetry.mod electron.mod phonon.mod bz_sums.mod migel_sc.o eliashberg.o interactions.mod bte.mod
 
 %.o %.mod: %.f90
-	$(FC) $(FFLAGS) -c -o $*.o $<
-	touch $*.mod
+        $(FC) $(FFLAGS) -c -o $*.o $<
+        touch $*.mod
 clean:
-	rm -f ../*.x *.mod *.o
+        rm -f ../*.x *.mod *.o
+
