@@ -1430,7 +1430,7 @@ contains
 
        !  Write the mfp quantities to file
        call write2file_rank1_real("ph.mfps_sampling", ph_mfp_sampling_grid)
-       !call write2file_rank2_real("ph.mfps", ph_scalar_mfps)
+       call write2file_rank2_real("ph.mfps", ph_scalar_mfps)
 
        !  Allocate phonon mfp
        allocate(ph_kappa_cumulative_mfp(ph%numbands, 3, 3, num%ph_mfp_npts))
