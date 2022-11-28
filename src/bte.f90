@@ -1424,13 +1424,14 @@ contains
           end do
        end do
        ph_scalar_mfps = ph_scalar_mfps/kB !nm
+       ph_scalar_mfps(1, :) = 0.0_dp !handle gamma point modes
 
        !  Calculate phonon mfp sampling grid [T-dependent quantity]
        call linspace(ph_mfp_sampling_grid, 0.0_dp, maxval(ph_scalar_mfps), num%ph_mfp_npts)
 
        !  Write the mfp quantities to file
-       call write2file_rank1_real("ph.mfps_sampling", ph_mfp_sampling_grid)
-       call write2file_rank2_real("ph.mfps", ph_scalar_mfps)
+       call write2file_rank1_real("nodrag_iterated_ph_mfps_sampling", ph_mfp_sampling_grid)
+       call write2file_rank2_real("nodrag_iterated_ph_mfps", ph_scalar_mfps)
 
        !  Allocate phonon mfp
        allocate(ph_kappa_cumulative_mfp(ph%numbands, 3, 3, num%ph_mfp_npts))
