@@ -1241,7 +1241,7 @@ contains
          el_kappa0(:,:,:,:), el_sigmaS(:,:,:,:), el_sigma(:,:,:,:), el_alphabyT(:,:,:,:), &
          ph_alphabyT(:,:,:,:), ph_scalar_mfps(:, :), ph_mfp_sampling_grid(:), &
          ph_kappa_cumulative_mfp(:, :, :, :)
-    character(len = 1024) :: tag, Tdir
+    character(len = 1024) :: tag, Tdir, numcols
     integer(k8) :: ik, ib
 
     !Calculate electron and/or phonon sampling energy grid
@@ -1251,18 +1251,6 @@ contains
     !Write energy grids to file
     call write2file_rank1_real("ph.en_grid", ph_en_grid)
     call write2file_rank1_real("el.en_grid", el_en_grid)
-!!$    if(this_image() == 1) then
-!!$       open(1, file = "ph.en_grid", status = "replace")
-!!$       do ie = 1, num%ph_en_num
-!!$          write(1, "(E20.10)") ph_en_grid(ie)
-!!$       end do
-!!$       close(1)
-!!$       open(1, file = "el.en_grid", status = "replace")
-!!$       do ie = 1, num%el_en_num
-!!$          write(1, "(E20.10)") el_en_grid(ie)
-!!$       end do
-!!$       close(1)
-!!$    end if
 
     !Change to T-dependent directory
     write(tag, "(E9.3)") crys%T
@@ -1426,12 +1414,24 @@ contains
        ph_scalar_mfps = ph_scalar_mfps/kB !nm
        ph_scalar_mfps(1, :) = 0.0_dp !handle gamma point modes
 
+       !  Print out IBZ mfps
+       if(this_image() == 1) then
+          write(numcols, "(I0)") ph%numbands
+          open(1, file = "nodrag_iterated_ph_mfps_ibz", status = "replace")
+          do ik = 1, ph%nwv_irred
+             write(1, "(" // trim(adjustl(numcols)) // "E20.10)") &
+                  ph_scalar_mfps(ph%indexlist_irred(ik), :)
+          end do
+          close(1)
+       end if
+       sync all
+       
        !  Calculate phonon mfp sampling grid [T-dependent quantity]
        call linspace(ph_mfp_sampling_grid, 0.0_dp, maxval(ph_scalar_mfps), num%ph_mfp_npts)
 
-       !  Write the mfp quantities to file
+       !  Write the sampling mfps to file
        call write2file_rank1_real("nodrag_iterated_ph_mfps_sampling", ph_mfp_sampling_grid)
-       call write2file_rank2_real("nodrag_iterated_ph_mfps", ph_scalar_mfps)
+       !call write2file_rank2_real("nodrag_iterated_ph_mfps", ph_scalar_mfps)
 
        !  Allocate phonon mfp
        allocate(ph_kappa_cumulative_mfp(ph%numbands, 3, 3, num%ph_mfp_npts))
