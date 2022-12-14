@@ -321,7 +321,7 @@ contains
                       !Calculate phonon-substitution scattering in the Tamura model
                       if(phsubs) then
                          W_phsubs_chunk(counter, ib) = W_phsubs_chunk(counter, ib) + &
-                           delta*aux*subs_gfactors(atomtypes(a))*e**2
+                              delta*aux*subs_gfactors(atomtypes(a))*e**2
                       end if
                    end do
                 end if

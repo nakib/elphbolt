@@ -1005,7 +1005,7 @@ contains
        if(present(velocities)) then
           ddyn(:,:,:) = ddyn_s(ik,:,:,:) + ddyn_g(ik,:,:,:)
        end if
-
+       
        do ipol=1,3
           do jpol=1,3
              do iat=1,nat

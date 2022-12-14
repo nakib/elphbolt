@@ -1431,7 +1431,6 @@ contains
 
        !  Write the sampling mfps to file
        call write2file_rank1_real("nodrag_iterated_ph_mfps_sampling", ph_mfp_sampling_grid)
-       !call write2file_rank2_real("nodrag_iterated_ph_mfps", ph_scalar_mfps)
 
        !  Allocate phonon mfp
        allocate(ph_kappa_cumulative_mfp(ph%numbands, 3, 3, num%ph_mfp_npts))

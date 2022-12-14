@@ -17,7 +17,7 @@
 module Green_function
   !! Module containing Green's function related procedures.
 
-  use params, only: k8, dp, pi, oneI
+  use params, only: k8, dp, pi, oneI, twopi
   use electron_module, only: electron
   use phonon_module, only: phonon
   use crystal_module, only: crystal
@@ -73,9 +73,7 @@ contains
     resolvent = Re_resolvent + oneI*Im_resolvent
   end function resolvent
 
-!!$  subroutine calculate_retarded_phonon_D0(ph, crys, def_supercell_cell_pos_intvec, &
-!!$       pcell_atom_label, D0)
-  subroutine calculate_retarded_phonon_D0(ph, crys, def_atom_pos, &
+  subroutine calculate_retarded_phonon_D0(ph, crys, def_supercell_cell_pos_intvec, &
        pcell_atom_label, D0)
     !! Parallel driver of the retarded, bare phonon Green's function, D0, over
     !! the IBZ states.
@@ -88,8 +86,7 @@ contains
 
     type(phonon), intent(in) :: ph
     type(crystal), intent(in) :: crys
-    !integer(k8), intent(in) :: def_supercell_cell_pos_intvec(:, :) !Cartesian
-    real(dp), intent(in) :: def_atom_pos(:, :)
+    integer(k8), intent(in) :: def_supercell_cell_pos_intvec(:, :)
     integer(k8), intent(in) :: pcell_atom_label(:)
     complex(dp), allocatable, intent(out) :: D0(:, :, :)
     
@@ -104,46 +101,37 @@ contains
     !Total number of atoms in the defective block of the supercell
     def_numatoms = size(pcell_atom_label)
     
-    !Total number of IBZ and FBZ blocks states
+    !Total number of IBZ blocks states
     nstates_irred = ph%nwv_irred*ph%numbands
 
     !Total number of degrees of freedom in defective supercell
     num_dof_def = def_numatoms*3
-
+    
     !Number of primitive unit cells in the defective supercell    
-    !def_numcells = size(def_supercell_cell_pos_intvec, 2)
-    def_numcells = num_dof_def/def_numatoms/3
+    def_numcells = num_dof_def/crys%numatoms/3
     
     allocate(phi(num_dof_def, ph%numbands, ph%nwv), phi_internal(num_dof_def), &
          D0(num_dof_def, num_dof_def, nstates_irred))
 
     !Precompute the defective supercell eigenfunctions
     do iq = 1, ph%nwv
-       !Calculate wave vector in Cartesian coordinates
-       q_cart = matmul(crys%reclattvecs, ph%wavevecs(iq, :))
-
        !This phonon eigenvector
        ev = ph%evecs(iq, :, :)
        
        !TODO this should be done in a separate subroutine.
        dof_counter = 0
        do cell = 1, def_numcells
-          !TODO Check units below. def_supercell_cell_pos_intvec is in integer triplet form.
-          !DBG
-          phase = 1.0_dp !expi( &
-          !dot_product(q_cart, def_supercell_cell_pos_intvec(:, cell)) )
-
+          !Cell dependent phase
+          phase = expi( &
+               twopi*dot_product(ph%wavevecs(iq, :), &
+               def_supercell_cell_pos_intvec(:, cell)) )
+          
           do atom = 1, crys%numatoms
              !Index of basis atom in supercell
              tau_sc = mux_state(crys%numatoms, atom, cell)
-
-             !phase = expi( &
-             !     dot_product(q_cart, def_atom_pos(:, tau_sc)) )
-             
+                       
              !Get primitive cell equivalent atom of supercell atom
              tau_uc = pcell_atom_label(tau_sc)
-
-             !print*, tau_uc, (tau_uc - 1)*3 + 1, (tau_uc - 1)*3 + 3
              
              !Run over Cartesian directions
              do a = 1, 3
@@ -173,7 +161,7 @@ contains
        
        !Squared energy of phonon 1
        en1_sq = ph%ens(iq1, s1)**2
-       
+              
        !Sum over internal (FBZ) phonon wave vectors
        do iq2 = 1, ph%nwv
           !Sum over internal phonon bands
@@ -181,13 +169,26 @@ contains
              phi_internal(:) = phi(:, s2, iq2)
 
              d0_istate = resolvent(ph, s2, iq2, en1_sq)
-
+             
              do j = 1, num_dof_def
                 D0(:, j, istate1) = D0(:, j, istate1) + &
-                     d0_istate*conjg(phi_internal(j))*phi_internal(:)
+                     d0_istate*phi_internal(:)*conjg(phi_internal(j))
              end do
           end do
        end do
+
+!!$       if(this_image() == 1) then
+!!$          if(iq1 == 2 .and. s1 == 2) then
+!!$             print*, D0(1, :, istate1)
+!!$             print*, '..'
+!!$             print*, D0(2, :, istate1)
+!!$             print*, '..'
+!!$             print*, D0(3, :, istate1)
+!!$             print*, '..'
+!!$             print*, D0(13, :, istate1)
+!!$             call exit
+!!$          end if
+!!$       end if
     end do
 
     !Reduce D0
