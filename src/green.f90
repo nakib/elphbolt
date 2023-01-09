@@ -17,7 +17,7 @@
 module Green_function
   !! Module containing Green's function related procedures.
 
-  use params, only: k8, dp, pi, oneI, twopi
+  use params, only: k8, dp, pi, oneI, twopi, hbar_eVps
   use electron_module, only: electron
   use phonon_module, only: phonon
   use crystal_module, only: crystal
@@ -74,7 +74,7 @@ contains
   end function resolvent
 
   subroutine calculate_retarded_phonon_D0(ph, crys, def_supercell_cell_pos_intvec, &
-       pcell_atom_label, D0)
+       pcell_atom_label, D0, dimp_cell_pos_intvec, pcell_atom_dof)
     !! Parallel driver of the retarded, bare phonon Green's function, D0, over
     !! the IBZ states.
     !!
@@ -88,6 +88,9 @@ contains
     type(crystal), intent(in) :: crys
     integer(k8), intent(in) :: def_supercell_cell_pos_intvec(:, :)
     integer(k8), intent(in) :: pcell_atom_label(:)
+
+    integer(k8), intent(in) :: dimp_cell_pos_intvec(:, :), pcell_atom_dof(:)
+    
     complex(dp), allocatable, intent(out) :: D0(:, :, :)
     
     !Local variables
@@ -95,7 +98,7 @@ contains
          istate1, s1, iq1_ibz, iq1, s2, iq2, i, j, num_dof_def, a, dof_counter, iq, &
          tau_sc, tau_uc, def_numatoms, def_numcells, atom, cell
     real(dp) :: en1_sq, q_cart(3)
-    complex(dp) :: d0_istate, phase, ev(ph%numbands, ph%numbands)
+    complex(dp) :: d0_istate, phase, ev(ph%numbands, ph%numbands), dos(ph%nwv_irred, ph%numbands)
     complex(dp), allocatable :: phi(:, :, :), phi_internal(:)
 
     !Total number of atoms in the defective block of the supercell
@@ -117,29 +120,14 @@ contains
     do iq = 1, ph%nwv
        !This phonon eigenvector
        ev = ph%evecs(iq, :, :)
-       
-       !TODO this should be done in a separate subroutine.
-       dof_counter = 0
-       do cell = 1, def_numcells
-          !Cell dependent phase
+
+       do dof_counter = 1, num_dof_def
           phase = expi( &
                twopi*dot_product(ph%wavevecs(iq, :), &
-               def_supercell_cell_pos_intvec(:, cell)) )
+               dimp_cell_pos_intvec(:, dof_counter)) )
           
-          do atom = 1, crys%numatoms
-             !Index of basis atom in supercell
-             tau_sc = mux_state(crys%numatoms, atom, cell)
-                       
-             !Get primitive cell equivalent atom of supercell atom
-             tau_uc = pcell_atom_label(tau_sc)
-             
-             !Run over Cartesian directions
-             do a = 1, 3
-                dof_counter = dof_counter + 1
-                phi(dof_counter, :, iq) = &
-                     phase*ev(:, mux_state(3_k8, a, tau_uc))
-             end do
-          end do
+          phi(dof_counter, :, iq) = &
+               phase*ev(:, pcell_atom_dof(dof_counter))
        end do
     end do
 
@@ -176,24 +164,36 @@ contains
              end do
           end do
        end do
-
-!!$       if(this_image() == 1) then
-!!$          if(iq1 == 2 .and. s1 == 2) then
-!!$             print*, D0(1, :, istate1)
-!!$             print*, '..'
-!!$             print*, D0(2, :, istate1)
-!!$             print*, '..'
-!!$             print*, D0(3, :, istate1)
-!!$             print*, '..'
-!!$             print*, D0(13, :, istate1)
-!!$             call exit
-!!$          end if
-!!$       end if
     end do
 
     !Reduce D0
     sync all
     call co_sum(D0)
     sync all
+
+!!$    !Sanity check: print DOS
+!!$    dos = 0.0_dp
+!!$    do istate1 = start, end
+!!$       !Demux state index into branch (s) and wave vector (iq) indices
+!!$       call demux_state(istate1, ph%numbands, s1, iq1_ibz)
+!!$
+!!$       iq1 = ph%indexlist_irred(iq1_ibz)
+!!$
+!!$       do i = 1, num_dof_def
+!!$          dos(iq1_ibz, s1) = dos(iq1_ibz, s1) + &
+!!$               D0(i, i, istate1)
+!!$       end do
+!!$       
+!!$       dos(iq1_ibz, s1) = dos(iq1_ibz, s1)*ph%ens(iq1, s1)
+!!$    end do
+!!$
+!!$    !Reduce dos
+!!$    sync all
+!!$    call co_sum(dos)
+!!$    sync all
+!!$    
+!!$    call write2file_rank2_real(ph%prefix // '.D0test_'//ph%prefix//'dos', imag(-2.0/pi*dos))
+!!$    sync all
+!!$    !!
   end subroutine calculate_retarded_phonon_D0
 end module Green_function

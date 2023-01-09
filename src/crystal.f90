@@ -81,6 +81,14 @@ module crystal_module
      !! g-factors for the substitutional defects.
      integer(k8), allocatable :: defect_hosts(:)
      !! Basis atom sites that can be a host for an impurity, one for each unique element.
+
+     !DBG!!!!
+     integer(k8), allocatable :: numdopants_types(:)
+     real(dp), allocatable :: dopant_masses(:, :)
+     real(dp), allocatable :: dopant_conc(:, :)
+     !real(dp), allocatable :: dopant_frac(:, :)
+     !!!!!!!!
+     
      logical :: twod
      !! Is the system 2d?
      real(dp) :: dim
@@ -104,9 +112,10 @@ contains
 
     !Local variables
     integer(k8) :: i, j, k, numelements, numatoms
-    integer(k8), allocatable :: atomtypes(:), num_atomtypes(:), defect_hosts(:)
+    integer(k8), allocatable :: atomtypes(:), num_atomtypes(:), defect_hosts(:), numdopants_types(:)
     real(dp), allocatable :: masses(:), born(:,:,:), basis(:,:), &
-         basis_cart(:,:), subs_perc(:), subs_masses(:), subs_conc(:)
+         basis_cart(:,:), subs_perc(:), subs_masses(:), subs_conc(:), &
+         dopant_masses(:, :), dopant_conc(:, :)
     real(dp) :: epsilon(3,3), lattvecs(3,3), T, &
          epsilon0, epsiloninf, subs_mavg, bound_length
     character(len=3), allocatable :: elements(:)
@@ -117,7 +126,7 @@ contains
     namelist /crystal_info/ name, elements, atomtypes, basis, lattvecs, &
          polar, born, epsilon, read_epsiloninf, epsilon0, epsiloninf, &
          masses, T, autoisotopes, twod, subs_masses, subs_conc, bound_length, &
-         defect_hosts
+         defect_hosts, numdopants_types, dopant_masses, dopant_conc
 
     call subtitle("Setting up crystal...")
 
@@ -132,15 +141,16 @@ contains
     read(1, nml = allocations)
     if(numelements < 1 .or. numatoms < 1 .or. numatoms < numelements) then
        call exit_with_message('Bad input(s) in allocations.')
-    end if
+    end if    
     self%numelements = numelements
     self%numatoms = numatoms
-
+    
     !Allocate variables
     allocate(elements(numelements), atomtypes(numatoms), born(3,3,numatoms), &
          basis(3,numatoms), masses(numelements), basis_cart(3,numatoms), &
          subs_masses(numelements), subs_conc(numelements), subs_perc(numelements), &
-         num_atomtypes(numelements), defect_hosts(numelements))
+         num_atomtypes(numelements), defect_hosts(numelements), &
+         numdopants_types(numelements), dopant_masses(10, numelements), dopant_conc(10, numelements))
     allocate(self%elements(self%numelements), self%atomtypes(self%numatoms), self%born(3,3,self%numatoms), &
          self%masses(self%numatoms), self%gfactors(self%numelements), self%basis(3,self%numatoms), &
          self%basis_cart(3,self%numatoms), self%subs_masses(self%numelements), self%subs_conc(self%numelements), &
@@ -166,6 +176,9 @@ contains
     subs_conc = 0.0_dp
     defect_hosts = -1_k8
     bound_length = 1.e12_dp !mm, practically inifinity
+    numdopants_types = [1, 1]
+    dopant_masses = 0.0_dp
+    dopant_conc = 0.0_dp
     read(1, nml = crystal_info)
     if(any(atomtypes < 1) .or. T < 0.0_dp) then
        call exit_with_message('Bad input(s) in crystal_info.')
@@ -199,7 +212,12 @@ contains
     self%subs_conc = subs_conc
     self%bound_length = bound_length
     self%defect_hosts = defect_hosts
-     
+    self%numdopants_types = numdopants_types
+    
+    if(product(numdopants_types) <= 0) then
+       call exit_with_message('Number of dopant types must be a non-zero integer. Exiting.')   
+    end if
+    
     if(self%twod) then
        if(lattvecs(1,3) /= 0 .or. lattvecs(2,3) /= 0 .or. lattvecs(3,3) == 0) then
           call exit_with_message('For 2d systems, cross plane lattice vector must be &
@@ -210,6 +228,14 @@ contains
     else
        self%dim = 3.0_dp
     end if
+
+    !Dopant masses and concentrations
+    allocate(self%dopant_masses(maxval(numdopants_types), self%numelements), &
+         self%dopant_conc(maxval(numdopants_types), self%numelements))
+    self%dopant_masses = 0.0_dp
+    self%dopant_conc = 0.0_dp
+    self%dopant_masses = dopant_masses(1:size(self%dopant_masses, 1), :)
+    self%dopant_conc = dopant_conc(1:size(self%dopant_conc, 1), :)
     
     !Set high-frequency dielectric constant
     if(self%read_epsiloninf) then
@@ -264,6 +290,24 @@ contains
             (100.0_dp - subs_perc(i))*(1.0_dp - self%masses(i)/subs_mavg)**2
     end do
     self%subs_gfactors = self%subs_gfactors/100.0_dp
+
+    !DBG!!!!
+    !GaN data
+    !allocate(self%numdopants_types(2), self%dopant_masses(2, 2), self%dopant_conc(2, 2), self%dopant_frac(2, 2))
+    !self%numdopants_types = [2, 2]
+!!$    allocate(self%numdopants_types(1), self%dopant_masses(1, 2), self%dopant_conc(1, 2), self%dopant_frac(1, 2))
+!!$    self%numdopants_types = [1, 1]
+
+    !self%dopant_masses(:, 1) = self%masses(1) !default
+    !self%dopant_masses(:, 2) = self%masses(2) !default
+    !self%dopant_conc = 0.0_dp !default
+
+    !self%dopant_masses(:, 1) = [70.924701, 68.925581] !Ga isotopes
+    !self%dopant_masses(:, 2) = [15.000109, 14.003074] !N isotopes
+
+    !self%dopant_frac(:, 1) = [0.399_dp, 0.601_dp] !Ga isotopes fraction
+    !self%dopant_frac(:, 2) = [0.0037_dp, 0.9963_dp] !N isotopes fraction
+    !!!!!!!!
     
     !Print out crystal and reciprocal lattice information.
     if(this_image() == 1) then

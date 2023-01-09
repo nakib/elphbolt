@@ -42,7 +42,7 @@ program elphbolt
        calculate_defect_scatt_rates
   use eliashberg, only: calculate_a2F
   use phonon_defect_module, only: phonon_defect
-  use Green_function, only: calculate_retarded_phonon_D0 !, calculate_phonon_Tmatrix
+  use Green_function, only: calculate_retarded_phonon_D0
   
   implicit none
   
@@ -145,12 +145,11 @@ program elphbolt
         call t_event%start_timer("Phonon-defect transition rates")
 
         !Calculate phonon Green's function on defective space
-        call calculate_retarded_phonon_D0(ph, crys, ph_def%cell_pos_intvec, ph_def%pcell_atom_label, ph_def%D0)
-        !call calculate_retarded_phonon_D0(ph, crys, ph_def%atom_pos, ph_def%pcell_atom_label, ph_def%D0)
+        call calculate_retarded_phonon_D0(ph, crys, ph_def%cell_pos_intvec, ph_def%pcell_atom_label, ph_def%D0, &
+             ph_def%dimp_cell_pos_intvec, ph_def%pcell_atom_dof)
 
         call ph_def%calculate_phonon_Tmatrix(ph, crys, '1st Born')
-        !call ph_def%calculate_phonon_Tmatrix(ph, crys, 'full Born')
-
+        
         call t_event%end_timer("Phonon-defect transition rates")
         
         call exit
