@@ -74,21 +74,19 @@ module crystal_module
      real(dp), allocatable :: gfactors(:)
      !! g-factors.
      real(dp), allocatable :: subs_masses(:)
-     !! Masses of the substitutional atoms
+     !! Masses of the substitutional atoms [D]
      real(dp), allocatable :: subs_conc(:)
-     !! Concentration of the substitutional atoms in cm^-3
+     !! Concentration of the substitutional atoms in cm^-3 [D]
      real(dp), allocatable :: subs_gfactors(:)
-     !! g-factors for the substitutional defects.
+     !! g-factors for the substitutional defects. [D]
      integer(k8), allocatable :: defect_hosts(:)
      !! Basis atom sites that can be a host for an impurity, one for each unique element.
-
-     !DBG!!!!
      integer(k8), allocatable :: numdopants_types(:)
+     !! Number of dopant types at each host atom site.
      real(dp), allocatable :: dopant_masses(:, :)
+     !! Masses of the dopants at each host atom site.
      real(dp), allocatable :: dopant_conc(:, :)
-     !real(dp), allocatable :: dopant_frac(:, :)
-     !!!!!!!!
-     
+     !! Concentrations [cm^-3] of the dopants at each host atom site.
      logical :: twod
      !! Is the system 2d?
      real(dp) :: dim
@@ -290,24 +288,6 @@ contains
             (100.0_dp - subs_perc(i))*(1.0_dp - self%masses(i)/subs_mavg)**2
     end do
     self%subs_gfactors = self%subs_gfactors/100.0_dp
-
-    !DBG!!!!
-    !GaN data
-    !allocate(self%numdopants_types(2), self%dopant_masses(2, 2), self%dopant_conc(2, 2), self%dopant_frac(2, 2))
-    !self%numdopants_types = [2, 2]
-!!$    allocate(self%numdopants_types(1), self%dopant_masses(1, 2), self%dopant_conc(1, 2), self%dopant_frac(1, 2))
-!!$    self%numdopants_types = [1, 1]
-
-    !self%dopant_masses(:, 1) = self%masses(1) !default
-    !self%dopant_masses(:, 2) = self%masses(2) !default
-    !self%dopant_conc = 0.0_dp !default
-
-    !self%dopant_masses(:, 1) = [70.924701, 68.925581] !Ga isotopes
-    !self%dopant_masses(:, 2) = [15.000109, 14.003074] !N isotopes
-
-    !self%dopant_frac(:, 1) = [0.399_dp, 0.601_dp] !Ga isotopes fraction
-    !self%dopant_frac(:, 2) = [0.0037_dp, 0.9963_dp] !N isotopes fraction
-    !!!!!!!!
     
     !Print out crystal and reciprocal lattice information.
     if(this_image() == 1) then
