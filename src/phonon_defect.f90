@@ -51,7 +51,9 @@ module phonon_defect_module
      !! Retarded, bare Green's function defined on the defect space.
      logical mass_defect
      !! Choose if mass defect is going to be used.
-
+     character(len=100) :: approx
+     !! Approximation of scattering T-matrix.
+     
    contains
 
      procedure, public :: initialize, calculate_phonon_Tmatrix
@@ -73,13 +75,15 @@ contains
     integer(k8) :: cell, atom, cell_count, cell_intvec(3), &
          supercell_numatoms, atom_count, supercell_cell_pos_intvec(3, product(ph%scell)), &
          uc_dof_count, sc_dof_count, a
+    character(len=100) :: approx
 
-    namelist /phonon_defect/ mass_defect, range
+    namelist /phonon_defect/ mass_defect, range, approx
     
     call subtitle("Setting up phonon defect...")
 
     mass_defect = .false.
     range = 0.0_dp
+    approx = 'full Born'
     
     !Read defect input
     open(1, file = 'input.nml', status = 'old')
@@ -90,8 +94,16 @@ contains
        call exit_with_message("Must provide non-zero range (in nm) of defect.")
     end if
 
+    if(.not. (approx .eq. 'lowest order' .or. &
+         approx .eq. '1st Born' .or. &
+         approx .eq. 'full Born')  ) then
+       call exit_with_message(&
+            "T-matrix approximation must be either 'lowest order', '1st Born', or 'full Born.'")
+    end if
+
     self%mass_defect = mass_defect
     self%range = range !nm
+    self%approx = approx
     
     !Apply defect radius
     cell_count = 0
@@ -143,6 +155,12 @@ contains
           end do
        end do
     end do
+
+    if(this_image() == 1) then
+       write(*, "(A, A)") 'T-matrix approximation level: ', self%approx
+       write(*,"(A, F7.2, A)") 'Defect range = ', self%range, ' nm'
+       if(self%mass_defect) write(*,"(A)") 'On-site mass-defect scattering will be used.'
+    end if
   end subroutine initialize
   
   pure real(dp) function distance_from_origin(cell_intvec, scell, lattvecs)
@@ -177,13 +195,12 @@ contains
     distance_from_origin = minval(distance_from_origins)
   end function distance_from_origin
   
-  subroutine calculate_phonon_Tmatrix(self, ph, crys, approx)
+  subroutine calculate_phonon_Tmatrix(self, ph, crys)
 
     class(phonon_defect), intent(inout) :: self
     type(phonon), intent(in) :: ph
     type(crystal), intent(in) :: crys
-    character(len=*), intent(in) :: approx
-
+  
     integer(k8) :: host, ik, i, j, dopant
     real(dp) :: def_frac
     real(dp), allocatable :: scatt_rates(:, :)
@@ -205,33 +222,35 @@ contains
     
     scatt_rates = 0.0_dp
 
-    do host = 1, crys%numelements
-       do dopant = 1, crys%numdopants_types(host) !dopants of this host atom
-          V_mass_iso = 0.0_dp
-          V_mass_iso(host) = 1.0_dp - crys%dopant_masses(dopant, host)/crys%masses(host)
+    if(self%mass_defect) then
+       do host = 1, crys%numelements
+          do dopant = 1, crys%numdopants_types(host) !dopants of this host atom
+             V_mass_iso = 0.0_dp
+             V_mass_iso(host) = 1.0_dp - crys%dopant_masses(dopant, host)/crys%masses(host)
 
-          call self%calculate_phonon_Tmatrix_host(ph, crys, approx, &
-               host, irred_diagT(:, :, host), V_mass_iso)
+             call self%calculate_phonon_Tmatrix_host(ph, crys, host, &
+                  irred_diagT(:, :, host), V_mass_iso)
 
-          def_frac = crys%dopant_conc(dopant, host)*(1.0e-21_dp*crys%volume)/num_atomtypes(host)
+             def_frac = crys%dopant_conc(dopant, host)*(1.0e-21_dp*crys%volume)/num_atomtypes(host)
 
-          do ik = 1, ph%nwv_irred
-             scatt_rates(ik, :) = scatt_rates(ik, :) + &
-                  def_frac*imag(irred_diagT(ik, :, host))/ph%ens(ph%indexlist_irred(ik), :)
+             do ik = 1, ph%nwv_irred
+                scatt_rates(ik, :) = scatt_rates(ik, :) + &
+                     def_frac*imag(irred_diagT(ik, :, host))/ph%ens(ph%indexlist_irred(ik), :)
+             end do
           end do
        end do
-    end do
+    end if
 
     scatt_rates = -scatt_rates/hbar_eVps
 
-    !Deal with Gamma point phonons
-    scatt_rates(1, :) = 0.0_dp
+    !Deal with Gamma point acoustic phonons
+    scatt_rates(1, 1:3) = 0.0_dp
 
     !Write to file
     call write2file_rank2_real(ph%prefix // '.W_rta_'//ph%prefix//'defect', scatt_rates)
   end subroutine calculate_phonon_Tmatrix
   
-  subroutine calculate_phonon_Tmatrix_host(self, ph, crys, approx, host_atom_type, diagT, V_mass)
+  subroutine calculate_phonon_Tmatrix_host(self, ph, crys, host_atom_type, diagT, V_mass)
     !! Parallel calculator of the scattering T-matrix for phonons for a given approximation.
     !!
     !! D0 Retarded, bare Green's function in real space
@@ -242,7 +261,6 @@ contains
     class(phonon_defect), intent(in) :: self
     type(phonon), intent(in) :: ph
     type(crystal), intent(in) :: crys
-    character(len=*), intent(in) :: approx
     complex(dp), intent(out) :: diagT(:, :)
     real(dp), intent(in) :: V_mass(crys%numatoms)
     integer(k8), intent(in) :: host_atom_type
@@ -276,7 +294,7 @@ contains
        identity(i, i) = 1.0_dp
     end do
 
-    if(approx == 'full Born') allocate(inv_one_minus_VD0(num_dof_def, num_dof_def))
+    if(self%approx == 'full Born') allocate(inv_one_minus_VD0(num_dof_def, num_dof_def))
 
     !Divide phonon states among images
     call distribute_points(numstates_irred, chunk, start, end, num_active_images)
@@ -305,7 +323,7 @@ contains
           end do
        end do
        
-       select case(approx)
+       select case(self%approx)
        case('lowest order')
           ! Lowest order:
           ! T = V

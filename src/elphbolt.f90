@@ -148,7 +148,7 @@ program elphbolt
         call calculate_retarded_phonon_D0(ph, crys, ph_def%cell_pos_intvec, ph_def%pcell_atom_label, ph_def%D0, &
              ph_def%dimp_cell_pos_intvec, ph_def%pcell_atom_dof)
 
-        call ph_def%calculate_phonon_Tmatrix(ph, crys, '1st Born')
+        call ph_def%calculate_phonon_Tmatrix(ph, crys)
         
         call t_event%end_timer("Phonon-defect transition rates")
         
