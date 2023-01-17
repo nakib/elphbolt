@@ -310,8 +310,7 @@ contains
        dof_counter = 0
        do cell = 1, self%numcells
           do atom = 1, crys%numatoms !Number of atoms in the unit cell
-             val = en_sq*V_mass(crys%atomtypes(atom)) &
-                  *kronecker(crys%atomtypes(atom), host_atom_type)
+             val = en_sq*V_mass(crys%atomtypes(atom))
              do a = 1, 3 !Cartesian directions
                 dof_counter = dof_counter + 1
                 !Since on-site mass perturbation is forced to be in the central unit cell,
