@@ -26,7 +26,7 @@
 module spglib_wrapper
   !! Wrapper for spglib from ShengBTE.
   
-  use params, only: dp, k8
+  use params, only: r64, i64
   use iso_c_binding
 
   implicit none
@@ -87,12 +87,12 @@ contains
     !! Return the number of symmetry operations. Useful for allocating
     !! memory for get_operations().
 
-    real(dp),dimension(3,3),intent(in) :: lattice
-    integer(k8),intent(in) :: natoms
-    integer(k8),dimension(natoms),intent(in) :: types
-    real(dp),dimension(3,natoms),intent(in) :: positions
+    real(r64),dimension(3,3),intent(in) :: lattice
+    integer(i64),intent(in) :: natoms
+    integer(i64),dimension(natoms),intent(in) :: types
+    real(r64),dimension(3,natoms),intent(in) :: positions
 
-    integer(k8) :: get_num_operations
+    integer(i64) :: get_num_operations
 
     ! Notice the explicit C-compatible types used through this module.
     real(kind=C_DOUBLE),dimension(3,3) :: clattice
@@ -118,13 +118,13 @@ contains
     !! Return the matrix and vector representations of the symmetry
     !! operations of the system.
 
-    real(dp),dimension(3,3),intent(in) :: lattice
-    integer(k8),intent(in) :: natoms
-    integer(k8),dimension(natoms),intent(in) :: types
-    real(dp),dimension(3,natoms),intent(in) :: positions
-    integer(k8),intent(inout) :: nops
-    integer(k8),dimension(3,3,nops),intent(out) :: rotations
-    real(dp),dimension(3,nops),intent(out) :: translations
+    real(r64),dimension(3,3),intent(in) :: lattice
+    integer(i64),intent(in) :: natoms
+    integer(i64),dimension(natoms),intent(in) :: types
+    real(r64),dimension(3,natoms),intent(in) :: positions
+    integer(i64),intent(inout) :: nops
+    integer(i64),dimension(3,3,nops),intent(out) :: rotations
+    real(r64),dimension(3,nops),intent(out) :: translations
     character(len=10),intent(out) :: international
 
     integer(kind=C_INT) :: i
@@ -165,16 +165,16 @@ contains
     !! Return the Cartesian components of the rotations and translations
     !! returned by get_operations().
     
-    real(dp),dimension(3,3),intent(in) :: lattice
-    integer(k8),intent(in) :: nops
-    integer(k8),dimension(3,3,nops),intent(in) :: rotations
-    real(dp),dimension(3,nops),intent(in) :: translations
-    real(dp),dimension(3,3,nops),intent(out) :: crotations
-    real(dp),dimension(3,nops),intent(out) :: ctranslations
+    real(r64),dimension(3,3),intent(in) :: lattice
+    integer(i64),intent(in) :: nops
+    integer(i64),dimension(3,3,nops),intent(in) :: rotations
+    real(r64),dimension(3,nops),intent(in) :: translations
+    real(r64),dimension(3,3,nops),intent(out) :: crotations
+    real(r64),dimension(3,nops),intent(out) :: ctranslations
 
-    integer(k8) :: i,info
-    integer(k8),dimension(3) :: P
-    real(dp),dimension(3,3) :: tmp1,tmp2
+    integer(i64) :: i,info
+    integer(i64),dimension(3) :: P
+    real(r64),dimension(3,3) :: tmp1,tmp2
 
     ctranslations=matmul(lattice,translations)
     do i=1,nops

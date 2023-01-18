@@ -17,7 +17,7 @@
 module Green_function
   !! Module containing Green's function related procedures.
 
-  use params, only: k8, dp, pi, oneI, twopi, hbar_eVps
+  use params, only: i64, r64, pi, oneI, twopi, hbar_eVps
   use electron_module, only: electron
   use phonon_module, only: phonon
   use crystal_module, only: crystal
@@ -32,7 +32,7 @@ module Green_function
   
 contains
   
-  complex(dp) function resolvent(species, ib, iwv, sampling_point)
+  complex(r64) function resolvent(species, ib, iwv, sampling_point)
     !! Calculate the resolvant
     !!   electron: 1/[z - E(k)], lim z -> E + i0^{+}.
     !!   phonon:   1/[z - omega^2(q)], lim z -> omega^2 + i0^{+}.
@@ -42,11 +42,11 @@ contains
     !! sampling_point Sampling energy (or energy squared) in eV (or eV^2), depending on particle type.
 
     class(*), intent(in) :: species
-    integer(k8), intent(in) :: ib, iwv
-    real(dp), intent(in) :: sampling_point
+    integer(i64), intent(in) :: ib, iwv
+    real(r64), intent(in) :: sampling_point
 
     !Local variables
-    real(dp) :: Im_resolvent, Re_resolvent
+    real(r64) :: Im_resolvent, Re_resolvent
 
     select type(species)
     class is(phonon)
@@ -86,20 +86,20 @@ contains
 
     type(phonon), intent(in) :: ph
     type(crystal), intent(in) :: crys
-    integer(k8), intent(in) :: def_supercell_cell_pos_intvec(:, :)
-    integer(k8), intent(in) :: pcell_atom_label(:)
+    integer(i64), intent(in) :: def_supercell_cell_pos_intvec(:, :)
+    integer(i64), intent(in) :: pcell_atom_label(:)
 
-    integer(k8), intent(in) :: dimp_cell_pos_intvec(:, :), pcell_atom_dof(:)
+    integer(i64), intent(in) :: dimp_cell_pos_intvec(:, :), pcell_atom_dof(:)
     
-    complex(dp), allocatable, intent(out) :: D0(:, :, :)
+    complex(r64), allocatable, intent(out) :: D0(:, :, :)
     
     !Local variables
-    integer(k8) :: nstates_irred, chunk, start, end, num_active_images, &
+    integer(i64) :: nstates_irred, chunk, start, end, num_active_images, &
          istate1, s1, iq1_ibz, iq1, s2, iq2, i, j, num_dof_def, a, dof_counter, iq, &
          tau_sc, tau_uc, def_numatoms, def_numcells, atom, cell
-    real(dp) :: en1_sq, q_cart(3)
-    complex(dp) :: d0_istate, phase, ev(ph%numbands, ph%numbands), dos(ph%nwv_irred, ph%numbands)
-    complex(dp), allocatable :: phi(:, :, :), phi_internal(:)
+    real(r64) :: en1_sq, q_cart(3)
+    complex(r64) :: d0_istate, phase, ev(ph%numbands, ph%numbands), dos(ph%nwv_irred, ph%numbands)
+    complex(r64), allocatable :: phi(:, :, :), phi_internal(:)
 
     !Total number of atoms in the defective block of the supercell
     def_numatoms = size(pcell_atom_label)
@@ -135,7 +135,7 @@ contains
     call distribute_points(nstates_irred, chunk, start, end, num_active_images)
     
     !Initialize D0
-    D0 = 0.0_dp
+    D0 = 0.0_r64
     
     !Run over first (IBZ) phonon states
     do istate1 = start, end
@@ -172,7 +172,7 @@ contains
     sync all
 
 !!$    !Sanity check: print DOS
-!!$    dos = 0.0_dp
+!!$    dos = 0.0_r64
 !!$    do istate1 = start, end
 !!$       !Demux state index into branch (s) and wave vector (iq) indices
 !!$       call demux_state(istate1, ph%numbands, s1, iq1_ibz)

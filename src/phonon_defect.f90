@@ -17,7 +17,7 @@
 module phonon_defect_module
   !! Module containing phonon defect related data type and procedures.
 
-  use params, only: k8, dp, hbar_eVps, twopi, pi
+  use params, only: i64, r64, hbar_eVps, twopi, pi
   use misc, only: exit_with_message, subtitle, demux_vector, twonorm, write2file_rank2_real, &
        kronecker, expi, demux_state, invert, distribute_points, mux_state
   use crystal_module, only: crystal
@@ -31,23 +31,23 @@ module phonon_defect_module
   type :: phonon_defect
      !! Data and procedures related to phonon defects.
 
-     real(dp) :: range
+     real(r64) :: range
      !! Radius of the defect in nm. This defines a block of cells in the defective supercell.
-     integer(k8) :: numcells
+     integer(i64) :: numcells
      !! Number of cells in the defective supercell block.
-     integer(k8) :: numhosts
+     integer(i64) :: numhosts
      !! Number of host sites in the unit cell. This can't exceed the number of unique elements.
-     integer(k8), allocatable :: cell_pos_intvec(:, :), dimp_cell_pos_intvec(:, :)
+     integer(i64), allocatable :: cell_pos_intvec(:, :), dimp_cell_pos_intvec(:, :)
      !! Unitcell positions as 0-based integer triplets in the defective supercell block.  
-     integer(k8), allocatable :: pcell_atom_label(:)
+     integer(i64), allocatable :: pcell_atom_label(:)
      !! Primitive cell equivalence (integer label) of atoms in the defective supercell block.
-     integer(k8), allocatable :: pcell_atom_dof(:)
+     integer(i64), allocatable :: pcell_atom_dof(:)
      !! Primitive cell equivalent atomic degree of freedom.
-     real(dp), allocatable :: V_mass(:)
+     real(r64), allocatable :: V_mass(:)
      !! On-site mass defect potential.
-     real(dp), allocatable :: V_bond(:, :)
+     real(r64), allocatable :: V_bond(:, :)
      !! General space-dependent, pairwise defect potential.
-     complex(dp), allocatable :: D0(:, :, :)
+     complex(r64), allocatable :: D0(:, :, :)
      !! Retarded, bare Green's function defined on the defect space.
      logical mass_defect
      !! Choose if mass defect is going to be used.
@@ -70,9 +70,9 @@ contains
     type(crystal), intent(in) :: crys
     
     !Local variables
-    real(dp) :: range
+    real(r64) :: range
     logical :: mass_defect
-    integer(k8) :: cell, atom, cell_count, cell_intvec(3), &
+    integer(i64) :: cell, atom, cell_count, cell_intvec(3), &
          supercell_numatoms, atom_count, supercell_cell_pos_intvec(3, product(ph%scell)), &
          uc_dof_count, sc_dof_count, a
     character(len=100) :: approx
@@ -82,7 +82,7 @@ contains
     call subtitle("Setting up phonon defect...")
 
     mass_defect = .false.
-    range = 0.0_dp
+    range = 0.0_r64
     approx = 'full Born'
     
     !Read defect input
@@ -110,7 +110,7 @@ contains
     do cell = 1, product(ph%scell)
        !Demultiplex cell index into an 0-based integer triplet
        !giving the coordinates of a cell in the supercell.
-       call demux_vector(cell, cell_intvec, ph%scell, 0_k8)
+       call demux_vector(cell, cell_intvec, ph%scell, 0_i64)
        !cell_intvec = cell_intvec - ph%scell/2
        
        !If position of cell is within range, then keep it.
@@ -163,16 +163,16 @@ contains
     end if
   end subroutine initialize
   
-  pure real(dp) function distance_from_origin(cell_intvec, scell, lattvecs)
+  pure real(r64) function distance_from_origin(cell_intvec, scell, lattvecs)
     !! Function to calculate the minimum distance (nm) of a vector measured from
     !! the origin of a supercell.
 
-    integer(k8), intent(in) :: cell_intvec(3), scell(3)
-    real(dp), intent(in) :: lattvecs(3, 3)
+    integer(i64), intent(in) :: cell_intvec(3), scell(3)
+    real(r64), intent(in) :: lattvecs(3, 3)
 
     !Local variables
-    real(dp) :: distance_from_origins(5**3), supercell_lattvecs(3, 3)
-    integer(k8) :: i, j, k, count
+    real(r64) :: distance_from_origins(5**3), supercell_lattvecs(3, 3)
+    integer(i64) :: i, j, k, count
     
     !Calculate supercell lattice vectors
     do i = 1, 3
@@ -201,15 +201,15 @@ contains
     type(phonon), intent(in) :: ph
     type(crystal), intent(in) :: crys
   
-    integer(k8) :: host, ik, i, j, dopant
-    real(dp) :: def_frac
-    real(dp), allocatable :: scatt_rates(:, :)
-    complex(dp), allocatable :: irred_diagT(:, :, :)
+    integer(i64) :: host, ik, i, j, dopant
+    real(r64) :: def_frac
+    real(r64), allocatable :: scatt_rates(:, :)
+    complex(r64), allocatable :: irred_diagT(:, :, :)
 
-    real(dp) :: V_mass_iso(crys%numelements)
-    integer(k8) :: num_atomtypes(crys%numelements)
+    real(r64) :: V_mass_iso(crys%numelements)
+    integer(i64) :: num_atomtypes(crys%numelements)
     
-    num_atomtypes(:) = 0_k8
+    num_atomtypes(:) = 0_i64
     do i = 1, crys%numelements
        do j = 1, crys%numatoms
           if(crys%atomtypes(j) == i) num_atomtypes(i) = num_atomtypes(i) + 1 
@@ -220,18 +220,18 @@ contains
 
     allocate(scatt_rates(ph%nwv_irred, ph%numbands))
     
-    scatt_rates = 0.0_dp
+    scatt_rates = 0.0_r64
 
     if(self%mass_defect) then
        do host = 1, crys%numelements
           do dopant = 1, crys%numdopants_types(host) !dopants of this host atom
-             V_mass_iso = 0.0_dp
-             V_mass_iso(host) = 1.0_dp - crys%dopant_masses(dopant, host)/crys%masses(host)
+             V_mass_iso = 0.0_r64
+             V_mass_iso(host) = 1.0_r64 - crys%dopant_masses(dopant, host)/crys%masses(host)
 
              call self%calculate_phonon_Tmatrix_host(ph, crys, host, &
                   irred_diagT(:, :, host), V_mass_iso)
 
-             def_frac = crys%dopant_conc(dopant, host)*(1.0e-21_dp*crys%volume)/num_atomtypes(host)
+             def_frac = crys%dopant_conc(dopant, host)*(1.0e-21_r64*crys%volume)/num_atomtypes(host)
 
              do ik = 1, ph%nwv_irred
                 scatt_rates(ik, :) = scatt_rates(ik, :) + &
@@ -244,7 +244,7 @@ contains
     scatt_rates = -scatt_rates/hbar_eVps
 
     !Deal with Gamma point acoustic phonons
-    scatt_rates(1, 1:3) = 0.0_dp
+    scatt_rates(1, 1:3) = 0.0_r64
 
     !Write to file
     call write2file_rank2_real(ph%prefix // '.W_rta_'//ph%prefix//'defect', scatt_rates)
@@ -261,18 +261,18 @@ contains
     class(phonon_defect), intent(in) :: self
     type(phonon), intent(in) :: ph
     type(crystal), intent(in) :: crys
-    complex(dp), intent(out) :: diagT(:, :)
-    real(dp), intent(in) :: V_mass(crys%numatoms)
-    integer(k8), intent(in) :: host_atom_type
+    complex(r64), intent(out) :: diagT(:, :)
+    real(r64), intent(in) :: V_mass(crys%numatoms)
+    integer(i64), intent(in) :: host_atom_type
 
     !Local variables
-    integer(k8) :: num_dof_def, numstates_irred, istate, &
+    integer(i64) :: num_dof_def, numstates_irred, istate, &
          chunk, start, end, num_active_images, i, a, def_numatoms, &
          dof_counter, iq, s, cell, atom
-    complex(dp), allocatable :: inv_one_minus_VD0(:, :), T(:, :, :), phi(:)
-    real(dp), allocatable :: V(:, :), identity(:, :)
-    complex(dp) :: phase, ev(ph%numbands)
-    real(dp) :: en_sq, val
+    complex(r64), allocatable :: inv_one_minus_VD0(:, :), T(:, :, :), phi(:)
+    real(r64), allocatable :: V(:, :), identity(:, :)
+    complex(r64) :: phase, ev(ph%numbands)
+    real(r64) :: en_sq, val
 
     !Displacement degrees of freedom in the defective supercell 
     num_dof_def = size(self%D0, 1)
@@ -285,13 +285,13 @@ contains
     
     allocate(T(num_dof_def, num_dof_def, numstates_irred))
     allocate(V(num_dof_def, num_dof_def))
-    T = 0.0_dp
-    V = 0.0_dp
+    T = 0.0_r64
+    V = 0.0_r64
 
     allocate(identity(num_dof_def, num_dof_def))
-    identity = 0.0_dp
+    identity = 0.0_r64
     do i = 1, num_dof_def
-       identity(i, i) = 1.0_dp
+       identity(i, i) = 1.0_r64
     end do
 
     if(self%approx == 'full Born') allocate(inv_one_minus_VD0(num_dof_def, num_dof_def))
@@ -373,7 +373,7 @@ contains
     
     !Calculate diagonal T in reciprocal space.
     allocate(phi(num_dof_def))
-    diagT = 0.0_dp
+    diagT = 0.0_r64
     
     !Optical theorem
     do istate = start, end

@@ -18,7 +18,7 @@ module MigEl_sc_module
   !! Module containing types and procedures related to the
   !! Migdal-Eliashberg (MigEl) solver environment.
   
-  use params, only: dp, k8, pi, kB, oneI
+  use params, only: r64, i64, pi, kB, oneI
   use misc, only: subtitle, print_message, exit_with_message, write2file_rank1_real, &
        twonorm, distribute_points, Pade_continued, demux_state, mux_state
   use numerics_module, only: numerics
@@ -36,39 +36,39 @@ module MigEl_sc_module
   type MigEl_sc
      !! Data and procedures related to the Migdal-Eliashberg equations solver environment.
      
-     integer(k8) :: numqp
+     integer(i64) :: numqp
      !! Number of point on quasiparticle energy grid
-     real(dp), allocatable :: qp_ens(:)
+     real(r64), allocatable :: qp_ens(:)
      !! Uniform quasiparticle energy mesh
-     integer(k8) :: qp_cutoff
+     integer(i64) :: qp_cutoff
      !! Quasiparticle energy cutoff (factor that multiplies the highest phonon energy)
-     integer(k8) :: nummatsubara
+     integer(i64) :: nummatsubara
      !! Number of points on Matsubara mesh
-     integer(k8) :: nummatsubara_upper
+     integer(i64) :: nummatsubara_upper
      !! Number of points on upper plane Matsubara mesh
-     integer(k8) :: matsubara_cutoff
+     integer(i64) :: matsubara_cutoff
      !! Matsubara energy cutoff (factor of highest phonon energy)
-     real(dp), allocatable :: bose_matsubara_ens(:)
+     real(r64), allocatable :: bose_matsubara_ens(:)
      !! Uniform Bosonic Matsubara mesh
-     real(dp), allocatable :: fermi_matsubara_ens(:)
+     real(r64), allocatable :: fermi_matsubara_ens(:)
      !! Number of point on phonon energy grid
-     real(dp), allocatable :: omegas(:)
+     real(r64), allocatable :: omegas(:)
      !! Uniform Fermionic Matsubara mesh
-     integer(k8) :: numomega
+     integer(i64) :: numomega
      !! Uniform phonon energy mesh
-     real(dp) :: omegalog
+     real(r64) :: omegalog
      !! Logarithmic average of phonon energy
-     real(dp) :: iso_lambda0
+     real(r64) :: iso_lambda0
      !! Standard, isotropic e-ph coupling
-     real(dp) :: domega
+     real(r64) :: domega
      !! Uniform bosonic mesh energy difference
-     real(dp) :: Tstart, Tend, dT
+     real(r64) :: Tstart, Tend, dT
      !! Temperature sweep: start, end, difference
-     real(dp) :: mustar
+     real(r64) :: mustar
      !! Dimensionless Coulomb pseudopotential parameter
-     real(dp) :: MAD_Tc
+     real(r64) :: MAD_Tc
      !! Superconducting transition temperature in the McMillan-Allen-Dynes (MAD) theory
-     real(dp) :: BCS_delta
+     real(r64) :: BCS_delta
      !! Superconducting gap from the BCS theory using the MAD Tc
      logical :: isotropic
      !! Use isotropic approximation?
@@ -86,12 +86,12 @@ contains
     !! Read input file and setup the T-independent part of the MigEl environment.
     
     class(MigEl_sc), intent(out) :: self
-    real(dp), intent(in) :: max_ph_en
+    real(r64), intent(in) :: max_ph_en
 
     !Local variables
-    real(dp) :: domega, Tstart, Tend, &
+    real(r64) :: domega, Tstart, Tend, &
          dT, mustar, qp_cutoff, matsubara_cutoff
-    logical(dp) :: isotropic, use_external_eps
+    logical(r64) :: isotropic, use_external_eps
     
     namelist /superconductivity/ domega, matsubara_cutoff, qp_cutoff, &
          Tstart, Tend, dT, mustar, isotropic, use_external_eps
@@ -102,13 +102,13 @@ contains
     open(1, file = 'input.nml', status = 'old')
 
     !Read superconductivity-related information
-    qp_cutoff = 0_dp
-    matsubara_cutoff = 0_dp
-    domega = 0.0_dp
-    Tstart = 0.0_dp
-    Tend = 0.0_dp
-    dT = 0.0_dp
-    mustar = 0.0_dp
+    qp_cutoff = 0_r64
+    matsubara_cutoff = 0_r64
+    domega = 0.0_r64
+    Tstart = 0.0_r64
+    Tend = 0.0_r64
+    dT = 0.0_r64
+    mustar = 0.0_r64
     isotropic = .false.
     use_external_eps = .false.
     read(1, nml = superconductivity)
@@ -156,17 +156,17 @@ contains
     class(MigEl_sc), intent(inout) :: self
     
     !McMillan-Allen-Dynes Tc
-    self%MAD_Tc = self%omegalog/1.2_dp*exp( -1.04_dp*(1.0_dp + self%iso_lambda0)/ &
-         (self%iso_lambda0 - self%mustar*(1.0_dp + 0.62_dp*self%iso_lambda0)))/kB
+    self%MAD_Tc = self%omegalog/1.2_r64*exp( -1.04_r64*(1.0_r64 + self%iso_lambda0)/ &
+         (self%iso_lambda0 - self%mustar*(1.0_r64 + 0.62_r64*self%iso_lambda0)))/kB
 
     !BCS gap in the weak-coupling limit from the MAD Tc
-    self%BCS_Delta = 1.72_dp*kB*self%MAD_Tc
+    self%BCS_Delta = 1.72_r64*kB*self%MAD_Tc
 
     if(this_image() == 1) then
        write(*,"(A, (1E16.8, x), A)") 'McMillan-Allen-Dynes Tc =', &
             self%MAD_Tc, ' K'
        write(*,"(A, (1E16.8, x), A)") 'BCS gap =', &
-            self%BCS_delta*1.0e3_dp, ' meV'
+            self%BCS_delta*1.0e3_r64, ' meV'
     end if
   end subroutine calculate_MAD_theory
 
@@ -177,17 +177,17 @@ contains
     type(electron), intent(in) :: el
     type(epw_wannier), intent(in) :: wann
     type(numerics), intent(in) :: num
-    real(dp), intent(in) :: max_ph_en
+    real(r64), intent(in) :: max_ph_en
 
     !Local variables
     logical :: in_T_bracket
-    real(dp) :: T, norm_Z, norm_Zold, norm_Delta, norm_Deltaold, aux
-    real(dp), allocatable :: quasi_dos(:), &
+    real(r64) :: T, norm_Z, norm_Zold, norm_Delta, norm_Deltaold, aux
+    real(r64), allocatable :: quasi_dos(:), &
          iso_matsubara_lambda(:), iso_matsubara_Delta(:), iso_matsubara_Z(:), &
          aniso_matsubara_Delta(:, :), aniso_matsubara_Z(:, :)
-    complex(dp), allocatable :: iso_quasi_Delta(:), iso_quasi_Z(:), &
+    complex(r64), allocatable :: iso_quasi_Delta(:), iso_quasi_Z(:), &
          aniso_quasi_Delta(:, :), aniso_quasi_Z(:, :)
-    integer(k8) :: iter, nstates_irred, i, istate, m, ik
+    integer(i64) :: iter, nstates_irred, i, istate, m, ik
     character(len = 1024) :: filename, numcols
     
     !Total number of IBZ blocks states
@@ -231,7 +231,7 @@ contains
           iso_matsubara_Delta(:) = self%BCS_delta
           norm_Delta = twonorm(iso_matsubara_Delta)
 
-          iso_matsubara_Z = 1.0_dp !For the sake of non-zero initial norm
+          iso_matsubara_Z = 1.0_r64 !For the sake of non-zero initial norm
           norm_Z = twonorm(iso_matsubara_Z)
 
           !Calculate isotropic lambda function
@@ -247,7 +247,7 @@ contains
           aniso_matsubara_Delta(:, :) = self%BCS_delta
           norm_Delta = twonorm(aniso_matsubara_Delta)
 
-          aniso_matsubara_Z = 1.0_dp !For the sake of non-zero initial norm
+          aniso_matsubara_Z = 1.0_r64 !For the sake of non-zero initial norm
           norm_Z = twonorm(aniso_matsubara_Z)
 
           !Calculate anisotropic lambda function
@@ -280,7 +280,7 @@ contains
           end if
 
           !Zero out norm_Delata if it is smaller 1 micro eV 
-          if(norm_Delta < 1.0e-6_dp) norm_Delta = 0.0_dp
+          if(norm_Delta < 1.0e-6_r64) norm_Delta = 0.0_r64
 
           !Output norms every 100 iterations
           if(this_image() == 1 .and. mod(iter, 100) == 0) then
@@ -290,7 +290,7 @@ contains
           !Iteration breaker
           if((abs(norm_Z - norm_Zold)/norm_Zold < num%conv_thres) .and. &
                ((abs(norm_Delta - norm_Deltaold)/norm_Deltaold < num%conv_thres) &
-               .or. norm_Delta == 0.0_dp)) then
+               .or. norm_Delta == 0.0_r64)) then
              if(this_image() == 1) write(*, "(A, (I5))") "   Convergence reached after iter", iter
              if(this_image() == 1) write(*, "(A, (1E16.8))") "   ||Delta|| = ", norm_Delta
              exit
@@ -308,8 +308,8 @@ contains
 
           !Reduced quasiparticle density of states
           !Eq. 11 of H.J. Choi et al. Physica C 385 (2003) 66–74
-          quasi_dos = real((self%qp_ens + oneI*1.0e-6_dp)/ &
-               sqrt((self%qp_ens + oneI*1.0e-6_dp)**2 - iso_quasi_Delta**2))
+          quasi_dos = real((self%qp_ens + oneI*1.0e-6_r64)/ &
+               sqrt((self%qp_ens + oneI*1.0e-6_r64)**2 - iso_quasi_Delta**2))
 
           !Write quasiparticle Delta and reduced DOS as text data to file
           if(this_image() == 1) then
@@ -353,14 +353,14 @@ contains
           !Reduced quasiparticle density of states
           !Eq. 11 of H.J. Choi et al. Physica C 385 (2003) 66–74
           do i = 1, self%numqp
-             aux = 0.0_dp
+             aux = 0.0_r64
              do istate = 1, nstates_irred
                 !Demux state index into band (m) and wave vector (ik) indices
                 call demux_state(istate, wann%numwannbands, m, ik)
                 
                 aux = aux + el%nequiv(ik)*el%Ws_irred(ik, m)*&
-                     real((self%qp_ens(i) + oneI*1.0e-6_dp)/ &
-                     sqrt((self%qp_ens(i) + oneI*1.0e-6_dp)**2 - aniso_quasi_Delta(istate, i)**2))
+                     real((self%qp_ens(i) + oneI*1.0e-6_r64)/ &
+                     sqrt((self%qp_ens(i) + oneI*1.0e-6_r64)**2 - aniso_quasi_Delta(istate, i)**2))
              end do
              quasi_dos(i) = aux
           end do
@@ -401,14 +401,14 @@ contains
     type(electron), intent(in) :: el
     type(epw_wannier), intent(in) :: wann
     type(numerics), intent(in) :: num
-    real(dp), intent(in) :: Delta(:, :), fermi_matsubara_ens(:), T
-    real(dp), intent(out) :: Z(:, :)
+    real(r64), intent(in) :: Delta(:, :), fermi_matsubara_ens(:), T
+    real(r64), intent(out) :: Z(:, :)
 
     !Internal variables
-    integer(k8) :: j, jp, nstates_irred, nummatsubara, nprocs, start, end, chunk, &
+    integer(i64) :: j, jp, nstates_irred, nummatsubara, nprocs, start, end, chunk, &
          num_active_images, istate, count, m, n, s, ik, ikp, ikp_ibz, istatep_ibz
-    real(dp) :: aux, pikBT
-    real(dp), allocatable :: lambda(:), lambda_istate(:, :)
+    real(r64) :: aux, pikBT
+    real(r64), allocatable :: lambda(:), lambda_istate(:, :)
     character(len = 1024) :: filename
 
     nstates_irred = size(Delta(:, 1))
@@ -420,7 +420,7 @@ contains
     
     call distribute_points(nstates_irred, chunk, start, end, num_active_images)
 
-    Z = 0.0_dp
+    Z = 0.0_r64
     !Run over IBZ blocks states
     do istate = start, end
        !Initialize eligible process counter for this state
@@ -457,7 +457,7 @@ contains
              istatep_ibz = mux_state(wann%numwannbands, n, ikp_ibz)
 
              !Branch summed lambda
-             lambda = 0.0_dp
+             lambda = 0.0_r64
              do s = 1, wann%numbranches
                 !Increment anisotropic lambda_istate processes counter
                 count = count + 1
@@ -467,7 +467,7 @@ contains
              !Run over Matsubara axis
              do j = 1, nummatsubara
                 !Sum over Matsubara axis
-                aux = 0.0_dp
+                aux = 0.0_r64
                 do jp = 1, nummatsubara
                    aux = aux + el%Ws(ikp, n)* &
                         lambda(abs(j - jp) + 1)*fermi_matsubara_ens(jp)/ &
@@ -483,7 +483,7 @@ contains
     call co_sum(Z)
     sync all
     
-    Z = 1.0_dp + Z*pikBT
+    Z = 1.0_r64 + Z*pikBT
     sync all
   end subroutine iterate_aniso_matsubara_Z
 
@@ -496,14 +496,14 @@ contains
     type(electron), intent(in) :: el
     type(epw_wannier), intent(in) :: wann
     type(numerics), intent(in) :: num
-    real(dp), intent(in) :: Z(:, :), fermi_matsubara_ens(:), T, mustar
-    real(dp), intent(inout) :: Delta(:, :)
+    real(r64), intent(in) :: Z(:, :), fermi_matsubara_ens(:), T, mustar
+    real(r64), intent(inout) :: Delta(:, :)
 
     !Internal variables
-    integer(k8) :: j, jp, nstates_irred, nummatsubara, nprocs, start, end, chunk, &
+    integer(i64) :: j, jp, nstates_irred, nummatsubara, nprocs, start, end, chunk, &
          num_active_images, istate, count, m, n, s, ik, ikp, ikp_ibz, istatep_ibz
-    real(dp) :: aux, pikBT
-    real(dp), allocatable :: lambda(:), lambda_istate(:, :), old_Delta(:, :)
+    real(r64) :: aux, pikBT
+    real(r64), allocatable :: lambda(:), lambda_istate(:, :), old_Delta(:, :)
     character(len = 1024) :: filename
 
     nstates_irred = size(Delta(:, 1))
@@ -518,7 +518,7 @@ contains
     call distribute_points(nstates_irred, chunk, start, end, num_active_images)
 
     old_Delta = Delta
-    Delta = 0.0_dp
+    Delta = 0.0_r64
     
     !Run over IBZ blocks states
     do istate = start, end
@@ -556,7 +556,7 @@ contains
              istatep_ibz = mux_state(wann%numwannbands, n, ikp_ibz)
 
              !Branch summed lambda
-             lambda = 0.0_dp
+             lambda = 0.0_r64
              do s = 1, wann%numbranches
                 !Increment anisotropic lambda_istate processes counter
                 count = count + 1
@@ -566,7 +566,7 @@ contains
              !Run over Matsubara axis
              do j = 1, nummatsubara
                 !Sum over Matsubara axis
-                aux = 0.0_dp
+                aux = 0.0_r64
                 do jp = 1, nummatsubara
                    aux = aux + el%Ws(ikp, n)* &
                         (lambda(abs(j - jp) + 1) - mustar)*old_Delta(istatep_ibz, jp)/ &
@@ -591,13 +591,13 @@ contains
     !! Iterate the isotropic Matsubara mass renormalization function for
     !! a given gap (Delta) at a given temperature (T) in K.
     
-    real(dp), intent(in) :: iso_matsubara_lambda(:), Delta(:), &
+    real(r64), intent(in) :: iso_matsubara_lambda(:), Delta(:), &
          fermi_matsubara_ens(:), T
-    real(dp), intent(out) :: Z(:)
+    real(r64), intent(out) :: Z(:)
 
     !Internal variables
-    integer(k8) :: j, jp, nummatsubara, start, end, chunk, num_active_images
-    real(dp) :: aux, pikBT
+    integer(i64) :: j, jp, nummatsubara, start, end, chunk, num_active_images
+    real(r64) :: aux, pikBT
 
     nummatsubara = size(Delta)
     
@@ -605,12 +605,12 @@ contains
 
     call distribute_points(nummatsubara, chunk, start, end, num_active_images)
     
-    Z = 0.0_dp
+    Z = 0.0_r64
     
     !Run over Matsubara energies
     do j = start, end
        !Sum over Matsubara energies
-       aux = 0.0_dp
+       aux = 0.0_r64
        do jp = 1, nummatsubara
           aux = aux + iso_matsubara_lambda(abs(j - jp) + 1)* &
                fermi_matsubara_ens(jp)/ &
@@ -624,7 +624,7 @@ contains
     call co_sum(Z)
     sync all
     
-    Z = 1.0_dp + pikBT*Z
+    Z = 1.0_r64 + pikBT*Z
     sync all
   end subroutine iterate_iso_matsubara_Z
 
@@ -634,14 +634,14 @@ contains
     !! This will take Delta^(tau) -> Delta^(tau + 1) for a given mass enhancement, Z^(tau),
     !! tau being the "time" in the iterator sense.
 
-    real(dp), intent(in) :: iso_matsubara_lambda(:), fermi_matsubara_ens(:), &
+    real(r64), intent(in) :: iso_matsubara_lambda(:), fermi_matsubara_ens(:), &
          Z(:), T, mustar
-    real(dp), intent(inout) :: Delta(:)
+    real(r64), intent(inout) :: Delta(:)
 
     !Internal variables
-    integer(k8) :: j, jp, nummatsubara, start, end, chunk, num_active_images
-    real(dp) :: aux, lambda_aux, pikBT
-    real(dp), allocatable :: old_Delta(:)
+    integer(i64) :: j, jp, nummatsubara, start, end, chunk, num_active_images
+    real(r64) :: aux, lambda_aux, pikBT
+    real(r64), allocatable :: old_Delta(:)
 
     nummatsubara = size(Delta)
 
@@ -652,12 +652,12 @@ contains
     call distribute_points(nummatsubara, chunk, start, end, num_active_images)
     
     old_Delta = Delta
-    Delta = 0.0_dp
+    Delta = 0.0_r64
     
     !Run over Matsubara energies
     do j = start, end
        !Sum over Matsubara energies
-       aux = 0.0_dp
+       aux = 0.0_r64
        do jp = 1, nummatsubara
           lambda_aux = iso_matsubara_lambda(abs(j - jp) + 1)
 
@@ -680,20 +680,20 @@ contains
     !! Create uniform mesh of phonon energies and quasiparticle energies
 
     class(MigEl_sc), intent(inout) :: self
-    real(dp), intent(in) :: max_ph_en
+    real(r64), intent(in) :: max_ph_en
 
     !Local variables
-    integer(k8) :: i
+    integer(i64) :: i
 
     call print_message("Creating uniform phonon energy mesh...")
 
     !Number of phonon energy points in mesh
-    self%numomega = ceiling((max_ph_en + 5.0e-3_dp)/self%domega)
+    self%numomega = ceiling((max_ph_en + 5.0e-3_r64)/self%domega)
 
     !Create uniform phonon energy mesh
     if(allocated(self%omegas)) deallocate(self%omegas)
     allocate(self%omegas(self%numomega))
-    self%omegas(1) = 1.0e-5_dp !avoid zero phonon energy
+    self%omegas(1) = 1.0e-5_r64 !avoid zero phonon energy
     do i = 2, self%numomega
        self%omegas(i) = self%omegas(i - 1) + self%domega
     end do
@@ -718,11 +718,11 @@ contains
     !! for a given temperature in Kelvins. 
 
     class(MigEl_sc), intent(inout) :: self
-    real(dp), intent(in) :: temp, max_ph_en
+    real(r64), intent(in) :: temp, max_ph_en
     
     !Local variables
-    integer(k8) :: l, halfloc
-    real(dp) :: dmatsubara, invbeta
+    integer(i64) :: l, halfloc
+    real(r64) :: dmatsubara, invbeta
 
     call print_message("   Creating Matsubara meshes...")
 

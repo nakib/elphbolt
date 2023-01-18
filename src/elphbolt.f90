@@ -24,7 +24,7 @@ program elphbolt
   !! electron-phonon and phonon-phonon interactions computed ab initio.
 
   !TEST
-  use params, only: dp, k8
+  use params, only: r64, i64
   
   use misc, only: welcome, print_message, subtitle, timer, exit_with_message
   use numerics_module, only: numerics

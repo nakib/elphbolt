@@ -16,52 +16,46 @@
 
 module params
   !! Module containing various parameters and constants.
+
+  use iso_fortran_env, only: real64, int64
   
   implicit none
 
-  integer, parameter :: r_int = 12
-  !! Exponent range for reals.
-  integer, parameter :: r_real = 200
-  !! Exponent range for reals.
-  integer, parameter :: p_real = 14
-  !! Number of digits for reals.
-  integer, parameter :: dp = selected_real_kind(p_real, r_real)
-  !! Custom real precision.
-  integer, parameter :: k8 = selected_int_kind(r_int)
-  !! Custom integer precision.
+  integer, parameter :: r64 = real64
+  integer, parameter :: i64 = int64
 
   !Physical constants:
-  real(dp), parameter :: qe = 1.602176634e-19_dp
+  real(r64), parameter :: qe = 1.602176634e-19_r64
   !! Electron charge magnitude (C)
-  real(dp), parameter :: me = 9.1093837015e-31_dp
+  real(r64), parameter :: me = 9.1093837015e-31_r64
   !! Electron mass (Kg)
-  real(dp), parameter :: amu = 1.66053906660e-27_dp
+  real(r64), parameter :: amu = 1.66053906660e-27_r64
   !! Atomic mass unit (Kg)
-  real(dp), parameter :: hbar = 1.05457172647e-22_dp
+  real(r64), parameter :: hbar = 1.05457172647e-22_r64
   !! Reduced Planck's constant (J/THz = J.ps)
-  real(dp), parameter :: hbar_eVps = hbar/qe
+  real(r64), parameter :: hbar_eVps = hbar/qe
   !! Reduced Planck's constant (eV/THz = eV.ps)
-  real(dp), parameter :: perm0 =  8.854187817e-12_dp
+  real(r64), parameter :: perm0 =  8.854187817e-12_r64
   !! Permittivity of free space (F/m)
-  real(dp), parameter :: kB = 1.380649e-23_dp/qe
+  real(r64), parameter :: kB = 1.380649e-23_r64/qe
   !! Boltzmann constant (eV/K)
-  real(dp), parameter :: pi = 4.0_dp*atan(1.0_dp)
+  real(r64), parameter :: pi = 4.0_r64*atan(1.0_r64)
   !! Value of pi
-  real(dp), parameter :: twopi = 2.0_dp*pi
+  real(r64), parameter :: twopi = 2.0_r64*pi
   !! Value of 2pi
 
   !Conversion factors:
-  real(dp), parameter :: Hartree2radTHz = 27.2116_dp*qe/hbar !Hartree to rad.THz
-  real(dp), parameter :: Hartree2eV = 27.2116_dp !Hartree to eV
-  real(dp), parameter :: Ryd2radTHz = 0.5_dp*Hartree2radTHz !Rydberg to rad.THz
-  real(dp), parameter :: Ryd2eV = 0.5_dp*Hartree2eV !Rydberg to eV
-  real(dp), parameter :: Ryd2meV = Ryd2eV*1.0e3_dp !Rydberg to meV
-  real(dp), parameter :: Ryd2amu = 2.0_dp*me/amu !Rydberg mass to amu
-  real(dp), parameter :: bohr2nm=0.052917721092_dp !Bohr to nm
+  real(r64), parameter :: Hartree2radTHz = 27.2116_r64*qe/hbar !Hartree to rad.THz
+  real(r64), parameter :: Hartree2eV = 27.2116_r64 !Hartree to eV
+  real(r64), parameter :: Ryd2radTHz = 0.5_r64*Hartree2radTHz !Rydberg to rad.THz
+  real(r64), parameter :: Ryd2eV = 0.5_r64*Hartree2eV !Rydberg to eV
+  real(r64), parameter :: Ryd2meV = Ryd2eV*1.0e3_r64 !Rydberg to meV
+  real(r64), parameter :: Ryd2amu = 2.0_r64*me/amu !Rydberg mass to amu
+  real(r64), parameter :: bohr2nm=0.052917721092_r64 !Bohr to nm
   
   !Miscellaneous
-  complex(dp), parameter :: oneI = (0.0_dp,1.0_dp)
-  complex(dp), parameter :: twopiI = twopi*oneI
+  complex(r64), parameter :: oneI = (0.0_r64,1.0_r64)
+  complex(r64), parameter :: twopiI = twopi*oneI
 
   !The code below is adapted from ShengBTE (file data.f90):
   

@@ -19,7 +19,7 @@
 module phonon_module
   !! Module containing type and procedures related to the phononic properties.
 
-  use params, only: dp, k8, bohr2nm, pi, twopi, Ryd2eV, oneI
+  use params, only: r64, i64, bohr2nm, pi, twopi, Ryd2eV, oneI
   use particle_module, only: particle
   use misc, only: print_message, subtitle, expi, distribute_points, &
        write2file_rank2_real, exit_with_message
@@ -40,26 +40,26 @@ module phonon_module
      
      character(len = 2) :: prefix = 'ph'
      !! Prefix idenitfying particle type.
-     integer(k8) :: scell(3)
+     integer(i64) :: scell(3)
      !! q-mesh used in DFPT or, equivalently, supercell used in finite displencement
      !! method for calculating the 2nd order force constants.
-     real(dp), allocatable :: ifc2(:,:,:,:,:,:,:)
+     real(r64), allocatable :: ifc2(:,:,:,:,:,:,:)
      !! Second order force constants (ifc2) tensor.
-     real(dp), allocatable :: ifc3(:,:,:,:)
+     real(r64), allocatable :: ifc3(:,:,:,:)
      !! Third order force constants (ifc3) tensor.
-     integer(k8) :: numtriplets
+     integer(i64) :: numtriplets
      !! Number of triplets in the ifc3 file.
-     real(dp), allocatable :: R_j(:,:), R_k(:,:)
+     real(r64), allocatable :: R_j(:,:), R_k(:,:)
      !! Position of the 2nd and 3rd unitcell in supercell for an ifc3 triplet.
-     integer(k8), allocatable :: Index_i(:), Index_j(:), Index_k(:)
+     integer(i64), allocatable :: Index_i(:), Index_j(:), Index_k(:)
      !! Label of primitive cell atoms in the ifc3 triplet.
-     real(dp), allocatable :: tetra_squared_evals(:,:,:)
+     real(r64), allocatable :: tetra_squared_evals(:,:,:)
      !! Tetrahedra vertices filled with squared eigenvalues.
      !! This is needed only for the phonon Green's function calculation.
 
      !Data read from ifc2 file. These will be used in the phonon calculation.
-     real(dp) :: rws(124, 0:3), cell_r(1:3, 0:3), cell_g(1:3, 0:3)
-     real(dp), allocatable :: mm(:,:), rr(:,:,:)
+     real(r64) :: rws(124, 0:3), cell_r(1:3, 0:3), cell_g(1:3, 0:3)
+     real(r64), allocatable :: mm(:,:), rr(:,:,:)
       
    contains
 
@@ -127,12 +127,12 @@ contains
     type(numerics), intent(in) :: num
     
     !Local variables
-    integer(k8) :: i, iq, ii, jj, kk, l, il, s, ib, im, chunk, &
+    integer(i64) :: i, iq, ii, jj, kk, l, il, s, ib, im, chunk, &
          num_active_images
-    integer(k8), allocatable :: start[:], end[:]
-    real(dp), allocatable :: ens_chunk(:,:)[:], vels_chunk(:,:,:)[:], &
+    integer(i64), allocatable :: start[:], end[:]
+    real(r64), allocatable :: ens_chunk(:,:)[:], vels_chunk(:,:,:)[:], &
          symmetrizers_chunk(:,:,:)[:]
-    complex(dp), allocatable :: evecs_chunk(:,:,:)[:]
+    complex(r64), allocatable :: evecs_chunk(:,:,:)[:]
     !Switch for mesh utilites with or without energy restriction
     logical :: blocks
     character(len = 1024) :: numcols
@@ -193,7 +193,7 @@ contains
     
     !Create symmetrizers of wave vector dependent vectors ShengBTE style
     allocate(symmetrizers_chunk(3, 3, chunk)[*])
-    symmetrizers_chunk = 0.0_dp
+    symmetrizers_chunk = 0.0_r64
     do iq = start, end
        kk = 0
        do jj = 1, sym%nsymm
@@ -289,14 +289,14 @@ contains
     type(crystal), intent(in) :: crys
 
     !Local variables
-    integer(k8) :: qscell(3), tipo(crys%numatoms), t1, t2, t3, i, j, &
+    integer(i64) :: qscell(3), tipo(crys%numatoms), t1, t2, t3, i, j, &
          iat, jat, ibrav, ipol, jpol, m1, m2, m3, ntype, nat, nfc2 
-    real(dp) :: r(crys%numatoms, 3), wscell(3,0:3), celldm(6), at(3,3), &
+    real(r64) :: r(crys%numatoms, 3), wscell(3,0:3), celldm(6), at(3,3), &
          mass(crys%numelements), zeff(crys%numatoms, 3, 3), eps(3, 3), &
          dnrm2
     character(len = 1) :: polar_key
     character(len = 6) :: label(crys%numelements)
-    real(dp), parameter :: massfactor=1.8218779_dp*6.022e-4_dp
+    real(r64), parameter :: massfactor=1.8218779_r64*6.022e-4_r64
     
     allocate(self%mm(crys%numatoms, crys%numatoms))
     allocate(self%rr(crys%numatoms, crys%numatoms, 3))
@@ -406,14 +406,14 @@ contains
     type(crystal), intent(in) :: crys
     
     !Local variables
-    real(dp) :: tmp(3,3), r(crys%numatoms, 3), celldm(6), at(3,3), &
+    real(r64) :: tmp(3,3), r(crys%numatoms, 3), celldm(6), at(3,3), &
          mass(crys%numelements), zeff(crys%numatoms, 3, 3), eps(3, 3), fc_
-    real(dp), allocatable :: fc(:,:,:,:)
-    integer(k8) :: ii, jj, ll, mm, nn, ltem, mtem, ntem, info, P(3), &
+    real(r64), allocatable :: fc(:,:,:,:)
+    integer(i64) :: ii, jj, ll, mm, nn, ltem, mtem, ntem, info, P(3), &
          na1, na2, na3, j1, j2, j3, na1_, na2_, na3_, j1_, j2_, j3_, &
          triplet_counter, nR, nR_, qscell(3), tipo(crys%numatoms), i, j, &
          ibrav, ntype, nat, jn1, jn2, jn3, ind
-    integer(k8), allocatable :: nind(:), R2tmp(:,:), R3tmp(:,:), &
+    integer(i64), allocatable :: nind(:), R2tmp(:,:), R3tmp(:,:), &
          R2(:,:), R3(:,:), triplet_map(:,:,:,:)
     character(len = 1) :: polar_key
     character(len = 6) :: label(crys%numelements), sparse_header
@@ -582,9 +582,9 @@ contains
                    !Positions of the 2nd and 3rd unitcell in the triplet
                    !converted to Cartesian coordinates (Ang).
                    self%R_j(:, triplet_counter) = &
-                        matmul(crys%lattvecs, R2(:, ii)*10.0_dp) !Ang
+                        matmul(crys%lattvecs, R2(:, ii)*10.0_r64) !Ang
                    self%R_k(:, triplet_counter) = &
-                        matmul(crys%lattvecs, R3(:, ii)*10.0_dp) !Ang
+                        matmul(crys%lattvecs, R3(:, ii)*10.0_r64) !Ang
                    
                    do j1 =1, 3
                       jn1 = j1 + (na1 - 1)*3
@@ -600,7 +600,7 @@ contains
              end do
           end do
        end do
-       self%ifc3 = self%ifc3*Ryd2eV/(bohr2nm*10.0_dp)**3 !eV/Ang^3
+       self%ifc3 = self%ifc3*Ryd2eV/(bohr2nm*10.0_r64)**3 !eV/Ang^3
     else if(d3q_sparse_file_exists) then
        !See SUBROUTINE read_fc3_sparse of fc3_interp.f90 of the d3q code
        !for more information about the format.
@@ -720,7 +720,7 @@ contains
           read(1, *) nind(ii), tmp(:, 2), tmp(:, 3)
        end do
 
-       self%ifc3 = 0._dp
+       self%ifc3 = 0._r64
        do ii = 1, nR
           do ind = 1, nind(ii)
              read(1,*) jn1, jn2, jn3, fc_
@@ -751,20 +751,20 @@ contains
           !Positions of the 2nd and 3rd unitcell in the triplet
           !converted to Cartesian coordinates (Ang).
           self%R_j(:, ii) = &
-               matmul(crys%lattvecs, R2(:, ii)*10.0_dp) !Ang
+               matmul(crys%lattvecs, R2(:, ii)*10.0_r64) !Ang
           self%R_k(:, ii) = &
-               matmul(crys%lattvecs, R3(:, ii)*10.0_dp) !Ang
+               matmul(crys%lattvecs, R3(:, ii)*10.0_r64) !Ang
        end do
-       self%ifc3 = self%ifc3*Ryd2eV/(bohr2nm*10.0_dp)**3 !eV/Ang^3
+       self%ifc3 = self%ifc3*Ryd2eV/(bohr2nm*10.0_r64)**3 !eV/Ang^3
     end if
 
     !Each vector is rounded to the nearest lattice vector.
     tmp = crys%lattvecs
     call dgesv(3, self%numtriplets, tmp, 3, P, self%R_j, 3, info)
-    self%R_j = matmul(crys%lattvecs, anint(self%R_j/10.0_dp)) !nm
+    self%R_j = matmul(crys%lattvecs, anint(self%R_j/10.0_r64)) !nm
     tmp = crys%lattvecs
     call dgesv(3, self%numtriplets, tmp, 3, P, self%R_k, 3, info)
-    self%R_k = matmul(crys%lattvecs, anint(self%R_k/10.0_dp)) !nm
+    self%R_k = matmul(crys%lattvecs, anint(self%R_k/10.0_r64)) !nm
 
     if(this_image() == 1) &
        write(*, "(A, I10)") " Number triplets read in = ", self%numtriplets
@@ -778,31 +778,31 @@ contains
     
     class(phonon), intent(in) :: self
     type(crystal), intent(in) :: crys
-    integer(k8), intent(in) :: nk
-    real(dp), intent(in) :: kpoints(nk, 3)
-    real(dp), intent(out) :: omegas(nk, self%numbands)
-    real(dp), optional, intent(out) :: velocities(nk, self%numbands, 3)
-    complex(dp), optional, intent(out) :: eigenvect(nk, self%numbands, self%numbands)
+    integer(i64), intent(in) :: nk
+    real(r64), intent(in) :: kpoints(nk, 3)
+    real(r64), intent(out) :: omegas(nk, self%numbands)
+    real(r64), optional, intent(out) :: velocities(nk, self%numbands, 3)
+    complex(r64), optional, intent(out) :: eigenvect(nk, self%numbands, self%numbands)
 
     ! QE's 2nd-order files are in Ryd units.
-    real(dp),parameter :: toTHz=20670.687,&
+    real(r64),parameter :: toTHz=20670.687,&
          massfactor=1.8218779*6.022e-4
 
-    integer(k8) :: ir,nreq,ntype,nat,nbranches
-    integer(k8) :: i,j,ipol,jpol,iat,jat,idim,jdim,t1,t2,t3,m1,m2,m3,ik
-    integer(k8) :: ndim,nwork,ncell_g(3)
-    integer(k8),allocatable :: tipo(:)
-    real(dp) :: weight,total_weight,exp_g,ck
-    real(dp) :: r_ws(3)
-    real(dp) :: alpha,geg,gmax,kt,gr,volume_r,dnrm2
-    real(dp) :: zig(3),zjg(3),dgeg(3),t(0:3),g(0:3),g_old(0:3)
-    real(dp), allocatable :: omega2(:),rwork(:)
-    real(dp),allocatable :: k(:,:),mass(:),eps(:,:)
-    real(dp),allocatable :: eival(:,:),vels(:,:,:),zeff(:,:,:)
-    complex(dp) :: auxi(3)
-    complex(dp),allocatable :: cauxiliar(:),eigenvectors(:,:),work(:)
-    complex(dp),allocatable :: dyn(:,:),dyn_s(:,:,:),dyn_g(:,:,:)
-    complex(dp),allocatable :: ddyn(:,:,:),ddyn_s(:,:,:,:),ddyn_g(:,:,:,:)
+    integer(i64) :: ir,nreq,ntype,nat,nbranches
+    integer(i64) :: i,j,ipol,jpol,iat,jat,idim,jdim,t1,t2,t3,m1,m2,m3,ik
+    integer(i64) :: ndim,nwork,ncell_g(3)
+    integer(i64),allocatable :: tipo(:)
+    real(r64) :: weight,total_weight,exp_g,ck
+    real(r64) :: r_ws(3)
+    real(r64) :: alpha,geg,gmax,kt,gr,volume_r,dnrm2
+    real(r64) :: zig(3),zjg(3),dgeg(3),t(0:3),g(0:3),g_old(0:3)
+    real(r64), allocatable :: omega2(:),rwork(:)
+    real(r64),allocatable :: k(:,:),mass(:),eps(:,:)
+    real(r64),allocatable :: eival(:,:),vels(:,:,:),zeff(:,:,:)
+    complex(r64) :: auxi(3)
+    complex(r64),allocatable :: cauxiliar(:),eigenvectors(:,:),work(:)
+    complex(r64),allocatable :: dyn(:,:),dyn_s(:,:,:),dyn_g(:,:,:)
+    complex(r64),allocatable :: ddyn(:,:,:),ddyn_s(:,:,:,:),ddyn_g(:,:,:,:)
 
     !External procedures
     external :: zheev
@@ -859,8 +859,8 @@ contains
     geg=gmax*4.*alpha
     ncell_g=int(sqrt(geg)/self%cell_g(:,0))+1
     
-    dyn_s = 0.0_dp
-    if(present(velocities)) ddyn_s = 0.0_dp
+    dyn_s = 0.0_r64
+    if(present(velocities)) ddyn_s = 0.0_r64
     
     do iat=1,nat
        do jat=1,nat
@@ -928,8 +928,8 @@ contains
     end do
 
     !The nonanalytic correction has two components in this approximation.
-    dyn_g = 0.0_dp
-    if(present(velocities)) ddyn_g = 0.0_dp
+    dyn_g = 0.0_r64
+    if(present(velocities)) ddyn_g = 0.0_r64
     if(crys%polar) then
        do m1=-ncell_g(1),ncell_g(1)
           do m2=-ncell_g(2),ncell_g(2)
@@ -993,8 +993,8 @@ contains
              end do
           end do
        end do
-       dyn_g = dyn_g*8.0_dp*pi/volume_r
-       if(present(velocities)) ddyn_g = ddyn_g*8.0_dp*pi/volume_r
+       dyn_g = dyn_g*8.0_r64*pi/volume_r
+       if(present(velocities)) ddyn_g = ddyn_g*8.0_r64*pi/volume_r
     end if
     
     ! Once the dynamical matrix has been built, the frequencies and
@@ -1021,7 +1021,7 @@ contains
           end do
        end do
        
-       call zheev("V","U",nbranches,dyn(:,:),nbranches,omega2,work,-1_k8,rwork,i)
+       call zheev("V","U",nbranches,dyn(:,:),nbranches,omega2,work,-1_i64,rwork,i)
        if(real(work(1)).gt.nwork) then
           nwork=nint(2*real(work(1)))
           deallocate(work)
@@ -1041,14 +1041,14 @@ contains
                 velocities(ik,i,j)=real(dot_product(dyn(:,i),&
                      matmul(ddyn(:,:,j),dyn(:,i))))
              end do
-             velocities(ik,i,:)=velocities(ik,i,:)/(2.0_dp*omegas(ik,i))
+             velocities(ik,i,:)=velocities(ik,i,:)/(2.0_r64*omegas(ik,i))
           end do
        end if
 
        !Take care of gamma point.
        if(all(k(ik,1:3) == 0)) then
-          omegas(ik, 1:3) = 0.0_dp
-          if(present(velocities)) velocities(ik, :, :) = 0.0_dp
+          omegas(ik, 1:3) = 0.0_r64
+          if(present(velocities)) velocities(ik, :, :) = 0.0_r64
        end if
     end do
 

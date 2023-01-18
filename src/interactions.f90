@@ -17,7 +17,7 @@
 module interactions
   !! Module containing the procedures related to the computation of interactions.
 
-  use params, only: k8, dp, pi, twopi, amu, qe, hbar_eVps, perm0
+  use params, only: i64, r64, pi, twopi, amu, qe, hbar_eVps, perm0
   use misc, only: exit_with_message, print_message, distribute_points, &
        demux_state, mux_vector, mux_state, expi, Bose, binsearch, Fermi, &
        twonorm, write2file_rank2_real
@@ -41,30 +41,30 @@ module interactions
   
 contains
 
-  pure real(dp) function transfac(v1, v2)
+  pure real(r64) function transfac(v1, v2)
     !! Calculate the "transport factor" that suppresses forward scattering
     !! v1, v2: vectors in cartesian coordinates
     
-    real(dp), intent(in) :: v1(3),v2(3)
-    real(dp) :: v1sc, v2sc, thresh
+    real(r64), intent(in) :: v1(3),v2(3)
+    real(r64) :: v1sc, v2sc, thresh
 
-    thresh = 1.0e-8_dp
-    transfac = 0.0_dp
+    thresh = 1.0e-8_r64
+    transfac = 0.0_r64
     v1sc = twonorm(v1)
     v2sc = twonorm(v2)
     if(v1sc /= v2sc .and. v1sc > thresh .and. v2sc > thresh) then
-       transfac = 1.0_dp - dot_product(v1,v2)/v1sc/v2sc
+       transfac = 1.0_r64 - dot_product(v1,v2)/v1sc/v2sc
     end if
   end function transfac
 
-  pure real(dp) function qdist(q, reclattvecs)
+  pure real(r64) function qdist(q, reclattvecs)
     !! Function to calculate the smallest wave vector distance in the BZ.
     !! q is in crystal coordinates.
     !! qdist will be in nm^-1
     
-    real(dp), intent(in) :: q(3), reclattvecs(3, 3)
-    real(dp) :: distfromcorners(3**3)
-    integer(k8) :: i, j, k, count
+    real(r64), intent(in) :: q(3), reclattvecs(3, 3)
+    real(r64) :: distfromcorners(3**3)
+    integer(i64) :: i, j, k, count
 
     count = 1
     do i = -1, 1
@@ -78,7 +78,7 @@ contains
     qdist = minval(distfromcorners)
   end function qdist
   
-  pure real(dp) function gchimp2(el, crys, q)
+  pure real(r64) function gchimp2(el, crys, q)
     !! Function to calculate the squared electron-charged impurity vertex.
     !!
     !! This is the Fourier transform of the Yukawa potential, c.f. Eq. 33
@@ -86,36 +86,36 @@ contains
 
     type(crystal), intent(in) :: crys
     type(electron), intent(in) :: el
-    real(dp), intent(in) :: q
+    real(r64), intent(in) :: q
 
-    gchimp2 = 1.0e-3_dp/crys%volume/((perm0*crys%epsilon0)*(q**2 + crys%qTF**2))**2*&
+    gchimp2 = 1.0e-3_r64/crys%volume/((perm0*crys%epsilon0)*(q**2 + crys%qTF**2))**2*&
          (el%chimp_conc_n*(qe*el%Zn**2)**2 + el%chimp_conc_p*(qe*el%Zp**2)**2) !ev^2
   end function gchimp2
 
-  pure real(dp) function Vm2_3ph(ev1_s1, conjg_ev2_s2, conjg_ev3_s3, &
+  pure real(r64) function Vm2_3ph(ev1_s1, conjg_ev2_s2, conjg_ev3_s3, &
        Index_i, Index_j, Index_k, ifc3, phases_q2q3, ntrip, nb)
     !! Function to calculate the squared 3-ph interaction vertex |V-|^2.
     
-    integer(k8), intent(in) :: ntrip, Index_i(ntrip), Index_j(ntrip), Index_k(ntrip), nb
-    complex(dp), intent(in) :: phases_q2q3(ntrip), ev1_s1(nb), conjg_ev2_s2(nb), conjg_ev3_s3(nb)
-    real(dp), intent(in) :: ifc3(3, 3, 3, ntrip)
+    integer(i64), intent(in) :: ntrip, Index_i(ntrip), Index_j(ntrip), Index_k(ntrip), nb
+    complex(r64), intent(in) :: phases_q2q3(ntrip), ev1_s1(nb), conjg_ev2_s2(nb), conjg_ev3_s3(nb)
+    real(r64), intent(in) :: ifc3(3, 3, 3, ntrip)
 
     !Local variables
-    integer(k8) :: it, a, b, c, aind, bind, cind
-    complex(dp) :: aux1, aux2, aux3, V0
+    integer(i64) :: it, a, b, c, aind, bind, cind
+    complex(r64) :: aux1, aux2, aux3, V0
     
-    aux1 = (0.0_dp, 0.0_dp)
+    aux1 = (0.0_r64, 0.0_r64)
     do it = 1, ntrip
        aind = 3*(Index_k(it) - 1)
        bind = 3*(Index_j(it) - 1)
        cind = 3*(Index_i(it) - 1)
-       V0 = (0.0_dp, 0.0_dp)
+       V0 = (0.0_r64, 0.0_r64)
        do a = 1, 3
           aux2 = conjg_ev3_s3(a + aind)
           do b = 1, 3
              aux3 = aux2*conjg_ev2_s2(b + bind)
              do c = 1, 3
-                if(ifc3(c, b, a, it) /= 0.0_dp) then
+                if(ifc3(c, b, a, it) /= 0.0_r64) then
                    V0 = V0 + ifc3(c, b, a, it)*ev1_s1(c + cind)*aux3
                 end if
              end do
@@ -140,15 +140,15 @@ contains
     character(len = 1), intent(in) :: key
     
     !Local variables
-    integer(k8) :: start, end, chunk, istate1, nstates_irred, &
+    integer(i64) :: start, end, chunk, istate1, nstates_irred, &
          nprocs, s1, s2, s3, iq1_ibz, iq1, iq2, iq3_minus, it, &
          q1_indvec(3), q2_indvec(3), q3_minus_indvec(3), index_minus, index_plus, &
          neg_iq2, neg_q2_indvec(3), num_active_images, plus_count, minus_count
-    real(dp) :: en1, en2, en3, massfac, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
+    real(r64) :: en1, en2, en3, massfac, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
          occup_fac, const, bose2, bose3, delta_minus, delta_plus
-    real(dp), allocatable :: Vm2_1(:), Vm2_2(:), Wm(:), Wp(:)
-    integer(k8), allocatable :: istate2_plus(:), istate3_plus(:), istate2_minus(:), istate3_minus(:)
-    complex(dp) :: phases_q2q3(ph%numtriplets)
+    real(r64), allocatable :: Vm2_1(:), Vm2_2(:), Wm(:), Wp(:)
+    integer(i64), allocatable :: istate2_plus(:), istate3_plus(:), istate2_minus(:), istate3_minus(:)
+    complex(r64) :: phases_q2q3(ph%numtriplets)
     character(len = 1024) :: filename, filename_Wm, filename_Wp
 
     if(key /= 'V' .and. key /= 'W') then
@@ -162,7 +162,7 @@ contains
     end if
    
     !Conversion factor in transition probability expression
-    const = pi/4.0_dp*hbar_eVps**5*(qe/amu)**3*1.0d-12
+    const = pi/4.0_r64*hbar_eVps**5*(qe/amu)**3*1.0d-12
 
     !Total number of IBZ blocks states
     nstates_irred = ph%nwv_irred*ph%numbands
@@ -218,17 +218,17 @@ contains
           call chdir(num%cwd)
 
           !Initialize transition probabilities
-          Wp(:) = 0.0_dp
-          Wm(:) = 0.0_dp
-          istate2_plus(:) = 0_k8
-          istate3_plus(:) = 0_k8
-          istate2_minus(:) = 0_k8
-          istate3_minus(:) = 0_k8
+          Wp(:) = 0.0_r64
+          Wm(:) = 0.0_r64
+          istate2_plus(:) = 0_i64
+          istate3_plus(:) = 0_i64
+          istate2_minus(:) = 0_i64
+          istate3_minus(:) = 0_i64
        end if
 
        !Initialize transition probabilities
-       plus_count = 0_k8
-       minus_count = 0_k8
+       plus_count = 0_i64
+       minus_count = 0_i64
        
        !Demux state index into branch (s) and wave vector (iq) indices
        call demux_state(istate1, ph%numbands, s1, iq1_ibz)
@@ -259,13 +259,13 @@ contains
           q3_minus = q3_minus_indvec/dble(ph%wvmesh) !crystal coords.
 
           !Muxed index of q3_minus
-          iq3_minus = mux_vector(q3_minus_indvec, ph%wvmesh, 0_k8)
+          iq3_minus = mux_vector(q3_minus_indvec, ph%wvmesh, 0_i64)
           
           if(key == 'V') then
-             if(en1 /= 0.0_dp) then
+             if(en1 /= 0.0_r64) then
                 !Calculate the numtriplet number of mass-normalized phases for this (q2,q3) pair
                 do it = 1, ph%numtriplets
-                   massfac = 1.0_dp/sqrt(&
+                   massfac = 1.0_r64/sqrt(&
                         crys%masses(crys%atomtypes(ph%Index_i(it)))*&
                         crys%masses(crys%atomtypes(ph%Index_j(it)))*&
                         crys%masses(crys%atomtypes(ph%Index_k(it))))
@@ -285,7 +285,7 @@ contains
 
              !Get index of -q2
              neg_q2_indvec = modulo(-q2_indvec, ph%wvmesh)
-             neg_iq2 = mux_vector(neg_q2_indvec, ph%wvmesh, 0_k8)
+             neg_iq2 = mux_vector(neg_q2_indvec, ph%wvmesh, 0_i64)
 
              if(key == 'W') then
                 !Bose factor for phonon 2
@@ -316,9 +316,9 @@ contains
                 end if
                 
                 if(key == 'V') then
-                   if(en1*en2*en3 == 0.0_dp) cycle
+                   if(en1*en2*en3 == 0.0_r64) cycle
 
-                   if(delta_minus > 0.0_dp) then
+                   if(delta_minus > 0.0_r64) then
                       !Increase counter for energetically available minus process
                       minus_count = minus_count + 1
 
@@ -332,7 +332,7 @@ contains
                            phases_q2q3, ph%numtriplets, ph%numbands)
                    end if
 
-                   if(delta_plus > 0.0_dp) then
+                   if(delta_plus > 0.0_r64) then
                       !Increase counter for energetically available plus process
                       plus_count = plus_count + 1
 
@@ -345,7 +345,7 @@ contains
                 end if
 
                 if(key == 'W') then
-                   if(en1*en2*en3 == 0.0_dp) cycle
+                   if(en1*en2*en3 == 0.0_r64) cycle
                    
                    !Bose factor for phonon 3
                    bose3 = Bose(en3, crys%T)
@@ -355,9 +355,9 @@ contains
                    !Temperature dependent occupation factor
                    !(bose1 + 1)*bose2*bose3/(bose1*(bose1 + 1))
                    ! = (bose2 + bose3 + 1)
-                   occup_fac = (bose2 + bose3 + 1.0_dp)
+                   occup_fac = (bose2 + bose3 + 1.0_r64)
 
-                   if(delta_minus > 0.0_dp) then
+                   if(delta_minus > 0.0_r64) then
                       !Non-zero process counter
                       minus_count = minus_count + 1
 
@@ -379,7 +379,7 @@ contains
                    ! = bose2 - bose3.
                    occup_fac = (bose2 - bose3)
 
-                   if(delta_plus > 0.0_dp) then
+                   if(delta_plus > 0.0_r64) then
                       !Non-zero process counter
                       plus_count = plus_count + 1
 
@@ -453,7 +453,7 @@ contains
     type(numerics), intent(in) :: num
 
     !Local variables
-    integer(k8) :: iq, iqstart, iqend, chunk, num_active_images
+    integer(i64) :: iq, iqstart, iqend, chunk, num_active_images
 
     call print_message("Calculating g(Re,Rp) -> g(Re,q) for all IBZ q...")
 
@@ -479,7 +479,7 @@ contains
     type(numerics), intent(in) :: num
 
     !Local variables
-    integer(k8) :: ik, ikstart, ikend, chunk, num_active_images
+    integer(i64) :: ik, ikstart, ikend, chunk, num_active_images
 
     call print_message("Calculating g(Re,Rp) -> g(k,Rp) for all IBZ k...")
 
@@ -519,14 +519,14 @@ contains
     character(len = 1), intent(in) :: key
     
     !Local variables
-    integer(k8) :: nstates_irred, istate, m, iq, iq_fbz, n, ik, ikp, s, &
+    integer(i64) :: nstates_irred, istate, m, iq, iq_fbz, n, ik, ikp, s, &
          ikp_window, start, end, chunk, k_indvec(3), kp_indvec(3), &
          q_indvec(3), nprocs, count, num_active_images
-    integer(k8), allocatable :: istate1(:), istate2(:)
-    real(dp) :: k(3), q(3), en_ph, en_el, en_elp, const, delta, &
+    integer(i64), allocatable :: istate1(:), istate2(:)
+    real(r64) :: k(3), q(3), en_ph, en_el, en_elp, const, delta, &
          invboseplus1, fermi1, fermi2, occup_fac
-    real(dp), allocatable :: g2_istate(:), Y_istate(:)
-    complex(dp), allocatable :: gReq_iq(:,:,:,:)
+    real(r64), allocatable :: g2_istate(:), Y_istate(:)
+    complex(r64), allocatable :: gReq_iq(:,:,:,:)
     character(len = 1024) :: filename
     
     if(key /= 'g' .and. key /= 'Y') then
@@ -547,7 +547,7 @@ contains
        !Maximum length of g2_istate
        nprocs = el%nstates_inwindow*ph%numbands
        allocate(g2_istate(nprocs))
-       g2_istate(:) = 0.0_dp
+       g2_istate(:) = 0.0_r64
     end if
 
     !Conversion factor in transition probability expression
@@ -587,10 +587,10 @@ contains
 
        !1/(1 + Bose factor) for phonon
        if(key == 'Y') then
-          if(en_ph /= 0.0_dp) then
-             invboseplus1 = 1.0_dp/(1.0_dp + Bose(en_ph, crys%T))
+          if(en_ph /= 0.0_r64) then
+             invboseplus1 = 1.0_r64/(1.0_r64 + Bose(en_ph, crys%T))
           else
-             invboseplus1 = 0.0_dp
+             invboseplus1 = 0.0_r64
           end if
        end if
        
@@ -621,9 +621,9 @@ contains
           !Allocate and initialize quantities related to transition probabilities
           allocate(Y_istate(nprocs))
           allocate(istate1(nprocs), istate2(nprocs))
-          istate1(:) = -1_k8
-          istate2(:) = -1_k8
-          Y_istate(:) = 0.0_dp
+          istate1(:) = -1_i64
+          istate2(:) = -1_i64
+          Y_istate(:) = 0.0_r64
        end if
 
        !Initialize process counter
@@ -641,7 +641,7 @@ contains
           kp_indvec = modulo(k_indvec + el%mesh_ref_array*q_indvec, el%wvmesh) !0-based index vector
 
           !Muxed index of kp
-          ikp = mux_vector(kp_indvec, el%wvmesh, 0_k8)
+          ikp = mux_vector(kp_indvec, el%wvmesh, 0_i64)
 
           !Check if final electron wave vector is within energy window
           call binsearch(el%indexlist, ikp, ikp_window)
@@ -692,7 +692,7 @@ contains
                    end if
 
                    !Temperature dependent occupation factor
-                   occup_fac = fermi1*(1.0_dp - fermi2)*invboseplus1
+                   occup_fac = fermi1*(1.0_r64 - fermi2)*invboseplus1
                    
                    !Save Y
                    if(en_ph >= 0.5e-3) then !Use a small phonon energy cut-off
@@ -780,15 +780,15 @@ contains
     character(len = 1), intent(in) :: key
     
     !Local variables
-    integer(k8) :: nstates_irred, istate, m, ik, n, ikp, s, &
+    integer(i64) :: nstates_irred, istate, m, ik, n, ikp, s, &
          iq, start, end, chunk, k_indvec(3), kp_indvec(3), &
          q_indvec(3), count, nprocs, num_active_images
-    real(dp) :: k(3), kp(3), q(3), ph_ens_iq(1, ph%numbands), qlist(1, 3), &
+    real(r64) :: k(3), kp(3), q(3), ph_ens_iq(1, ph%numbands), qlist(1, 3), &
          const, bosefac, fermi_minus_fac, fermi_plus_fac, en_ph, en_el, delta, occup_fac
-    real(dp), allocatable :: g2_istate(:), Xplus_istate(:), Xminus_istate(:)
-    integer(k8), allocatable :: istate_el(:), istate_ph(:)
-    complex(dp), allocatable :: gkRp_ik(:, :, :, :)
-    complex(dp) :: ph_evecs_iq(1, ph%numbands,ph%numbands)
+    real(r64), allocatable :: g2_istate(:), Xplus_istate(:), Xminus_istate(:)
+    integer(i64), allocatable :: istate_el(:), istate_ph(:)
+    complex(r64), allocatable :: gkRp_ik(:, :, :, :)
+    complex(r64) :: ph_evecs_iq(1, ph%numbands,ph%numbands)
     character(len = 1024) :: filename
     logical :: needfinephon
     
@@ -810,7 +810,7 @@ contains
        !Length of g2_istate
        nprocs = el%nstates_inwindow*wann%numbranches
        allocate(g2_istate(nprocs))
-       g2_istate(:) = 0.0_dp
+       g2_istate(:) = 0.0_r64
     end if
 
     !Conversion factor in transition probability expression
@@ -875,10 +875,10 @@ contains
           !Allocate and initialize quantities related to transition probabilities
           allocate(Xplus_istate(nprocs), Xminus_istate(nprocs))
           allocate(istate_el(nprocs), istate_ph(nprocs))
-          istate_el(:) = 0_k8
-          istate_ph(:) = 0_k8
-          Xplus_istate(:) = 0.0_dp
-          Xminus_istate(:) = 0.0_dp
+          istate_el(:) = 0_i64
+          istate_ph(:) = 0_i64
+          Xplus_istate(:) = 0.0_r64
+          Xminus_istate(:) = 0.0_r64
        end if
 
        !Initialize eligible process counter for this state
@@ -896,21 +896,21 @@ contains
           !Note that q, k, and k' are all on the same mesh
           q_indvec = kp_indvec - k_indvec
           needfinephon = .false.
-          if(any(mod(q_indvec(:), el%mesh_ref_array) /= 0_k8)) then
+          if(any(mod(q_indvec(:), el%mesh_ref_array) /= 0_i64)) then
              needfinephon = .true.
              q_indvec = modulo(q_indvec, el%wvmesh) !0-based index vector
              q = q_indvec/dble(el%wvmesh) !crystal coords.
              !Muxed index of q
-             iq = mux_vector(q_indvec, el%wvmesh, 0_k8)
+             iq = mux_vector(q_indvec, el%wvmesh, 0_i64)
 
              !Calculate the fine mesh phonon.
              qlist(1, :) = q
-             call wann%ph_wann_epw(crys, 1_k8, qlist, ph_ens_iq, ph_evecs_iq)
+             call wann%ph_wann_epw(crys, 1_i64, qlist, ph_ens_iq, ph_evecs_iq)
           else !Original (coarser) mesh phonon
              q_indvec = modulo(q_indvec/el%mesh_ref_array, ph%wvmesh) !0-based index vector
              q = q_indvec/dble(ph%wvmesh) !crystal coords.
              !Muxed index of q
-             iq = mux_vector(q_indvec, ph%wvmesh, 0_k8)
+             iq = mux_vector(q_indvec, ph%wvmesh, 0_i64)
           end if
           
           !Run over final electron bands
@@ -945,10 +945,10 @@ contains
                    end if
 
                    !Bose and Fermi factors
-                   if(en_ph /= 0.0_dp) then
+                   if(en_ph /= 0.0_r64) then
                       bosefac = Bose(en_ph, crys%T)
                    else
-                      bosefac = 0.0_dp
+                      bosefac = 0.0_r64
                    end if
                    fermi_plus_fac = Fermi(en_el + en_ph, el%chempot, crys%T)
                    fermi_minus_fac = Fermi(en_el - en_ph, el%chempot, crys%T)
@@ -984,7 +984,7 @@ contains
                    end if
 
                    !Temperature dependent occupation factor
-                   occup_fac = 1.0_dp + bosefac - fermi_minus_fac
+                   occup_fac = 1.0_r64 + bosefac - fermi_minus_fac
                    
                    !Save X-
                    if(en_ph >= 0.5e-3) then !Use a small phonon energy cut-off
@@ -1080,12 +1080,12 @@ contains
     type(numerics), intent(in) :: num
     
     !Local variables
-    integer(k8) :: nstates_irred, istate, m, ik, n, ikp, &
+    integer(i64) :: nstates_irred, istate, m, ik, n, ikp, &
          start, end, chunk, k_indvec(3), kp_indvec(3), &
          q_indvec(3), count, nprocs, num_active_images
-    real(dp) :: k(3), kp(3), q_mag, const, en_el, delta, g2
-    real(dp), allocatable :: Xchimp_istate(:)
-    integer(k8), allocatable :: istate_el(:)
+    real(r64) :: k(3), kp(3), q_mag, const, en_el, delta, g2
+    real(r64), allocatable :: Xchimp_istate(:)
+    integer(i64), allocatable :: istate_el(:)
     character(len = 1024) :: filename
 
     call print_message("Calculating e-ch. imp. transition probabilities for all IBZ electrons...")
@@ -1096,8 +1096,8 @@ contains
     !Number of processes
     nprocs = el%nstates_inwindow
     allocate(Xchimp_istate(nprocs), istate_el(nprocs))
-    Xchimp_istate(:) = 0.0_dp
-    istate_el(:) = 0_k8
+    Xchimp_istate(:) = 0.0_r64
+    istate_el(:) = 0_i64
     
     !Total number of IBZ blocks states
     nstates_irred = el%nwv_irred*el%numbands
@@ -1199,17 +1199,17 @@ contains
     !! from disk and calculating the relaxation time approximation (RTA)
     !! scattering rates for the 3-ph and ph-e channels.
 
-    real(dp), allocatable, intent(out) :: rta_rates_3ph(:,:)
-    real(dp), allocatable, intent(out) :: rta_rates_phe(:,:)
+    real(r64), allocatable, intent(out) :: rta_rates_3ph(:,:)
+    real(r64), allocatable, intent(out) :: rta_rates_phe(:,:)
     type(numerics), intent(in) :: num
     type(crystal), intent(in) :: crys
     type(phonon), intent(in) :: ph
     type(electron), intent(in), optional :: el
 
     !Local variables
-    integer(k8) :: nstates_irred, istate, nprocs_3ph_plus, nprocs_3ph_minus, &
+    integer(i64) :: nstates_irred, istate, nprocs_3ph_plus, nprocs_3ph_minus, &
          nprocs_phe, iproc, chunk, s, iq, num_active_images, start, end
-    real(dp), allocatable :: W(:), Y(:)
+    real(r64), allocatable :: W(:), Y(:)
     character(len = 1024) :: filepath_Wm, filepath_Wp, filepath_Y, tag
     
     !Set output directory of transition probilities
@@ -1223,8 +1223,8 @@ contains
     
     !Allocate and initialize scattering rates
     allocate(rta_rates_3ph(ph%nwv_irred, ph%numbands), rta_rates_phe(ph%nwv_irred, ph%numbands))
-    rta_rates_3ph(:, :) = 0.0_dp
-    rta_rates_phe(:, :) = 0.0_dp
+    rta_rates_3ph(:, :) = 0.0_r64
+    rta_rates_phe(:, :) = 0.0_r64
         
     !Run over first phonon IBZ states
     do istate = start, end
@@ -1251,7 +1251,7 @@ contains
        call read_transition_probs_e(trim(adjustl(filepath_Wm)), nprocs_3ph_minus, W)
 
        do iproc = 1, nprocs_3ph_minus
-          rta_rates_3ph(iq, s) = rta_rates_3ph(iq, s) + 0.5_dp*W(iproc)
+          rta_rates_3ph(iq, s) = rta_rates_3ph(iq, s) + 0.5_r64*W(iproc)
        end do
 
        if(present(el)) then
@@ -1284,15 +1284,15 @@ contains
     !! from disk and calculating the relaxation time approximation (RTA)
     !! scattering rates for the e-ph channel.
 
-    real(dp), allocatable, intent(out) :: rta_rates_eph(:,:), rta_rates_echimp(:,:)
+    real(r64), allocatable, intent(out) :: rta_rates_eph(:,:), rta_rates_echimp(:,:)
     type(numerics), intent(in) :: num
     type(crystal), intent(in) :: crys
     type(electron), intent(in) :: el
     
     !Local variables
-    integer(k8) :: nstates_irred, istate, nprocs_eph, &
+    integer(i64) :: nstates_irred, istate, nprocs_eph, &
          iproc, chunk, m, ik, num_active_images, start, end
-    real(dp), allocatable :: X(:)
+    real(r64), allocatable :: X(:)
     character(len = 1024) :: filepath_Xp, filepath_Xm, tag
 
     !Set output directory of transition probilities
@@ -1306,9 +1306,9 @@ contains
     
     !Allocate and initialize scattering rates
     allocate(rta_rates_eph(el%nwv_irred, el%numbands))
-    rta_rates_eph(:, :) = 0.0_dp
+    rta_rates_eph(:, :) = 0.0_r64
     allocate(rta_rates_echimp(el%nwv_irred, el%numbands))
-    rta_rates_echimp(:, :) = 0.0_dp
+    rta_rates_echimp(:, :) = 0.0_r64
 
     do istate = start, end !over IBZ blocks states
        !Demux state index into band (m) and wave vector (ik) indices
@@ -1371,9 +1371,9 @@ contains
     !! Subroutine to read transition probabilities from disk for interaction processes.
 
     character(len = *), intent(in) :: filepath
-    integer(k8), intent(out) :: N
-    real(dp), allocatable, intent(out) :: TP(:)
-    integer(k8), allocatable, intent(out), optional :: istate1(:), istate2(:)
+    integer(i64), intent(out) :: N
+    real(r64), allocatable, intent(out) :: TP(:)
+    integer(i64), allocatable, intent(out), optional :: istate1(:), istate2(:)
 
     !Read data
     open(1, file = trim(adjustl(filepath)), status = 'old', access = 'stream')
@@ -1408,13 +1408,13 @@ contains
 
     character(len = 2), intent(in) :: prefix
     logical, intent(in) :: finite_crys
-    real(dp), intent(in) :: length
-    real(dp), intent(in) :: vels_fbz(:,:,:)
-    integer(k8), intent(in) :: indexlist_irred(:)
-    real(dp), allocatable, intent(out) :: scatt_rates(:,:)
+    real(r64), intent(in) :: length
+    real(r64), intent(in) :: vels_fbz(:,:,:)
+    integer(i64), intent(in) :: indexlist_irred(:)
+    real(r64), allocatable, intent(out) :: scatt_rates(:,:)
 
     !Local variables
-    integer(k8) :: ik, ib, nk_irred, nb
+    integer(i64) :: ik, ib, nk_irred, nb
 
     !Number of IBZ wave vectors and bands
     nk_irred = size(indexlist_irred(:))
@@ -1422,14 +1422,14 @@ contains
     
     !Allocate boundary scattering rates and initialize to infinite crystal values
     allocate(scatt_rates(nk_irred, nb))
-    scatt_rates = 0.0_dp
+    scatt_rates = 0.0_r64
     
     !Check finiteness of crystal
     if(finite_crys) then
        do ik = 1, nk_irred
           do ib = 1, nb
              scatt_rates(ik, ib) = twonorm(vels_fbz(indexlist_irred(ik), ib, :))&
-                  /length*1.e-6_dp !THz
+                  /length*1.e-6_r64 !THz
           end do
        end do
     end if
@@ -1449,15 +1449,15 @@ contains
     !! scatt_rates IBZ Scattering rates
 
     character(len = 2), intent(in) :: prefix
-    real(dp), intent(in) :: def_frac
-    real(dp), intent(in) :: ens_fbz(:, :)
-    integer(k8), intent(in) :: indexlist_ibz(:)
-    complex(dp), intent(in) :: diagT(:, :)
-    !real(dp), allocatable, intent(out) :: scatt_rates(:, :)
+    real(r64), intent(in) :: def_frac
+    real(r64), intent(in) :: ens_fbz(:, :)
+    integer(i64), intent(in) :: indexlist_ibz(:)
+    complex(r64), intent(in) :: diagT(:, :)
+    !real(r64), allocatable, intent(out) :: scatt_rates(:, :)
     
     !Local variables
-    integer(k8) :: nk_ibz, nbands, ik
-    real(dp), allocatable :: scatt_rates(:, :)
+    integer(i64) :: nk_ibz, nbands, ik
+    real(r64), allocatable :: scatt_rates(:, :)
 
     nk_ibz = size(diagT, 1)
     nbands = size(diagT, 2)
@@ -1473,7 +1473,7 @@ contains
     scatt_rates = -def_frac*scatt_rates/hbar_eVps
 
     !Deal with Gamma point acoustic phonons! and zero-velocity optic phonons
-    scatt_rates(1, 1:3) = 0.0_dp
+    scatt_rates(1, 1:3) = 0.0_r64
     
     !Write to file
     call write2file_rank2_real(prefix // '.W_rta_'//prefix//'defect', scatt_rates)

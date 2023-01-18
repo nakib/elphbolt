@@ -18,7 +18,7 @@ module eliashberg
   !! Module containing the procedures related to the computation of the Eliashberg
   !! spectral function a2F and the e-ph coupling factor lambda.
   
-  use params, only: k8, dp
+  use params, only: i64, r64
   use misc, only: exit_with_message, print_message, distribute_points, &
        demux_state, mux_vector, write2file_rank1_real, write2file_rank2_real, &
        compsimps
@@ -56,17 +56,17 @@ contains
     type(electron), intent(in) :: el
     type(phonon), intent(in) :: ph
     type(numerics), intent(in) :: num
-    real(dp), intent(in) :: omegas(:)
-    real(dp), intent(out) :: iso_lambda0, omegalog
+    real(r64), intent(in) :: omegas(:)
+    real(r64), intent(out) :: iso_lambda0, omegalog
     logical, intent(in), optional :: external_eps_switch
 
     !Local variables
-    integer(k8) :: nstates_irred, istate, m, ik, n, ikp, s, &
+    integer(i64) :: nstates_irred, istate, m, ik, n, ikp, s, &
          iq, start, end, chunk, k_indvec(3), kp_indvec(3), &
          q_indvec(3), count, nprocs, num_active_images, &
          iomega, numomega
-    real(dp) :: k(3), kp(3), en_el, WWp, aux, domega
-    real(dp), allocatable :: ph_deltas(:, :, :), g2_istate(:), a2F_istate(:, :), &
+    real(r64) :: k(3), kp(3), en_el, WWp, aux, domega
+    real(r64), allocatable :: ph_deltas(:, :, :), g2_istate(:), a2F_istate(:, :), &
          iso_a2F_branches(:, :), cum_iso_lambda_branches(:, :), eps_squared(:)
     character(len = 1024) :: filename
     logical :: use_external_eps = .false.
@@ -82,7 +82,7 @@ contains
     
     ! Allocate and initialize
     allocate(ph_deltas(wann%numbranches, ph%nwv, numomega))
-    ph_deltas = 0.0_dp
+    ph_deltas = 0.0_r64
 
     call distribute_points(numomega, chunk, start, end, num_active_images)
 
@@ -156,7 +156,7 @@ contains
 
     !Allocate and initialize isotropic a2F
     allocate(iso_a2F_branches(numomega, wann%numbranches))
-    iso_a2F_branches = 0.0_dp
+    iso_a2F_branches = 0.0_r64
     
     do istate = start, end !over IBZ blocks states
        !Demux state index into band (m) and wave vector (ik) indices
@@ -207,7 +207,7 @@ contains
           q_indvec = modulo(kp_indvec - k_indvec, el%wvmesh)
 
           ! Muxed index of q
-          iq = mux_vector(q_indvec, el%wvmesh, 0_k8)
+          iq = mux_vector(q_indvec, el%wvmesh, 0_i64)
           
           !Run over final electron bands
           do n = 1, wann%numwannbands
@@ -272,7 +272,7 @@ contains
     do s = 1, wann%numbranches
        do iomega = 1, numomega
           call compsimps(&
-               iso_a2F_branches(1:iomega, s)*2.0_dp/omegas(1:iomega), &
+               iso_a2F_branches(1:iomega, s)*2.0_r64/omegas(1:iomega), &
                domega, aux)
           cum_iso_lambda_branches(iomega, s) = aux
        end do
@@ -287,12 +287,12 @@ contains
 
     ! Calculate and print out log-averaged phonon energy
     call compsimps(&
-         log(omegas(:))*sum(iso_a2F_branches, dim = 2)*2.0_dp/omegas(:), &
+         log(omegas(:))*sum(iso_a2F_branches, dim = 2)*2.0_r64/omegas(:), &
          domega, aux)
     omegalog = exp(aux/iso_lambda0)
     if(this_image() == 1) then
        write(*,"(A, (1E16.8, x), A)") ' Log-averaged phonon energy =', &
-            omegalog*1.0e3_dp, ' meV'
+            omegalog*1.0e3_r64, ' meV'
     end if
 
     ! Print cumulative lambda to file
@@ -308,13 +308,13 @@ contains
     
     type(epw_wannier), intent(in) :: wann
     type(numerics), intent(in) :: num
-    real(dp), intent(in) :: omegas(:), bose_matsubara_ens(:)
-    real(dp), intent(out) :: iso_matsubara_lambda(:)
+    real(r64), intent(in) :: omegas(:), bose_matsubara_ens(:)
+    real(r64), intent(out) :: iso_matsubara_lambda(:)
 
     !Local variables
-    integer(k8) :: s, l, iomega, numomega, nummatsubara
-    real(dp) :: aux, domega
-    real(dp), allocatable :: iso_a2F_branches(:, :)
+    integer(i64) :: s, l, iomega, numomega, nummatsubara
+    real(r64) :: aux, domega
+    real(r64), allocatable :: iso_a2F_branches(:, :)
     character(len = 1024) :: filename
     
     !Number of equidistant Boson energy points
@@ -344,14 +344,14 @@ contains
     sync all
     
     !Isotropic theory
-    iso_matsubara_lambda = 0.0_dp
+    iso_matsubara_lambda = 0.0_r64
 
     !Sum over phonon branches
     do s = 1, wann%numbranches
        !Run over Matsubara frequencies
        do l = 1, nummatsubara
           call compsimps(&
-               iso_a2F_branches(:, s)*2.0_dp*omegas(:)/ &
+               iso_a2F_branches(:, s)*2.0_r64*omegas(:)/ &
                (omegas(:)**2 + bose_matsubara_ens(l)**2), domega, aux)
           iso_matsubara_lambda(l) = iso_matsubara_lambda(l) + aux
        end do
@@ -374,14 +374,14 @@ contains
     type(epw_wannier), intent(in) :: wann
     type(electron), intent(in) :: el
     type(numerics), intent(in) :: num
-    real(dp), intent(in) :: omegas(:), bose_matsubara_ens(:)
+    real(r64), intent(in) :: omegas(:), bose_matsubara_ens(:)
 
     !Local variables
-    integer(k8) :: nstates_irred, istate, m, ik, n, ikp, s, l, &
+    integer(i64) :: nstates_irred, istate, m, ik, n, ikp, s, l, &
          start, end, chunk, count, nprocs, &
          num_active_images, numomega, nummatsubara
-    real(dp) :: aux, domega
-    real(dp), allocatable :: a2F_istate(:, :), matsubara_lambda_istate(:, :)
+    real(r64) :: aux, domega
+    real(r64), allocatable :: a2F_istate(:, :), matsubara_lambda_istate(:, :)
     character(len = 1024) :: filename
     
     call print_message("   Calculating lambda for all IBZ electrons...")
@@ -451,7 +451,7 @@ contains
                 !Calculate lambda for each Matsubara energy
                 do l = 1, nummatsubara
                    call compsimps(&
-                        a2F_istate(count, :)*2.0_dp*omegas(:)/ &
+                        a2F_istate(count, :)*2.0_r64*omegas(:)/ &
                         (omegas(:)**2 + bose_matsubara_ens(l)**2), domega, aux)
                    matsubara_lambda_istate(count, l) = aux
                 end do

@@ -17,7 +17,7 @@
 module delta
   !! Module containing the procedures related to delta function evaulation.
 
-  use params, only: dp, k8
+  use params, only: r64, i64
   use misc, only: exit_with_message, print_message, demux_vector, mux_vector, &
        binsearch, sort
   
@@ -29,7 +29,7 @@ module delta
   
 contains
 
-  pure real(dp) function delta_fn_tetra(e, ik, ib, mesh, tetramap, tetracount, tetra_evals)
+  pure real(r64) function delta_fn_tetra(e, ik, ib, mesh, tetramap, tetracount, tetra_evals)
     !! Calculate delta function using the tetraheron method.
     !!
     !! e Sample energy
@@ -40,19 +40,19 @@ contains
     !! tetracount Number of tetrahedra in which a wave vector belongs
     !! tetra_evals Tetrahedra populated with the eigenvalues
 
-    real(dp), intent(in) :: e
-    integer(k8), intent(in) :: ik, ib
-    integer(k8), intent(in) :: mesh(3), tetramap(:,:,:), tetracount(:)
-    real(dp), intent(in) :: tetra_evals(:,:,:)
+    real(r64), intent(in) :: e
+    integer(i64), intent(in) :: ik, ib
+    integer(i64), intent(in) :: mesh(3), tetramap(:,:,:), tetracount(:)
+    real(r64), intent(in) :: tetra_evals(:,:,:)
 
     !Local variables
-    integer(k8) :: iv, it, itk, num, numtetra
+    integer(i64) :: iv, it, itk, num, numtetra
     logical :: c1, c2, c3
-    real(dp) :: e1, e2, e3, e4, e1e, e2e, e3e, e4e, &
+    real(r64) :: e1, e2, e3, e4, e1e, e2e, e3e, e4e, &
          e21, e31, e41, e32, e42, e43, tmp ! eji \equiv ej - ei
 
-    tmp = 0.0_dp
-    delta_fn_tetra = 0.0_dp
+    tmp = 0.0_r64
+    delta_fn_tetra = 0.0_r64
 
     !Total number of tetrahedra in the system
     numtetra = product(mesh)*6
@@ -95,14 +95,14 @@ contains
                 tmp = (e2e/e21 + e3e/e31 + e4e/e41)*(e1e**2)/e41/e31/e21
 
                 if(e1 == e2) then
-                   tmp = 0.0_dp
+                   tmp = 0.0_r64
                 end if
              else if(c2) then
-                tmp = -0.5_dp*(e3e/(e31**2)*(e3e*e2e/e42/e32 + e4e*e1e/e41/e42 + e3e*e1e/e32/e41) &
+                tmp = -0.5_r64*(e3e/(e31**2)*(e3e*e2e/e42/e32 + e4e*e1e/e41/e42 + e3e*e1e/e32/e41) &
                      + e4e/(e41**2)*(e4e*e1e/e42/e31 + e4e*e2e/e42/e32 + e3e*e1e/e31/e32))
 
                 if(e2 == e3) then
-                   tmp = -0.5_dp*(e4e*e1e/e41/e42 + e1e/e41 &
+                   tmp = -0.5_r64*(e4e*e1e/e41/e42 + e1e/e41 &
                         + e4e/(e41**2)*(e4e*e1e/e42/e31 + e4e/e42 + e1e/e31))
                 end if
              else if(c3) then
@@ -117,21 +117,21 @@ contains
                 tmp = -(e1e**3)/(e21**2)/e31/e41
 
                 if(e1 == e2) then
-                   tmp = 0.0_dp
+                   tmp = 0.0_r64
                 end if
              else if(c2) then
-                tmp = -0.5_dp*(e3e/(e32**2)*(e3e*e2e/e42/e31 + e4e*e2e/e42/e41 + e3e*e1e/e31/e41) &
+                tmp = -0.5_r64*(e3e/(e32**2)*(e3e*e2e/e42/e31 + e4e*e2e/e42/e41 + e3e*e1e/e31/e41) &
                      + e4e/(e42**2)*(e3e*e2e/e32/e31 + e4e*e1e/e41/e31 + e4e*e2e/e32/e41))
 
                 if(e2 == e3) then
-                   tmp = -0.5_dp*(0.0 + e4e/e42/e41 + 0.0 &
+                   tmp = -0.5_r64*(0.0 + e4e/e42/e41 + 0.0 &
                         + e4e/(e42**2)*(0.0 + e4e*e1e/e41/e31 + 1.0))
                 end if
              else if(c3) then
                 tmp = (e4e**3)/e41/(e42**2)/e43
 
                 if(e3 == e4) then
-                   tmp = 0.0_dp
+                   tmp = 0.0_r64
                 end if
              end if
           case(3)
@@ -139,61 +139,61 @@ contains
                 tmp = -(e1e**3)/e21/(e31**2)/e41
 
                 if(e1 == e2) then
-                   tmp = 0.0_dp
+                   tmp = 0.0_r64
                 end if
              else if(c2) then
-                tmp = 0.5_dp*(e2e/(e32**2)*(e3e*e2e/e42/e31 + e4e*e2e/e42/e41 + e3e*e1e/e31/e41) &
+                tmp = 0.5_r64*(e2e/(e32**2)*(e3e*e2e/e42/e31 + e4e*e2e/e42/e41 + e3e*e1e/e31/e41) &
                      + e1e/(e31**2)*(e3e*e2e/e42/e32 + e4e*e1e/e41/e42 + e3e*e1e/e32/e41))
 
                 if(e2 == e3) then
-                   tmp = 0.5_dp*(0.0 + e4e/e42/e41 + e1e/e31/e41 &
+                   tmp = 0.5_r64*(0.0 + e4e/e42/e41 + e1e/e31/e41 &
                         + e1e/(e31**2)*(0.0 + e4e*e1e/e41/e42 + e1e/e41))
                 end if
              else if(c3) then
                 tmp = (e4e**3)/e41/e42/(e43**2)
 
                 if(e3 == e4) then
-                   tmp = 0.0_dp
+                   tmp = 0.0_r64
                 end if
              end if
           case(4)
              if(c1) then
                 tmp = -(e1e**3)/e21/e31/(e41**2)
                 if(e1 == e2) then
-                   tmp = 0.0_dp
+                   tmp = 0.0_r64
                 end if
              else if(c2) then
-                tmp = 0.5_dp*(e2e/(e42**2)*(e3e*e2e/e32/e31 + e4e*e1e/e41/e31 + e4e*e2e/e32/e41) &
+                tmp = 0.5_r64*(e2e/(e42**2)*(e3e*e2e/e32/e31 + e4e*e1e/e41/e31 + e4e*e2e/e32/e41) &
                      + e1e/(e41**2)*(e4e*e1e/e42/e31 + e4e*e2e/e42/e32 + e3e*e1e/e31/e32))
 
                 if(e2 == e3) then
-                   tmp = 0.5_dp*(0.0 &
+                   tmp = 0.5_r64*(0.0 &
                         + e1e/(e41**2)*(e4e*e1e/e42/e31 + e4e/e42 + e1e/e31))
                 end if
              else if(c3) then
                 tmp = -(e3e/e43 + e2e/e42 + e1e/e41)*(e4e**2)/e41/e42/e43
 
                 if(e3 == e4) then
-                   tmp = 0.0_dp
+                   tmp = 0.0_r64
                 end if
              end if
           end select
 
           if ((e1 == e2) .and. (e1 == e3) .and. (e1 == e4) .and. (e == e1)) then
-             tmp = 0.25_dp
+             tmp = 0.25_r64
           end if
 
           delta_fn_tetra = delta_fn_tetra + tmp
        end if ! .not. (e <= e1 .or. e >= e4)
     end do !itk
 
-    if(delta_fn_tetra < 1.0e-12_dp) delta_fn_tetra = 0.0_dp
+    if(delta_fn_tetra < 1.0e-12_r64) delta_fn_tetra = 0.0_r64
     
     !Normalize with the total number of tetrahedra
     delta_fn_tetra = delta_fn_tetra/numtetra
   end function delta_fn_tetra
 
-  pure real(dp) function real_tetra(e, ik, ib, mesh, tetramap, tetracount, tetra_evals)
+  pure real(r64) function real_tetra(e, ik, ib, mesh, tetramap, tetracount, tetra_evals)
     !! Calculate the real part of the matrix elements of the resolvent operator
     !! using the analytic tetraheron method.
     !! Lambin and Vigneron Phys. Rev. B 29 6 1984 Eqs. A3-A6
@@ -209,21 +209,21 @@ contains
     !! tetracount Number of tetrahedra in which a wave vector belongs
     !! tetra_evals Tetrahedra populated with the eigenvalues
 
-    real(dp), intent(in) :: e
-    integer(k8), intent(in) :: ik, ib
-    integer(k8), intent(in) :: mesh(3), tetramap(:,:,:), tetracount(:)
-    real(dp), intent(in) :: tetra_evals(:,:,:)
+    real(r64), intent(in) :: e
+    integer(i64), intent(in) :: ik, ib
+    integer(i64), intent(in) :: mesh(3), tetramap(:,:,:), tetracount(:)
+    real(r64), intent(in) :: tetra_evals(:,:,:)
 
     !Local variables
-    integer(k8) :: iv, it, itk, num, numtetra
+    integer(i64) :: iv, it, itk, num, numtetra
     logical :: c1, c2, c3, c4, c5, c6, c7
-    real(dp) :: e0, e1, e2, e3, &
+    real(r64) :: e0, e1, e2, e3, &
          ee0, ee1, ee2, ee3, &
          logabs_ee0, logabs_ee1, logabs_ee2, logabs_ee3, &
          e01, e02, e03, e12, e13, e23, tmp
 
-    tmp = 0.0_dp
-    real_tetra = 0.0_dp
+    tmp = 0.0_r64
+    real_tetra = 0.0_r64
 
     !Total number of tetrahedra in the system
     numtetra = product(mesh)*6
@@ -254,17 +254,17 @@ contains
        e23 = e2 - e3
 
        !Precalculate all the log(abs(e - e_vertex))
-       logabs_ee0 = 0.0_dp
-       if(ee0 /= 0.0_dp) logabs_ee0 = log(abs(ee0))
+       logabs_ee0 = 0.0_r64
+       if(ee0 /= 0.0_r64) logabs_ee0 = log(abs(ee0))
 
-       logabs_ee1 = 0.0_dp
-       if(ee1 /= 0.0_dp) logabs_ee1 = log(abs(ee1))
+       logabs_ee1 = 0.0_r64
+       if(ee1 /= 0.0_r64) logabs_ee1 = log(abs(ee1))
 
-       logabs_ee2 = 0.0_dp
-       if(ee2 /= 0.0_dp) logabs_ee2 = log(abs(ee2))
+       logabs_ee2 = 0.0_r64
+       if(ee2 /= 0.0_r64) logabs_ee2 = log(abs(ee2))
 
-       logabs_ee3 = 0.0_dp
-       if(ee3 /= 0.0_dp) logabs_ee3 = log(abs(ee3))
+       logabs_ee3 = 0.0_r64
+       if(ee3 /= 0.0_r64) logabs_ee3 = log(abs(ee3))
        
 
        !Evaluate the seven cases
@@ -281,33 +281,33 @@ contains
        case(1)
           if(c1) then !Eq. 9.5.124 [x]
              tmp = -ee0**2/(e01*e02*e03) &
-                  *( 1.0_dp + (ee1/e01 + ee2/e02 + ee3/e03)*logabs_ee0 ) &
+                  *( 1.0_r64 + (ee1/e01 + ee2/e02 + ee3/e03)*logabs_ee0 ) &
                   + ee1**3/(e01**2*e12*e13)*logabs_ee1 &
                   - ee2**3/(e02**2*e12*e23)*logabs_ee2 &
                   + ee3**3/(e03**2*e13*e23)*logabs_ee3
           else if(c2) then !Eq. 9.5.130 [x]
              tmp = eval_Eq9_5_130()
           else if(c3) then !Eq. 9.5.133 [x]
-             tmp = -ee0**2/(e01**2*e03)*( 1.0_dp + (2.0_dp*ee1/e01 + ee3/e03)*logabs_ee0 ) &
-                  - ee1**2/(e01**2*e13)*( 1.0_dp + (-2.0_dp*ee0/e01 + ee3/e13)*logabs_ee1 ) &
+             tmp = -ee0**2/(e01**2*e03)*( 1.0_r64 + (2.0_r64*ee1/e01 + ee3/e03)*logabs_ee0 ) &
+                  - ee1**2/(e01**2*e13)*( 1.0_r64 + (-2.0_r64*ee0/e01 + ee3/e13)*logabs_ee1 ) &
                   + ee3**3/(e03*e13)**2*logabs_ee3
           else if(c4) then !Eq. 9.5.136 [x]
-             tmp = -ee0**2/(e02**2*e01)*( 1.0_dp + (2.0_dp*ee2/e02 + ee1/e01)*logabs_ee0 ) &
-                  + ee2**2/(e02**2*e12)*( 1.0_dp - (2.0_dp*ee0/e02 + ee1/e12)*logabs_ee2 ) &
+             tmp = -ee0**2/(e02**2*e01)*( 1.0_r64 + (2.0_r64*ee2/e02 + ee1/e01)*logabs_ee0 ) &
+                  + ee2**2/(e02**2*e12)*( 1.0_r64 - (2.0_r64*ee0/e02 + ee1/e12)*logabs_ee2 ) &
                   + ee1**3/(e01*e12)**2*logabs_ee1
           else if(c5) then !Eq. 9.5.139 [x]
              tmp = eval_Eq9_5_139()
           else if(c6) then  !Eq. 9.5.141 [x]
              tmp = eval_Eq9_5_141()
           else if(c7) then !Eq. 9.5.143 [x]
-             tmp = 3.0_dp*ee0**2*ee1/e01**4*(logabs_ee1 - logabs_ee0) &
-                  - 1.5_dp*ee1*(2.0_dp*ee0 - e01)/e01**3 &
-                  - 1.0_dp/e01
+             tmp = 3.0_r64*ee0**2*ee1/e01**4*(logabs_ee1 - logabs_ee0) &
+                  - 1.5_r64*ee1*(2.0_r64*ee0 - e01)/e01**3 &
+                  - 1.0_r64/e01
           end if
        case(2)
           if(c1) then !Eq. 9.5.125 [x]
              tmp = ee1**2/(e01*e12*e13) &
-                  *( 1.0_dp + (-ee0/e01 + ee2/e12 + ee3/e13)*logabs_ee1 ) &
+                  *( 1.0_r64 + (-ee0/e01 + ee2/e12 + ee3/e13)*logabs_ee1 ) &
                   + ee0**3/(e01**2*e02*e03)*logabs_ee0 &
                   - ee2**3/(e02*e12**2*e23)*logabs_ee2 &
                   + ee3**3/(e03*e13**2*e23)*logabs_ee3
@@ -316,8 +316,8 @@ contains
           else if(c3) then !Eq. 9.5.134 [x]
              tmp = eval_Eq9_5_134()
           else if(c4) then !Eq. 9.5.137 [x]
-             tmp = ee1**2/(e12**2*e01)*( 1.0_dp + (2.0_dp*ee2/e12 - ee0/e01)*logabs_ee1 ) &
-                  + ee2**2/(e12**2*e02)*( 1.0_dp - (2.0_dp*ee1/e12 + ee0/e02)*logabs_ee2 ) &
+             tmp = ee1**2/(e12**2*e01)*( 1.0_r64 + (2.0_r64*ee2/e12 - ee0/e01)*logabs_ee1 ) &
+                  + ee2**2/(e12**2*e02)*( 1.0_r64 - (2.0_r64*ee1/e12 + ee0/e02)*logabs_ee2 ) &
                   + ee0**3/(e01*e02)**2*logabs_ee0
           else if(c5) then !Eq. 9.5.139 [x]
              tmp = eval_Eq9_5_139()
@@ -329,13 +329,13 @@ contains
        case(3)
           if(c1) then !Eq. 9.5.126 [x]
              tmp = -ee2**2/(e02*e12*e23) &
-                  *( 1.0_dp + (-ee0/e02 - ee1/e12 + ee3/e23)*logabs_ee2 ) &
+                  *( 1.0_r64 + (-ee0/e02 - ee1/e12 + ee3/e23)*logabs_ee2 ) &
                   + ee0**3/(e01*e02**2*e03)*logabs_ee0 &
                   - ee1**3/(e01*e12**2*e13)*logabs_ee1 &
                   + ee3**3/(e03*e13*e23**2)*logabs_ee3
           else if(c2) then !Eq. 9.5.131 [x] 
-             tmp = -ee2**2/(e02**2*e23)*( 1.0_dp + (-2.0_dp*ee0/e02 + ee3/e23)*logabs_ee2 ) &
-                  - ee0**2/(e02**2*e03)*( 1.0_dp + (2.0_dp*ee2/e02 + ee3/e03)*logabs_ee0 ) &
+             tmp = -ee2**2/(e02**2*e23)*( 1.0_r64 + (-2.0_r64*ee0/e02 + ee3/e23)*logabs_ee2 ) &
+                  - ee0**2/(e02**2*e03)*( 1.0_r64 + (2.0_r64*ee2/e02 + ee3/e03)*logabs_ee0 ) &
                   + ee3**3/(e23*e03)**2*logabs_ee3
           else if(c3) then !Eq. 9.5.134 [x]
              tmp = eval_Eq9_5_134()
@@ -351,24 +351,24 @@ contains
        case(4)
           if(c1) then !Eq. 9.5.127 [x]
              tmp = ee3**2/(e03*e13*e23) &
-                  *( 1.0_dp + (-ee0/e03 - ee1/e13 - ee2/e23)*logabs_ee3 ) &
+                  *( 1.0_r64 + (-ee0/e03 - ee1/e13 - ee2/e23)*logabs_ee3 ) &
                   + ee0**3/(e01*e02*e03**2)*logabs_ee0 &
                   - ee1**3/(e01*e12*e13**2)*logabs_ee1 &
                   + ee2**3/(e02*e12*e23**2)*logabs_ee2
           else if(c2) then !Eq. 9.5.132 [x]
-             tmp = ee3**2/(e03**2*e23)*( 1.0_dp - (2.0_dp*ee0/e03 + ee2/e23)*logabs_ee3 ) &
-                  - ee0**2/(e03**2*e02)*( 1.0_dp + (2.0_dp*ee3/e03 + ee2/e02)*logabs_ee0 ) &
+             tmp = ee3**2/(e03**2*e23)*( 1.0_r64 - (2.0_r64*ee0/e03 + ee2/e23)*logabs_ee3 ) &
+                  - ee0**2/(e03**2*e02)*( 1.0_r64 + (2.0_r64*ee3/e03 + ee2/e02)*logabs_ee0 ) &
                   + ee2**3/(e23*e02)**2*logabs_ee2
           else if(c3) then !Eq. 9.5.135 [x]
-             tmp = ee3**2/(e13**2*e03)*( 1.0_dp - (2.0_dp*ee1/e13 + ee0/e03)*logabs_ee3 ) &
-                  + ee1**2/(e13**2*e01)*( 1.0_dp + (2.0_dp*ee3/e13 - ee0/e01)*logabs_ee1 ) &
+             tmp = ee3**2/(e13**2*e03)*( 1.0_r64 - (2.0_r64*ee1/e13 + ee0/e03)*logabs_ee3 ) &
+                  + ee1**2/(e13**2*e01)*( 1.0_r64 + (2.0_r64*ee3/e13 - ee0/e01)*logabs_ee1 ) &
                   + ee0**3/(e03*e01)**2*logabs_ee0
           else if(c4) then !Eq. 9.5. 138 [x]
              tmp = eval_Eq9_5_138()
           else if(c5) then !Eq. 9.5. 140 [x]
-             tmp =  3.0_dp*ee0*ee3**2/e03**4*(logabs_ee0 - logabs_ee3) &
-                  + 1.5_dp*ee0*(2.0_dp*ee3 + e03)/e03**3 &
-                  + 1.0_dp/e03
+             tmp =  3.0_r64*ee0*ee3**2/e03**4*(logabs_ee0 - logabs_ee3) &
+                  + 1.5_r64*ee0*(2.0_r64*ee3 + e03)/e03**3 &
+                  + 1.0_r64/e03
           else if(c6) then !Eq. 9.5.142 [x]
              tmp = eval_Eq9_5_142()
           else if(c7) then !Eq. 9.5.144 [x]
@@ -376,12 +376,12 @@ contains
           end if
        end select
 
-       if(e0 == e1 .and. e1 == e2 .and. e2 == e3) tmp = 0.25_dp/ee0
+       if(e0 == e1 .and. e1 == e2 .and. e2 == e3) tmp = 0.25_r64/ee0
 
        real_tetra = real_tetra + tmp
     end do !itk
 
-    if(real_tetra < 1.0e-12_dp) real_tetra = 0.0_dp
+    if(real_tetra < 1.0e-12_r64) real_tetra = 0.0_r64
 
     !Normalize with the total number of tetrahedra
     real_tetra = real_tetra/numtetra
@@ -389,73 +389,73 @@ contains
   contains
 
     ![x]
-    pure real(dp) function eval_Eq9_5_130()
+    pure real(r64) function eval_Eq9_5_130()
       !! Right hand side of Eq. 9.5.130 of
       !! V. Eyert The Augmented Spherical Wave Method DOI 10.1007/978-3-642-25864-0.
 
       eval_Eq9_5_130 = -ee2**3/(e23*e02**3)*logabs_ee2 &
            + ee3**3/(e23*e03**3)*logabs_ee3 &
-           + ee0/(e02*e03)*( 0.5_dp + ee2/e02 + ee3/e03 &
+           + ee0/(e02*e03)*( 0.5_r64 + ee2/e02 + ee3/e03 &
            + ((ee2/e02)**2 + (ee3/e03)**2 + ee2*ee3/(e02*e03))*logabs_ee0 )
     end function eval_Eq9_5_130
 
     ![x]
-    pure real(dp) function eval_Eq9_5_134()
+    pure real(r64) function eval_Eq9_5_134()
       !! Right hand side of Eq. 9.5.134 of
       !! V. Eyert The Augmented Spherical Wave Method DOI 10.1007/978-3-642-25864-0.
 
       eval_Eq9_5_134 = ee0**3/(e03*e01**3)*logabs_ee0 &
            + ee3**3/(e03*e13**3)*logabs_ee3 &
-           - ee1/(e01*e13)*( 0.5_dp - ee0/e01 + ee3/e13 + &
+           - ee1/(e01*e13)*( 0.5_r64 - ee0/e01 + ee3/e13 + &
            ((ee0/e01)**2 + (ee3/e13)**2 - ee0*ee3/(e01*e13))*logabs_ee1 )
     end function eval_Eq9_5_134
 
     ![x]
-    pure real(dp) function eval_Eq9_5_138()
+    pure real(r64) function eval_Eq9_5_138()
       !! Right hand side of Eq. 9.5.138 of
       !! V. Eyert The Augmented Spherical Wave Method DOI 10.1007/978-3-642-25864-0.
 
       eval_Eq9_5_138 = ee0**3/(e01*e02**3)*logabs_ee0 &
            - ee1**3/(e01*e12**3)*logabs_ee1 &
-           + ee2/(e02*e12)*( 0.5_dp - ee0/e02 - ee1/e12 + &
+           + ee2/(e02*e12)*( 0.5_r64 - ee0/e02 - ee1/e12 + &
            ((ee0/e02)**2 + (ee1/e12)**2 + ee0*ee1/(e02*e12))*logabs_ee2 )
     end function eval_Eq9_5_138
 
     ![x]
-    pure real(dp) function eval_Eq9_5_139()
+    pure real(r64) function eval_Eq9_5_139()
       !! Right hand side of Eq. 9.5.139 of
       !! V. Eyert The Augmented Spherical Wave Method DOI 10.1007/978-3-642-25864-0.
 
       eval_Eq9_5_139 = ee3**3/e03**4*(logabs_ee3 - logabs_ee0) &
-           - (ee3**2 + 0.5_dp*ee3*e03 + e03**2/3.0_dp)/e03**3
+           - (ee3**2 + 0.5_r64*ee3*e03 + e03**2/3.0_r64)/e03**3
     end function eval_Eq9_5_139
 
     ![x]
-    pure real(dp) function eval_Eq9_5_141()
+    pure real(r64) function eval_Eq9_5_141()
       !! Right hand side of Eq. 9.5.141 of
       !! V. Eyert The Augmented Spherical Wave Method DOI 10.1007/978-3-642-25864-0.
 
-      eval_Eq9_5_141 = 3.0_dp*ee0*ee2**2/e02**4*(logabs_ee0 - logabs_ee2) &
-           + 1.5_dp*ee0*(2.0_dp*ee2 + e02)/e02**3 &
-           + 1.0_dp/e02
+      eval_Eq9_5_141 = 3.0_r64*ee0*ee2**2/e02**4*(logabs_ee0 - logabs_ee2) &
+           + 1.5_r64*ee0*(2.0_r64*ee2 + e02)/e02**3 &
+           + 1.0_r64/e02
     end function eval_Eq9_5_141
     ![x]
-    pure real(dp) function eval_Eq9_5_142()
+    pure real(r64) function eval_Eq9_5_142()
       !! Right hand side of Eq. 9.5.142 of
       !! V. Eyert The Augmented Spherical Wave Method DOI 10.1007/978-3-642-25864-0.
 
-      eval_Eq9_5_142 = 3.0_dp*ee0**2*ee2/e02**4*(logabs_ee2 - logabs_ee0) &
-           - 1.5_dp*ee2*(2.0_dp*ee0 - e02)/e02**3 &
-           - 1.0_dp/e02
+      eval_Eq9_5_142 = 3.0_r64*ee0**2*ee2/e02**4*(logabs_ee2 - logabs_ee0) &
+           - 1.5_r64*ee2*(2.0_r64*ee0 - e02)/e02**3 &
+           - 1.0_r64/e02
     end function eval_Eq9_5_142
 
     ![x]
-    pure real(dp) function eval_Eq9_5_144()
+    pure real(r64) function eval_Eq9_5_144()
       !! Right hand side of Eq. 9.5.144 of
       !! V. Eyert The Augmented Spherical Wave Method DOI 10.1007/978-3-642-25864-0.
 
       eval_Eq9_5_144 = ee0**3/e01**4*(logabs_ee0 - logabs_ee1) &
-           + (ee0**2 - 0.5_dp*ee0*e01 + e01**2/3.0_dp)/e01**3
+           + (ee0**2 - 0.5_r64*ee0*e01 + e01**2/3.0_r64)/e01**3
     end function eval_Eq9_5_144
   end function real_tetra
   
@@ -471,16 +471,16 @@ contains
     !! blocks Is the FBZ wave vector list full or energy restricted?
     !! indexlist List of muxed indices of the FBZ wave vectors
 
-    integer(k8), intent(in) :: nk, mesh(3)
-    integer(k8), intent(out), allocatable :: tetra(:,:), tetracount(:), tetramap(:,:,:)
+    integer(i64), intent(in) :: nk, mesh(3)
+    integer(i64), intent(out), allocatable :: tetra(:,:), tetracount(:), tetramap(:,:,:)
     logical, intent(in) :: blocks
-    integer(k8), optional, intent(in) :: indexlist(:)
+    integer(i64), optional, intent(in) :: indexlist(:)
 
     !Local variables
-    integer(k8) :: ik, i, j, k, ijk(3), ii, jj, kk, tk, tl, aux, count
-    integer(k8) :: ip1, jp1, kp1, n1, n2, n3, tmp
-    integer(k8) :: tetra_vertices_labels(6, 4)
-    integer(k8) :: scvol_vertices(8, 3) ! subcell volume vertices
+    integer(i64) :: ik, i, j, k, ijk(3), ii, jj, kk, tk, tl, aux, count
+    integer(i64) :: ip1, jp1, kp1, n1, n2, n3, tmp
+    integer(i64) :: tetra_vertices_labels(6, 4)
+    integer(i64) :: scvol_vertices(8, 3) ! subcell volume vertices
 
     n1 = mesh(1)
     n2 = mesh(2)
@@ -506,9 +506,9 @@ contains
     
     do ik = 1, nk !Run over all wave vectors in FBZ
        if(blocks) then !For energy window restricted FBZ
-          call demux_vector(indexlist(ik), ijk, mesh, 1_k8)
+          call demux_vector(indexlist(ik), ijk, mesh, 1_i64)
        else !For unrestristed FBZ
-          call demux_vector(ik, ijk, mesh, 1_k8)
+          call demux_vector(ik, ijk, mesh, 1_i64)
        end if
        i = ijk(1)
        j = ijk(2)
@@ -552,7 +552,7 @@ contains
              ii = scvol_vertices(aux,1)
              jj = scvol_vertices(aux,2)
              kk = scvol_vertices(aux,3)
-             aux = mux_vector((/ii, jj, kk/), mesh, 1_k8)
+             aux = mux_vector((/ii, jj, kk/), mesh, 1_i64)
              tmp = aux !Guaranteed to be > 0
              if(blocks) then
                 !Which point in indexlist does aux correspond to?
@@ -579,12 +579,12 @@ contains
     !! evals List of eigenvalues 
     !! tetra_evals Tetrahedra populated with the eigenvalues
 
-    integer(k8), intent(in) :: tetra(:,:)
-    real(dp), intent(in) :: evals(:,:)
-    real(dp), allocatable, intent(out) :: tetra_evals(:,:,:)
+    integer(i64), intent(in) :: tetra(:,:)
+    real(r64), intent(in) :: evals(:,:)
+    real(r64), allocatable, intent(out) :: tetra_evals(:,:,:)
 
     !Local variables
-    integer(k8) :: iv, it, ib, numbands, aux, numtetra
+    integer(i64) :: iv, it, ib, numbands, aux, numtetra
 
     numtetra = size(tetra(:, 1))
     numbands = size(evals(1, :))
@@ -594,7 +594,7 @@ contains
     !Note: Eigenvalues outside the transport active window is taken to be zero.
     !      As such, close to the transport window boundary, this method is inaccurate.
     !      A large enough transport window must be chosen to obtain accurate transport coefficients.
-    tetra_evals(:,:,:) = 0.0_dp
+    tetra_evals(:,:,:) = 0.0_r64
     
     do it = 1, numtetra !Run over tetrahedra
        do ib = 1, numbands !Run over bands
@@ -621,16 +621,16 @@ contains
     !! blocks Is the FBZ wave vector list full or energy restricted?
     !! indexlist List of muxed indices of the FBZ wave vectors
 
-    integer(k8), intent(in) :: nk, mesh(3)
-    integer(k8), intent(out), allocatable :: triang(:,:), triangcount(:), triangmap(:,:,:)
+    integer(i64), intent(in) :: nk, mesh(3)
+    integer(i64), intent(out), allocatable :: triang(:,:), triangcount(:), triangmap(:,:,:)
     logical, intent(in) :: blocks
-    integer(k8), optional, intent(in) :: indexlist(:)
+    integer(i64), optional, intent(in) :: indexlist(:)
 
     !Local variables
-    integer(k8) :: ik, i, j, k, ijk(3), ii, jj, kk, tk, tl, aux, count
-    integer(k8) :: ip1, jp1, n1, n2, n3, tmp
-    integer(k8) :: triang_vertices_labels(2, 3)
-    integer(k8) :: scvol_vertices(4, 3) !subcell vertices
+    integer(i64) :: ik, i, j, k, ijk(3), ii, jj, kk, tk, tl, aux, count
+    integer(i64) :: ip1, jp1, n1, n2, n3, tmp
+    integer(i64) :: triang_vertices_labels(2, 3)
+    integer(i64) :: scvol_vertices(4, 3) !subcell vertices
 
     n1 = mesh(1)
     n2 = mesh(2)
@@ -652,9 +652,9 @@ contains
 
     do ik = 1, nk !Run over all wave vectors in FBZ
        if(blocks) then !For energy window restricted FBZ
-          call demux_vector(indexlist(ik), ijk, mesh, 1_k8)
+          call demux_vector(indexlist(ik), ijk, mesh, 1_i64)
        else !For unrestristed FBZ
-          call demux_vector(ik, ijk, mesh, 1_k8)
+          call demux_vector(ik, ijk, mesh, 1_i64)
        end if
        i = ijk(1)
        j = ijk(2)
@@ -690,7 +690,7 @@ contains
              ii = scvol_vertices(aux, 1)
              jj = scvol_vertices(aux, 2)
              kk = scvol_vertices(aux, 3)
-             aux = mux_vector((/ii, jj, kk/), mesh, 1_k8)
+             aux = mux_vector((/ii, jj, kk/), mesh, 1_i64)
              tmp = aux !Guaranteed to be > 0
              if(blocks) then
                 !Which point in indexlist does aux correspond to?
@@ -717,12 +717,12 @@ contains
     !! evals List of eigenvalues 
     !! triang_evals Triangles populated with the eigenvalues
 
-    integer(k8), intent(in) :: triang(:,:)
-    real(dp), intent(in) :: evals(:,:)
-    real(dp), allocatable, intent(out) :: triang_evals(:,:,:)
+    integer(i64), intent(in) :: triang(:,:)
+    real(r64), intent(in) :: evals(:,:)
+    real(r64), allocatable, intent(out) :: triang_evals(:,:,:)
 
     !Local variables
-    integer(k8) :: iv, it, ib, numbands, aux, numtriangs, numvertices
+    integer(i64) :: iv, it, ib, numbands, aux, numtriangs, numvertices
 
     numtriangs = size(triang(:, 1))
     numbands = size(evals(1, :))
@@ -733,7 +733,7 @@ contains
     !Note: Eigenvalues outside the transport active window is taken to be zero.
     !      As such, close to the transport window boundary, this method is inaccurate.
     !      A large enough transport window must be chosen to obtain accurate transport coefficients.
-    triang_evals(:,:,:) = 0.0_dp
+    triang_evals(:,:,:) = 0.0_r64
     
     do it = 1, numtriangs !Run over triangles
        do ib = 1, numbands !Run over bands
@@ -748,7 +748,7 @@ contains
     end do
   end subroutine fill_triangles
 
-  pure real(dp) function delta_fn_triang(e, ik, ib, mesh, triangmap, triangcount, triang_evals)
+  pure real(r64) function delta_fn_triang(e, ik, ib, mesh, triangmap, triangcount, triang_evals)
     !! Calculate delta function using the triangle method a la
     !! Kurganskii et al. Phys. Stat. Sol.(b) 129, 293 (1985)
     !!
@@ -760,18 +760,18 @@ contains
     !! triangcount Number of triangles in which a wave vector belongs
     !! triang_evals Triangles populated with the eigenvalues
 
-    real(dp), intent(in) :: e
-    integer(k8), intent(in) :: ik, ib
-    integer(k8), intent(in) :: mesh(3), triangmap(:,:,:), triangcount(:)
-    real(dp), intent(in) :: triang_evals(:,:,:)
+    real(r64), intent(in) :: e
+    integer(i64), intent(in) :: ik, ib
+    integer(i64), intent(in) :: mesh(3), triangmap(:,:,:), triangcount(:)
+    real(r64), intent(in) :: triang_evals(:,:,:)
 
     !Local variables
-    integer(k8) :: iv, it, itk, num, numtriangs
+    integer(i64) :: iv, it, itk, num, numtriangs
     logical :: c1, c2, c3, c4
-    real(dp) :: e1, e2, e3, E12, E21, E13, E31, E23, E32, tmp
+    real(r64) :: e1, e2, e3, E12, E21, E13, E31, E23, E32, tmp
 
-    tmp = 0.0_dp
-    delta_fn_triang = 0.0_dp
+    tmp = 0.0_r64
+    delta_fn_triang = 0.0_r64
 
     !Total number of triangles in the system
     numtriangs = product(mesh)*2
@@ -794,7 +794,7 @@ contains
        c3 = e2 < e .and. e <= e3
        c4 = e3 < e
 
-       tmp = 0.0_dp
+       tmp = 0.0_r64
 
        if(c1 .or. c4) cycle
        
@@ -833,7 +833,7 @@ contains
        delta_fn_triang = delta_fn_triang + tmp
     end do !itk
     
-    if(delta_fn_triang < 1.0e-12_dp) delta_fn_triang = 0.0_dp
+    if(delta_fn_triang < 1.0e-12_r64) delta_fn_triang = 0.0_r64
     
     !Normalize with the total number of triangles
     delta_fn_triang = delta_fn_triang/numtriangs

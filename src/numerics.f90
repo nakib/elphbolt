@@ -17,7 +17,7 @@
 module numerics_module
   !! Module containing type and procedures related to the numerics.
 
-  use params, only: dp, k8, twopi
+  use params, only: r64, i64, twopi
   use misc, only: exit_with_message, subtitle
   use crystal_module, only: crystal
 
@@ -31,11 +31,11 @@ module numerics_module
   type numerics
      !! Data and procedures related to the numerics.
 
-     integer(k8) :: qmesh(3)
+     integer(i64) :: qmesh(3)
      !! Phonon wave vector mesh.
-     integer(k8) :: mesh_ref
+     integer(i64) :: mesh_ref
      !! Electron mesh refinement factor compared to the phonon mesh.
-     real(dp) :: fsthick
+     real(r64) :: fsthick
      !! Fermi surface thickness in eV.
      character(len = 1024) :: cwd
      !! Current working directory.
@@ -87,23 +87,23 @@ module numerics_module
      !! Use electron-boundary scattering?
      logical :: drag
      !! Choose if the drag effect will be included.
-     integer(k8) :: maxiter
+     integer(i64) :: maxiter
      !! Maximum number of iterations in the BTE/Migdal-Eliashberg equations solver.
-     real(dp) :: conv_thres
+     real(r64) :: conv_thres
      !! BTE/Migdal-Eliashberg euqations iteration convergence criterion.
      logical :: plot_along_path
      !! Plot Wannierized quantities along high symmetry wave vectors?
-     integer(k8) :: runlevel
+     integer(i64) :: runlevel
      !! Control for the type of calculation.
-     real(dp) :: ph_en_min, ph_en_max
+     real(r64) :: ph_en_min, ph_en_max
      !! Bounds of equidistant phonon energy mesh.
-     integer(k8) :: ph_en_num
+     integer(i64) :: ph_en_num
      !! Number of equidistant phonon energy mesh points.
-     real(dp) :: el_en_min, el_en_max
+     real(r64) :: el_en_min, el_en_max
      !! Bounds of equidistant electron energy mesh.
-     integer(k8) :: el_en_num
+     integer(i64) :: el_en_num
      !! Number of equidistant electron energy mesh points.
-     integer(k8) :: ph_mfp_npts
+     integer(i64) :: ph_mfp_npts
      !! Number of equidistant phonon mean-free-path mesh points.
    contains
 
@@ -123,8 +123,8 @@ contains
     type(crystal), intent(in) :: crys
     
     !Local variables
-    integer(k8) :: mesh_ref, qmesh(3), maxiter, runlevel, el_en_num, ph_en_num, ph_mfp_npts
-    real(dp) :: fsthick, conv_thres, ph_en_min, ph_en_max, el_en_min, el_en_max
+    integer(i64) :: mesh_ref, qmesh(3), maxiter, runlevel, el_en_num, ph_en_num, ph_mfp_npts
+    real(r64) :: fsthick, conv_thres, ph_en_min, ph_en_max, el_en_min, el_en_max
     character(len = 1024) :: datadumpdir, tag
     logical :: read_gq2, read_gk2, read_V, read_W, tetrahedra, phe, phiso, phsubs, &
          phbound, phdef_Tmat, onlyphbte, onlyebte, elchimp, elbound, drag, plot_along_path
@@ -143,7 +143,7 @@ contains
     !Read numerics information
     qmesh = (/1, 1, 1/)
     mesh_ref = 1
-    fsthick = 0.0_dp
+    fsthick = 0.0_r64
     datadumpdir = './'
     read_gq2 = .false.
     read_gk2 = .false.
@@ -162,13 +162,13 @@ contains
     drag = .true.
     plot_along_path = .false.
     maxiter = 50
-    conv_thres = 1e-4_dp
+    conv_thres = 1e-4_r64
     runlevel = 1
-    ph_en_min = 0.0_dp
-    ph_en_max = 1.0_dp
+    ph_en_min = 0.0_r64
+    ph_en_max = 1.0_r64
     ph_en_num = 100
-    el_en_min = -10.0_dp
-    el_en_max = 10.0_dp
+    el_en_min = -10.0_r64
+    el_en_max = 10.0_r64
     el_en_num = 100
     ph_mfp_npts = 100
     read(1, nml = numerics)
@@ -332,7 +332,7 @@ contains
     !! and subdirectories within.
     
     class(numerics), intent(inout) :: self
-    real(dp), intent(in) :: chempot
+    real(r64), intent(in) :: chempot
 
     !Local variables
     character(len = 1024) :: tag

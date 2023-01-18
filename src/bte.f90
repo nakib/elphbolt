@@ -18,7 +18,7 @@ module bte_module
   !! Module containing type and procedures related to the solution of the
   !! Boltzmann transport equation (BTE).
 
-  use params, only: dp, k8, qe, kB
+  use params, only: r64, i64, qe, kB
   use misc, only: print_message, exit_with_message, write2file_rank2_real, &
        distribute_points, demux_state, binsearch, interpolate, demux_vector, &
        trace, subtitle, append2file_transport_tensor, write2file_response, &
@@ -44,36 +44,36 @@ module bte_module
   type bte
      !! Data and procedures related to the BTE.
 
-     real(dp), allocatable :: ph_rta_rates_iso_ibz(:,:)
+     real(r64), allocatable :: ph_rta_rates_iso_ibz(:,:)
      !! Phonon RTA scattering rates on the IBZ due to isotope scattering.
-     real(dp), allocatable :: ph_rta_rates_subs_ibz(:,:)
+     real(r64), allocatable :: ph_rta_rates_subs_ibz(:,:)
      !! Phonon RTA scattering rates on the IBZ due to substitution scattering.
-     real(dp), allocatable :: ph_rta_rates_bound_ibz(:,:)
+     real(r64), allocatable :: ph_rta_rates_bound_ibz(:,:)
      !! Phonon RTA scattering rates on the IBZ due to boundary scattering.
-     real(dp), allocatable :: ph_rta_rates_ibz(:,:)
+     real(r64), allocatable :: ph_rta_rates_ibz(:,:)
      !! Phonon RTA scattering rates on the IBZ.
-     real(dp), allocatable :: ph_field_term_T(:,:,:)
+     real(r64), allocatable :: ph_field_term_T(:,:,:)
      !! Phonon field coupling term for gradT field on the FBZ.
-     real(dp), allocatable :: ph_response_T(:,:,:)
+     real(r64), allocatable :: ph_response_T(:,:,:)
      !! Phonon response function for gradT field on the FBZ.
-     real(dp), allocatable :: ph_field_term_E(:,:,:)
+     real(r64), allocatable :: ph_field_term_E(:,:,:)
      !! Phonon field coupling term for E field on the FBZ.
-     real(dp), allocatable :: ph_response_E(:,:,:)
+     real(r64), allocatable :: ph_response_E(:,:,:)
      !! Phonon response function for E field on the FBZ.
      
-     real(dp), allocatable :: el_rta_rates_echimp_ibz(:,:)
+     real(r64), allocatable :: el_rta_rates_echimp_ibz(:,:)
      !! Electron RTA scattering rates on the IBZ due to charged impurity scattering.
-     real(dp), allocatable :: el_rta_rates_bound_ibz(:,:)
+     real(r64), allocatable :: el_rta_rates_bound_ibz(:,:)
      !! Electron RTA scattering rates on the IBZ due to boundary scattering.
-     real(dp), allocatable :: el_rta_rates_ibz(:,:)
+     real(r64), allocatable :: el_rta_rates_ibz(:,:)
      !! Electron RTA scattering rates on the IBZ.
-     real(dp), allocatable :: el_field_term_T(:,:,:)
+     real(r64), allocatable :: el_field_term_T(:,:,:)
      !! Electron field coupling term for gradT field on the FBZ.
-     real(dp), allocatable :: el_response_T(:,:,:)
+     real(r64), allocatable :: el_response_T(:,:,:)
      !! Electron response function for gradT field on the FBZ.
-     real(dp), allocatable :: el_field_term_E(:,:,:)
+     real(r64), allocatable :: el_field_term_E(:,:,:)
      !! Electron field coupling term for E field on the FBZ.
-     real(dp), allocatable :: el_response_E(:,:,:)
+     real(r64), allocatable :: el_response_E(:,:,:)
      !! Electron response function for E field on the FBZ.
    contains
 
@@ -102,12 +102,12 @@ contains
 
     !Local variables
     character(len = 1024) :: tag, Tdir, tableheader
-    integer(k8) :: iq, ik, it_ph, it_el, icart
-    real(dp), allocatable :: rates_3ph(:,:), rates_phe(:,:), rates_eph(:,:), &
+    integer(i64) :: iq, ik, it_ph, it_el, icart
+    real(r64), allocatable :: rates_3ph(:,:), rates_phe(:,:), rates_eph(:,:), &
          I_diff(:,:,:), I_drag(:,:,:), ph_kappa(:,:,:), ph_alphabyT(:,:,:), &
          el_sigma(:,:,:), el_sigmaS(:,:,:), el_alphabyT(:,:,:), el_kappa0(:,:,:), &
          dummy(:,:,:), ph_drag_term_T(:,:,:), ph_drag_term_E(:,:,:)
-    real(dp) :: ph_kappa_scalar, ph_kappa_scalar_old, el_sigma_scalar, el_sigma_scalar_old, &
+    real(r64) :: ph_kappa_scalar, ph_kappa_scalar_old, el_sigma_scalar, el_sigma_scalar_old, &
          el_sigmaS_scalar, el_sigmaS_scalar_old, el_kappa0_scalar, el_kappa0_scalar_old, &
          ph_alphabyT_scalar, ph_alphabyT_scalar_old, el_alphabyT_scalar, el_alphabyT_scalar_old, &
          KO_dev, tot_alphabyT_scalar, lambda
@@ -150,7 +150,7 @@ contains
        !gradT field:
        ! Calculate field term (gradT=>F0)
        call calculate_field_term('ph', 'T', ph%nequiv, ph%ibz2fbz_map, &
-            crys%T, 0.0_dp, ph%ens, ph%vels, self%ph_rta_rates_ibz, self%ph_field_term_T)
+            crys%T, 0.0_r64, ph%ens, ph%vels, self%ph_rta_rates_ibz, self%ph_field_term_T)
 
        ! Symmetrize field term
        do iq = 1, ph%nwv
@@ -163,21 +163,21 @@ contains
        self%ph_response_T = self%ph_field_term_T
 
        ! Calculate transport coefficient
-       call calculate_transport_coeff('ph', 'T', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
+       call calculate_transport_coeff('ph', 'T', crys%T, 1_i64, 0.0_r64, ph%ens, ph%vels, &
             crys%volume, ph%wvmesh, self%ph_response_T, sym, ph_kappa, dummy)
        !---------------------------------------------------------------------------------!
 
        !E field:
        ! Calculate field term (E=>G0)
        call calculate_field_term('ph', 'E', ph%nequiv, ph%ibz2fbz_map, &
-            crys%T, 0.0_dp, ph%ens, ph%vels, self%ph_rta_rates_ibz, self%ph_field_term_E)
+            crys%T, 0.0_r64, ph%ens, ph%vels, self%ph_rta_rates_ibz, self%ph_field_term_E)
 
        ! RTA solution of BTE
        allocate(self%ph_response_E(ph%nwv, ph%numbands, 3))
        self%ph_response_E = self%ph_field_term_E
 
        ! Calculate transport coefficient
-       call calculate_transport_coeff('ph', 'E', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
+       call calculate_transport_coeff('ph', 'E', crys%T, 1_i64, 0.0_r64, ph%ens, ph%vels, &
             crys%volume, ph%wvmesh, self%ph_response_E, sym, ph_alphabyT, dummy)
        ph_alphabyT = ph_alphabyT/crys%T
        !---------------------------------------------------------------------------------!
@@ -210,7 +210,7 @@ contains
        ! Append RTA coefficients in no-drag files
        ! Change to data output directory
        call chdir(trim(adjustl(Tdir)))
-       call append2file_transport_tensor('nodrag_ph_kappa_', 0_k8, ph_kappa)
+       call append2file_transport_tensor('nodrag_ph_kappa_', 0_i64, ph_kappa)
 
        ! Print RTA band/branch resolved response functions
        call write2file_response('RTA_F0_', self%ph_response_T) !gradT, ph
@@ -317,10 +317,10 @@ contains
        ! Append RTA coefficients in no-drag files
        ! Change to data output directory
        call chdir(trim(adjustl(Tdir)))
-       call append2file_transport_tensor('nodrag_el_sigmaS_', 0_k8, el_sigmaS, el%bandlist)
-       call append2file_transport_tensor('nodrag_el_sigma_', 0_k8, el_sigma, el%bandlist)
-       call append2file_transport_tensor('nodrag_el_alphabyT_', 0_k8, el_alphabyT, el%bandlist)
-       call append2file_transport_tensor('nodrag_el_kappa0_', 0_k8, el_kappa0, el%bandlist)
+       call append2file_transport_tensor('nodrag_el_sigmaS_', 0_i64, el_sigmaS, el%bandlist)
+       call append2file_transport_tensor('nodrag_el_sigma_', 0_i64, el_sigma, el%bandlist)
+       call append2file_transport_tensor('nodrag_el_alphabyT_', 0_i64, el_alphabyT, el%bandlist)
+       call append2file_transport_tensor('nodrag_el_kappa0_', 0_i64, el_kappa0, el%bandlist)
 
        ! Print RTA band/branch resolved response functions
        call write2file_response('RTA_I0_', self%el_response_T, el%bandlist) !gradT, el
@@ -336,7 +336,7 @@ contains
        call t%start_timer('Coupled e-ph BTEs')
        
        tot_alphabyT_scalar = el_alphabyT_scalar + ph_alphabyT_scalar
-       KO_dev = 100.0_dp*abs(&
+       KO_dev = 100.0_r64*abs(&
             (el_sigmaS_scalar - tot_alphabyT_scalar)/tot_alphabyT_scalar)
 
        call print_message("RTA solution:")
@@ -359,12 +359,12 @@ contains
        !Append RTA coefficients in drag files
        ! Change to data output directory
        call chdir(trim(adjustl(Tdir)))
-       call append2file_transport_tensor('drag_ph_kappa_', 0_k8, ph_kappa)
-       call append2file_transport_tensor('drag_ph_alphabyT_', 0_k8, ph_alphabyT)
-       call append2file_transport_tensor('drag_el_sigmaS_', 0_k8, el_sigmaS, el%bandlist)
-       call append2file_transport_tensor('drag_el_sigma_', 0_k8, el_sigma, el%bandlist)
-       call append2file_transport_tensor('drag_el_alphabyT_', 0_k8, el_alphabyT, el%bandlist)
-       call append2file_transport_tensor('drag_el_kappa0_', 0_k8, el_kappa0, el%bandlist)
+       call append2file_transport_tensor('drag_ph_kappa_', 0_i64, ph_kappa)
+       call append2file_transport_tensor('drag_ph_alphabyT_', 0_i64, ph_alphabyT)
+       call append2file_transport_tensor('drag_el_sigmaS_', 0_i64, el_sigmaS, el%bandlist)
+       call append2file_transport_tensor('drag_el_sigma_', 0_i64, el_sigma, el%bandlist)
+       call append2file_transport_tensor('drag_el_alphabyT_', 0_i64, el_alphabyT, el%bandlist)
+       call append2file_transport_tensor('drag_el_kappa0_', 0_i64, el_kappa0, el%bandlist)
        ! Change back to cwd
        call chdir(trim(adjustl(num%cwd)))
        
@@ -393,9 +393,9 @@ contains
                self%ph_field_term_E, self%ph_response_E, self%el_response_E)
 
           !Calculate phonon transport coefficients
-          call calculate_transport_coeff('ph', 'T', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
+          call calculate_transport_coeff('ph', 'T', crys%T, 1_i64, 0.0_r64, ph%ens, ph%vels, &
                crys%volume, ph%wvmesh, self%ph_response_T, sym, ph_kappa, dummy)
-          call calculate_transport_coeff('ph', 'E', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
+          call calculate_transport_coeff('ph', 'E', crys%T, 1_i64, 0.0_r64, ph%ens, ph%vels, &
                crys%volume, ph%wvmesh, self%ph_response_E, sym, ph_alphabyT, dummy)
           ph_alphabyT = ph_alphabyT/crys%T
 
@@ -471,7 +471,7 @@ contains
           end if
 
           tot_alphabyT_scalar = el_alphabyT_scalar + ph_alphabyT_scalar
-          KO_dev = 100.0_dp*abs(&
+          KO_dev = 100.0_r64*abs(&
                (el_sigmaS_scalar - tot_alphabyT_scalar)/tot_alphabyT_scalar)
 
           if(this_image() == 1) then
@@ -538,7 +538,7 @@ contains
                self%ph_field_term_T, self%ph_response_T)
 
           !Calculate phonon transport coefficients
-          call calculate_transport_coeff('ph', 'T', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
+          call calculate_transport_coeff('ph', 'T', crys%T, 1_i64, 0.0_r64, ph%ens, ph%vels, &
                crys%volume, ph%wvmesh, self%ph_response_T, sym, ph_kappa, dummy)
 
           !Calculate and print phonon transport scalar
@@ -662,20 +662,20 @@ contains
     subroutine correct_I_drag(I_drag, constraint, lambda)
       !! Subroutine to find scaling correction to I_drag.
 
-      real(dp), intent(in) :: I_drag(:,:,:), constraint
-      real(dp), intent(out) :: lambda
+      real(r64), intent(in) :: I_drag(:,:,:), constraint
+      real(r64), intent(out) :: lambda
 
       !Internal variables
-      integer(k8) :: it, maxiter
-      real(dp) :: a, b, sigmaS(size(I_drag(1,:,1)), 3, 3),&
+      integer(i64) :: it, maxiter
+      real(r64) :: a, b, sigmaS(size(I_drag(1,:,1)), 3, 3),&
            thresh, sigmaS_scalar, dummy(size(I_drag(1,:,1)), 3, 3)
       
-      a = 0.0_dp !lower bound
-      b = 2.0_dp !upper bound
+      a = 0.0_r64 !lower bound
+      b = 2.0_r64 !upper bound
       maxiter = 100
-      thresh = 1.0e-6_dp
+      thresh = 1.0e-6_r64
       do it = 1, maxiter
-         lambda = 0.5_dp*(a + b)
+         lambda = 0.5_r64*(a + b)
          !Calculate electron transport coefficients
          call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
               el%ens, el%vels, crys%volume, el%wvmesh, lambda*I_drag, sym, &
@@ -711,27 +711,27 @@ contains
 
     character(len = 2), intent(in) :: species
     character(len = 1), intent(in) :: field
-    integer(k8), intent(in) :: nequiv(:), ibz2fbz_map(:,:,:)
-    real(dp), intent(in) :: T, chempot, ens(:,:), vels(:,:,:), rta_rates_ibz(:,:)
-    real(dp), allocatable, intent(out) :: field_term(:,:,:)
-    integer(k8), intent(in), optional :: el_indexlist(:)
+    integer(i64), intent(in) :: nequiv(:), ibz2fbz_map(:,:,:)
+    real(r64), intent(in) :: T, chempot, ens(:,:), vels(:,:,:), rta_rates_ibz(:,:)
+    real(r64), allocatable, intent(out) :: field_term(:,:,:)
+    integer(i64), intent(in), optional :: el_indexlist(:)
 
     !Local variables
-    integer(k8) :: ik_ibz, ik_fbz, ieq, ib, nk_ibz, nk, nbands, pow, &
+    integer(i64) :: ik_ibz, ik_fbz, ieq, ib, nk_ibz, nk, nbands, pow, &
          chunk, num_active_images, start, end
-    real(dp) :: A
+    real(r64) :: A
     logical :: trivial_case
 
     !Set constant and power of energy depending on species and field type
     if(species == 'ph') then
-       A = 1.0_dp/T
+       A = 1.0_r64/T
        pow = 1
-       if(chempot /= 0.0_dp) then
+       if(chempot /= 0.0_r64) then
           call exit_with_message("Phonon chemical potential non-zero in calculate_field_term. Exiting.")
        end if
     else if(species == 'el') then
        if(field == 'T') then
-          A = 1.0_dp/T
+          A = 1.0_r64/T
           pow = 1
        else if(field == 'E') then
           A = qe
@@ -754,7 +754,7 @@ contains
 
     !Allocate and initialize field term
     allocate(field_term(nk, nbands, 3))
-    field_term(:,:,:) = 0.0_dp
+    field_term(:,:,:) = 0.0_r64
 
     !No field-coupling case
     trivial_case = species == 'ph' .and. field == 'E'
@@ -773,7 +773,7 @@ contains
                 call binsearch(el_indexlist, ibz2fbz_map(ieq, ik_ibz, 2), ik_fbz)
              end if
              do ib = 1, nbands
-                if(rta_rates_ibz(ik_ibz, ib) /= 0.0_dp) then
+                if(rta_rates_ibz(ik_ibz, ib) /= 0.0_r64) then
                    field_term(ik_fbz, ib, :) = A*vels(ik_fbz, ib, :)*&
                         (ens(ik_fbz, ib) - chempot)**pow/rta_rates_ibz(ik_ibz, ib)
                 end if
@@ -808,19 +808,19 @@ contains
     type(electron), intent(in) :: el
     type(numerics), intent(in) :: num
     logical, intent(in) :: drag
-    real(dp), intent(in) :: T, rta_rates_ibz(:,:), field_term(:,:,:)
-    real(dp), intent(in), optional :: response_el(:,:,:)
-    real(dp), intent(inout) :: response_ph(:,:,:)
+    real(r64), intent(in) :: T, rta_rates_ibz(:,:), field_term(:,:,:)
+    real(r64), intent(in), optional :: response_el(:,:,:)
+    real(r64), intent(inout) :: response_ph(:,:,:)
 
     !Local variables
-    integer(k8) :: nstates_irred, chunk, istate1, numbranches, s1, &
+    integer(i64) :: nstates_irred, chunk, istate1, numbranches, s1, &
          iq1_ibz, ieq, iq1_sym, iq1_fbz, iproc, iq2, s2, iq3, s3, nq, &
          num_active_images, numbands, ik, ikp, m, n, nprocs_phe, aux1, aux2, &
          nprocs_3ph_plus, nprocs_3ph_minus, start, end
-    integer(k8), allocatable :: istate2_plus(:), istate3_plus(:), &
+    integer(i64), allocatable :: istate2_plus(:), istate3_plus(:), &
          istate2_minus(:), istate3_minus(:), istate_el1(:), istate_el2(:)
-    real(dp) :: tau_ibz
-    real(dp), allocatable :: Wp(:), Wm(:), Y(:), response_ph_reduce(:,:,:)
+    real(r64) :: tau_ibz
+    real(r64), allocatable :: Wp(:), Wm(:), Y(:), response_ph_reduce(:,:,:)
     character(len = 1024) :: filepath_Wm, filepath_Wp, filepath_Y, tag
 
     !Set output directory of transition probilities
@@ -846,7 +846,7 @@ contains
     
     !Allocate and initialize response reduction array
     allocate(response_ph_reduce(nq, numbranches, 3))
-    response_ph_reduce(:,:,:) = 0.0_dp
+    response_ph_reduce(:,:,:) = 0.0_r64
     
     !Divide phonon states among images
     call distribute_points(nstates_irred, chunk, start, end, num_active_images)
@@ -857,9 +857,9 @@ contains
        call demux_state(istate1, numbranches, s1, iq1_ibz)
 
        !RTA lifetime
-       tau_ibz = 0.0_dp
-       if(rta_rates_ibz(iq1_ibz, s1) /= 0.0_dp) then
-          tau_ibz = 1.0_dp/rta_rates_ibz(iq1_ibz, s1)
+       tau_ibz = 0.0_r64
+       if(rta_rates_ibz(iq1_ibz, s1) /= 0.0_r64) then
+          tau_ibz = 1.0_r64/rta_rates_ibz(iq1_ibz, s1)
        end if
 
        !Set W+ filename
@@ -919,7 +919,7 @@ contains
              call demux_state(istate3_minus(iproc), numbranches, s3, iq3)
 
              response_ph_reduce(iq1_fbz, s1, :) = response_ph_reduce(iq1_fbz, s1, :) + &
-                  0.5_dp*Wm(iproc)*(response_ph(ph%equiv_map(iq1_sym, iq3), s3, :) + &
+                  0.5_r64*Wm(iproc)*(response_ph(ph%equiv_map(iq1_sym, iq3), s3, :) + &
                   response_ph(ph%equiv_map(iq1_sym, iq2), s2, :))
           end do
 
@@ -975,17 +975,17 @@ contains
     type(electron), intent(in) :: el
     type(numerics), intent(in) :: num
     logical, intent(in) :: drag
-    real(dp), intent(in) :: T, rta_rates_ibz(:,:), field_term(:,:,:)
-    real(dp), intent(in), optional :: ph_drag_term(:,:,:)
-    real(dp), intent(inout) :: response_el(:,:,:)
+    real(r64), intent(in) :: T, rta_rates_ibz(:,:), field_term(:,:,:)
+    real(r64), intent(in), optional :: ph_drag_term(:,:,:)
+    real(r64), intent(inout) :: response_el(:,:,:)
 
     !Local variables
-    integer(k8) :: nstates_irred, nprocs, chunk, istate, numbands, numbranches, &
+    integer(i64) :: nstates_irred, nprocs, chunk, istate, numbands, numbranches, &
          ik_ibz, m, ieq, ik_sym, ik_fbz, iproc, ikp, n, nk, num_active_images, aux, &
          start, end
-    integer(k8), allocatable :: istate_el(:), istate_ph(:)
-    real(dp) :: tau_ibz
-    real(dp), allocatable :: Xplus(:), Xminus(:), response_el_reduce(:,:,:)
+    integer(i64), allocatable :: istate_el(:), istate_ph(:)
+    real(r64) :: tau_ibz
+    real(r64), allocatable :: Xplus(:), Xminus(:), response_el_reduce(:,:,:)
     character(1024) :: filepath_Xminus, filepath_Xplus, tag
 
     !Set output directory of transition probilities
@@ -1011,7 +1011,7 @@ contains
 
     !Allocate and initialize response reduction array
     allocate(response_el_reduce(nk, numbands, 3))
-    response_el_reduce(:,:,:) = 0.0_dp
+    response_el_reduce(:,:,:) = 0.0_r64
     
     !Divide electron states among images
     call distribute_points(nstates_irred, chunk, start, end, num_active_images)
@@ -1025,9 +1025,9 @@ contains
        if(abs(el%ens_irred(ik_ibz, m) - el%enref) > el%fsthick) cycle
 
        !RTA lifetime
-       tau_ibz = 0.0_dp
-       if(rta_rates_ibz(ik_ibz, m) /= 0.0_dp) then
-          tau_ibz = 1.0_dp/rta_rates_ibz(ik_ibz, m)
+       tau_ibz = 0.0_r64
+       if(rta_rates_ibz(ik_ibz, m) /= 0.0_r64) then
+          tau_ibz = 1.0_r64/rta_rates_ibz(ik_ibz, m)
        end if
 
        !Set X+ filename
@@ -1103,16 +1103,16 @@ contains
     type(phonon), intent(in) :: ph
     type(numerics), intent(in) :: num
     type(symmetry), intent(in) :: sym
-    real(dp), intent(in) :: rta_rates_ibz(:,:), response_ph(:,:,:)
-    real(dp), intent(out) :: ph_drag_term(:,:,:)
+    real(r64), intent(in) :: rta_rates_ibz(:,:), response_ph(:,:,:)
+    real(r64), intent(out) :: ph_drag_term(:,:,:)
 
     !Local variables
-    integer(k8) :: nstates_irred, nprocs, chunk, istate, numbands, numbranches, &
+    integer(i64) :: nstates_irred, nprocs, chunk, istate, numbands, numbranches, &
          ik_ibz, m, ieq, ik_sym, ik_fbz, iproc, iq, s, nk, num_active_images, &
          ipol, fineq_indvec(3), start, end
-    integer(k8), allocatable :: istate_el(:), istate_ph(:)
-    real(dp) :: tau_ibz, ForG(3)
-    real(dp), allocatable :: Xplus(:), Xminus(:), ph_drag_term_reduce(:,:,:)
+    integer(i64), allocatable :: istate_el(:), istate_ph(:)
+    real(r64) :: tau_ibz, ForG(3)
+    real(r64), allocatable :: Xplus(:), Xminus(:), ph_drag_term_reduce(:,:,:)
     character(1024) :: filepath_Xminus, filepath_Xplus, tag
     
     !Number of electron bands
@@ -1129,7 +1129,7 @@ contains
 
     !Allocate and initialize response reduction array
     allocate(ph_drag_term_reduce(nk, numbands, 3))
-    ph_drag_term_reduce(:,:,:) = 0.0_dp
+    ph_drag_term_reduce(:,:,:) = 0.0_r64
 
     !Divide electron states among images
     call distribute_points(nstates_irred, chunk, start, end, num_active_images)
@@ -1143,9 +1143,9 @@ contains
        if(abs(el%ens_irred(ik_ibz, m) - el%enref) > el%fsthick) cycle
 
        !RTA lifetime
-       tau_ibz = 0.0_dp
-       if(rta_rates_ibz(ik_ibz, m) /= 0.0_dp) then
-          tau_ibz = 1.0_dp/rta_rates_ibz(ik_ibz, m)
+       tau_ibz = 0.0_r64
+       if(rta_rates_ibz(ik_ibz, m) /= 0.0_r64) then
+          tau_ibz = 1.0_r64/rta_rates_ibz(ik_ibz, m)
        end if
 
        !Set X+ filename
@@ -1180,7 +1180,7 @@ contains
              !Drag contribution:             
              if(iq < 0) then !Need to interpolate on this point
                 !Calculate the fine mesh wave vector, 0-based index vector
-                call demux_vector(-iq, fineq_indvec, el%wvmesh, 0_k8)
+                call demux_vector(-iq, fineq_indvec, el%wvmesh, 0_i64)
 
                 !Find image of phonon wave vector due to the current symmetry
                 fineq_indvec = modulo( &
@@ -1215,13 +1215,13 @@ contains
   pure logical function converged(oldval, newval, thres)
     !! Function to check if newval is the same as oldval
 
-    real(dp), intent(in) :: oldval, newval, thres
+    real(r64), intent(in) :: oldval, newval, thres
 
     converged = .False.
 
     if(newval == oldval) then
        converged = .True.
-    else if(oldval /= 0.0_dp) then
+    else if(oldval /= 0.0_r64) then
        if(abs(newval - oldval)/abs(oldval) < thres) converged = .True.
     end if
   end function converged
@@ -1237,12 +1237,12 @@ contains
     type(electron), intent(in), optional :: el
 
     !Local variables
-    real(dp), allocatable :: ph_en_grid(:), el_en_grid(:), ph_kappa(:,:,:,:), dummy(:,:,:,:), &
+    real(r64), allocatable :: ph_en_grid(:), el_en_grid(:), ph_kappa(:,:,:,:), dummy(:,:,:,:), &
          el_kappa0(:,:,:,:), el_sigmaS(:,:,:,:), el_sigma(:,:,:,:), el_alphabyT(:,:,:,:), &
          ph_alphabyT(:,:,:,:), ph_scalar_mfps(:, :), ph_mfp_sampling_grid(:), &
          ph_kappa_cumulative_mfp(:, :, :, :)
     character(len = 1024) :: tag, Tdir, numcols
-    integer(k8) :: ik, ib
+    integer(i64) :: ik, ib
 
     !Calculate electron and/or phonon sampling energy grid
     call linspace(ph_en_grid, num%ph_en_min, num%ph_en_max, num%ph_en_num)
@@ -1382,7 +1382,7 @@ contains
             dummy(ph%numbands, 3, 3, num%ph_en_num))
 
        !  Calculate spectral function
-       call calculate_spectral_transport_coeff(ph, 'T', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
+       call calculate_spectral_transport_coeff(ph, 'T', crys%T, 1_i64, 0.0_r64, ph%ens, ph%vels, &
             crys%volume, self%ph_response_T, ph_en_grid, num%tetrahedra, sym, ph_kappa, dummy)
 
        !  Write spectral phonon kappa
@@ -1396,7 +1396,7 @@ contains
        call readfile_response('nodrag_F0_', self%ph_response_T)
 
        !  Calculate spectral function
-       call calculate_spectral_transport_coeff(ph, 'T', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
+       call calculate_spectral_transport_coeff(ph, 'T', crys%T, 1_i64, 0.0_r64, ph%ens, ph%vels, &
             crys%volume, self%ph_response_T, ph_en_grid, num%tetrahedra, sym, ph_kappa, dummy)
 
        !  Write spectral phonon kappa
@@ -1412,7 +1412,7 @@ contains
           end do
        end do
        ph_scalar_mfps = ph_scalar_mfps/kB !nm
-       ph_scalar_mfps(1, :) = 0.0_dp !handle gamma point modes
+       ph_scalar_mfps(1, :) = 0.0_r64 !handle gamma point modes
 
        !  Print out IBZ mfps
        if(this_image() == 1) then
@@ -1427,7 +1427,7 @@ contains
        sync all
        
        !  Calculate phonon mfp sampling grid [T-dependent quantity]
-       call linspace(ph_mfp_sampling_grid, 0.0_dp, maxval(ph_scalar_mfps), num%ph_mfp_npts)
+       call linspace(ph_mfp_sampling_grid, 0.0_r64, maxval(ph_scalar_mfps), num%ph_mfp_npts)
 
        !  Write the sampling mfps to file
        call write2file_rank1_real("nodrag_iterated_ph_mfps_sampling", ph_mfp_sampling_grid)
@@ -1436,7 +1436,7 @@ contains
        allocate(ph_kappa_cumulative_mfp(ph%numbands, 3, 3, num%ph_mfp_npts))
 
        !  Calculate culumative phonon kappa vs scalar mean-free-path (mfp)
-       call calculate_mfp_cumulative_transport_coeff(ph%prefix, 'T', crys%T, 1_k8, 0.0_dp, &
+       call calculate_mfp_cumulative_transport_coeff(ph%prefix, 'T', crys%T, 1_i64, 0.0_r64, &
             ph%ens, ph%vels, ph%wvmesh, crys%volume, self%ph_response_T, ph_mfp_sampling_grid, &
             ph_scalar_mfps, sym, ph_kappa_cumulative_mfp)!, dummy)
 
@@ -1603,7 +1603,7 @@ contains
             dummy(ph%numbands, 3, 3, num%ph_en_num))
 
        !  Calculate spectral function
-       call calculate_spectral_transport_coeff(ph, 'T', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
+       call calculate_spectral_transport_coeff(ph, 'T', crys%T, 1_i64, 0.0_r64, ph%ens, ph%vels, &
             crys%volume, self%ph_response_T, ph_en_grid, num%tetrahedra, sym, ph_kappa, dummy)
 
        !  Write spectral phonon kappa
@@ -1628,7 +1628,7 @@ contains
        allocate(ph_alphabyT(ph%numbands, 3, 3, num%ph_en_num))
 
        !  Calculate spectral function
-       call calculate_spectral_transport_coeff(ph, 'E', crys%T, 1_k8, 0.0_dp, ph%ens, ph%vels, &
+       call calculate_spectral_transport_coeff(ph, 'E', crys%T, 1_i64, 0.0_r64, ph%ens, ph%vels, &
             crys%volume, self%ph_response_E, ph_en_grid, num%tetrahedra, sym, ph_alphabyT, dummy)
 
        !  Write spectral phonon kappa
