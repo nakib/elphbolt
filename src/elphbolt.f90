@@ -22,9 +22,6 @@ program elphbolt
   !! elphbolt is a program for solving the coupled electron-phonon Boltzmann transport equations
   !! (e-ph BTEs) as formulated in https://arxiv.org/abs/2109.08547 (2021) with both the
   !! electron-phonon and phonon-phonon interactions computed ab initio.
-
-  !TEST
-  use params, only: r64, i64
   
   use misc, only: welcome, print_message, subtitle, timer, exit_with_message
   use numerics_module, only: numerics
