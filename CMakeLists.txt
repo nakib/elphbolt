@@ -8,8 +8,8 @@ project(elphbolt Fortran)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 #Set compiler
-set(CMAKE_Fortran_COMPILER "ifort")
-#set(CMAKE_Fortran_COMPILER "caf")
+#set(CMAKE_Fortran_COMPILER "ifort")
+set(CMAKE_Fortran_COMPILER "caf")
 
 #Set flags and mkl library for ifort
 if(CMAKE_Fortran_COMPILER MATCHES "ifort")
@@ -37,7 +37,7 @@ endif()
 
 #For caf
 if(CMAKE_Fortran_COMPILER MATCHES "caf")
-  set(LINKS "lapack blas ${SPG_LIB}")
+  set(LINKS "-lblas -llapack ${SPG_LIB}")
 endif()
 
 #Set elphbolt source
@@ -76,7 +76,7 @@ foreach(module misc)
   add_executable(test_${module} tests/test_${module}.f90 ${SRC})
 
   #Link libraries
-  target_link_libraries(test_${module} testify -mkl ${LINKS})
+  target_link_libraries(test_${module} testify ${LINKS})
 
   #Add to test battery
   add_test(test_${module} bin/test_${module})
