@@ -4,6 +4,9 @@ cmake_minimum_required(VERSION 3.10)
 #Set project name and language
 project(elphbolt Fortran)
 
+#Set directory for executable binary/ies
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+
 #Set compiler
 set(CMAKE_Fortran_COMPILER "ifort")
 #set(CMAKE_Fortran_COMPILER "caf")
@@ -26,9 +29,55 @@ endif()
 #Set spg library
 find_library(SPG_LIB NAMES symspg REQUIRED)
 
-#Set directory for executable binary/ies
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(SRC
+  src/params.f90
+  src/misc.f90
+  src/spglib_wrapper.f90
+  src/numerics.f90
+  src/migel_sc.f90
+  src/crystal.f90
+  src/symmetry.f90
+  src/wannier.f90
+  src/delta.f90
+  src/particle.f90
+  src/electron.f90
+  src/phonon.f90
+  src/bz_sums.f90
+  src/green.f90
+  src/phonon_defect.f90
+  src/interactions.f90
+  src/eliashberg.f90
+  src/bte.f90)
 
-#Set source directory/ies
-add_subdirectory(src)
+add_executable(elphbolt src/elphbolt.f90 ${SRC})
 
+#For ifort
+if(CMAKE_Fortran_COMPILER MATCHES "ifort")
+  target_link_libraries(elphbolt -mkl "${SPG_LIB}")
+endif()
+
+#For caf
+if(CMAKE_Fortran_COMPILER MATCHES "caf")
+  target_link_libraries(elphbolt lapack blas "${SPG_LIB}")
+endif()
+
+#Set tests library
+add_library(testify thirdparty/testify/src/testify.f90)
+
+enable_testing()
+
+foreach(module misc)
+  add_executable(test_${module} tests/test_${module}.f90 ${SRC})
+  
+  #For ifort
+  if(CMAKE_Fortran_COMPILER MATCHES "ifort")
+    target_link_libraries(test_${module} testify -mkl "${SPG_LIB}")
+  endif()
+
+  #For caf
+  if(CMAKE_Fortran_COMPILER MATCHES "caf")
+    target_link_libraries(test_${module} testify lapack blas "${SPG_LIB}")
+  endif()
+
+  add_test(test_${module} bin/test_${module})
+endforeach()
