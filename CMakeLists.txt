@@ -29,6 +29,18 @@ endif()
 #Set spg library
 find_library(SPG_LIB NAMES symspg REQUIRED)
 
+#Set compiler dependent library links
+#For ifort
+if(CMAKE_Fortran_COMPILER MATCHES "ifort")
+  set(LINKS "-mkl ${SPG_LIB}")
+endif()
+
+#For caf
+if(CMAKE_Fortran_COMPILER MATCHES "caf")
+  set(LINKS "lapack blas ${SPG_LIB}")
+endif()
+
+#Set elphbolt source
 set(SRC
   src/params.f90
   src/misc.f90
@@ -49,35 +61,23 @@ set(SRC
   src/eliashberg.f90
   src/bte.f90)
 
+#Set elphbolt driver program
 add_executable(elphbolt src/elphbolt.f90 ${SRC})
 
-#For ifort
-if(CMAKE_Fortran_COMPILER MATCHES "ifort")
-  target_link_libraries(elphbolt -mkl "${SPG_LIB}")
-endif()
-
-#For caf
-if(CMAKE_Fortran_COMPILER MATCHES "caf")
-  target_link_libraries(elphbolt lapack blas "${SPG_LIB}")
-endif()
+#Link libraries
+target_link_libraries(elphbolt ${LINKS})
 
 #Set tests library
 add_library(testify thirdparty/testify/src/testify.f90)
 
 enable_testing()
-
 foreach(module misc)
+  #Set test program
   add_executable(test_${module} tests/test_${module}.f90 ${SRC})
-  
-  #For ifort
-  if(CMAKE_Fortran_COMPILER MATCHES "ifort")
-    target_link_libraries(test_${module} testify -mkl "${SPG_LIB}")
-  endif()
 
-  #For caf
-  if(CMAKE_Fortran_COMPILER MATCHES "caf")
-    target_link_libraries(test_${module} testify lapack blas "${SPG_LIB}")
-  endif()
+  #Link libraries
+  target_link_libraries(test_${module} testify -mkl ${LINKS})
 
+  #Add to test battery
   add_test(test_${module} bin/test_${module})
 endforeach()
