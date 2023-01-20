@@ -62,18 +62,18 @@ set(SRC
   src/bte.f90)
 
 #Set elphbolt driver program
-add_executable(elphbolt src/elphbolt.f90 ${SRC})
+add_executable(elphbolt app/elphbolt.f90 ${SRC})
 
 #Link libraries
 target_link_libraries(elphbolt ${LINKS})
 
-#Set tests library
+#Set test library
 add_library(testify thirdparty/testify/src/testify.f90)
 
 enable_testing()
 foreach(module misc)
   #Set test program
-  add_executable(test_${module} tests/test_${module}.f90 ${SRC})
+  add_executable(test_${module} test/test_${module}.f90 ${SRC})
 
   #Link libraries
   target_link_libraries(test_${module} testify ${LINKS})
