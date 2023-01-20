@@ -40,7 +40,7 @@ Above, you can change the build path with the additional argument ~--install-pre
 
 *** 3. Build
 **** Using cmake [Preferred]
-Issue the following commands to build and run tests: ~mkdir build; cd build; cmake ..; make; ctests~. If all goes well, the exectuable will be available as ~build/bin/elphbolt~.
+Issue the following commands to build and run tests: ~mkdir build; cd build; cmake ..; make; ctest~. If all goes well, the exectuable will be available as ~build/bin/elphbolt~.
 **** Using make [Deprecated]
 Alternatively, you can use make. In the ~Makefiles~ directory you will find a few ~<title>.make~ files. Adapt them to your own architecture. Then, in the ~Makefile~ include your personal ~<title>.make~ file at the top, commenting out any exiting one. Copy your ~Makefile~ and ~<title>.make~ files to the ~src/~ directory.
 
