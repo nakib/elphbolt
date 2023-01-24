@@ -86,35 +86,46 @@ contains
     get_status = self%status
   end function get_status
     
-  subroutine assert_scalar(self, val, ref)
+  subroutine assert_scalar(self, val, ref, tol)
     class(testify), intent(inout) :: self
     class(*), intent(in) :: val, ref
+    class(*), intent(in), optional :: tol
 
     self%test_count = self%test_count + 1
-    
-    self%status = self%assert_elemental(val, ref) .eqv. .true.
+
+    if(present(tol)) then
+       self%status = self%assert_elemental(val, ref, tol) .eqv. .true.
+    else
+       self%status = self%assert_elemental(val, ref) .eqv. .true.
+    end if
 
     if(self%status) self%pass_count = self%pass_count + 1
 
     call print_test_result(self%name, self%status)
   end subroutine assert_scalar
   
-  subroutine assert_array(self, val, ref)
+  subroutine assert_array(self, val, ref, tol)
     class(testify), intent(inout) :: self
     class(*), intent(in) :: val(:), ref(:)
+    class(*), intent(in), optional :: tol
     
     self%test_count = self%test_count + 1
-    
-    self%status = all(self%assert_elemental(val, ref) .eqv. .true.)
+
+    if(present(tol)) then
+       self%status = all(self%assert_elemental(val, ref, tol) .eqv. .true.)
+    else
+       self%status = all(self%assert_elemental(val, ref) .eqv. .true.)
+    end if
 
     if(self%status) self%pass_count = self%pass_count + 1
 
     call print_test_result(self%name, self%status)
   end subroutine assert_array
   
-  elemental logical function assert_elemental(self, val, ref)
+  elemental logical function assert_elemental(self, val, ref, tol)
     class(testify), intent(in) :: self
     class(*), intent(in) :: val, ref
+    class(*), intent(in), optional :: tol
 
     assert_elemental = .false.
     
@@ -158,37 +169,85 @@ contains
     type is(real(r32))
        select type(ref)
        type is(real(r32))
-          assert_elemental = val == ref
+          if(present(tol)) then
+             select type(tol)
+             type is(real(r32))
+                assert_elemental = abs(val - ref) < tol
+             end select
+          else
+             assert_elemental = val == ref
+          end if
        end select
        
     type is(real(r64))
        select type(ref)
        type is(real(r64))
-          assert_elemental = val == ref
+          if(present(tol)) then
+             select type(tol)
+             type is(real(r64))
+                assert_elemental = abs(val - ref) < tol
+             end select
+          else
+             assert_elemental = val == ref
+          end if
        end select
 
     type is(real(r128))
        select type(ref)
        type is(real(r128))
-          assert_elemental = val == ref
+          if(present(tol)) then
+             select type(tol)
+             type is(real(r128))
+                assert_elemental = abs(val - ref) < tol
+             end select
+          else
+             assert_elemental = val == ref
+          end if
        end select
 
     type is(complex(r32))
        select type(ref)
        type is(complex(r32))
-          assert_elemental = val == ref
+          if(present(tol)) then
+             select type(tol)
+             type is(real(r32))
+                assert_elemental = &
+                     (abs(val%re - ref%re) < tol) .and. &
+                     (abs(val%im - ref%im) < tol)
+             end select
+          else
+             assert_elemental = val == ref
+          end if
        end select
 
     type is(complex(r64))
        select type(ref)
        type is(complex(r64))
-          assert_elemental = val == ref
+          if(present(tol)) then
+             select type(tol)
+             type is(real(r64))
+                assert_elemental = &
+                     (abs(val%re - ref%re) < tol) .and. &
+                     (abs(val%im - ref%im) < tol)
+             end select
+          else
+             assert_elemental = val == ref
+          end if
        end select
 
     type is(complex(r128))
        select type(ref)
        type is(complex(r128))
-          assert_elemental = val == ref
+          if(present(tol)) then
+             select type(tol)
+             type is(real(r128))
+                assert_elemental = &
+                     (abs(val%re - ref%re) < tol) .and. &
+                     (abs(val%im - ref%im) < tol)
+             end select
+          else
+             assert_elemental = val == ref
+          end if
        end select
     end select
   end function assert_elemental
