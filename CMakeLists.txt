@@ -71,13 +71,29 @@ target_link_libraries(elphbolt ${LINKS})
 add_library(testify thirdparty/testify/src/testify.f90)
 
 enable_testing()
-foreach(module misc)
+
+#Unit tests
+foreach(component misc)
   #Set test program
-  add_executable(test_${module} test/test_${module}.f90 ${SRC})
+  add_executable(test_${component} test/test_${component}.f90 ${SRC})
 
   #Link libraries
-  target_link_libraries(test_${module} testify ${LINKS})
+  target_link_libraries(test_${component} testify ${LINKS})
 
   #Add to test battery
-  add_test(test_${module} bin/test_${module})
+  add_test(test_${component} bin/test_${component})
 endforeach()
+
+#Regression tests
+find_program (bash /bin/bash)
+if(bash)
+  #For ifort
+  if(CMAKE_Fortran_COMPILER MATCHES "ifort")
+    add_test (bte_regression ${script} ../test/3C-SiC/run_bte_ifort.sh)
+  endif()
+
+  #For caf
+  if(CMAKE_Fortran_COMPILER MATCHES "caf")
+    add_test (bte_regression ${script} ../test/3C-SiC/run_bte_caf.sh)
+  endif()
+endif(bash)

@@ -212,8 +212,8 @@ contains
              select type(tol)
              type is(real(r32))
                 assert_elemental = &
-                     (abs(val%re - ref%re) < tol) .and. &
-                     (abs(val%im - ref%im) < tol)
+                     (abs(real(val) - real(ref)) < tol) .and. &
+                     (abs(imag(val) - imag(ref)) < tol)
              end select
           else
              assert_elemental = val == ref
@@ -227,8 +227,8 @@ contains
              select type(tol)
              type is(real(r64))
                 assert_elemental = &
-                     (abs(val%re - ref%re) < tol) .and. &
-                     (abs(val%im - ref%im) < tol)
+                     (abs(real(val) - real(ref)) < tol) .and. &
+                     (abs(imag(val) - imag(ref)) < tol)
              end select
           else
              assert_elemental = val == ref
@@ -242,8 +242,8 @@ contains
              select type(tol)
              type is(real(r128))
                 assert_elemental = &
-                     (abs(val%re - ref%re) < tol) .and. &
-                     (abs(val%im - ref%im) < tol)
+                     (abs(real(val) - real(ref)) < tol) .and. &
+                     (abs(imag(val) - imag(ref)) < tol)
              end select
           else
              assert_elemental = val == ref
