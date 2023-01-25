@@ -8,14 +8,16 @@ project(elphbolt Fortran)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 #Set compiler
-#set(CMAKE_Fortran_COMPILER "ifort")
-set(CMAKE_Fortran_COMPILER "caf")
+set(CMAKE_Fortran_COMPILER "ifort")
+#set(CMAKE_Fortran_COMPILER "caf")
 
 #Set flags and mkl library for ifort
 if(CMAKE_Fortran_COMPILER MATCHES "ifort")
-  set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -O2 -fPIC -warn -no-wrap-margin -coarray=distributed")
+  set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -O2 -fPIC -warn -no-wrap-margin -coarray=distributed -fp-model source")
 
-  find_library(MKL_LIB REQUIRED)
+  #find_library(MKL_LIB REQUIRED)
+  find_library(BLAS_LIB NAMES blas REQUIRED)
+  find_library(LAPACK_LIB NAMES lapack REQUIRED)
 endif()
 
 #Set flags and blas+lapack libraries for caf
@@ -32,7 +34,8 @@ find_library(SPG_LIB NAMES symspg REQUIRED)
 #Set compiler dependent library links
 #For ifort
 if(CMAKE_Fortran_COMPILER MATCHES "ifort")
-  set(LINKS "-mkl ${SPG_LIB}")
+  #set(LINKS "-mkl ${SPG_LIB}")
+  set(LINKS "-lblas -llapack ${SPG_LIB}")
 endif()
 
 #For caf
@@ -84,7 +87,13 @@ foreach(component misc)
   add_test(test_${component} bin/test_${component})
 endforeach()
 
-#Regression tests
+#BTE regression test
+#Set test program
+add_executable(test_bte_regression test/bte_regression.f90 ${SRC})
+
+#Link libraries
+target_link_libraries(test_bte_regression testify ${LINKS})
+
 find_program (bash /bin/bash)
 if(bash)
   #For ifort

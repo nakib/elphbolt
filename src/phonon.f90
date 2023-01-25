@@ -785,8 +785,8 @@ contains
     complex(r64), optional, intent(out) :: eigenvect(nk, self%numbands, self%numbands)
 
     ! QE's 2nd-order files are in Ryd units.
-    real(r64),parameter :: toTHz=20670.687,&
-         massfactor=1.8218779*6.022e-4
+    real(r64),parameter :: toTHz=20670.687_r64,&
+         massfactor=1.8218779_r64*6.022e-4_r64
 
     integer(i64) :: ir,nreq,ntype,nat,nbranches
     integer(i64) :: i,j,ipol,jpol,iat,jat,idim,jdim,t1,t2,t3,m1,m2,m3,ik
@@ -854,9 +854,9 @@ contains
     
     volume_r = crys%volume/bohr2nm**3
 
-    gmax=14.
+    gmax=14.0_r64
     alpha=(twopi*bohr2nm/dnrm2(3,crys%lattvecs(:,1),1))**2
-    geg=gmax*4.*alpha
+    geg=gmax*4.0_r64*alpha
     ncell_g=int(sqrt(geg)/self%cell_g(:,0))+1
     
     dyn_s = 0.0_r64
@@ -864,7 +864,7 @@ contains
     
     do iat=1,nat
        do jat=1,nat
-          total_weight=0.0d0
+          total_weight=0.0_r64
           do m1=-2*self%scell(1),2*self%scell(1)
              do m2=-2*self%scell(2),2*self%scell(2)
                 do m3=-2*self%scell(3),2*self%scell(3)
@@ -872,23 +872,23 @@ contains
                       t(i)=m1*self%cell_r(1,i)+m2*self%cell_r(2,i)+m3*self%cell_r(3,i)
                       r_ws(i)=t(i)+self%rr(iat,jat,i)
                    end do
-                   weight=0.d0
+                   weight=0._r64
                    nreq=1
                    j=0
                    Do ir=1,124
                       ck=dot_product(r_ws,self%rws(ir,1:3))-self%rws(ir,0)
-                      if(ck.gt.1e-6) then
+                      if(ck.gt.1e-6_r64) then
                          j=1
                          cycle
                       end if
-                      if(abs(ck).lt.1e-6) then
+                      if(abs(ck).lt.1e-6_r64) then
                          nreq=nreq+1
                       end if
                    end do
                    if(j.eq.0) then
-                      weight=1.d0/dble(nreq)
+                      weight=1._r64/dble(nreq)
                    end if
-                   if(weight.gt.0.d0) then
+                   if(weight.gt.0._r64) then
                       t1=mod(m1+1,self%scell(1))
                       if(t1.le.0) then
                          t1=t1+self%scell(1)
@@ -937,8 +937,8 @@ contains
                 g(1:3)=m1*self%cell_g(1,1:3)+&
                      m2*self%cell_g(2,1:3)+m3*self%cell_g(3,1:3)
                 geg=dot_product(g(1:3),matmul(eps,g(1:3)))
-                if(geg.gt.0.0d0.and.geg/alpha/4.0d0.lt.gmax) then
-                   exp_g=exp(-geg/alpha/4.0d0)/geg
+                if(geg.gt.0.0_r64.and.geg/alpha/4.0_r64.lt.gmax) then
+                   exp_g=exp(-geg/alpha/4.0_r64)/geg
                    do iat=1,nat
                       zig(1:3)=matmul(g(1:3),zeff(iat,1:3,1:3))
                       auxi(1:3)=0.
@@ -961,8 +961,8 @@ contains
                 do ik=1,nk
                    g(1:3)=g_old(1:3)+k(ik,1:3)
                    geg=dot_product(g(1:3),matmul(eps,g(1:3)))
-                   if (geg.gt.0.0d0.and.geg/alpha/4.0d0.lt.gmax) then
-                      exp_g=exp(-geg/alpha/4.0d0)/geg
+                   if (geg.gt.0.0_r64.and.geg/alpha/4.0_r64.lt.gmax) then
+                      exp_g=exp(-geg/alpha/4.0_r64)/geg
                       dgeg=matmul(eps+transpose(eps),g(1:3))
                       do iat=1,nat
                          zig(1:3)=matmul(g(1:3),zeff(iat,1:3,1:3))
@@ -1005,6 +1005,14 @@ contains
        if(present(velocities)) then
           ddyn(:,:,:) = ddyn_s(ik,:,:,:) + ddyn_g(ik,:,:,:)
        end if
+
+       !Force Hermiticity
+       do ipol = 1, nbranches
+          do jpol = ipol + 1, nbranches
+             dyn(ipol, jpol) = (dyn(ipol, jpol) + conjg(dyn(jpol, ipol)))*0.5_r64
+             dyn(jpol, ipol) = dyn(ipol, jpol)
+          end do
+       end do
        
        do ipol=1,3
           do jpol=1,3

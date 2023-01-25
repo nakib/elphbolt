@@ -145,5 +145,5 @@ program test_misc
   tests_all = testify(test_array)
   call tests_all%report
   
-  if (tests_all%get_status() .eqv. .false.) error stop
+  if (tests_all%get_status() .eqv. .false.) error stop -1
 end program test_misc
