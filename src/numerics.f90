@@ -75,6 +75,8 @@ module numerics_module
      !! Use phonon-substitution scattering?
      logical :: phbound
      !! Use phonon-boundary scattering?
+     logical :: phthinfilm
+     !! Use phonon-thin-film scattering?
      logical :: phdef_Tmat
      !! Calculate phonon-defect scattering T-matrix?
      logical :: onlyphbte
@@ -127,13 +129,14 @@ contains
     real(r64) :: fsthick, conv_thres, ph_en_min, ph_en_max, el_en_min, el_en_max
     character(len = 1024) :: datadumpdir, tag
     logical :: read_gq2, read_gk2, read_V, read_W, tetrahedra, phe, phiso, phsubs, &
-         phbound, phdef_Tmat, onlyphbte, onlyebte, elchimp, elbound, drag, plot_along_path
+         phbound, phdef_Tmat, onlyphbte, onlyebte, elchimp, elbound, drag, plot_along_path, &
+         phthinfilm
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
          read_V, read_W, tetrahedra, phe, phiso, phsubs, onlyphbte, onlyebte, maxiter, &
          conv_thres, drag, elchimp, plot_along_path, runlevel, ph_en_min, ph_en_max, &
          ph_en_num, el_en_min, el_en_max, el_en_num, phbound, elbound, phdef_Tmat, &
-         ph_mfp_npts
+         ph_mfp_npts, phthinfilm 
 
     call subtitle("Reading numerics information...")
     
@@ -154,6 +157,7 @@ contains
     phiso = .false.
     phsubs = .false.
     phbound = .false.
+    phthinfilm = .false.
     phdef_Tmat = .false.
     onlyphbte = .false.
     onlyebte = .false.
@@ -197,6 +201,7 @@ contains
        self%phiso = phiso
        self%phsubs = phsubs
        self%phbound = phbound
+       self%phthinfilm = phthinfilm
        self%phdef_Tmat = phdef_Tmat
        self%onlyphbte = onlyphbte
        self%onlyebte = onlyebte
@@ -304,10 +309,15 @@ contains
           write(*, "(A, L)") "Include ph-isotope interaction: ", self%phiso       
           write(*, "(A, L)") "Include ph-substitution interaction: ", self%phsubs
           write(*, "(A, L)") "Include ph-boundary interaction: ", self%phbound
+          write(*, "(A, L)") "Include ph-thin-film interaction: ", self%phthinfilm
           write(*, "(A, L)") "Include ph-defect interaction using the T-matrix: ", self%phdef_Tmat
           if(self%phbound) then
              write(*,"(A,(1E16.8,x),A)") 'Characteristic length for ph-boundary scattering =', &
                   crys%bound_length, 'mm'
+          end if
+          if(self%phthinfilm) then
+             write(*,"(A,(1E16.8,x),A,A,A)") 'Height for ph-thin-film scattering =', &
+                  crys%thinfilm_height, 'mm along', crys%thinfilm_normal, ' direction'
           end if
           write(*, "(A, L)") "Include el-charged impurity interaction: ", self%elchimp
           write(*, "(A, L)") "Include el-boundary interaction: ", self%elbound

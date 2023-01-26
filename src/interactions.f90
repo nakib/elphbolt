@@ -35,7 +35,8 @@ module interactions
        calculate_ph_rta_rates, read_transition_probs_e, &
        calculate_eph_interaction_ibzq, calculate_eph_interaction_ibzk, &
        calculate_echimp_interaction_ibzk, calculate_el_rta_rates, &
-       calculate_bound_scatt_rates, calculate_defect_scatt_rates
+       calculate_bound_scatt_rates, calculate_defect_scatt_rates, &
+       calculate_thinfilm_scatt_rates
 
   !external chdir, system
   
@@ -1437,6 +1438,62 @@ contains
     !Write to file
     call write2file_rank2_real(prefix // '.W_rta_'//prefix//'bound', scatt_rates)
   end subroutine calculate_bound_scatt_rates
+
+  subroutine calculate_thinfilm_scatt_rates(prefix, finite_crys, height, normal, vels_fbz, &
+       indexlist_irred, scatt_rates)
+    !! Subroutine to calculate the phonon/electron-thin-film scattering rates.
+    !!
+    !! prefix Type of particle
+    !! finite_crys Is the crystal finite?
+    !! height Height of thin-film in mm
+    !! normal Normal direction to thin-film
+    !! vels Velocities on the FBZ
+    !! indexlist_irred List of muxed indices of the IBZ wedge.
+    !! scatt_rates Thin-film scattering rates on the IBZ
+
+    character(len = 2), intent(in) :: prefix
+    logical, intent(in) :: finite_crys
+    real(r64), intent(in) :: height
+    character(1), intent(in) :: normal
+    real(r64), intent(in) :: vels_fbz(:,:,:)
+    integer(i64), intent(in) :: indexlist_irred(:)
+    real(r64), allocatable, intent(out) :: scatt_rates(:,:)
+
+    !Local variables
+    integer(i64) :: ik, ib, nk_irred, nb, dir
+
+    !Number of IBZ wave vectors and bands
+    nk_irred = size(indexlist_irred(:))
+    nb = size(vels_fbz(1,:,1))
+
+    !Allocate boundary scattering rates and initialize to infinite crystal values
+    allocate(scatt_rates(nk_irred, nb))
+    scatt_rates = 0.0_r64
+
+    if(normal == 'x') then
+       dir = 1_i64
+    else if(normal == 'y') then
+       dir = 2_i64
+    else if(normal == 'z') then
+       dir = 3_i64
+    else
+       call exit_with_message("Bad thin-film normal direction in calculate_thinfilm_scattrates. Exiting.")
+    end if
+    
+    !Check finiteness of crystal
+    if(finite_crys) then
+       do ik = 1, nk_irred
+          do ib = 1, nb
+             scatt_rates(ik, ib) = abs(vels_fbz(indexlist_irred(ik), ib, dir)) &
+                  /height*1.e-6_r64 !THz
+          end do
+       end do
+    end if
+    scatt_rates = 2.0_r64*scatt_rates
+
+    !Write to file
+    call write2file_rank2_real(prefix // '.W_rta_'//prefix//'thinfilm', scatt_rates)
+  end subroutine calculate_thinfilm_scatt_rates
 
   subroutine calculate_defect_scatt_rates(prefix, def_frac, indexlist_ibz, ens_fbz, diagT)!, scatt_rates)
     !! Subroutine to calculate the phonon-defect scattering rate given

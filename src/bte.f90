@@ -50,6 +50,8 @@ module bte_module
      !! Phonon RTA scattering rates on the IBZ due to substitution scattering.
      real(r64), allocatable :: ph_rta_rates_bound_ibz(:,:)
      !! Phonon RTA scattering rates on the IBZ due to boundary scattering.
+     real(r64), allocatable :: ph_rta_rates_thinfilm_ibz(:,:)
+     !! Phonon RTA scattering rates on the IBZ due to thin-film scattering.
      real(r64), allocatable :: ph_rta_rates_ibz(:,:)
      !! Phonon RTA scattering rates on the IBZ.
      real(r64), allocatable :: ph_field_term_T(:,:,:)
@@ -145,7 +147,7 @@ contains
        !Matthiessen's rule
        self%ph_rta_rates_ibz = rates_3ph + rates_phe + &
             self%ph_rta_rates_iso_ibz + self%ph_rta_rates_subs_ibz + &
-            self%ph_rta_rates_bound_ibz
+            self%ph_rta_rates_bound_ibz + self%ph_rta_rates_thinfilm_ibz
 
        !gradT field:
        ! Calculate field term (gradT=>F0)

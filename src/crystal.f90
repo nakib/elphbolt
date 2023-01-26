@@ -95,6 +95,10 @@ module crystal_module
      !! Thickness of the system
      real(r64) :: bound_length
      !! Characteristic boundary scattering length in mm
+     real(r64) :: thinfilm_height
+     !! Height of thin-film in mm
+     character(1) :: thinfilm_normal
+     !! Normal direction of the thin-film: 'x', 'y', or 'z'.
      
    contains
 
@@ -115,16 +119,18 @@ contains
          basis_cart(:,:), subs_perc(:), subs_masses(:), subs_conc(:), &
          dopant_masses(:, :), dopant_conc(:, :)
     real(r64) :: epsilon(3,3), lattvecs(3,3), T, &
-         epsilon0, epsiloninf, subs_mavg, bound_length
+         epsilon0, epsiloninf, subs_mavg, bound_length, thinfilm_height
     character(len=3), allocatable :: elements(:)
     character(len=100) :: name
+    character(1) :: thinfilm_normal
     logical :: polar, autoisotopes, read_epsiloninf, twod
     
     namelist /allocations/ numelements, numatoms
     namelist /crystal_info/ name, elements, atomtypes, basis, lattvecs, &
          polar, born, epsilon, read_epsiloninf, epsilon0, epsiloninf, &
          masses, T, autoisotopes, twod, subs_masses, subs_conc, bound_length, &
-         defect_hosts, numdopants_types, dopant_masses, dopant_conc
+         defect_hosts, numdopants_types, dopant_masses, dopant_conc, thinfilm_height, &
+         thinfilm_normal
 
     call subtitle("Setting up crystal...")
 
@@ -174,6 +180,8 @@ contains
     subs_conc = 0.0_r64
     defect_hosts = -1_i64
     bound_length = 1.e12_r64 !mm, practically inifinity
+    thinfilm_height = 1.e12_r64 !mm, practically inifinity
+    thinfilm_normal = 'z'
     numdopants_types = [1, 1]
     dopant_masses = 0.0_r64
     dopant_conc = 0.0_r64
@@ -186,6 +194,12 @@ contains
     end if
     if(bound_length <= 0.0_r64) then
        call exit_with_message('Characteristic length for boundary scattering must be positive.')
+    end if
+    if(thinfilm_height <= 0.0_r64) then
+       call exit_with_message('Height of thin-film must be positive.')
+    end if
+    if(.not. (thinfilm_normal == 'x' .or.  thinfilm_normal == 'y' .or. thinfilm_normal == 'z')) then
+       call exit_with_message("Thin-film normal direction must be 'x', 'y', or 'z'.")
     end if
 
     !Close input file
@@ -209,6 +223,8 @@ contains
     self%subs_masses = subs_masses
     self%subs_conc = subs_conc
     self%bound_length = bound_length
+    self%thinfilm_height = thinfilm_height
+    self%thinfilm_normal = thinfilm_normal
     self%defect_hosts = defect_hosts
     self%numdopants_types = numdopants_types
     
