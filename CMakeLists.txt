@@ -11,37 +11,24 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 set(CMAKE_Fortran_COMPILER "ifort")
 #set(CMAKE_Fortran_COMPILER "caf")
 
-#Set flags and mkl library for ifort
+
+#Set flags for ifort
 if(CMAKE_Fortran_COMPILER MATCHES "ifort")
   set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -O2 -fPIC -warn -no-wrap-margin -coarray=distributed -fp-model source")
-
-  #find_library(MKL_LIB REQUIRED)
-  find_library(BLAS_LIB NAMES blas REQUIRED)
-  find_library(LAPACK_LIB NAMES lapack REQUIRED)
 endif()
 
-#Set flags and blas+lapack libraries for caf
+#Set flags for caf
 if(CMAKE_Fortran_COMPILER MATCHES "caf")
   set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -O2 -fPIC -fbounds-check -Wunused -Wconversion -Wunderflow -Wdo-subscript")
-
-  find_library(BLAS_LIB NAMES blas REQUIRED)
-  find_library(LAPACK_LIB NAMES lapack REQUIRED)
 endif()
 
 #Set spg library
 find_library(SPG_LIB NAMES symspg REQUIRED)
+find_library(BLAS_LIB NAMES blas REQUIRED)
+find_library(LAPACK_LIB NAMES lapack REQUIRED)
 
-#Set compiler dependent library links
-#For ifort
-if(CMAKE_Fortran_COMPILER MATCHES "ifort")
-  #set(LINKS "-mkl ${SPG_LIB}")
-  set(LINKS "-lblas -llapack ${SPG_LIB}")
-endif()
-
-#For caf
-if(CMAKE_Fortran_COMPILER MATCHES "caf")
-  set(LINKS "-lblas -llapack ${SPG_LIB}")
-endif()
+#Set library links
+set(LINKS "-lblas -llapack ${SPG_LIB}")
 
 #Set elphbolt source
 set(SRC

@@ -1,4 +1,4 @@
-program test_misc
+program bte_regression
 
   use iso_fortran_env, only : r64 => real64, i64 => int64
   use testify_m, only : testify
@@ -21,9 +21,6 @@ program test_misc
   integer :: itest
   integer, parameter :: num_tests = 8
   type(testify) :: test_array(num_tests), tests_all
-  integer(i64) :: index, quotient, remainder, int_array(5), v1(3), v2(3), v1_muxed, v2_muxed
-  real(r64) :: pauli1(2, 2), ipauli2(2, 2), pauli3(2, 2), &
-       real_array(5)
 
   type(numerics) :: num
   type(crystal) :: crys
@@ -335,4 +332,4 @@ program test_misc
   sync all
 
   call t_all%end_timer('elphbolt: BTE')
-end program test_misc
+end program bte_regression
