@@ -30,7 +30,7 @@ module bte_module
   use phonon_module, only: phonon
   use electron_module, only: electron
   use interactions, only: calculate_ph_rta_rates, read_transition_probs_e, &
-       calculate_el_rta_rates
+       calculate_el_rta_rates, calculate_bound_scatt_rates, calculate_thinfilm_scatt_rates
   use bz_sums, only: calculate_transport_coeff, calculate_spectral_transport_coeff, &
        calculate_mfp_cumulative_transport_coeff
 
@@ -138,16 +138,29 @@ contains
        allocate(self%ph_rta_rates_ibz(ph%nwv_irred, ph%numbands))
 
        !Calculate RTA scattering rates
+       ! phonon-boundary
+       call calculate_bound_scatt_rates(ph%prefix, num%phbound, crys%bound_length, &
+            ph%vels, ph%indexlist_irred, self%ph_rta_rates_bound_ibz)
+
+       ! phonon-thin-film
+       call calculate_thinfilm_scatt_rates(ph%prefix, num%phthinfilm, crys%thinfilm_height, &
+            crys%thinfilm_normal, ph%vels, ph%indexlist_irred, self%ph_rta_rates_thinfilm_ibz)
+       
+       ! 3-phonon and, optionally, phonon-electron 
        if(num%phe) then
           call calculate_ph_rta_rates(rates_3ph, rates_phe, num, crys, ph, el)
        else
           call calculate_ph_rta_rates(rates_3ph, rates_phe, num, crys, ph)
        end if
+
+       ! TODO 4-ph
+       !if(num%4ph) call calculate_4ph_rates(rates_4ph, num, crys, ph)
        
        !Matthiessen's rule
        self%ph_rta_rates_ibz = rates_3ph + rates_phe + &
             self%ph_rta_rates_iso_ibz + self%ph_rta_rates_subs_ibz + &
-            self%ph_rta_rates_bound_ibz + self%ph_rta_rates_thinfilm_ibz
+            self%ph_rta_rates_bound_ibz + self%ph_rta_rates_thinfilm_ibz !+ &
+            !rates_4ph
 
        !gradT field:
        ! Calculate field term (gradT=>F0)
@@ -231,7 +244,12 @@ contains
             el_alphabyT(el%numbands, 3, 3), el_kappa0(el%numbands, 3, 3))
        
        !Calculate RTA scattering rates
+       ! e-ph and e-impurity
        call calculate_el_rta_rates(rates_eph, self%el_rta_rates_echimp_ibz, num, crys, el)
+
+       ! e-boundary
+       call calculate_bound_scatt_rates(el%prefix, num%elbound, crys%bound_length, &
+            el%vels, el%indexlist_irred, self%el_rta_rates_bound_ibz)
 
        !Allocate total RTA scattering rates
        allocate(self%el_rta_rates_ibz(el%nwv_irred, el%numbands))

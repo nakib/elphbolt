@@ -35,8 +35,7 @@ program elphbolt
   use bz_sums, only: calculate_dos, calculate_qTF, calculate_el_dos_fermi, calculate_el_Ws
   use interactions, only: calculate_gReq, calculate_gkRp, calculate_3ph_interaction, &
        calculate_eph_interaction_ibzq, calculate_eph_interaction_ibzk, &
-       calculate_echimp_interaction_ibzk, calculate_bound_scatt_rates, &
-       calculate_defect_scatt_rates, calculate_thinfilm_scatt_rates
+       calculate_echimp_interaction_ibzk, calculate_defect_scatt_rates
   use eliashberg, only: calculate_a2F
   use phonon_defect_module, only: phonon_defect
   use Green_function, only: calculate_retarded_phonon_D0
@@ -102,10 +101,6 @@ program elphbolt
 
         !Calculate Thomas-Fermi screening
         call calculate_qTF(crys, el)
-
-        !Calculate boundary scattering rates.
-        call calculate_bound_scatt_rates(el%prefix, num%elbound, crys%bound_length, &
-             el%vels, el%indexlist_irred, bt%el_rta_rates_bound_ibz)
      end if
 
      !Calculate phonon density of states and, if needed, phonon-isotope
@@ -113,14 +108,6 @@ program elphbolt
      call calculate_dos(ph, num%tetrahedra, crys%gfactors, crys%subs_gfactors, &
           crys%atomtypes, bt%ph_rta_rates_iso_ibz, bt%ph_rta_rates_subs_ibz, &
           num%phiso, num%phsubs)
-
-     !Calculate boundary scattering rates.
-     call calculate_bound_scatt_rates(ph%prefix, num%phbound, crys%bound_length, &
-          ph%vels, ph%indexlist_irred, bt%ph_rta_rates_bound_ibz)
-
-     !Calculate thin-film scattering rates.
-     call calculate_thinfilm_scatt_rates(ph%prefix, num%phthinfilm, crys%thinfilm_height, &
-          crys%thinfilm_normal, ph%vels, ph%indexlist_irred, bt%ph_rta_rates_thinfilm_ibz)
 
      call t_event%end_timer('Density of states and one-particle scattering rates')
      
