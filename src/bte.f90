@@ -52,6 +52,12 @@ module bte_module
      !! Phonon RTA scattering rates on the IBZ due to boundary scattering.
      real(r64), allocatable :: ph_rta_rates_thinfilm_ibz(:,:)
      !! Phonon RTA scattering rates on the IBZ due to thin-film scattering.
+     real(r64), allocatable :: ph_rta_rates_3ph_ibz(:,:)
+     !! Phonon RTA scattering rates on the IBZ due to 3-ph interactions.
+     real(r64), allocatable :: ph_rta_rates_4ph_ibz(:,:)
+     !! Phonon RTA scattering rates on the IBZ due to 4-ph interactions.
+     real(r64), allocatable :: ph_rta_rates_phe_ibz(:,:)
+     !! Phonon RTA scattering rates on the IBZ due to ph-e interactions.
      real(r64), allocatable :: ph_rta_rates_ibz(:,:)
      !! Phonon RTA scattering rates on the IBZ.
      real(r64), allocatable :: ph_field_term_T(:,:,:)
@@ -67,6 +73,8 @@ module bte_module
      !! Electron RTA scattering rates on the IBZ due to charged impurity scattering.
      real(r64), allocatable :: el_rta_rates_bound_ibz(:,:)
      !! Electron RTA scattering rates on the IBZ due to boundary scattering.
+     real(r64), allocatable :: el_rta_rates_eph_ibz(:,:)
+     !! Electron RTA scattering rates on the IBZ due to e-ph interactions.
      real(r64), allocatable :: el_rta_rates_ibz(:,:)
      !! Electron RTA scattering rates on the IBZ.
      real(r64), allocatable :: el_field_term_T(:,:,:)
@@ -105,8 +113,7 @@ contains
     !Local variables
     character(len = 1024) :: tag, Tdir, tableheader
     integer(i64) :: iq, ik, it_ph, it_el, icart
-    real(r64), allocatable :: rates_3ph(:,:), rates_phe(:,:), rates_eph(:,:), &
-         I_diff(:,:,:), I_drag(:,:,:), ph_kappa(:,:,:), ph_alphabyT(:,:,:), &
+    real(r64), allocatable :: I_diff(:,:,:), I_drag(:,:,:), ph_kappa(:,:,:), ph_alphabyT(:,:,:), &
          el_sigma(:,:,:), el_sigmaS(:,:,:), el_alphabyT(:,:,:), el_kappa0(:,:,:), &
          dummy(:,:,:), ph_drag_term_T(:,:,:), ph_drag_term_E(:,:,:)
     real(r64) :: ph_kappa_scalar, ph_kappa_scalar_old, el_sigma_scalar, el_sigma_scalar_old, &
@@ -148,16 +155,16 @@ contains
        
        ! 3-phonon and, optionally, phonon-electron 
        if(num%phe) then
-          call calculate_ph_rta_rates(rates_3ph, rates_phe, num, crys, ph, el)
+          call calculate_ph_rta_rates(self%ph_rta_rates_3ph_ibz, self%ph_rta_rates_phe_ibz, num, crys, ph, el)
        else
-          call calculate_ph_rta_rates(rates_3ph, rates_phe, num, crys, ph)
+          call calculate_ph_rta_rates(self%ph_rta_rates_3ph_ibz, self%ph_rta_rates_phe_ibz, num, crys, ph)
        end if
 
        ! TODO 4-ph
        !if(num%4ph) call calculate_4ph_rates(rates_4ph, num, crys, ph)
        
        !Matthiessen's rule
-       self%ph_rta_rates_ibz = rates_3ph + rates_phe + &
+       self%ph_rta_rates_ibz = self%ph_rta_rates_3ph_ibz + self%ph_rta_rates_phe_ibz + &
             self%ph_rta_rates_iso_ibz + self%ph_rta_rates_subs_ibz + &
             self%ph_rta_rates_bound_ibz + self%ph_rta_rates_thinfilm_ibz !+ &
             !rates_4ph
@@ -201,8 +208,8 @@ contains
        call chdir(trim(adjustl(Tdir)))
 
        !Write T-dependent RTA scattering rates to file
-       call write2file_rank2_real('ph.W_rta_3ph', rates_3ph)
-       call write2file_rank2_real('ph.W_rta_phe', rates_phe)
+       call write2file_rank2_real('ph.W_rta_3ph', self%ph_rta_rates_3ph_ibz)
+       call write2file_rank2_real('ph.W_rta_phe', self%ph_rta_rates_phe_ibz)
        call write2file_rank2_real('ph.W_rta', self%ph_rta_rates_ibz)
 
        !Change back to cwd
@@ -245,7 +252,7 @@ contains
        
        !Calculate RTA scattering rates
        ! e-ph and e-impurity
-       call calculate_el_rta_rates(rates_eph, self%el_rta_rates_echimp_ibz, num, crys, el)
+       call calculate_el_rta_rates(self%el_rta_rates_eph_ibz, self%el_rta_rates_echimp_ibz, num, crys, el)
 
        ! e-boundary
        call calculate_bound_scatt_rates(el%prefix, num%elbound, crys%bound_length, &
@@ -255,7 +262,7 @@ contains
        allocate(self%el_rta_rates_ibz(el%nwv_irred, el%numbands))
 
        !Matthiessen's rule
-       self%el_rta_rates_ibz = rates_eph + self%el_rta_rates_echimp_ibz + &
+       self%el_rta_rates_ibz = self%el_rta_rates_eph_ibz + self%el_rta_rates_echimp_ibz + &
             self%el_rta_rates_bound_ibz
 
        !gradT field:
@@ -304,7 +311,7 @@ contains
        call chdir(trim(adjustl(Tdir)))
 
        !Write RTA scattering rates to file
-       call write2file_rank2_real('el.W_rta_eph', rates_eph)
+       call write2file_rank2_real('el.W_rta_eph', self%el_rta_rates_eph_ibz)
 
        !Write e-chimp RTA scattering rates to file
        call write2file_rank2_real('el.W_rta_echimp', self%el_rta_rates_echimp_ibz)
