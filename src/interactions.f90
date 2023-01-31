@@ -20,7 +20,7 @@ module interactions
   use params, only: i64, r64, pi, twopi, amu, qe, hbar_eVps, perm0
   use misc, only: exit_with_message, print_message, distribute_points, &
        demux_state, mux_vector, mux_state, expi, Bose, binsearch, Fermi, &
-       twonorm, write2file_rank2_real
+       twonorm, write2file_rank2_real, demux_vector, interpolate
   use wannier_module, only: epw_wannier
   use crystal_module, only: crystal
   use electron_module, only: electron
@@ -35,8 +35,8 @@ module interactions
        calculate_ph_rta_rates, read_transition_probs_e, &
        calculate_eph_interaction_ibzq, calculate_eph_interaction_ibzk, &
        calculate_echimp_interaction_ibzk, calculate_el_rta_rates, &
-       calculate_bound_scatt_rates, calculate_defect_scatt_rates, &
-       calculate_thinfilm_scatt_rates
+       calculate_bound_scatt_rates, calculate_thinfilm_scatt_rates, &
+       calculate_4ph_rta_rates
 
   !external chdir, system
   
@@ -1280,6 +1280,117 @@ contains
     end if
   end subroutine calculate_ph_rta_rates
 
+  subroutine calculate_4ph_rta_rates(rta_rates, num, crys, ph)
+    !! Subroutine for interporlating 4-ph scattering rates from an
+    !! external coarser mesh calculation.
+    
+    real(r64), allocatable, intent(out) :: rta_rates(:,:)
+    type(numerics), intent(in) :: num
+    type(crystal), intent(in) :: crys
+    type(phonon), intent(in) :: ph
+
+    !Local variables
+    integer(i64) :: chunk, s, iq, coarse_numq_irred, coarse_numq_full, &
+         num_active_images, start, end, fineq_indvec(3), mesh_ref_array(3), &
+         coarse_qmesh(3), fbz2ibz
+    real(r64) :: ignore
+    real(r64), allocatable :: coarse_rta_rates_ibz(:, :), coarse_rta_rates_fbz(:, :)
+    character(len=1024) :: temp_tag, filename
+
+    allocate(rta_rates(ph%nwv_irred, ph%numbands))
+    rta_rates = 0.0_r64
+
+    if(num%fourph) then
+       !Set some internal mesh related variables
+       mesh_ref_array = num%fourph_mesh_ref
+       if(crys%twod) mesh_ref_array(3) = 1
+       coarse_qmesh = num%fourph_mesh_ref*ph%wvmesh
+       if(crys%twod) coarse_qmesh(3) = 1
+
+       write(temp_tag, "(E9.3)") crys%T
+       filename = "FourPhonon_BTE.w_4ph_T" // trim(adjustl(temp_tag))
+
+       !Read number of irreducible q-points
+       if(this_image() == 1 .and. num%fourph) then
+          open(1, file=filename, status="old")
+          read(1, *) coarse_numq_irred
+       end if
+
+       sync all
+       call co_broadcast(coarse_numq_irred, 1)
+       sync all
+       
+       allocate(coarse_rta_rates_ibz(coarse_numq_irred, ph%numbands))
+       
+       !Read coarse mesh, IBZ 4-ph scattering rates
+       if(this_image() == 1 .and. num%fourph) then
+          open(1, file=filename, status="old")
+
+          do s = 1, ph%numbands
+             do iq = 1, coarse_numq_irred
+                read(1, *) ignore, coarse_rta_rates_ibz(iq, s)
+             end do
+          end do
+
+          close(1)
+       end if
+       sync all
+       call co_broadcast(coarse_rta_rates_ibz, 1)
+       sync all
+
+       !Compute FBZ <-> IBZ mapping from BTE.qpoints_full file
+       if(this_image() == 1 .and. num%fourph) then
+          open(1, file="FourPhonon_BTE.qpoints_full", status="old")
+
+          read(1, *) coarse_numq_full
+          if(coarse_numq_full /= product(coarse_qmesh)) then
+             call exit_with_message('Wrong q-mesh in external 4-ph calculation. Exiting.')
+          end if
+       end if
+
+       sync all
+       call co_broadcast(coarse_numq_full, 1)
+       sync all
+          
+       allocate(coarse_rta_rates_fbz(coarse_numq_full, ph%numbands))
+
+       if(this_image() == 1 .and. num%fourph) then
+          do iq = 1, coarse_numq_full
+             read(1, *) ignore, fbz2ibz, ignore, ignore, ignore
+             coarse_rta_rates_fbz(iq, :) = coarse_rta_rates_ibz(fbz2ibz, :)
+          end do
+
+          close(1)
+       end if
+       sync all
+       call co_broadcast(coarse_rta_rates_fbz, 1)
+       sync all
+       
+       !Divide phonon states among images
+       call distribute_points(ph%nwv_irred, chunk, start, end, num_active_images)
+
+       !If needed, parallely interpolate over fine q-mesh
+       if(num%fourph_mesh_ref > 1) then
+          do iq = start, end
+             !Calculate the fine mesh wave vector, 0-based index vector
+             call demux_vector(iq, fineq_indvec, ph%wvmesh, 0_i64)
+
+             !Interpolate 4-ph scattering rates on this wave vector
+             do s = 1, ph%numbands
+                call interpolate(coarse_qmesh, mesh_ref_array, coarse_rta_rates_fbz(:, s), &
+                     fineq_indvec, rta_rates(iq, s))
+             end do
+          end do
+
+          sync all
+          call co_sum(rta_rates)
+          sync all
+       else
+          rta_rates = coarse_rta_rates_ibz
+       end if
+    end if
+  end subroutine calculate_4ph_rta_rates
+  
   subroutine calculate_el_rta_rates(rta_rates_eph, rta_rates_echimp, num, crys, el)
     !! Subroutine for parallel reading of the e-ph transition probabilities
     !! from disk and calculating the relaxation time approximation (RTA)
@@ -1495,44 +1606,44 @@ contains
     call write2file_rank2_real(prefix // '.W_rta_'//prefix//'thinfilm', scatt_rates)
   end subroutine calculate_thinfilm_scatt_rates
 
-  subroutine calculate_defect_scatt_rates(prefix, def_frac, indexlist_ibz, ens_fbz, diagT)!, scatt_rates)
-    !! Subroutine to calculate the phonon-defect scattering rate given
-    !! the diagonal of the scattering T-matrix.
-    !!
-    !! prefix Particle type label
-    !! def_frac Elemental fraction of defects
-    !! ens IBZ energies
-    !! diagT Diagonal of the IBZ T-matrix
-    !! scatt_rates IBZ Scattering rates
-
-    character(len = 2), intent(in) :: prefix
-    real(r64), intent(in) :: def_frac
-    real(r64), intent(in) :: ens_fbz(:, :)
-    integer(i64), intent(in) :: indexlist_ibz(:)
-    complex(r64), intent(in) :: diagT(:, :)
-    !real(r64), allocatable, intent(out) :: scatt_rates(:, :)
-    
-    !Local variables
-    integer(i64) :: nk_ibz, nbands, ik
-    real(r64), allocatable :: scatt_rates(:, :)
-
-    nk_ibz = size(diagT, 1)
-    nbands = size(diagT, 2)
-
-    print*, 'def_frac = ', def_frac
-    
-    allocate(scatt_rates(nk_ibz, nbands))
-
-    do ik = 1, nk_ibz
-       scatt_rates(ik, :) = imag(diagT(ik, :))/ens_fbz(indexlist_ibz(ik), :)
-    end do
-
-    scatt_rates = -def_frac*scatt_rates/hbar_eVps
-
-    !Deal with Gamma point acoustic phonons! and zero-velocity optic phonons
-    scatt_rates(1, 1:3) = 0.0_r64
-    
-    !Write to file
-    call write2file_rank2_real(prefix // '.W_rta_'//prefix//'defect', scatt_rates)
-  end subroutine calculate_defect_scatt_rates
+!!$  subroutine calculate_defect_scatt_rates(prefix, def_frac, indexlist_ibz, ens_fbz, diagT)!, scatt_rates)
+!!$    !! Subroutine to calculate the phonon-defect scattering rate given
+!!$    !! the diagonal of the scattering T-matrix.
+!!$    !!
+!!$    !! prefix Particle type label
+!!$    !! def_frac Elemental fraction of defects
+!!$    !! ens IBZ energies
+!!$    !! diagT Diagonal of the IBZ T-matrix
+!!$    !! scatt_rates IBZ Scattering rates
+!!$
+!!$    character(len = 2), intent(in) :: prefix
+!!$    real(r64), intent(in) :: def_frac
+!!$    real(r64), intent(in) :: ens_fbz(:, :)
+!!$    integer(i64), intent(in) :: indexlist_ibz(:)
+!!$    complex(r64), intent(in) :: diagT(:, :)
+!!$    !real(r64), allocatable, intent(out) :: scatt_rates(:, :)
+!!$    
+!!$    !Local variables
+!!$    integer(i64) :: nk_ibz, nbands, ik
+!!$    real(r64), allocatable :: scatt_rates(:, :)
+!!$
+!!$    nk_ibz = size(diagT, 1)
+!!$    nbands = size(diagT, 2)
+!!$
+!!$    print*, 'def_frac = ', def_frac
+!!$    
+!!$    allocate(scatt_rates(nk_ibz, nbands))
+!!$
+!!$    do ik = 1, nk_ibz
+!!$       scatt_rates(ik, :) = imag(diagT(ik, :))/ens_fbz(indexlist_ibz(ik), :)
+!!$    end do
+!!$
+!!$    scatt_rates = -def_frac*scatt_rates/hbar_eVps
+!!$
+!!$    !Deal with Gamma point acoustic phonons! and zero-velocity optic phonons
+!!$    scatt_rates(1, 1:3) = 0.0_r64
+!!$    
+!!$    !Write to file
+!!$    call write2file_rank2_real(prefix // '.W_rta_'//prefix//'defect', scatt_rates)
+!!$  end subroutine calculate_defect_scatt_rates
 end module interactions

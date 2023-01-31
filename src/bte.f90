@@ -30,7 +30,8 @@ module bte_module
   use phonon_module, only: phonon
   use electron_module, only: electron
   use interactions, only: calculate_ph_rta_rates, read_transition_probs_e, &
-       calculate_el_rta_rates, calculate_bound_scatt_rates, calculate_thinfilm_scatt_rates
+       calculate_el_rta_rates, calculate_bound_scatt_rates, calculate_thinfilm_scatt_rates, &
+       calculate_4ph_rta_rates
   use bz_sums, only: calculate_transport_coeff, calculate_spectral_transport_coeff, &
        calculate_mfp_cumulative_transport_coeff
 
@@ -160,14 +161,14 @@ contains
           call calculate_ph_rta_rates(self%ph_rta_rates_3ph_ibz, self%ph_rta_rates_phe_ibz, num, crys, ph)
        end if
 
-       ! TODO 4-ph
-       !if(num%4ph) call calculate_4ph_rates(rates_4ph, num, crys, ph)
+       ! 4-ph scattering rates
+       call calculate_4ph_rta_rates(self%ph_rta_rates_4ph_ibz, num, crys, ph)
        
        !Matthiessen's rule
        self%ph_rta_rates_ibz = self%ph_rta_rates_3ph_ibz + self%ph_rta_rates_phe_ibz + &
             self%ph_rta_rates_iso_ibz + self%ph_rta_rates_subs_ibz + &
-            self%ph_rta_rates_bound_ibz + self%ph_rta_rates_thinfilm_ibz !+ &
-            !rates_4ph
+            self%ph_rta_rates_bound_ibz + self%ph_rta_rates_thinfilm_ibz + &
+            self%ph_rta_rates_4ph_ibz
 
        !gradT field:
        ! Calculate field term (gradT=>F0)
@@ -209,6 +210,7 @@ contains
 
        !Write T-dependent RTA scattering rates to file
        call write2file_rank2_real('ph.W_rta_3ph', self%ph_rta_rates_3ph_ibz)
+       call write2file_rank2_real('ph.W_rta_4ph', self%ph_rta_rates_4ph_ibz)
        call write2file_rank2_real('ph.W_rta_phe', self%ph_rta_rates_phe_ibz)
        call write2file_rank2_real('ph.W_rta', self%ph_rta_rates_ibz)
 

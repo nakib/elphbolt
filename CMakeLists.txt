@@ -8,9 +8,8 @@ project(elphbolt Fortran)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 #Set compiler
-set(CMAKE_Fortran_COMPILER "ifort")
-#set(CMAKE_Fortran_COMPILER "caf")
-
+#set(CMAKE_Fortran_COMPILER "ifort")
+set(CMAKE_Fortran_COMPILER "caf")
 
 #Set flags for ifort
 if(CMAKE_Fortran_COMPILER MATCHES "ifort")
@@ -85,11 +84,11 @@ find_program (bash /bin/bash)
 if(bash)
   #For ifort
   if(CMAKE_Fortran_COMPILER MATCHES "ifort")
-    add_test (bte_regression ${script} ../test/3C-SiC/run_bte_ifort.sh)
+    add_test (bte_regression bash ../test/3C-SiC/run_bte_ifort.sh)
   endif()
 
   #For caf
   if(CMAKE_Fortran_COMPILER MATCHES "caf")
-    add_test (bte_regression ${script} ../test/3C-SiC/run_bte_caf.sh)
+    add_test (bte_regression bash ../test/3C-SiC/run_bte_caf.sh)
   endif()
 endif(bash)

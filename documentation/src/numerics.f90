@@ -71,6 +71,8 @@ module numerics_module
      !! Use phonon-substitution scattering?
      logical :: phbound
      !! Use phonon-boundary scattering?
+     logical :: 4ph
+     !! Use 4-phonon scattering?
      logical :: onlyphbte
      !! Choose if only phonon BTE will be solved.
      logical :: onlyebte
@@ -119,12 +121,12 @@ contains
     real(dp) :: fsthick, conv_thres, ph_en_min, ph_en_max, el_en_min, el_en_max
     character(len = 1024) :: datadumpdir, tag
     logical :: read_gq2, read_gk2, read_V, read_W, tetrahedra, phe, phiso, phsubs, &
-         phbound, onlyphbte, onlyebte, elchimp, elbound, drag, plot_along_path
+         phbound, onlyphbte, onlyebte, elchimp, elbound, drag, plot_along_path, 4ph
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
          read_V, read_W, tetrahedra, phe, phiso, phsubs, onlyphbte, onlyebte, maxiter, &
          conv_thres, drag, elchimp, plot_along_path, runlevel, ph_en_min, ph_en_max, &
-         ph_en_num, el_en_min, el_en_max, el_en_num, phbound, elbound
+         ph_en_num, el_en_min, el_en_max, el_en_num, phbound, elbound, 4ph
 
     call subtitle("Reading numerics information...")
     
@@ -145,6 +147,7 @@ contains
     phiso = .false.
     phsubs = .false.
     phbound = .false.
+    4ph = .false.
     onlyphbte = .false.
     onlyebte = .false.
     elchimp = .false.
@@ -184,6 +187,7 @@ contains
     self%phiso = phiso
     self%phsubs = phsubs
     self%phbound = phbound
+    self%4ph = 4ph
     self%onlyphbte = onlyphbte
     self%onlyebte = onlyebte
     self%elchimp = elchimp
@@ -274,6 +278,7 @@ contains
        write(*, "(A, L)") "Include ph-isotope interaction: ", self%phiso       
        write(*, "(A, L)") "Include ph-substitution interaction: ", self%phsubs
        write(*, "(A, L)") "Include ph-boundary interaction: ", self%phbound
+       write(*, "(A, L)") "Include 4-ph interaction: ", self%4ph
        if(self%phbound) then
           write(*,"(A,(1E16.8,x),A)") 'Characteristic length for ph-boundary scattering =', &
                crys%bound_length, 'mm'

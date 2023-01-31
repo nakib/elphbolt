@@ -75,6 +75,10 @@ module numerics_module
      !! Use phonon-substitution scattering?
      logical :: phbound
      !! Use phonon-boundary scattering?
+     logical :: fourph
+     !! Use 4-ph scattering?
+     integer(i64) :: fourph_mesh_ref
+     !! Mesh refinement factor of phonon wavectors with respect to external 4-ph calculation 
      logical :: phthinfilm
      !! Use phonon-thin-film scattering?
      logical :: phdef_Tmat
@@ -125,18 +129,19 @@ contains
     type(crystal), intent(in) :: crys
     
     !Local variables
-    integer(i64) :: mesh_ref, qmesh(3), maxiter, runlevel, el_en_num, ph_en_num, ph_mfp_npts
+    integer(i64) :: mesh_ref, qmesh(3), maxiter, runlevel, el_en_num, &
+         ph_en_num, ph_mfp_npts, fourph_mesh_ref
     real(r64) :: fsthick, conv_thres, ph_en_min, ph_en_max, el_en_min, el_en_max
     character(len = 1024) :: datadumpdir, tag
     logical :: read_gq2, read_gk2, read_V, read_W, tetrahedra, phe, phiso, phsubs, &
          phbound, phdef_Tmat, onlyphbte, onlyebte, elchimp, elbound, drag, plot_along_path, &
-         phthinfilm
+         phthinfilm, fourph
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
          read_V, read_W, tetrahedra, phe, phiso, phsubs, onlyphbte, onlyebte, maxiter, &
          conv_thres, drag, elchimp, plot_along_path, runlevel, ph_en_min, ph_en_max, &
          ph_en_num, el_en_min, el_en_max, el_en_num, phbound, elbound, phdef_Tmat, &
-         ph_mfp_npts, phthinfilm 
+         ph_mfp_npts, phthinfilm , fourph, fourph_mesh_ref
 
     call subtitle("Reading numerics information...")
     
@@ -146,6 +151,7 @@ contains
     !Read numerics information
     qmesh = (/1, 1, 1/)
     mesh_ref = 1
+    fourph_mesh_ref = 1
     fsthick = 0.0_r64
     datadumpdir = './'
     read_gq2 = .false.
@@ -157,6 +163,7 @@ contains
     phiso = .false.
     phsubs = .false.
     phbound = .false.
+    fourph = .false.
     phthinfilm = .false.
     phdef_Tmat = .false.
     onlyphbte = .false.
@@ -176,7 +183,7 @@ contains
     el_en_num = 100
     ph_mfp_npts = 100
     read(1, nml = numerics)
-    if(any(qmesh <= 0) .or. mesh_ref < 1 .or. fsthick < 0) then
+    if(any(qmesh <= 0) .or. fourph_mesh_ref < 1 .or. mesh_ref < 1 .or. fsthick < 0) then
        call exit_with_message('Bad input(s) in numerics.')
     end if
     if(crys%twod .and. tetrahedra) then
@@ -194,6 +201,7 @@ contains
     !3 Superconductivity
     if(self%runlevel /= 3) then !Non-superconductivity mode
        self%mesh_ref = mesh_ref
+       self%fourph_mesh_ref = fourph_mesh_ref
        self%read_gq2 = read_gq2
        self%read_V = read_V
        self%read_W = read_W
@@ -201,6 +209,7 @@ contains
        self%phiso = phiso
        self%phsubs = phsubs
        self%phbound = phbound
+       self%fourph = fourph
        self%phthinfilm = phthinfilm
        self%phdef_Tmat = phdef_Tmat
        self%onlyphbte = onlyphbte
@@ -294,6 +303,16 @@ contains
           write(*, "(A, (3I5,x))") "k-mesh = ", self%mesh_ref*self%qmesh(1), self%mesh_ref*self%qmesh(2), &
                self%mesh_ref*self%qmesh(3)
        end if
+       if(self%fourph) then
+          if(crys%twod) then
+             write(*, "(A, (3I5,x))") "external 4ph q-mesh = ", &
+                  self%fourph_mesh_ref*self%qmesh(1), self%fourph_mesh_ref*self%qmesh(2), 1
+          else
+             write(*, "(A, (3I5,x))") "external 4ph q-mesh = ", &
+                  self%fourph_mesh_ref*self%qmesh(1), self%fourph_mesh_ref*self%qmesh(2), &
+                  self%fourph_mesh_ref*self%qmesh(3)
+          end if
+       end if
        write(*, "(A, 1E16.8, A)") "Fermi window thickness (each side of reference energy) = ", self%fsthick, " eV"
        write(*, "(A, A)") "Working directory = ", trim(self%cwd)
        write(*, "(A, A)") "Data dump directory = ", trim(self%datadumpdir)
@@ -309,6 +328,7 @@ contains
           write(*, "(A, L)") "Include ph-isotope interaction: ", self%phiso       
           write(*, "(A, L)") "Include ph-substitution interaction: ", self%phsubs
           write(*, "(A, L)") "Include ph-boundary interaction: ", self%phbound
+          write(*, "(A, L)") "Include 4-ph interaction: ", self%fourph
           write(*, "(A, L)") "Include ph-thin-film interaction: ", self%phthinfilm
           write(*, "(A, L)") "Include ph-defect interaction using the T-matrix: ", self%phdef_Tmat
           if(self%phbound) then
