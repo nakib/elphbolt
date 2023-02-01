@@ -1304,7 +1304,7 @@ contains
        !Set some internal mesh related variables
        mesh_ref_array = num%fourph_mesh_ref
        if(crys%twod) mesh_ref_array(3) = 1
-       coarse_qmesh = num%fourph_mesh_ref*ph%wvmesh
+       coarse_qmesh = ph%wvmesh/num%fourph_mesh_ref
        if(crys%twod) coarse_qmesh(3) = 1
 
        write(temp_tag, "(E9.3)") crys%T
