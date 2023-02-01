@@ -1306,7 +1306,7 @@ contains
        if(crys%twod) mesh_ref_array(3) = 1
        coarse_qmesh = ph%wvmesh/num%fourph_mesh_ref
        if(crys%twod) coarse_qmesh(3) = 1
-
+       
        write(temp_tag, "(E9.3)") crys%T
        filename = "FourPhonon_BTE.w_4ph_T" // trim(adjustl(temp_tag))
 
@@ -1373,7 +1373,7 @@ contains
        if(num%fourph_mesh_ref > 1) then
           do iq = start, end
              !Calculate the fine mesh wave vector, 0-based index vector
-             call demux_vector(iq, fineq_indvec, ph%wvmesh, 0_i64)
+             call demux_vector(ph%indexlist_irred(iq), fineq_indvec, ph%wvmesh, 0_i64)
 
              !Interpolate 4-ph scattering rates on this wave vector
              do s = 1, ph%numbands
