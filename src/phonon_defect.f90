@@ -201,9 +201,9 @@ contains
     type(phonon), intent(in) :: ph
     type(crystal), intent(in) :: crys
   
-    integer(i64) :: host, ik, i, j, dopant
+    integer(i64) :: host, ik, i, j, dopant, atom
     real(r64) :: def_frac
-    real(r64), allocatable :: scatt_rates(:, :)
+    real(r64), allocatable :: scatt_rates(:, :), renorm_ens(:, :), lineshifts(:, :)
     complex(r64), allocatable :: irred_diagT(:, :, :)
 
     real(r64) :: V_mass_iso(crys%numelements)
@@ -218,10 +218,12 @@ contains
 
     allocate(irred_diagT(ph%nwv_irred, ph%numbands, crys%numelements))
 
-    allocate(scatt_rates(ph%nwv_irred, ph%numbands))
+    allocate(scatt_rates(ph%nwv_irred, ph%numbands), &
+         lineshifts(ph%nwv_irred, ph%numbands), renorm_ens(ph%nwv_irred, ph%numbands))
     
     scatt_rates = 0.0_r64
-
+    lineshifts = 0.0_r64
+    
     if(self%mass_defect) then
        do host = 1, crys%numelements
           do dopant = 1, crys%numdopants_types(host) !dopants of this host atom
@@ -236,6 +238,9 @@ contains
              do ik = 1, ph%nwv_irred
                 scatt_rates(ik, :) = scatt_rates(ik, :) + &
                      def_frac*imag(irred_diagT(ik, :, host))/ph%ens(ph%indexlist_irred(ik), :)
+
+                lineshifts(ik, :) = lineshifts(ik, :) + &
+                     + def_frac*real(irred_diagT(ik, :, host))
              end do
           end do
        end do
@@ -243,11 +248,18 @@ contains
 
     scatt_rates = -scatt_rates/hbar_eVps
 
+    do ik = 1, ph%nwv_irred
+       renorm_ens(ik, :) = sqrt(ph%ens(ph%indexlist_irred(ik), :)**2 + &
+            + lineshifts(ik, :))
+    end do
+    
     !Deal with Gamma point acoustic phonons
     scatt_rates(1, 1:3) = 0.0_r64
 
     !Write to file
     call write2file_rank2_real(ph%prefix // '.W_rta_'//ph%prefix//'defect', scatt_rates)
+    !call write2file_rank2_real(ph%prefix // '.lineshifts_ibz_'//ph%prefix//'defect', lineshifts)
+    call write2file_rank2_real(ph%prefix // '.ens_renorm_ibz_'//ph%prefix//'defect', renorm_ens)
   end subroutine calculate_phonon_Tmatrix
   
   subroutine calculate_phonon_Tmatrix_host(self, ph, crys, host_atom_type, diagT, V_mass)
@@ -262,7 +274,7 @@ contains
     type(phonon), intent(in) :: ph
     type(crystal), intent(in) :: crys
     complex(r64), intent(out) :: diagT(:, :)
-    real(r64), intent(in) :: V_mass(crys%numatoms)
+    real(r64), intent(in) :: V_mass(crys%numelements)
     integer(i64), intent(in) :: host_atom_type
 
     !Local variables
