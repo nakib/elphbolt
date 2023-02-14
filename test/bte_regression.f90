@@ -215,7 +215,7 @@ program bte_regression
      call subtitle("Plotting along high-symmetry path...")
 
      !Plot electron bands, phonon dispersions, and g along path.
-     call wann%plot_along_path(crys, num)
+     call wann%plot_along_path(crys, num,el%scissor)
 
      call t_event%end_timer('Plots along path')
   end if
