@@ -140,7 +140,7 @@ program elphbolt
         
         call t_event%end_timer("Phonon-defect transition rates")
         
-        call exit
+        call exit_with_message('At the present phonon-defect scattering is not part of the BTE suite. Exiting.')
      end if
      !!
      
