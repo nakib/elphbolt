@@ -190,7 +190,7 @@ contains
     close(2)
   end subroutine read_EPW_Wannier
 
-  subroutine el_wann_epw(self, crys, nk, kvecs, energies, velocities, evecs)
+  subroutine el_wann_epw(self, crys, nk, kvecs, energies, velocities, evecs, scissor)
     !! Wannier interpolate electrons on list of arb. k-vecs
 
     class(epw_wannier), intent(in) :: self
@@ -200,6 +200,7 @@ contains
     real(r64), intent(out) :: energies(nk,self%numwannbands)
     real(r64), optional, intent(out) :: velocities(nk,self%numwannbands,3)
     complex(r64), optional, intent(out) :: evecs(nk,self%numwannbands,self%numwannbands)
+    real(r64), optional, intent(in) :: scissor(self%numwannbands)
 
     !Local variables
     integer(i64) :: iuc, ib, jb, ipol, ik, nwork, tmp
@@ -275,7 +276,10 @@ contains
 
        !energies(ik,:) = energies(ik,:)*Rydberg2radTHz !2piTHz
        energies(ik,:) = energies(ik,:)*Ryd2eV !eV
-
+       !If present, apply the scissor operator to conduction bands
+       if (present(scissor)) then
+          energies(ik,:) = energies(ik,:) + scissor(:)
+       end if
        if(present(velocities)) then
           velocities(ik,:,:) = velocities(ik,:,:)*Ryd2radTHz !nmTHz = Km/s
        end if
@@ -746,13 +750,14 @@ contains
     end if
   end subroutine deallocate_wannier
   
-  subroutine plot_along_path(self, crys, num)
+  subroutine plot_along_path(self, crys, num, scissor)
     !! Subroutine to plot bands, dispersions, e-ph matrix elements
     !! using the Wannier interpolation method with EPW inputs.
 
     class(epw_wannier), intent(in) :: self
     type(crystal), intent(in) :: crys
     type(numerics), intent(in) :: num
+    real(r64), intent(in) :: scissor(self%numwannbands)
 
     !Local variables
     integer(i64) :: i, nqpath, m, n, s, deg_count, mp, np, sp, icart
@@ -795,7 +800,7 @@ contains
 
        !Calculate electron bands
        allocate(el_ens_path(nqpath, self%numwannbands))
-       call el_wann_epw(self, crys, nqpath, qpathvecs, el_ens_path)
+       call el_wann_epw(self, crys, nqpath, qpathvecs, el_ens_path, scissor = scissor)
 
        !Output electron dispersions
        write(saux,"(I0)") self%numwannbands
@@ -829,7 +834,8 @@ contains
        !Change back to working directory
        call chdir(num%cwd)
 
-       call el_wann_epw(self, crys, 1_i64, k, el_ens_k, el_vels_k, el_evecs_k)
+       call el_wann_epw(self, crys, 1_i64, k, el_ens_k, el_vels_k, el_evecs_k, &
+         scissor = scissor)
 
        do i = 1, nqpath !Over phonon wave vectors path
           kp(1, :) = k(1, :) + qpathvecs(i, :)
@@ -838,7 +844,8 @@ contains
           end do
 
           !Calculate electrons at this final wave vector
-          call el_wann_epw(self, crys, 1_i64, kp, el_ens_kp, el_vels_kp, el_evecs_kp)
+          call el_wann_epw(self, crys, 1_i64, kp, el_ens_kp, el_vels_kp, el_evecs_kp, &
+            scissor = scissor)
 
           do n = 1, self%numwannbands
              do m = 1, self%numwannbands

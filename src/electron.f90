@@ -85,6 +85,8 @@ module electron_module
      !! Ionization number of donor dopant.
      real(r64) :: Zp
      !! Ionization number of acceptor dopant.
+     real(r64), allocatable :: scissor(:)
+     !! Scissor operator (eV)
      logical :: metallic
      !! Is the system metallic?
      character(len = 1) :: dopingtype
@@ -121,7 +123,7 @@ contains
     type(numerics), intent(in) :: num
 
     !Local variables
-    real(r64) :: enref, Zn, Zp, chempot
+    real(r64) :: enref, Zn, Zp, chempot, scissor 
     real(r64), allocatable :: Tlist(:), conclist(:)
     integer(i64) :: ib, spindeg, numbands, indlowband, indhighband, &
          indlowconduction, indhighvalence, numT, numconc
@@ -132,7 +134,7 @@ contains
     namelist /electrons/ enref, spindeg, numbands, &
          indlowband, indhighband, metallic, chempot, Zn, Zp, &
          indlowconduction, indhighvalence, dopingtype, numT, numconc, &
-         Tlist, conclist
+         Tlist, conclist, scissor
          
     call subtitle("Setting up electrons...")
     
@@ -149,6 +151,7 @@ contains
     metallic = .false.
     Zn = 0.0_r64
     Zp = 0.0_r64
+    scissor = 0.0_r64
     chempot = -999999.99999_r64 !Something crazy
     enref = -999999.99999_r64 !Something crazy
     numT = 100 !Something crazy big
@@ -175,6 +178,18 @@ contains
           call exit_with_message(&
                'For non-metals, must provide lowest conduction or highest valence band.')
        end if
+    end if
+    if(metallic .and. scissor .ne. 0.0_r64) then
+       call exit_with_message(&
+               'Scissor operator cannot be applied to metals.')
+    end if
+    if(metallic .and. scissor .lt. 0.0_r64) then
+       call exit_with_message(&
+               'Scissor operator must be positive.')
+    end if
+    if(numbands .ne. wann%numwannbands ) then
+       call exit_with_message(&
+               'Number of wannier bands is not correct.')
     end if
     if(num%runlevel == 0) then
        if(numT <= 0 .or. numconc <= 0) then
@@ -204,6 +219,13 @@ contains
     self%metallic = metallic
     self%indlowconduction = indlowconduction
     self%indhighvalence = indhighvalence
+    !Define all cases even when one of them is not defined
+    if (.not. metallic .and. indlowconduction < 1) then
+        self%indlowconduction = indhighvalence + 1
+    end if
+    if (.not. metallic .and. indhighvalence < 1) then
+        self%indhighvalence = indlowconduction - 1
+    end if
     self%enref = enref
     self%chempot = chempot
     self%Zn = Zn
@@ -233,6 +255,13 @@ contains
     end if
     self%wvmesh = self%mesh_ref_array*num%qmesh
     self%fsthick = num%fsthick
+
+    !Computing the shift in energy due to scissor operator
+    allocate(self%scissor(wann%numwannbands))
+    self%scissor(:) = 0.0_r64
+    if (.not. metallic) then
+      self%scissor(self%indlowconduction:wann%numwannbands) = scissor
+    end if
     
     !Print out information.
     if(this_image() == 1) then
@@ -249,6 +278,10 @@ contains
        if(indhighvalence > 0) then
           write(*, "(A, I5)") "Highest valence band index = ", self%indhighvalence
        end if
+       if (scissor .ne. 0.0_r64) then
+          write(*, "(A, 1E16.8, A)") "Scissor operator = ", &
+            self%scissor(self%indlowconduction) , " eV"
+       end if     
     end if
     
     !Calculate electrons
@@ -336,7 +369,7 @@ contains
          self%vels_irred(self%nwv_irred, wann%numwannbands, 3), &
          self%evecs_irred(self%nwv_irred, wann%numwannbands, wann%numwannbands))
     call wann%el_wann_epw(crys, self%nwv_irred, self%wavevecs_irred, self%ens_irred, &
-         self%vels_irred, self%evecs_irred)
+         self%vels_irred, self%evecs_irred,self%scissor)
     
     ! 4. Map out FBZ quantities from IBZ ones
     call print_message("Mapping out FBZ energies...")
@@ -416,7 +449,8 @@ contains
     !not getting these from IBZ quantities via symmetry rotations
     allocate(self%evecs(self%nwv, wann%numwannbands, wann%numwannbands))
     allocate(el_ens_tmp(self%nwv, wann%numwannbands), el_vels_tmp(self%nwv, wann%numwannbands, 3))
-    call wann%el_wann_epw(crys, self%nwv, self%wavevecs, el_ens_tmp, el_vels_tmp, self%evecs)
+    call wann%el_wann_epw(crys, self%nwv, self%wavevecs, el_ens_tmp, el_vels_tmp, &
+      self%evecs,self%scissor)
     deallocate(el_ens_tmp, el_vels_tmp) !free up memory
     
     ! 8. Find IBZ of energy window restricted blocks
@@ -459,7 +493,7 @@ contains
          self%vels_irred(self%nwv_irred, wann%numwannbands, 3), &
          self%evecs_irred(self%nwv_irred, wann%numwannbands, wann%numwannbands))
     call wann%el_wann_epw(crys, self%nwv_irred, self%wavevecs_irred, self%ens_irred, &
-         self%vels_irred, self%evecs_irred)
+         self%vels_irred, self%evecs_irred,self%scissor)
     
     ! 10. Calculate the number of FBZ blocks electronic states
     !     available for scattering
@@ -725,6 +759,23 @@ contains
        low =  self%indlowband
        high = self%indhighvalence
     end if
+
+    if (this_image() == 1 .and. (.not. self%metallic) ) then
+       write(*, "(A, 1E16.8, A)") 'Maximum energy valence band = ' , &
+               maxval(self%ens_irred(:,self%indlowconduction-1)) , ' eV'
+       write(*, "(A, 1E16.8, A)") 'Minimum energy conduction band = ' , &
+               minval(self%ens_irred(:,self%indlowconduction)), ' eV'
+       if (any(self%scissor .ne. 0.0_r64)) then
+          write(*,"(A, 1E16.8,A)") 'Scissor operator applied at CBs = ', maxval(self%scissor), 'eV'
+          write(*, "(A, 1E16.8, A)") 'Minimum uncorrected energy conduction band = ' , &
+               minval(self%ens_irred(:,self%indlowconduction)) - self%scissor, ' eV'
+
+       end if
+       write(*, "(A, 1E16.8, A)") 'Band gap = ' , &
+           minval(self%ens_irred(:,self%indlowconduction)) - &
+           maxval(self%ens_irred(:,self%indlowconduction-1)) , ' eV'
+    end if
+
 
     !Loop over temperatures
     do itemp = 1, numtemp
