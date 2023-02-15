@@ -1,4 +1,4 @@
-! Copyright (C) 2020- Nakib Haider Protik <nakib.haider.protik@gmail.com>
+! Copyright 2020 elphbolt contributors.
 ! This file is part of elphbolt <https://github.com/nakib/elphbolt>.
 !
 ! elphbolt is free software: you can redistribute it and/or modify
@@ -18,10 +18,10 @@ module symmetry_module
   !! Module containing type and procedures related to crystal and
   !! Brillouin zone symmetries.
 
-  use params, only: dp, k8
+  use params, only: r64, i64
   use misc, only: mux_vector, demux_mesh, demux_vector, &
        exit_with_message, subtitle, distribute_points
-  use crystal_module !, only :: crystal
+  use crystal_module, only : crystal
   use spglib_wrapper, only: get_operations, get_cartesian_operations, get_num_operations
   
   implicit none
@@ -34,22 +34,22 @@ module symmetry_module
   type symmetry
      !! Data and procedure related to symmetries.
      
-     integer(k8) :: nsymm
+     integer(i64) :: nsymm
      !! Number of spacegroup symmetries.
-     integer(k8) :: nsymm_rot
+     integer(i64) :: nsymm_rot
      !! Number of rotations.
-     integer(k8), allocatable :: rotations_orig(:,:,:)
+     integer(i64), allocatable :: rotations_orig(:,:,:)
      !! Rotations without time-reversal, real space, crystal coordinates.
-     real(dp), allocatable :: crotations_orig(:,:,:)
+     real(r64), allocatable :: crotations_orig(:,:,:)
      !! Rotations without time-reversal, real space, Cartesian coordinates.
-     real(dp), allocatable :: qrotations_orig(:,:,:)
+     real(r64), allocatable :: qrotations_orig(:,:,:)
      !! Rotations without time-reversal, reciprocal space, crystal coordinates.
      !And with time-reversal (time reversed sector is the 2nd half of last axis):
-     integer(k8), allocatable :: rotations(:,:,:) 
+     integer(i64), allocatable :: rotations(:,:,:) 
      !! Rotations with time-reversal, real space, crystal coordinates.
-     real(dp), allocatable :: crotations(:,:,:)
+     real(r64), allocatable :: crotations(:,:,:)
      !! Rotations with time-reversal, real space, Cartesian coordinates.
-     real(dp), allocatable :: qrotations(:,:,:)
+     real(r64), allocatable :: qrotations(:,:,:)
      !! Rotations with time-reversal, reciprocal space, crystal coordinates.
      character(len=10) :: international
      !! Spacegroup in Hermann–Mauguin (or international) notation.
@@ -59,7 +59,7 @@ module symmetry_module
      procedure :: calculate_symmetries
      
   end type symmetry
-
+    
 contains
 
   subroutine calculate_symmetries(self, crys, mesh)
@@ -69,16 +69,16 @@ contains
 
     class(symmetry), intent(out) :: self
     type(crystal), intent(in) :: crys
-    integer(k8), intent(in) :: mesh(3)
+    integer(i64), intent(in) :: mesh(3)
 
     !Internal variables:
-    integer(k8) :: i, ii, jj, kk, ll, info, nq, nlen
-    integer(k8) :: P(3)
-    integer(k8), allocatable :: rtmp(:,:,:), local_equiv_map(:,:)
+    integer(i64) :: i, ii, jj, kk, ll, info, nq, nlen
+    integer(i64) :: P(3)
+    integer(i64), allocatable :: rtmp(:,:,:), local_equiv_map(:,:)
     logical, allocatable :: valid(:)
-    real(dp), allocatable :: crtmp(:,:,:), qrtmp(:,:,:)
-    real(dp), allocatable :: translations(:,:), ctranslations(:,:)
-    real(dp) :: tmp1(3,3), tmp2(3,3), tmp3(3,3)
+    real(r64), allocatable :: crtmp(:,:,:), qrtmp(:,:,:)
+    real(r64), allocatable :: translations(:,:), ctranslations(:,:)
+    real(r64) :: tmp1(3,3), tmp2(3,3), tmp3(3,3)
 
     !External procedures
     external :: dgesv
@@ -189,11 +189,11 @@ contains
     !! Compute all images of a wave vector (crystal coords.) under the
     !! rotational symmetry operations.
 
-    integer(k8), intent(in) :: q_in(3), mesh(3)
-    real(dp), intent(in) :: qrotations(:,:,:)
-    real(dp), intent(out) :: q_out(:,:)
+    integer(i64), intent(in) :: q_in(3), mesh(3)
+    real(r64), intent(in) :: qrotations(:,:,:)
+    real(r64), intent(out) :: q_out(:,:)
 
-    integer(k8) :: ii, nsymm_rot
+    integer(i64) :: ii, nsymm_rot
 
     nsymm_rot = size(qrotations(1,1,:))
 
@@ -205,16 +205,17 @@ contains
   subroutine find_equiv_map(nsymm_rot,equiv_map,mesh,qrotations,indexlist)
     !! Subroutine to create the map of equivalent wave vectors.
 
-    integer(k8), intent(in) :: nsymm_rot, mesh(3)
-    real(dp), intent(in) :: qrotations(:,:,:)
-    integer(k8), optional, intent(in) :: indexlist(:)
-    integer(k8), intent(out) :: equiv_map(:,:)
+    integer(i64), intent(in) :: nsymm_rot, mesh(3)
+    real(r64), intent(in) :: qrotations(:,:,:)
+    integer(i64), optional, intent(in) :: indexlist(:)
+    integer(i64), intent(out) :: equiv_map(:,:)
 
-    integer(k8) :: nmesh, chunk, counter, im, num_active_images
-    integer(k8), allocatable :: index_mesh(:,:)
-    integer(k8) :: i, isym, ivec(3), base
-    real(dp) :: vec(3), vec_star(3, nsymm_rot), dnrm2
-    integer(k8), allocatable :: start[:], end[:], equiv_map_chunk(:,:)[:]
+    !Local variables
+    integer(i64) :: nmesh, chunk, counter, im, num_active_images
+    integer(i64), allocatable :: index_mesh(:,:)
+    integer(i64) :: i, isym, ivec(3), base
+    real(r64) :: vec(3), vec_star(3, nsymm_rot), dnrm2
+    integer(i64), allocatable :: start[:], end[:], equiv_map_chunk(:,:)[:]
     
     if(present(indexlist)) then
        nmesh = size(indexlist)
@@ -250,7 +251,7 @@ contains
           vec = vec_star(:,isym) !Pick image.
           ivec = nint(vec) !Snap to nearest integer grid.
           !Check norm and save mapping:
-          if(dnrm2(3,abs(vec - dble(ivec)),1) >= 1e-2_dp) then
+          if(dnrm2(3,abs(vec - dble(ivec)),1) >= 1e-2_r64) then
              equiv_map_chunk(isym, counter) = -1
           else
              equiv_map_chunk(isym, counter) = mux_vector(modulo(ivec,mesh),mesh,base)
@@ -258,11 +259,16 @@ contains
        end do
     end do
     
-    !Collect equiv_map_chunks in equiv_map
+    !Gather equiv_map_chunks in equiv_map and broadcast to all
     sync all
-    do im = 1, num_active_images
-       equiv_map(:, start[im]:end[im]) = equiv_map_chunk(:,:)[im]
-    end do
+    if(this_image() == 1) then
+       do im = 1, num_active_images
+          equiv_map(:, start[im]:end[im]) = equiv_map_chunk(:,:)[im]
+       end do
+    end if
+    sync all
+    call co_broadcast(equiv_map, 1)
+    sync all
   end subroutine find_equiv_map
 
   subroutine find_irred_wedge(mesh,nwavevecs_irred,wavevecs_irred, &
@@ -282,22 +288,22 @@ contains
     !! indexlist is the sorted list of indices of the wavevectors
     !!   in the energy restricted FBZ which must be present if blocks is true
 
-    integer(k8), intent(in) :: mesh(3)
+    integer(i64), intent(in) :: mesh(3)
     logical, intent(in) :: blocks
-    integer(k8), intent(in) :: nsymm_rot
-    real(dp), intent(in) :: qrotations(:,:,:)
-    integer(k8), optional, intent(in) :: indexlist(:)
-    integer(k8), intent(out) :: nwavevecs_irred
-    integer(k8), allocatable, intent(out) :: indexlist_irred(:), &
+    integer(i64), intent(in) :: nsymm_rot
+    real(r64), intent(in) :: qrotations(:,:,:)
+    integer(i64), optional, intent(in) :: indexlist(:)
+    integer(i64), intent(out) :: nwavevecs_irred
+    integer(i64), allocatable, intent(out) :: indexlist_irred(:), &
          nequivalent(:), ibz2fbz_map(:,:,:), equivalence_map(:,:)
-    real(dp), allocatable, intent(out) :: wavevecs_irred(:,:)
+    real(r64), allocatable, intent(out) :: wavevecs_irred(:,:)
 
     !Local variables
-    integer(k8) :: nwavevecs, i, imux, s, image, imagelist(nsymm_rot), &
-         nrunninglist, counter, ijk(3), aux, num_active_images, chunk
-    integer(k8), allocatable :: runninglist(:), &
+    integer(i64) :: nwavevecs, i, imux, s, image, imagelist(nsymm_rot), &
+         nrunninglist, counter, ijk(3), aux, num_active_images, chunk, check
+    integer(i64), allocatable :: runninglist(:), &
          indexlist_irred_tmp(:), nequivalent_tmp(:), ibz2fbz_map_tmp(:,:,:), &
-         start[:], end[:], check[:]
+         start[:], end[:]
     logical :: in_list
 
     if(blocks .and. .not. present(indexlist)) &
@@ -321,13 +327,14 @@ contains
          runninglist(nwavevecs), ibz2fbz_map_tmp(nsymm_rot, nwavevecs, 2))
     
     !Allocate coarrays
-    allocate(start[*], end[*], check[*])
+    allocate(start[*], end[*])
     
     runninglist = 0
     nrunninglist = 0
     nwavevecs_irred = 0
     nequivalent_tmp = 0
     counter = 0
+    
     do i = 1, nwavevecs !Take a point from the FBZ
        !Get the muxed index of the wave vector
        if(blocks) then
@@ -341,10 +348,12 @@ contains
        if(nrunninglist > 0) then
           !Divide wave vectors among images
           call distribute_points(nrunninglist, chunk, start, end, num_active_images)
-
+          
           check = 0
           if(any(runninglist(start:end) == imux)) check = 1
+          sync all
           call co_sum(check)
+          sync all
 
           if(check > 0) in_list = .true.
        end if
@@ -373,7 +382,7 @@ contains
                 runninglist(nrunninglist) = image
                 !Save mapping of the irreducible point to its FBZ image
                 ibz2fbz_map_tmp(aux, &
-                     nwavevecs_irred, :) = (/s, image/)
+                     nwavevecs_irred, :) = [s, image]
              end if
           end do
           counter = counter + nequivalent_tmp(nwavevecs_irred)
@@ -383,27 +392,32 @@ contains
     !Check for error
     if(nwavevecs /= counter) call exit_with_message("Severe error: Could not find irreducible wedge.")
 
-    if(this_image() == 1) write(*, "(A, I10)") " Number of FBZ wave vectors = ", counter
-    if(this_image() == 1) write(*, "(A, I10)") " Number IBZ wave vectors = ", nwavevecs_irred
+    if(this_image() == 1) then
+       write(*, "(A, I10)") " Number of FBZ wave vectors = ", counter
+       write(*, "(A, I10)") " Number IBZ wave vectors = ", nwavevecs_irred
+    end if
 
     !Deallocate some internal data
     deallocate(runninglist)
 
     !Copy the tmp data into (much) smaller sized global data holders
-    allocate(indexlist_irred(nwavevecs_irred), nequivalent(nwavevecs_irred), &
-         ibz2fbz_map(nsymm_rot, nwavevecs_irred, 2))
+    allocate(indexlist_irred(nwavevecs_irred))
     indexlist_irred(1:nwavevecs_irred) = indexlist_irred_tmp(1:nwavevecs_irred)
-    nequivalent(1:nwavevecs_irred) = nequivalent_tmp(1:nwavevecs_irred)
-    ibz2fbz_map(:, 1:nwavevecs_irred, :) = ibz2fbz_map_tmp(:, 1:nwavevecs_irred, :)
+    deallocate(indexlist_irred_tmp)
 
-    !Deallocate some internal data
-    deallocate(indexlist_irred_tmp, nequivalent_tmp, ibz2fbz_map_tmp)
+    allocate(nequivalent(nwavevecs_irred))
+    nequivalent(1:nwavevecs_irred) = nequivalent_tmp(1:nwavevecs_irred)
+    deallocate(nequivalent_tmp)
+
+    allocate(ibz2fbz_map(nsymm_rot, nwavevecs_irred, 2))
+    ibz2fbz_map(:, 1:nwavevecs_irred, :) = ibz2fbz_map_tmp(:, 1:nwavevecs_irred, :)
+    deallocate(ibz2fbz_map_tmp)
     
     !Create crystal coords IBZ wave vectors
     allocate(wavevecs_irred(nwavevecs_irred,3))
     do i = 1, nwavevecs_irred !run over total number of vectors
        imux = indexlist_irred(i)
-       call demux_vector(imux, ijk, mesh, 0_k8) !get 0-based (i,j,k) indices
+       call demux_vector(imux, ijk, mesh, 0_i64) !get 0-based (i,j,k) indices
 
        wavevecs_irred(i,:) = dble(ijk)/mesh !wave vectors in crystal coordinates
     end do
@@ -412,8 +426,8 @@ contains
   function fbz2ibz(iwvmux,nwv_irred,nequiv,ibz2fbz_map)
     !! Find index in IBZ blocks list for a given FBZ blocks muxed vector index
 
-    integer(k8), intent(in) :: iwvmux, nwv_irred, nequiv(nwv_irred), ibz2fbz_map(:,:,:)
-    integer(k8) :: i, l, il, fbz2ibz
+    integer(i64), intent(in) :: iwvmux, nwv_irred, nequiv(nwv_irred), ibz2fbz_map(:,:,:)
+    integer(i64) :: i, l, il, fbz2ibz
 
     fbz2ibz = -1
 
@@ -439,11 +453,11 @@ contains
   subroutine create_fbz2ibz_map(fbz2ibz_map, nwv, nwv_irred, indexlist, nequiv, ibz2fbz_map)
     !! Subroutine to create map of FBZ blocks to IBZ blocks
 
-    integer(k8), intent(in) :: nwv, nwv_irred, indexlist(nwv), &
+    integer(i64), intent(in) :: nwv, nwv_irred, indexlist(nwv), &
          nequiv(nwv_irred),ibz2fbz_map(:,:,:)
-    integer(k8), intent(out), allocatable :: fbz2ibz_map(:)
+    integer(i64), intent(out), allocatable :: fbz2ibz_map(:)
 
-    integer(k8) :: iwv
+    integer(i64) :: iwv
 
     allocate(fbz2ibz_map(nwv))
 
@@ -455,14 +469,14 @@ contains
   subroutine symmetrize_3x3_tensor(tensor, crotations)
     !! Symmetrize a 3x3 tensor.
 
-    real(dp), intent(inout) :: tensor(3,3)
-    real(dp), intent(in) :: crotations(:,:,:)
-    integer(k8) :: irot, nrots
-    real(dp) :: aux(3,3)
+    real(r64), intent(inout) :: tensor(3,3)
+    real(r64), intent(in) :: crotations(:,:,:)
+    integer(i64) :: irot, nrots
+    real(r64) :: aux(3,3)
 
     nrots = size(crotations(1, 1, :))
     
-    aux(:,:) = 0.0_dp
+    aux(:,:) = 0.0_r64
     do irot = 1, nrots
        aux(:,:) = aux(:,:) + matmul(crotations(:, :, irot),&
             matmul(tensor, transpose(crotations(:, :, irot))))

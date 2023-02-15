@@ -1,4 +1,4 @@
-! Copyright (C) 2020- Nakib Haider Protik <nakib.haider.protik@gmail.com>
+! Copyright 2020 elphbolt contributors.
 ! This file is part of elphbolt <https://github.com/nakib/elphbolt>.
 !
 ! elphbolt is free software: you can redistribute it and/or modify
@@ -17,10 +17,10 @@
 module interactions
   !! Module containing the procedures related to the computation of interactions.
 
-  use params, only: k8, dp, pi, twopi, amu, qe, hbar_eVps, perm0
+  use params, only: i64, r64, pi, twopi, amu, qe, hbar_eVps, perm0
   use misc, only: exit_with_message, print_message, distribute_points, &
        demux_state, mux_vector, mux_state, expi, Bose, binsearch, Fermi, &
-       twonorm, write2file_rank2_real
+       twonorm, write2file_rank2_real, demux_vector, interpolate
   use wannier_module, only: epw_wannier
   use crystal_module, only: crystal
   use electron_module, only: electron
@@ -35,34 +35,37 @@ module interactions
        calculate_ph_rta_rates, read_transition_probs_e, &
        calculate_eph_interaction_ibzq, calculate_eph_interaction_ibzk, &
        calculate_echimp_interaction_ibzk, calculate_el_rta_rates, &
-       calculate_bound_scatt_rates
+       calculate_bound_scatt_rates, calculate_thinfilm_scatt_rates, &
+       calculate_4ph_rta_rates
 
+  !external chdir, system
+  
 contains
 
-  pure real(dp) function transfac(v1, v2)
+  pure real(r64) function transfac(v1, v2)
     !! Calculate the "transport factor" that suppresses forward scattering
     !! v1, v2: vectors in cartesian coordinates
     
-    real(dp), intent(in) :: v1(3),v2(3)
-    real(dp) :: v1sc, v2sc, thresh
+    real(r64), intent(in) :: v1(3),v2(3)
+    real(r64) :: v1sc, v2sc, thresh
 
-    thresh = 1.0e-8_dp
-    transfac = 0.0_dp
+    thresh = 1.0e-8_r64
+    transfac = 0.0_r64
     v1sc = twonorm(v1)
     v2sc = twonorm(v2)
     if(v1sc /= v2sc .and. v1sc > thresh .and. v2sc > thresh) then
-       transfac = 1.0_dp - dot_product(v1,v2)/v1sc/v2sc
+       transfac = 1.0_r64 - dot_product(v1,v2)/v1sc/v2sc
     end if
   end function transfac
 
-  pure real(dp) function qdist(q, reclattvecs)
+  pure real(r64) function qdist(q, reclattvecs)
     !! Function to calculate the smallest wave vector distance in the BZ.
     !! q is in crystal coordinates.
     !! qdist will be in nm^-1
     
-    real(dp), intent(in) :: q(3), reclattvecs(3, 3)
-    real(dp) :: distfromcorners(3**3)
-    integer(k8) :: i, j, k, count
+    real(r64), intent(in) :: q(3), reclattvecs(3, 3)
+    real(r64) :: distfromcorners(3**3)
+    integer(i64) :: i, j, k, count
 
     count = 1
     do i = -1, 1
@@ -76,7 +79,7 @@ contains
     qdist = minval(distfromcorners)
   end function qdist
   
-  pure real(dp) function gchimp2(el, crys, q)
+  pure real(r64) function gchimp2(el, crys, q)
     !! Function to calculate the squared electron-charged impurity vertex.
     !!
     !! This is the Fourier transform of the Yukawa potential, c.f. Eq. 33
@@ -84,36 +87,36 @@ contains
 
     type(crystal), intent(in) :: crys
     type(electron), intent(in) :: el
-    real(dp), intent(in) :: q
+    real(r64), intent(in) :: q
 
-    gchimp2 = 1.0e-3_dp/crys%volume/((perm0*crys%epsilon0)*(q**2 + crys%qTF**2))**2*&
+    gchimp2 = 1.0e-3_r64/crys%volume/((perm0*crys%epsilon0)*(q**2 + crys%qTF**2))**2*&
          (el%chimp_conc_n*(qe*el%Zn**2)**2 + el%chimp_conc_p*(qe*el%Zp**2)**2) !ev^2
   end function gchimp2
 
-  pure real(dp) function Vm2_3ph(ev1_s1, conjg_ev2_s2, conjg_ev3_s3, &
+  pure real(r64) function Vm2_3ph(ev1_s1, conjg_ev2_s2, conjg_ev3_s3, &
        Index_i, Index_j, Index_k, ifc3, phases_q2q3, ntrip, nb)
     !! Function to calculate the squared 3-ph interaction vertex |V-|^2.
     
-    integer(k8), intent(in) :: ntrip, Index_i(ntrip), Index_j(ntrip), Index_k(ntrip), nb
-    complex(dp), intent(in) :: phases_q2q3(ntrip), ev1_s1(nb), conjg_ev2_s2(nb), conjg_ev3_s3(nb)
-    real(dp), intent(in) :: ifc3(3, 3, 3, ntrip)
+    integer(i64), intent(in) :: ntrip, Index_i(ntrip), Index_j(ntrip), Index_k(ntrip), nb
+    complex(r64), intent(in) :: phases_q2q3(ntrip), ev1_s1(nb), conjg_ev2_s2(nb), conjg_ev3_s3(nb)
+    real(r64), intent(in) :: ifc3(3, 3, 3, ntrip)
 
     !Local variables
-    integer(k8) :: it, a, b, c, aind, bind, cind
-    complex(dp) :: aux1, aux2, aux3, V0
+    integer(i64) :: it, a, b, c, aind, bind, cind
+    complex(r64) :: aux1, aux2, aux3, V0
     
-    aux1 = (0.0_dp, 0.0_dp)
+    aux1 = (0.0_r64, 0.0_r64)
     do it = 1, ntrip
        aind = 3*(Index_k(it) - 1)
        bind = 3*(Index_j(it) - 1)
        cind = 3*(Index_i(it) - 1)
-       V0 = (0.0_dp, 0.0_dp)
+       V0 = (0.0_r64, 0.0_r64)
        do a = 1, 3
           aux2 = conjg_ev3_s3(a + aind)
           do b = 1, 3
              aux3 = aux2*conjg_ev2_s2(b + bind)
              do c = 1, 3
-                if(ifc3(c, b, a, it) /= 0.0_dp) then
+                if(ifc3(c, b, a, it) /= 0.0_r64) then
                    V0 = V0 + ifc3(c, b, a, it)*ev1_s1(c + cind)*aux3
                 end if
              end do
@@ -138,15 +141,15 @@ contains
     character(len = 1), intent(in) :: key
     
     !Local variables
-    integer(k8) :: start, end, chunk, istate1, nstates_irred, &
+    integer(i64) :: start, end, chunk, istate1, nstates_irred, &
          nprocs, s1, s2, s3, iq1_ibz, iq1, iq2, iq3_minus, it, &
          q1_indvec(3), q2_indvec(3), q3_minus_indvec(3), index_minus, index_plus, &
          neg_iq2, neg_q2_indvec(3), num_active_images, plus_count, minus_count
-    real(dp) :: en1, en2, en3, massfac, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
+    real(r64) :: en1, en2, en3, massfac, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
          occup_fac, const, bose2, bose3, delta_minus, delta_plus
-    real(dp), allocatable :: Vm2_1(:), Vm2_2(:), Wm(:), Wp(:)
-    integer(k8), allocatable :: istate2_plus(:), istate3_plus(:), istate2_minus(:), istate3_minus(:)
-    complex(dp) :: phases_q2q3(ph%numtriplets)
+    real(r64), allocatable :: Vm2_1(:), Vm2_2(:), Wm(:), Wp(:)
+    integer(i64), allocatable :: istate2_plus(:), istate3_plus(:), istate2_minus(:), istate3_minus(:)
+    complex(r64) :: phases_q2q3(ph%numtriplets)
     character(len = 1024) :: filename, filename_Wm, filename_Wp
 
     if(key /= 'V' .and. key /= 'W') then
@@ -160,7 +163,7 @@ contains
     end if
    
     !Conversion factor in transition probability expression
-    const = pi/4.0_dp*hbar_eVps**5*(qe/amu)**3*1.0d-12
+    const = pi/4.0_r64*hbar_eVps**5*(qe/amu)**3*1.0d-12
 
     !Total number of IBZ blocks states
     nstates_irred = ph%nwv_irred*ph%numbands
@@ -216,17 +219,17 @@ contains
           call chdir(num%cwd)
 
           !Initialize transition probabilities
-          Wp(:) = 0.0_dp
-          Wm(:) = 0.0_dp
-          istate2_plus(:) = 0_k8
-          istate3_plus(:) = 0_k8
-          istate2_minus(:) = 0_k8
-          istate3_minus(:) = 0_k8
+          Wp(:) = 0.0_r64
+          Wm(:) = 0.0_r64
+          istate2_plus(:) = 0_i64
+          istate3_plus(:) = 0_i64
+          istate2_minus(:) = 0_i64
+          istate3_minus(:) = 0_i64
        end if
 
        !Initialize transition probabilities
-       plus_count = 0_k8
-       minus_count = 0_k8
+       plus_count = 0_i64
+       minus_count = 0_i64
        
        !Demux state index into branch (s) and wave vector (iq) indices
        call demux_state(istate1, ph%numbands, s1, iq1_ibz)
@@ -257,13 +260,13 @@ contains
           q3_minus = q3_minus_indvec/dble(ph%wvmesh) !crystal coords.
 
           !Muxed index of q3_minus
-          iq3_minus = mux_vector(q3_minus_indvec, ph%wvmesh, 0_k8)
+          iq3_minus = mux_vector(q3_minus_indvec, ph%wvmesh, 0_i64)
           
           if(key == 'V') then
-             if(en1 /= 0.0_dp) then
+             if(en1 /= 0.0_r64) then
                 !Calculate the numtriplet number of mass-normalized phases for this (q2,q3) pair
                 do it = 1, ph%numtriplets
-                   massfac = 1.0_dp/sqrt(&
+                   massfac = 1.0_r64/sqrt(&
                         crys%masses(crys%atomtypes(ph%Index_i(it)))*&
                         crys%masses(crys%atomtypes(ph%Index_j(it)))*&
                         crys%masses(crys%atomtypes(ph%Index_k(it))))
@@ -283,7 +286,7 @@ contains
 
              !Get index of -q2
              neg_q2_indvec = modulo(-q2_indvec, ph%wvmesh)
-             neg_iq2 = mux_vector(neg_q2_indvec, ph%wvmesh, 0_k8)
+             neg_iq2 = mux_vector(neg_q2_indvec, ph%wvmesh, 0_i64)
 
              if(key == 'W') then
                 !Bose factor for phonon 2
@@ -314,9 +317,9 @@ contains
                 end if
                 
                 if(key == 'V') then
-                   if(en1*en2*en3 == 0.0_dp) cycle
+                   if(en1*en2*en3 == 0.0_r64) cycle
 
-                   if(delta_minus > 0.0_dp) then
+                   if(delta_minus > 0.0_r64) then
                       !Increase counter for energetically available minus process
                       minus_count = minus_count + 1
 
@@ -330,7 +333,7 @@ contains
                            phases_q2q3, ph%numtriplets, ph%numbands)
                    end if
 
-                   if(delta_plus > 0.0_dp) then
+                   if(delta_plus > 0.0_r64) then
                       !Increase counter for energetically available plus process
                       plus_count = plus_count + 1
 
@@ -343,7 +346,7 @@ contains
                 end if
 
                 if(key == 'W') then
-                   if(en1*en2*en3 == 0.0_dp) cycle
+                   if(en1*en2*en3 == 0.0_r64) cycle
                    
                    !Bose factor for phonon 3
                    bose3 = Bose(en3, crys%T)
@@ -353,9 +356,9 @@ contains
                    !Temperature dependent occupation factor
                    !(bose1 + 1)*bose2*bose3/(bose1*(bose1 + 1))
                    ! = (bose2 + bose3 + 1)
-                   occup_fac = (bose2 + bose3 + 1.0_dp)
+                   occup_fac = (bose2 + bose3 + 1.0_r64)
 
-                   if(delta_minus > 0.0_dp) then
+                   if(delta_minus > 0.0_r64) then
                       !Non-zero process counter
                       minus_count = minus_count + 1
 
@@ -377,7 +380,7 @@ contains
                    ! = bose2 - bose3.
                    occup_fac = (bose2 - bose3)
 
-                   if(delta_plus > 0.0_dp) then
+                   if(delta_plus > 0.0_r64) then
                       !Non-zero process counter
                       plus_count = plus_count + 1
 
@@ -451,7 +454,7 @@ contains
     type(numerics), intent(in) :: num
 
     !Local variables
-    integer(k8) :: iq, iqstart, iqend, chunk, num_active_images
+    integer(i64) :: iq, iqstart, iqend, chunk, num_active_images
 
     call print_message("Calculating g(Re,Rp) -> g(Re,q) for all IBZ q...")
 
@@ -477,7 +480,7 @@ contains
     type(numerics), intent(in) :: num
 
     !Local variables
-    integer(k8) :: ik, ikstart, ikend, chunk, num_active_images
+    integer(i64) :: ik, ikstart, ikend, chunk, num_active_images
 
     call print_message("Calculating g(Re,Rp) -> g(k,Rp) for all IBZ k...")
 
@@ -517,16 +520,16 @@ contains
     character(len = 1), intent(in) :: key
     
     !Local variables
-    integer(k8) :: nstates_irred, istate, m, iq, iq_fbz, n, ik, ikp, s, &
+    integer(i64) :: nstates_irred, istate, m, iq, iq_fbz, n, ik, ikp, s, &
          ikp_window, start, end, chunk, k_indvec(3), kp_indvec(3), &
          q_indvec(3), nprocs, count, num_active_images
-    integer(k8), allocatable :: istate1(:), istate2(:)
-    real(dp) :: k(3), q(3), en_ph, en_el, en_elp, const, delta, &
+    integer(i64), allocatable :: istate1(:), istate2(:)
+    real(r64) :: k(3), q(3), en_ph, en_el, en_elp, const, delta, &
          invboseplus1, fermi1, fermi2, occup_fac
-    real(dp), allocatable :: g2_istate(:), Y_istate(:)
-    complex(dp) :: gReq_iq(wann%numwannbands, wann%numwannbands, wann%numbranches, wann%nwsk)
+    real(r64), allocatable :: g2_istate(:), Y_istate(:)
+    complex(r64), allocatable :: gReq_iq(:,:,:,:)
     character(len = 1024) :: filename
-
+    
     if(key /= 'g' .and. key /= 'Y') then
        call exit_with_message(&
             "Invalid value of key in call to calculate_eph_interaction_ibzq. Exiting.")
@@ -537,13 +540,15 @@ contains
     else
        call print_message("Calculating ph-e transition probabilities for all IBZ phonons...")
     end if
-        
-    !Allocate and initialize g2_istate
+    
+    !Allocate and initialize gReq_iq and g2_istate
     if(key == 'g') then
+       allocate(gReq_iq(wann%numwannbands, wann%numwannbands, wann%numbranches, wann%nwsk))
+       
        !Maximum length of g2_istate
        nprocs = el%nstates_inwindow*ph%numbands
        allocate(g2_istate(nprocs))
-       g2_istate(:) = 0.0_dp
+       g2_istate(:) = 0.0_r64
     end if
 
     !Conversion factor in transition probability expression
@@ -558,7 +563,7 @@ contains
        write(*, "(A, I10)") " #states = ", nstates_irred
        write(*, "(A, I10)") " #states/image = ", chunk
     end if
-
+    
     do istate = start, end !over IBZ blocks states
        !Demux state index into branch (s) and wave vector (iq) indices
        call demux_state(istate, ph%numbands, s, iq)
@@ -568,6 +573,7 @@ contains
           call chdir(trim(adjustl(num%g2dir)))
           write (filename, '(I6)') iq
           filename = 'gReq.iq'//trim(adjustl(filename))
+          
           open(1,file=filename,status="old",access='stream')
           read(1) gReq_iq
           close(1)
@@ -582,10 +588,10 @@ contains
 
        !1/(1 + Bose factor) for phonon
        if(key == 'Y') then
-          if(en_ph /= 0.0_dp) then
-             invboseplus1 = 1.0_dp/(1.0_dp + Bose(en_ph, crys%T))
+          if(en_ph /= 0.0_r64) then
+             invboseplus1 = 1.0_r64/(1.0_r64 + Bose(en_ph, crys%T))
           else
-             invboseplus1 = 0.0_dp
+             invboseplus1 = 0.0_r64
           end if
        end if
        
@@ -616,9 +622,9 @@ contains
           !Allocate and initialize quantities related to transition probabilities
           allocate(Y_istate(nprocs))
           allocate(istate1(nprocs), istate2(nprocs))
-          istate1(:) = -1_k8
-          istate2(:) = -1_k8
-          Y_istate(:) = 0.0_dp
+          istate1(:) = -1_i64
+          istate2(:) = -1_i64
+          Y_istate(:) = 0.0_r64
        end if
 
        !Initialize process counter
@@ -636,7 +642,7 @@ contains
           kp_indvec = modulo(k_indvec + el%mesh_ref_array*q_indvec, el%wvmesh) !0-based index vector
 
           !Muxed index of kp
-          ikp = mux_vector(kp_indvec, el%wvmesh, 0_k8)
+          ikp = mux_vector(kp_indvec, el%wvmesh, 0_i64)
 
           !Check if final electron wave vector is within energy window
           call binsearch(el%indexlist, ikp, ikp_window)
@@ -687,7 +693,7 @@ contains
                    end if
 
                    !Temperature dependent occupation factor
-                   occup_fac = fermi1*(1.0_dp - fermi2)*invboseplus1
+                   occup_fac = fermi1*(1.0_r64 - fermi2)*invboseplus1
                    
                    !Save Y
                    if(en_ph >= 0.5e-3) then !Use a small phonon energy cut-off
@@ -701,7 +707,7 @@ contains
              end do !n
           end do !m
        end do !ik
-
+       
        if(key == 'g') then
           !Change to data output directory
           call chdir(trim(adjustl(num%g2dir)))
@@ -775,18 +781,18 @@ contains
     character(len = 1), intent(in) :: key
     
     !Local variables
-    integer(k8) :: nstates_irred, istate, m, ik, n, ikp, s, &
+    integer(i64) :: nstates_irred, istate, m, ik, n, ikp, s, &
          iq, start, end, chunk, k_indvec(3), kp_indvec(3), &
          q_indvec(3), count, nprocs, num_active_images
-    real(dp) :: k(3), kp(3), q(3), ph_ens_iq(1, ph%numbands), qlist(1, 3), &
+    real(r64) :: k(3), kp(3), q(3), ph_ens_iq(1, ph%numbands), qlist(1, 3), &
          const, bosefac, fermi_minus_fac, fermi_plus_fac, en_ph, en_el, delta, occup_fac
-    real(dp), allocatable :: g2_istate(:), Xplus_istate(:), Xminus_istate(:)
-    integer(k8), allocatable :: istate_el(:), istate_ph(:)
-    complex(dp) :: gkRp_ik(wann%numwannbands,wann%numwannbands,wann%numbranches,wann%nwsq), &
-         ph_evecs_iq(1, ph%numbands,ph%numbands)
+    real(r64), allocatable :: g2_istate(:), Xplus_istate(:), Xminus_istate(:)
+    integer(i64), allocatable :: istate_el(:), istate_ph(:)
+    complex(r64), allocatable :: gkRp_ik(:, :, :, :)
+    complex(r64) :: ph_evecs_iq(1, ph%numbands,ph%numbands)
     character(len = 1024) :: filename
     logical :: needfinephon
-
+    
     if(key /= 'g' .and. key /= 'X') then
        call exit_with_message(&
             "Invalid value of key in call to calculate_eph_interaction_ibzk. Exiting.")
@@ -798,12 +804,14 @@ contains
        call print_message("Calculating e-ph transition probabilities for all IBZ electrons...")
     end if
     
-    !Allocate and initialize g2_istate
+    !Allocate and initialize gkRp_ik and g2_istate
     if(key == 'g') then
+       allocate(gkRp_ik(wann%numwannbands,wann%numwannbands,wann%numbranches,wann%nwsq))
+       
        !Length of g2_istate
        nprocs = el%nstates_inwindow*wann%numbranches
        allocate(g2_istate(nprocs))
-       g2_istate(:) = 0.0_dp
+       g2_istate(:) = 0.0_r64
     end if
 
     !Conversion factor in transition probability expression
@@ -833,9 +841,6 @@ contains
           close(1)
           call chdir(num%cwd)
        end if
-
-       !Get the muxed index of FBZ wave vector from the IBZ blocks index list
-       !ik_fbz = el%indexlist_irred(ik)
 
        !Electron energy
        en_el = el%ens_irred(ik, m)
@@ -871,10 +876,10 @@ contains
           !Allocate and initialize quantities related to transition probabilities
           allocate(Xplus_istate(nprocs), Xminus_istate(nprocs))
           allocate(istate_el(nprocs), istate_ph(nprocs))
-          istate_el(:) = 0_k8
-          istate_ph(:) = 0_k8
-          Xplus_istate(:) = 0.0_dp
-          Xminus_istate(:) = 0.0_dp
+          istate_el(:) = 0_i64
+          istate_ph(:) = 0_i64
+          Xplus_istate(:) = 0.0_r64
+          Xminus_istate(:) = 0.0_r64
        end if
 
        !Initialize eligible process counter for this state
@@ -892,21 +897,21 @@ contains
           !Note that q, k, and k' are all on the same mesh
           q_indvec = kp_indvec - k_indvec
           needfinephon = .false.
-          if(any(mod(q_indvec(:), el%mesh_ref_array) /= 0_k8)) then
+          if(any(mod(q_indvec(:), el%mesh_ref_array) /= 0_i64)) then
              needfinephon = .true.
              q_indvec = modulo(q_indvec, el%wvmesh) !0-based index vector
              q = q_indvec/dble(el%wvmesh) !crystal coords.
              !Muxed index of q
-             iq = mux_vector(q_indvec, el%wvmesh, 0_k8)
+             iq = mux_vector(q_indvec, el%wvmesh, 0_i64)
 
              !Calculate the fine mesh phonon.
              qlist(1, :) = q
-             call wann%ph_wann_epw(crys, 1_k8, qlist, ph_ens_iq, ph_evecs_iq)
+             call wann%ph_wann_epw(crys, 1_i64, qlist, ph_ens_iq, ph_evecs_iq)
           else !Original (coarser) mesh phonon
              q_indvec = modulo(q_indvec/el%mesh_ref_array, ph%wvmesh) !0-based index vector
              q = q_indvec/dble(ph%wvmesh) !crystal coords.
              !Muxed index of q
-             iq = mux_vector(q_indvec, ph%wvmesh, 0_k8)
+             iq = mux_vector(q_indvec, ph%wvmesh, 0_i64)
           end if
           
           !Run over final electron bands
@@ -941,10 +946,10 @@ contains
                    end if
 
                    !Bose and Fermi factors
-                   if(en_ph /= 0.0_dp) then
+                   if(en_ph /= 0.0_r64) then
                       bosefac = Bose(en_ph, crys%T)
                    else
-                      bosefac = 0.0_dp
+                      bosefac = 0.0_r64
                    end if
                    fermi_plus_fac = Fermi(en_el + en_ph, el%chempot, crys%T)
                    fermi_minus_fac = Fermi(en_el - en_ph, el%chempot, crys%T)
@@ -980,7 +985,7 @@ contains
                    end if
 
                    !Temperature dependent occupation factor
-                   occup_fac = 1.0_dp + bosefac - fermi_minus_fac
+                   occup_fac = 1.0_r64 + bosefac - fermi_minus_fac
                    
                    !Save X-
                    if(en_ph >= 0.5e-3) then !Use a small phonon energy cut-off
@@ -1076,12 +1081,12 @@ contains
     type(numerics), intent(in) :: num
     
     !Local variables
-    integer(k8) :: nstates_irred, istate, m, ik, n, ikp, &
+    integer(i64) :: nstates_irred, istate, m, ik, n, ikp, &
          start, end, chunk, k_indvec(3), kp_indvec(3), &
          q_indvec(3), count, nprocs, num_active_images
-    real(dp) :: k(3), kp(3), q_mag, const, en_el, delta, g2
-    real(dp), allocatable :: Xchimp_istate(:)
-    integer(k8), allocatable :: istate_el(:)
+    real(r64) :: k(3), kp(3), q_mag, const, en_el, delta, g2
+    real(r64), allocatable :: Xchimp_istate(:)
+    integer(i64), allocatable :: istate_el(:)
     character(len = 1024) :: filename
 
     call print_message("Calculating e-ch. imp. transition probabilities for all IBZ electrons...")
@@ -1089,11 +1094,11 @@ contains
     !Conversion factor in transition probability expression
     const = twopi/hbar_eVps
 
-    !Length of 
+    !Number of processes
     nprocs = el%nstates_inwindow
     allocate(Xchimp_istate(nprocs), istate_el(nprocs))
-    Xchimp_istate(:) = 0.0_dp
-    istate_el(:) = 0_k8
+    Xchimp_istate(:) = 0.0_r64
+    istate_el(:) = 0_i64
     
     !Total number of IBZ blocks states
     nstates_irred = el%nwv_irred*el%numbands
@@ -1195,19 +1200,17 @@ contains
     !! from disk and calculating the relaxation time approximation (RTA)
     !! scattering rates for the 3-ph and ph-e channels.
 
-    real(dp), allocatable, intent(out) :: rta_rates_3ph(:,:)
-    real(dp), allocatable, intent(out) :: rta_rates_phe(:,:)
+    real(r64), allocatable, intent(out) :: rta_rates_3ph(:,:)
+    real(r64), allocatable, intent(out) :: rta_rates_phe(:,:)
     type(numerics), intent(in) :: num
     type(crystal), intent(in) :: crys
     type(phonon), intent(in) :: ph
     type(electron), intent(in), optional :: el
 
     !Local variables
-    integer(k8) :: nstates_irred, istate, nprocs_3ph_plus, nprocs_3ph_minus, &
-         nprocs_phe, iproc, chunk, s, iq, num_active_images
-    integer(k8), allocatable :: start[:], end[:]
-    real(dp), allocatable :: rta_rates_3ph_psum(:,:)[:], rta_rates_phe_psum(:,:)[:], &
-         W(:), Y(:)
+    integer(i64) :: nstates_irred, istate, nprocs_3ph_plus, nprocs_3ph_minus, &
+         nprocs_phe, iproc, chunk, s, iq, num_active_images, start, end
+    real(r64), allocatable :: W(:), Y(:)
     character(len = 1024) :: filepath_Wm, filepath_Wp, filepath_Y, tag
     
     !Set output directory of transition probilities
@@ -1215,25 +1218,14 @@ contains
     
     !Total number of IBZ blocks states
     nstates_irred = ph%nwv_irred*ph%numbands
-
-    !Allocate start and end coarrays
-    allocate(start[*], end[*])
     
     !Divide phonon states among images
     call distribute_points(nstates_irred, chunk, start, end, num_active_images)
-
-    !Allocate and initialize scattering rates coarrays
-    allocate(rta_rates_3ph_psum(ph%nwv_irred, ph%numbands)[*])
-    rta_rates_3ph_psum(:, :) = 0.0_dp
-    if(present(el)) then
-       allocate(rta_rates_phe_psum(ph%nwv_irred, ph%numbands)[*])
-       rta_rates_phe_psum(:, :) = 0.0_dp
-    end if
     
     !Allocate and initialize scattering rates
     allocate(rta_rates_3ph(ph%nwv_irred, ph%numbands), rta_rates_phe(ph%nwv_irred, ph%numbands))
-    rta_rates_3ph(:, :) = 0.0_dp
-    rta_rates_phe(:, :) = 0.0_dp
+    rta_rates_3ph(:, :) = 0.0_r64
+    rta_rates_phe(:, :) = 0.0_r64
         
     !Run over first phonon IBZ states
     do istate = start, end
@@ -1249,7 +1241,7 @@ contains
        call read_transition_probs_e(trim(adjustl(filepath_Wp)), nprocs_3ph_plus, W)
 
        do iproc = 1, nprocs_3ph_plus
-          rta_rates_3ph_psum(iq, s) = rta_rates_3ph_psum(iq, s) + W(iproc) 
+          rta_rates_3ph(iq, s) = rta_rates_3ph(iq, s) + W(iproc) 
        end do
 
        !Set W- filename
@@ -1260,7 +1252,7 @@ contains
        call read_transition_probs_e(trim(adjustl(filepath_Wm)), nprocs_3ph_minus, W)
 
        do iproc = 1, nprocs_3ph_minus
-          rta_rates_3ph_psum(iq, s) = rta_rates_3ph_psum(iq, s) + 0.5_dp*W(iproc)
+          rta_rates_3ph(iq, s) = rta_rates_3ph(iq, s) + 0.5_r64*W(iproc)
        end do
 
        if(present(el)) then
@@ -1272,36 +1264,147 @@ contains
           call read_transition_probs_e(trim(adjustl(filepath_Y)), nprocs_phe, Y)
 
           do iproc = 1, nprocs_phe
-             rta_rates_phe_psum(iq, s) = rta_rates_phe_psum(iq, s) + el%spindeg*Y(iproc)
+             rta_rates_phe(iq, s) = rta_rates_phe(iq, s) + el%spindeg*Y(iproc)
           end do
        end if
     end do
 
-    !Reduce coarray partial sums
-    call co_sum(rta_rates_3ph_psum)
-    rta_rates_3ph = rta_rates_3ph_psum
+    !Reduce partial sums
+    sync all
+    call co_sum(rta_rates_3ph)
+    sync all
     if(present(el)) then
-       call co_sum(rta_rates_phe_psum)
-       rta_rates_phe = rta_rates_phe_psum
+       sync all
+       call co_sum(rta_rates_phe)
+       sync all
     end if
   end subroutine calculate_ph_rta_rates
 
+  subroutine calculate_4ph_rta_rates(rta_rates, num, crys, ph)
+    !! Subroutine for interporlating 4-ph scattering rates from an
+    !! external coarser mesh calculation.
+    
+    real(r64), allocatable, intent(out) :: rta_rates(:,:)
+    type(numerics), intent(in) :: num
+    type(crystal), intent(in) :: crys
+    type(phonon), intent(in) :: ph
+
+    !Local variables
+    integer(i64) :: chunk, s, iq, coarse_numq_irred, coarse_numq_full, &
+         num_active_images, start, end, fineq_indvec(3), mesh_ref_array(3), &
+         coarse_qmesh(3), fbz2ibz
+    real(r64) :: ignore
+    real(r64), allocatable :: coarse_rta_rates_ibz(:, :), coarse_rta_rates_fbz(:, :)
+    character(len=1024) :: temp_tag, filename
+
+    allocate(rta_rates(ph%nwv_irred, ph%numbands))
+    rta_rates = 0.0_r64
+
+    if(num%fourph) then
+       !Set some internal mesh related variables
+       mesh_ref_array = num%fourph_mesh_ref
+       if(crys%twod) mesh_ref_array(3) = 1
+       coarse_qmesh = ph%wvmesh/num%fourph_mesh_ref
+       if(crys%twod) coarse_qmesh(3) = 1
+       
+       write(temp_tag, "(E9.3)") crys%T
+       filename = "FourPhonon_BTE.w_4ph_T" // trim(adjustl(temp_tag))
+
+       !Read number of irreducible q-points
+       if(this_image() == 1 .and. num%fourph) then
+          open(1, file=filename, status="old")
+          read(1, *) coarse_numq_irred
+       end if
+
+       sync all
+       call co_broadcast(coarse_numq_irred, 1)
+       sync all
+       
+       allocate(coarse_rta_rates_ibz(coarse_numq_irred, ph%numbands))
+       
+       !Read coarse mesh, IBZ 4-ph scattering rates
+       if(this_image() == 1 .and. num%fourph) then
+          open(1, file=filename, status="old")
+
+          do s = 1, ph%numbands
+             do iq = 1, coarse_numq_irred
+                read(1, *) ignore, coarse_rta_rates_ibz(iq, s)
+             end do
+          end do
+
+          close(1)
+       end if
+       sync all
+       call co_broadcast(coarse_rta_rates_ibz, 1)
+       sync all
+
+       !Compute FBZ <-> IBZ mapping from BTE.qpoints_full file
+       if(this_image() == 1 .and. num%fourph) then
+          open(1, file="FourPhonon_BTE.qpoints_full", status="old")
+
+          read(1, *) coarse_numq_full
+          if(coarse_numq_full /= product(coarse_qmesh)) then
+             call exit_with_message('Wrong q-mesh in external 4-ph calculation. Exiting.')
+          end if
+       end if
+
+       sync all
+       call co_broadcast(coarse_numq_full, 1)
+       sync all
+          
+       allocate(coarse_rta_rates_fbz(coarse_numq_full, ph%numbands))
+
+       if(this_image() == 1 .and. num%fourph) then
+          do iq = 1, coarse_numq_full
+             read(1, *) ignore, fbz2ibz, ignore, ignore, ignore
+             coarse_rta_rates_fbz(iq, :) = coarse_rta_rates_ibz(fbz2ibz, :)
+          end do
+
+          close(1)
+       end if
+       sync all
+       call co_broadcast(coarse_rta_rates_fbz, 1)
+       sync all
+       
+       !Divide phonon states among images
+       call distribute_points(ph%nwv_irred, chunk, start, end, num_active_images)
+
+       !If needed, parallely interpolate over fine q-mesh
+       if(num%fourph_mesh_ref > 1) then
+          do iq = start, end
+             !Calculate the fine mesh wave vector, 0-based index vector
+             call demux_vector(ph%indexlist_irred(iq), fineq_indvec, ph%wvmesh, 0_i64)
+
+             !Interpolate 4-ph scattering rates on this wave vector
+             do s = 1, ph%numbands
+                call interpolate(coarse_qmesh, mesh_ref_array, coarse_rta_rates_fbz(:, s), &
+                     fineq_indvec, rta_rates(iq, s))
+             end do
+          end do
+
+          sync all
+          call co_sum(rta_rates)
+          sync all
+       else
+          rta_rates = coarse_rta_rates_ibz
+       end if
+    end if
+  end subroutine calculate_4ph_rta_rates
+  
   subroutine calculate_el_rta_rates(rta_rates_eph, rta_rates_echimp, num, crys, el)
     !! Subroutine for parallel reading of the e-ph transition probabilities
     !! from disk and calculating the relaxation time approximation (RTA)
     !! scattering rates for the e-ph channel.
 
-    real(dp), allocatable, intent(out) :: rta_rates_eph(:,:), rta_rates_echimp(:,:)
+    real(r64), allocatable, intent(out) :: rta_rates_eph(:,:), rta_rates_echimp(:,:)
     type(numerics), intent(in) :: num
     type(crystal), intent(in) :: crys
     type(electron), intent(in) :: el
     
     !Local variables
-    integer(k8) :: nstates_irred, istate, nprocs_eph, &
-         iproc, chunk, m, ik, num_active_images
-    integer(k8), allocatable :: start[:], end[:]
-    real(dp), allocatable :: rta_rates_eph_psum(:,:)[:], &
-         rta_rates_echimp_psum(:,:)[:], X(:)
+    integer(i64) :: nstates_irred, istate, nprocs_eph, &
+         iproc, chunk, m, ik, num_active_images, start, end
+    real(r64), allocatable :: X(:)
     character(len = 1024) :: filepath_Xp, filepath_Xm, tag
 
     !Set output directory of transition probilities
@@ -1309,26 +1412,15 @@ contains
 
     !Total number of IBZ blocks states
     nstates_irred = el%nwv_irred*el%numbands
-    
-    !Allocate start and end coarrays
-    allocate(start[*], end[*])
 
     !Divide phonon states among images
     call distribute_points(nstates_irred, chunk, start, end, num_active_images)
-
-    !Allocate and initialize scattering rates coarrays
-    allocate(rta_rates_eph_psum(el%nwv_irred, el%numbands)[*])
-    rta_rates_eph_psum(:, :) = 0.0_dp
-    if(num%elchimp) then
-       allocate(rta_rates_echimp_psum(el%nwv_irred, el%numbands)[*])
-       rta_rates_echimp_psum(:, :) = 0.0_dp
-    end if
     
     !Allocate and initialize scattering rates
     allocate(rta_rates_eph(el%nwv_irred, el%numbands))
-    rta_rates_eph(:, :) = 0.0_dp
+    rta_rates_eph(:, :) = 0.0_r64
     allocate(rta_rates_echimp(el%nwv_irred, el%numbands))
-    rta_rates_echimp(:, :) = 0.0_dp
+    rta_rates_echimp(:, :) = 0.0_r64
 
     do istate = start, end !over IBZ blocks states
        !Demux state index into band (m) and wave vector (ik) indices
@@ -1346,7 +1438,7 @@ contains
        call read_transition_probs_e(trim(adjustl(filepath_Xp)), nprocs_eph, X)
        
        do iproc = 1, nprocs_eph
-          rta_rates_eph_psum(ik, m) = rta_rates_eph_psum(ik, m) + X(iproc) 
+          rta_rates_eph(ik, m) = rta_rates_eph(ik, m) + X(iproc) 
        end do
 
        !Set X- filename
@@ -1358,7 +1450,7 @@ contains
        call read_transition_probs_e(trim(adjustl(filepath_Xm)), nprocs_eph, X)
 
        do iproc = 1, nprocs_eph
-          rta_rates_eph_psum(ik, m) = rta_rates_eph_psum(ik, m) + X(iproc) 
+          rta_rates_eph(ik, m) = rta_rates_eph(ik, m) + X(iproc) 
        end do
 
        if(num%elchimp) then
@@ -1371,28 +1463,29 @@ contains
           call read_transition_probs_e(trim(adjustl(filepath_Xm)), nprocs_eph, X)
 
           do iproc = 1, nprocs_eph
-             rta_rates_echimp_psum(ik, m) = rta_rates_echimp_psum(ik, m) + X(iproc) 
+             rta_rates_echimp(ik, m) = rta_rates_echimp(ik, m) + X(iproc) 
           end do
        end if
     end do
 
-    !Reduce coarray partial sums
-    call co_sum(rta_rates_eph_psum)
-    rta_rates_eph = rta_rates_eph_psum
+    !Reduce partial sums
+    sync all
+    call co_sum(rta_rates_eph)
+    sync all
     if(num%elchimp) then
-       call co_sum(rta_rates_echimp_psum)
-       rta_rates_echimp = rta_rates_echimp_psum
-    end if
-    
+       sync all
+       call co_sum(rta_rates_echimp)
+       sync all
+    end if    
   end subroutine calculate_el_rta_rates
   
   subroutine read_transition_probs_e(filepath, N, TP, istate1, istate2)
     !! Subroutine to read transition probabilities from disk for interaction processes.
 
     character(len = *), intent(in) :: filepath
-    integer(k8), intent(out) :: N
-    real(dp), allocatable, intent(out) :: TP(:)
-    integer(k8), allocatable, intent(out), optional :: istate1(:), istate2(:)
+    integer(i64), intent(out) :: N
+    real(r64), allocatable, intent(out) :: TP(:)
+    integer(i64), allocatable, intent(out), optional :: istate1(:), istate2(:)
 
     !Read data
     open(1, file = trim(adjustl(filepath)), status = 'old', access = 'stream')
@@ -1427,13 +1520,13 @@ contains
 
     character(len = 2), intent(in) :: prefix
     logical, intent(in) :: finite_crys
-    real(dp), intent(in) :: length
-    real(dp), intent(in) :: vels_fbz(:,:,:)
-    integer(k8), intent(in) :: indexlist_irred(:)
-    real(dp), allocatable, intent(out) :: scatt_rates(:,:)
+    real(r64), intent(in) :: length
+    real(r64), intent(in) :: vels_fbz(:,:,:)
+    integer(i64), intent(in) :: indexlist_irred(:)
+    real(r64), allocatable, intent(out) :: scatt_rates(:,:)
 
     !Local variables
-    integer(k8) :: ik, ib, nk_irred, nb
+    integer(i64) :: ik, ib, nk_irred, nb
 
     !Number of IBZ wave vectors and bands
     nk_irred = size(indexlist_irred(:))
@@ -1441,14 +1534,14 @@ contains
     
     !Allocate boundary scattering rates and initialize to infinite crystal values
     allocate(scatt_rates(nk_irred, nb))
-    scatt_rates = 0.0_dp
+    scatt_rates = 0.0_r64
     
     !Check finiteness of crystal
     if(finite_crys) then
        do ik = 1, nk_irred
           do ib = 1, nb
              scatt_rates(ik, ib) = twonorm(vels_fbz(indexlist_irred(ik), ib, :))&
-                  /length*1.e-6_dp !THz
+                  /length*1.e-6_r64 !THz
           end do
        end do
     end if
@@ -1456,4 +1549,101 @@ contains
     !Write to file
     call write2file_rank2_real(prefix // '.W_rta_'//prefix//'bound', scatt_rates)
   end subroutine calculate_bound_scatt_rates
+
+  subroutine calculate_thinfilm_scatt_rates(prefix, finite_crys, height, normal, vels_fbz, &
+       indexlist_irred, scatt_rates)
+    !! Subroutine to calculate the phonon/electron-thin-film scattering rates.
+    !!
+    !! prefix Type of particle
+    !! finite_crys Is the crystal finite?
+    !! height Height of thin-film in mm
+    !! normal Normal direction to thin-film
+    !! vels Velocities on the FBZ
+    !! indexlist_irred List of muxed indices of the IBZ wedge.
+    !! scatt_rates Thin-film scattering rates on the IBZ
+
+    character(len = 2), intent(in) :: prefix
+    logical, intent(in) :: finite_crys
+    real(r64), intent(in) :: height
+    character(1), intent(in) :: normal
+    real(r64), intent(in) :: vels_fbz(:,:,:)
+    integer(i64), intent(in) :: indexlist_irred(:)
+    real(r64), allocatable, intent(out) :: scatt_rates(:,:)
+
+    !Local variables
+    integer(i64) :: ik, ib, nk_irred, nb, dir
+
+    !Number of IBZ wave vectors and bands
+    nk_irred = size(indexlist_irred(:))
+    nb = size(vels_fbz(1,:,1))
+
+    !Allocate boundary scattering rates and initialize to infinite crystal values
+    allocate(scatt_rates(nk_irred, nb))
+    scatt_rates = 0.0_r64
+
+    if(normal == 'x') then
+       dir = 1_i64
+    else if(normal == 'y') then
+       dir = 2_i64
+    else if(normal == 'z') then
+       dir = 3_i64
+    else
+       call exit_with_message("Bad thin-film normal direction in calculate_thinfilm_scattrates. Exiting.")
+    end if
+    
+    !Check finiteness of crystal
+    if(finite_crys) then
+       do ik = 1, nk_irred
+          do ib = 1, nb
+             scatt_rates(ik, ib) = abs(vels_fbz(indexlist_irred(ik), ib, dir)) &
+                  /height*1.e-6_r64 !THz
+          end do
+       end do
+    end if
+    scatt_rates = 2.0_r64*scatt_rates
+
+    !Write to file
+    call write2file_rank2_real(prefix // '.W_rta_'//prefix//'thinfilm', scatt_rates)
+  end subroutine calculate_thinfilm_scatt_rates
+
+!!$  subroutine calculate_defect_scatt_rates(prefix, def_frac, indexlist_ibz, ens_fbz, diagT)!, scatt_rates)
+!!$    !! Subroutine to calculate the phonon-defect scattering rate given
+!!$    !! the diagonal of the scattering T-matrix.
+!!$    !!
+!!$    !! prefix Particle type label
+!!$    !! def_frac Elemental fraction of defects
+!!$    !! ens IBZ energies
+!!$    !! diagT Diagonal of the IBZ T-matrix
+!!$    !! scatt_rates IBZ Scattering rates
+!!$
+!!$    character(len = 2), intent(in) :: prefix
+!!$    real(r64), intent(in) :: def_frac
+!!$    real(r64), intent(in) :: ens_fbz(:, :)
+!!$    integer(i64), intent(in) :: indexlist_ibz(:)
+!!$    complex(r64), intent(in) :: diagT(:, :)
+!!$    !real(r64), allocatable, intent(out) :: scatt_rates(:, :)
+!!$    
+!!$    !Local variables
+!!$    integer(i64) :: nk_ibz, nbands, ik
+!!$    real(r64), allocatable :: scatt_rates(:, :)
+!!$
+!!$    nk_ibz = size(diagT, 1)
+!!$    nbands = size(diagT, 2)
+!!$
+!!$    print*, 'def_frac = ', def_frac
+!!$    
+!!$    allocate(scatt_rates(nk_ibz, nbands))
+!!$
+!!$    do ik = 1, nk_ibz
+!!$       scatt_rates(ik, :) = imag(diagT(ik, :))/ens_fbz(indexlist_ibz(ik), :)
+!!$    end do
+!!$
+!!$    scatt_rates = -def_frac*scatt_rates/hbar_eVps
+!!$
+!!$    !Deal with Gamma point acoustic phonons! and zero-velocity optic phonons
+!!$    scatt_rates(1, 1:3) = 0.0_r64
+!!$    
+!!$    !Write to file
+!!$    call write2file_rank2_real(prefix // '.W_rta_'//prefix//'defect', scatt_rates)
+!!$  end subroutine calculate_defect_scatt_rates
 end module interactions

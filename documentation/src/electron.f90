@@ -1,4 +1,4 @@
-! Copyright (C) 2020- Nakib Haider Protik <nakib.haider.protik@gmail.com>
+! Copyright 2020 elphbolt contributors.
 ! This file is part of elphbolt <https://github.com/nakib/elphbolt>.
 !
 ! elphbolt is free software: you can redistribute it and/or modify
@@ -17,7 +17,7 @@
 module electron_module
   !! Module containing types and procedures related to the electronic properties.
 
-  use params, only: dp, k8
+  use params, only: r64, i64
   use particle_module, only: particle
   use misc, only: exit_with_message, print_message, demux_state, sort, &
        binsearch, subtitle, Fermi, write2file_rank2_real, write2file_rank3_real 
@@ -33,68 +33,76 @@ module electron_module
   private
   public electron
 
+  !external chdir
+
   type, extends (particle) :: electron
      !! Data and procedures related to the electronic properties.
 
      character(len = 2) :: prefix = 'el'
      !! Prefix idenitfying particle type.
-     integer(k8) :: spindeg
+     integer(i64) :: spindeg
      !! Spin degeneracy.
-     integer(k8) :: numtransbands
+     integer(i64) :: numtransbands
      !! Total number of transport active bands.
-     integer(k8) :: indlowband
+     integer(i64) :: indlowband
      !! Lowest transport band index.
-     integer(k8) :: indhighband
+     integer(i64) :: indhighband
      !! Highest transport band index.
-     integer(k8) :: indlowconduction
+     integer(i64) :: indlowconduction
      !! Lowest conduction band index.
-     integer(k8) :: indhighvalence
+     integer(i64) :: indhighvalence
      !! Highest valence band index.
-     integer(k8), allocatable :: bandlist(:)
+     integer(i64), allocatable :: bandlist(:)
      !! List of transport active band indices.
-     integer(k8) :: mesh_ref
+     integer(i64) :: mesh_ref
      !! Electron mesh refinement factor compared to the phonon mesh.
-     integer(k8) :: mesh_ref_array(3)
+     integer(i64) :: mesh_ref_array(3)
      !! The same as above, but in array form. This is useful for 3d vs 2d cases.
-     integer(k8) :: nstates_inwindow
+     integer(i64) :: nstates_inwindow
      !! Number of electron wave vectors within transport window.
-     integer(k8) :: nstates_irred_inwindow
+     integer(i64) :: nstates_irred_inwindow
      !! Number of IBZ wedge electron wave vectors within transport window.
-     integer(k8), allocatable :: IBZ_inwindow_states(:,:)
+     integer(i64), allocatable :: IBZ_inwindow_states(:,:)
      !! List of irreducible wedge states within transport window.
-     real(dp) :: enref
+     real(r64) :: enref
      !! Electron reference energy (eV).
      !! This is the center of the transport energy window.
-     real(dp) :: fsthick
+     real(r64) :: fsthick
      !! Fermi surface thickness (eV).
-     real(dp) :: chempot
+     real(r64) :: chempot
      !! Chemical potential in (eV).
-     real(dp), allocatable :: conc(:)
+     real(r64), allocatable :: conc(:)
      !! Band resolved carrier concentration.
-     real(dp) :: conc_el
+     real(r64) :: conc_el
      !! Total electron carrier concentration.
-     real(dp) :: conc_hole
+     real(r64) :: conc_hole
      !! Total hole carrier concentration.
-     real(dp) :: chimp_conc_n
+     real(r64) :: chimp_conc_n
      !! Concentration of donor impurities.
-     real(dp) :: chimp_conc_p
+     real(r64) :: chimp_conc_p
      !! Concentration of acceptor impurities.
-     real(dp) :: Zn
+     real(r64) :: Zn
      !! Ionization number of donor dopant.
-     real(dp) :: Zp
+     real(r64) :: Zp
      !! Ionization number of acceptor dopant.
+     real(r64), allocatable :: scissor(:)
+     !! Scissor operator (eV)
      logical :: metallic
      !! Is the system metallic?
      character(len = 1) :: dopingtype
      !! Type of doping. This is needed for runlevel 0 only.
-     integer(k8) :: numconc
+     integer(i64) :: numconc
      !! Number of concentration points. This is needed for runlevel 0 only.
-     real(dp), allocatable :: conclist(:)
+     real(r64), allocatable :: conclist(:)
      !! List of concentrations. This is needed for runlevel 0 only.
-     integer(k8) :: numT
+     integer(i64) :: numT
      !! Number of temperature points. This is needed for runlevel 0 only.
-     real(dp), allocatable :: Tlist(:)
+     real(r64), allocatable :: Tlist(:)
      !! List of temperatures. This is needed for runlevel 0 only.
+     real(r64) :: spinnormed_dos_fermi
+     !! Spin-normalized density of states at the Fermi level
+     real(r64), allocatable :: Ws_irred(:, :), Ws(:, :)
+     !! Electron delta functions normalized by spinnormed_dos_fermi
      
    contains
 
@@ -115,9 +123,9 @@ contains
     type(numerics), intent(in) :: num
 
     !Local variables
-    real(dp) :: enref, Zn, Zp, chempot
-    real(dp), allocatable :: Tlist(:), conclist(:)
-    integer(k8) :: ib, spindeg, numbands, indlowband, indhighband, &
+    real(r64) :: enref, Zn, Zp, chempot, scissor 
+    real(r64), allocatable :: Tlist(:), conclist(:)
+    integer(i64) :: ib, spindeg, numbands, indlowband, indhighband, &
          indlowconduction, indhighvalence, numT, numconc
     logical :: metallic
     character(len = 6) :: concunits
@@ -126,7 +134,7 @@ contains
     namelist /electrons/ enref, spindeg, numbands, &
          indlowband, indhighband, metallic, chempot, Zn, Zp, &
          indlowconduction, indhighvalence, dopingtype, numT, numconc, &
-         Tlist, conclist
+         Tlist, conclist, scissor
          
     call subtitle("Setting up electrons...")
     
@@ -141,16 +149,17 @@ contains
     indlowconduction = 0
     indhighvalence = 0
     metallic = .false.
-    Zn = 0.0_dp
-    Zp = 0.0_dp
-    chempot = -999999.99999_dp !Something crazy
-    enref = -999999.99999_dp !Something crazy
+    Zn = 0.0_r64
+    Zp = 0.0_r64
+    scissor = 0.0_r64
+    chempot = -999999.99999_r64 !Something crazy
+    enref = -999999.99999_r64 !Something crazy
     numT = 100 !Something crazy big
     numconc = 100 !Something crazy big
     dopingtype = 'x'
     allocate(Tlist(nuMT), conclist(numconc))
-    Tlist = -1.0_dp !Something crazy
-    conclist = 0.0_dp
+    Tlist = -1.0_r64 !Something crazy
+    conclist = 0.0_r64
     read(1, nml = electrons)
     if(spindeg < 1 .or. spindeg > 2) then
        call exit_with_message('spindeg can be 1 or 2.')
@@ -170,6 +179,18 @@ contains
                'For non-metals, must provide lowest conduction or highest valence band.')
        end if
     end if
+    if(metallic .and. scissor .ne. 0.0_r64) then
+       call exit_with_message(&
+               'Scissor operator cannot be applied to metals.')
+    end if
+    if(metallic .and. scissor .lt. 0.0_r64) then
+       call exit_with_message(&
+               'Scissor operator must be positive.')
+    end if
+    if(numbands .ne. wann%numwannbands ) then
+       call exit_with_message(&
+               'Number of wannier bands is not correct.')
+    end if
     if(num%runlevel == 0) then
        if(numT <= 0 .or. numconc <= 0) then
           call exit_with_message('numT or numconc should be > 0.')
@@ -177,7 +198,7 @@ contains
        if(numT > 100 .or. numconc > 100) then
           call exit_with_message('numT or numconc > 1000 is not supported.')
        end if
-       if(any(Tlist(1:numT) <= 0.0_dp)) then
+       if(any(Tlist(1:numT) <= 0.0_r64)) then
           call exit_with_message('Unphysical Tlist provided.')
        end if
        if(dopingtype /= 'n' .and. dopingtype /= 'p') then
@@ -198,6 +219,13 @@ contains
     self%metallic = metallic
     self%indlowconduction = indlowconduction
     self%indhighvalence = indhighvalence
+    !Define all cases even when one of them is not defined
+    if (.not. metallic .and. indlowconduction < 1) then
+        self%indlowconduction = indhighvalence + 1
+    end if
+    if (.not. metallic .and. indhighvalence < 1) then
+        self%indhighvalence = indlowconduction - 1
+    end if
     self%enref = enref
     self%chempot = chempot
     self%Zn = Zn
@@ -222,11 +250,18 @@ contains
     self%mesh_ref = num%mesh_ref
     self%mesh_ref_array = (/num%mesh_ref, num%mesh_ref, num%mesh_ref/)
     if(crys%twod) then
-       self%wvmesh(3) = 1_k8
-       self%mesh_ref_array(3) = 1_k8
+       self%wvmesh(3) = 1_i64
+       self%mesh_ref_array(3) = 1_i64
     end if
     self%wvmesh = self%mesh_ref_array*num%qmesh
     self%fsthick = num%fsthick
+
+    !Computing the shift in energy due to scissor operator
+    allocate(self%scissor(wann%numwannbands))
+    self%scissor(:) = 0.0_r64
+    if (.not. metallic) then
+      self%scissor(self%indlowconduction:wann%numwannbands) = scissor
+    end if
     
     !Print out information.
     if(this_image() == 1) then
@@ -243,6 +278,10 @@ contains
        if(indhighvalence > 0) then
           write(*, "(A, I5)") "Highest valence band index = ", self%indhighvalence
        end if
+       if (scissor .ne. 0.0_r64) then
+          write(*, "(A, 1E16.8, A)") "Scissor operator = ", &
+            self%scissor(self%indlowconduction) , " eV"
+       end if     
     end if
     
     !Calculate electrons
@@ -250,8 +289,8 @@ contains
     
     !Set total number of charged impurities
     if(.not. self%metallic) then
-       self%chimp_conc_n = 0.0_dp
-       self%chimp_conc_p = 0.0_dp
+       self%chimp_conc_n = 0.0_r64
+       self%chimp_conc_p = 0.0_r64
        if(self%Zn > 0) self%chimp_conc_n = self%chimp_conc_n + self%conc_el/self%Zn
        if(self%Zp > 0) self%chimp_conc_p = self%chimp_conc_p + self%conc_hole/self%Zp
     end if
@@ -297,8 +336,8 @@ contains
     type(numerics), intent(in) :: num
     
     !Some utitlity variables
-    integer(k8) :: i, l, s, il, ii, jj, kk, ib, count, istate, aux
-    real(dp), allocatable :: el_ens_tmp(:, :), el_vels_tmp(:, :, :)
+    integer(i64) :: i, l, s, il, ii, jj, kk, ib, count, istate, aux
+    real(r64), allocatable :: el_ens_tmp(:, :), el_vels_tmp(:, :, :)
 
     !Switch for mesh utilites with or without energy restriction
     logical :: blocks
@@ -330,7 +369,7 @@ contains
          self%vels_irred(self%nwv_irred, wann%numwannbands, 3), &
          self%evecs_irred(self%nwv_irred, wann%numwannbands, wann%numwannbands))
     call wann%el_wann_epw(crys, self%nwv_irred, self%wavevecs_irred, self%ens_irred, &
-         self%vels_irred, self%evecs_irred)
+         self%vels_irred, self%evecs_irred,self%scissor)
     
     ! 4. Map out FBZ quantities from IBZ ones
     call print_message("Mapping out FBZ energies...")
@@ -410,7 +449,8 @@ contains
     !not getting these from IBZ quantities via symmetry rotations
     allocate(self%evecs(self%nwv, wann%numwannbands, wann%numwannbands))
     allocate(el_ens_tmp(self%nwv, wann%numwannbands), el_vels_tmp(self%nwv, wann%numwannbands, 3))
-    call wann%el_wann_epw(crys, self%nwv, self%wavevecs, el_ens_tmp, el_vels_tmp, self%evecs)
+    call wann%el_wann_epw(crys, self%nwv, self%wavevecs, el_ens_tmp, el_vels_tmp, &
+      self%evecs,self%scissor)
     deallocate(el_ens_tmp, el_vels_tmp) !free up memory
     
     ! 8. Find IBZ of energy window restricted blocks
@@ -430,7 +470,7 @@ contains
     
     !Create symmetrizers of wave vector dependent vectors ShengBTE style
     allocate(self%symmetrizers(3, 3, self%nwv))
-    self%symmetrizers = 0.0_dp
+    self%symmetrizers = 0.0_r64
     do i = 1, self%nwv
        ii = self%indexlist(i)
        kk = 0
@@ -453,7 +493,7 @@ contains
          self%vels_irred(self%nwv_irred, wann%numwannbands, 3), &
          self%evecs_irred(self%nwv_irred, wann%numwannbands, wann%numwannbands))
     call wann%el_wann_epw(crys, self%nwv_irred, self%wavevecs_irred, self%ens_irred, &
-         self%vels_irred, self%evecs_irred)
+         self%vels_irred, self%evecs_irred,self%scissor)
     
     ! 10. Calculate the number of FBZ blocks electronic states
     !     available for scattering
@@ -469,7 +509,6 @@ contains
 
     ! 11. Create FBZ blocks to IBZ blocks map
     call print_message("Calculating FBZ -> IBZ mappings...")
-    !call create_fbz2ibz_map
     call create_fbz2ibz_map(self%fbz2ibz_map,self%nwv,self%nwv_irred, &
          self%indexlist,self%nequiv,self%ibz2fbz_map)
     
@@ -512,7 +551,7 @@ contains
        call demux_state(istate, wann%numwannbands, ib, i)
        if(abs(self%ens_irred(i, ib) - self%enref) <= self%fsthick) then
           count = count + 1
-          self%IBZ_inwindow_states(count,:) = (/i, ib/)
+          self%IBZ_inwindow_states(count,:) = [i, ib]
        end if
     end do
 
@@ -559,12 +598,12 @@ contains
     !! indexlist is the list of wave vector indices - will be updated
     !! to the list of indices in the blocks
 
-    integer(k8), intent(inout) :: nk
-    integer(k8), allocatable, intent(inout) :: indexlist(:)
-    real(dp), intent(in) :: energies(:,:), enref, fsthick
+    integer(i64), intent(inout) :: nk
+    integer(i64), allocatable, intent(inout) :: indexlist(:)
+    real(r64), intent(in) :: energies(:,:), enref, fsthick
 
-    integer(k8) :: ik, count, numbands, inwindow(nk)
-    real(dp), allocatable :: aux(:)
+    integer(i64) :: ik, count, numbands, inwindow(nk)
+    real(r64), allocatable :: aux(:)
     
     numbands = size(energies(1,:))    
     allocate(aux(numbands))
@@ -593,10 +632,10 @@ contains
   subroutine fbz_blocks_quantities(indexlist, energies, velocities)
     !! Subroutine to find FBZ quanties the lie within the Fermi window.
 
-    integer(k8), intent(in) :: indexlist(:)
-    real(dp), allocatable, intent(inout) :: energies(:,:), velocities(:,:,:)
-    integer(k8) :: i, nk, numbands
-    real(dp), allocatable :: energies_tmp(:,:), velocities_tmp(:,:,:)
+    integer(i64), intent(in) :: indexlist(:)
+    real(r64), allocatable, intent(inout) :: energies(:,:), velocities(:,:,:)
+    integer(i64) :: i, nk, numbands
+    real(r64), allocatable :: energies_tmp(:,:), velocities_tmp(:,:,:)
 
     nk = size(indexlist)
     numbands = size(energies(1,:))
@@ -620,22 +659,22 @@ contains
     !! for a given chemical potential and temperature.
 
     class(electron), intent(inout) :: self
-    real(dp), intent(in) :: T, vol
-    real(dp), intent(in), optional :: h
+    real(r64), intent(in) :: T, vol
+    real(r64), intent(in), optional :: h
 
     !Local variables
-    real(dp) :: const
-    integer(k8) :: ib, ik
+    real(r64) :: const
+    integer(i64) :: ib, ik
 
     !Allocate conc
     allocate(self%conc(self%numbands))
-    self%conc = 0.0_dp
+    self%conc = 0.0_r64
 
-    self%conc_el = 0.0_dp
-    self%conc_hole = 0.0_dp
+    self%conc_el = 0.0_r64
+    self%conc_hole = 0.0_r64
     
     !Normalization and units factor
-    const = self%spindeg/dble(product(self%wvmesh))/vol/(1.0e-21_dp)
+    const = self%spindeg/dble(product(self%wvmesh))/vol/(1.0e-21_r64)
 
     do ik = 1, self%nwv
        !Electron concentration
@@ -652,7 +691,7 @@ contains
        !By convention, the hole carrier concentration will have a positive sign.
        if(self%indhighvalence > 0) then !Calculation includes valence bands
           do ib = self%indlowband, self%indhighvalence !Valence bands manifold
-             self%conc(ib) = self%conc(ib) + (1.0_dp - Fermi(self%ens(ik, ib), self%chempot, T))
+             self%conc(ib) = self%conc(ib) + (1.0_r64 - Fermi(self%ens(ik, ib), self%chempot, T))
           end do
           !Total hole concentration
           self%conc_hole = sum(self%conc(self%indlowband:self%indhighvalence))
@@ -664,9 +703,9 @@ contains
 
     !If h is present that means the system is 2d
     if(present(h)) then
-       self%conc = self%conc*h*1.0e-7_dp !cm^-2
-       self%conc_el = self%conc_el*h*1.0e-7_dp !cm^-2
-       self%conc_hole = self%conc_hole*h*1.0e-7_dp !cm^-2
+       self%conc = self%conc*h*1.0e-7_r64 !cm^-2
+       self%conc_el = self%conc_el*h*1.0e-7_r64 !cm^-2
+       self%conc_hole = self%conc_hole*h*1.0e-7_r64 !cm^-2
     end if    
   end subroutine calculate_carrier_conc
 
@@ -675,15 +714,15 @@ contains
     !! given carrier concentration.
 
     class(electron), intent(in) :: self
-    real(dp), intent(in) :: vol, Tlist(:), conclist(:)
+    real(r64), intent(in) :: vol, Tlist(:), conclist(:)
     character(len = 1), intent(in) :: dopingtype
-    real(dp), intent(in), optional :: h
+    real(r64), intent(in), optional :: h
 
     !Local variables
-    integer(k8) :: ib, ik, it, ngrid, maxiter, itemp, iconc, &
+    integer(i64) :: ib, ik, it, ngrid, maxiter, itemp, iconc, &
          high, low, numtemp, numconc
-    real(dp) :: a, b, aux, const, mu, thresh
-    real(dp), allocatable :: chempot(:,:)
+    real(r64) :: a, b, aux, const, mu, thresh
+    real(r64), allocatable :: chempot(:,:)
 
     call print_message("Calculating chemical potential...")
 
@@ -695,22 +734,22 @@ contains
 
     !Allocate chemical potential array
     allocate(chempot(numtemp, numconc))
-    chempot = -99.99_dp
+    chempot = -99.99_r64
     
     !Total number of points in full mesh
     ngrid = product(self%wvmesh)
 
     !Normalization and units factor
-    const = self%spindeg/dble(ngrid)/vol/(1.0e-21_dp)
+    const = self%spindeg/dble(ngrid)/vol/(1.0e-21_r64)
     if(present(h)) then !2d system
-       const = const*h*1.0e-7_dp
+       const = const*h*1.0e-7_r64
     end if
 
     !Maximum number of iterations
     maxiter = 5000
 
     !Convergence threshold
-    thresh = 1.0e-12_dp
+    thresh = 1.0e-12_r64
 
     !Check doping type
     if(dopingtype == 'n') then
@@ -720,6 +759,23 @@ contains
        low =  self%indlowband
        high = self%indhighvalence
     end if
+
+    if (this_image() == 1 .and. (.not. self%metallic) ) then
+       write(*, "(A, 1E16.8, A)") 'Maximum energy valence band = ' , &
+               maxval(self%ens_irred(:,self%indlowconduction-1)) , ' eV'
+       write(*, "(A, 1E16.8, A)") 'Minimum energy conduction band = ' , &
+               minval(self%ens_irred(:,self%indlowconduction)), ' eV'
+       if (any(self%scissor .ne. 0.0_r64)) then
+          write(*,"(A, 1E16.8,A)") 'Scissor operator applied at CBs = ', maxval(self%scissor), 'eV'
+          write(*, "(A, 1E16.8, A)") 'Minimum uncorrected energy conduction band = ' , &
+               minval(self%ens_irred(:,self%indlowconduction)) - self%scissor, ' eV'
+
+       end if
+       write(*, "(A, 1E16.8, A)") 'Band gap = ' , &
+           minval(self%ens_irred(:,self%indlowconduction)) - &
+           maxval(self%ens_irred(:,self%indlowconduction-1)) , ' eV'
+    end if
+
 
     !Loop over temperatures
     do itemp = 1, numtemp
@@ -734,21 +790,21 @@ contains
        !Loop over concentrations
        do iconc = 1, numconc
           if(dopingtype == 'n') then
-             a = self%enref - 12.0_dp !guess lower bound
-             b = self%enref + 12.0_dp !guess upper bound
+             a = self%enref - 12.0_r64 !guess lower bound
+             b = self%enref + 12.0_r64 !guess upper bound
           else
-             a = self%enref + 12.0_dp !guess lower bound
-             b = self%enref - 12.0_dp !guess upper bound
+             a = self%enref + 12.0_r64 !guess lower bound
+             b = self%enref - 12.0_r64 !guess upper bound
           end if
           do it = 1, maxiter
-             mu = 0.5_dp*(a + b)
-             aux = 0.0_dp
+             mu = 0.5_r64*(a + b)
+             aux = 0.0_r64
              do ib = low, high
                 do ik = 1, self%nwv
                    if(dopingtype == 'n') then
                       aux = aux + Fermi(self%ens(ik, ib), mu, Tlist(itemp))
                    else
-                      aux = aux + 1.0_dp - Fermi(self%ens(ik, ib), mu, Tlist(itemp))
+                      aux = aux + 1.0_r64 - Fermi(self%ens(ik, ib), mu, Tlist(itemp))
                    end if
                 end do
              end do
@@ -781,5 +837,7 @@ contains
     class(electron), intent(inout) :: self
 
     deallocate(self%evecs, self%evecs_irred)
+
+    sync all
   end subroutine deallocate_eigenvecs
 end module electron_module

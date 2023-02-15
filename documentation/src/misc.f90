@@ -1,4 +1,4 @@
-! Copyright (C) 2020- Nakib Haider Protik <nakib.haider.protik@gmail.com>
+! Copyright 2020 elphbolt contributors.
 ! This file is part of elphbolt <https://github.com/nakib/elphbolt>.
 !
 ! elphbolt is free software: you can redistribute it and/or modify
@@ -17,20 +17,21 @@
 module misc
   !! Module containing miscellaneous math and numerics related functions and subroutines.
 
-  use params, only: dp, k8, kB
+  use params, only: r64, i64, kB
   
   implicit none
   
   public
-  private :: sort_int, sort_real
+  private :: sort_int, sort_real, Pade_coeffs, twonorm_real_rank1, twonorm_real_rank2, &
+       invert_complex_square
 
   type timer
      !! Container for timing related data and procedures.
 
-     integer(k8) :: rate = 0
-     integer(k8) :: start = -1
-     integer(k8) :: end = -1
-     character(len = 1024) :: event
+     integer(i64) :: rate = 0
+     integer(i64) :: start = -1
+     integer(i64) :: end = -1
+     character(len = :), allocatable :: event
 
    contains
 
@@ -40,6 +41,14 @@ module misc
   interface sort
      module procedure :: sort_int, sort_real
   end interface sort
+
+  interface twonorm
+     module procedure :: twonorm_real_rank1, twonorm_real_rank2
+  end interface twonorm
+
+  interface invert
+     module procedure :: invert_complex_square
+  end interface invert
   
 contains
 
@@ -71,7 +80,7 @@ contains
     character(len = *), intent(in) :: event
 
     !Local variable
-    real(dp) :: time_elapsed
+    real(r64) :: time_elapsed
 
     sync all
     if(this_image() == 1) then
@@ -79,16 +88,14 @@ contains
        call system_clock(count = self%end)
 
        !Check the event name and if clock-in happened
-       if((event /= self%event) .or. (self%start == -1_k8)) then
+       if((event /= self%event) .or. (self%start == -1_i64)) then
           call exit_with_message('Clock-in event does not match this clock-out event.')
        end if
 
        !Calculate and print time taken for this event
-       time_elapsed = dble(self%end - self%start)/self%rate/3600.0_dp !hours
-       !time_elapsed = dble(end - start)/rate/3600.0_dp*num_images() !cpu-hours
+       time_elapsed = dble(self%end - self%start)/self%rate/3600.0_r64 !hours
        write(*, "(A)") ".............."
-       write(*, "(A, A, 1E16.8, A)") "| Timing info:", trim(event), time_elapsed, " hr"
-       !write(*, "(A, A, 1E16.8, A)") "| Timing info:", trim(event), time_elapsed, " cpu-hrs"
+       write(*, "(A, A, 1E16.8, A)") "| Timing info: ", trim(event), time_elapsed, " hr"
        write(*, "(A)") ".............."
     end if
   end subroutine end_timer
@@ -96,13 +103,13 @@ contains
   subroutine linspace(grid, min, max, num)
     !! Create equidistant grid.
 
-    real(dp), allocatable, intent(out) :: grid(:)
-    real(dp), intent(in) :: min, max
-    integer(k8), intent(in) :: num
+    real(r64), allocatable, intent(out) :: grid(:)
+    real(r64), intent(in) :: min, max
+    integer(i64), intent(in) :: num
 
     !Local variables
-    integer(k8) :: i
-    real(dp) :: spacing
+    integer(i64) :: i
+    real(r64) :: spacing
 
     !Allocate grid array
     allocate(grid(num))
@@ -134,14 +141,34 @@ contains
 
     if(this_image() == 1) write(*, "(A)") trim(message)
   end subroutine print_message
+  
+  subroutine write2file_rank1_real(filename, data)
+    !! Write rank-1 data to file.
 
+    character(len = *), intent(in) :: filename
+    real(r64), intent(in) :: data(:)
+
+    integer(i64) :: ik, nk
+
+    nk = size(data(:))
+
+    if(this_image() == 1) then
+       open(1, file = trim(filename), status = "replace")
+       do ik = 1, nk
+          write(1, "(E20.10)") data(ik)
+       end do
+       close(1)
+    end if
+    sync all
+  end subroutine write2file_rank1_real
+  
   subroutine write2file_rank2_real(filename, data)
     !! Write rank-2 data to file.
 
     character(len = *), intent(in) :: filename
-    real(dp), intent(in) :: data(:,:)
+    real(r64), intent(in) :: data(:,:)
 
-    integer(k8) :: ik, nk
+    integer(i64) :: ik, nk
     character(len = 1024) :: numcols
 
     nk = size(data(:, 1))
@@ -162,9 +189,9 @@ contains
     !! Write rank-3 data to file.
 
     character(len = *), intent(in) :: filename
-    real(dp), intent(in) :: data(:,:,:)
+    real(r64), intent(in) :: data(:,:,:)
 
-    integer(k8) :: ik, nk
+    integer(i64) :: ik, nk
     character(len = 1024) :: numcols
 
     nk = size(data(:, 1, 1))
@@ -184,14 +211,14 @@ contains
     !! Write list of vectors to band/branch resolved files.
 
     character(len = *), intent(in) :: filename
-    real(dp), intent(in) :: data(:,:,:)
-    integer(k8), intent(in), optional :: bandlist(:)
+    real(r64), intent(in) :: data(:,:,:)
+    integer(i64), intent(in), optional :: bandlist(:)
 
     !Local variables
-    integer(k8) :: ib, ibstart, ibend, nb, ik, nk, dim
+    integer(i64) :: ib, ibstart, ibend, nb, ik, nk, dim
     character(len = 1) :: numcols
     character(len = 1024) :: bandtag
-    real(dp), allocatable :: aux(:,:)
+    real(r64), allocatable :: aux(:,:)
 
     if(this_image() == 1) then
        nk = size(data(:, 1, 1))
@@ -233,11 +260,11 @@ contains
     !! Read list of vectors to band/branch resolved files.
 
     character(len = *), intent(in) :: filename
-    real(dp), intent(out) :: data(:,:,:)
-    integer(k8), intent(in), optional :: bandlist(:)
+    real(r64), intent(out) :: data(:,:,:)
+    integer(i64), intent(in), optional :: bandlist(:)
 
     !Local variables
-    integer(k8) :: ib, ibstart, ibend, nb, ik, nk, dim
+    integer(i64) :: ib, ibstart, ibend, nb, ik, nk, dim
     character(len = 1) :: numcols
     character(len = 1024) :: bandtag
     
@@ -270,12 +297,12 @@ contains
     !! Append 3x3 tensor to band/branch resolved files.
 
     character(len = *), intent(in) :: filename
-    integer(k8), intent(in) :: it
-    real(dp), intent(in) :: data(:,:,:)
-    integer(k8), intent(in), optional :: bandlist(:)
+    integer(i64), intent(in) :: it
+    real(r64), intent(in) :: data(:,:,:)
+    integer(i64), intent(in), optional :: bandlist(:)
 
     !Local variables
-    integer(k8) :: ib, nb, ibstart, ibend
+    integer(i64) :: ib, nb, ibstart, ibend
     character(len = 1) :: numcols
     character(len = 1024) :: bandtag
 
@@ -322,14 +349,14 @@ contains
     !! Append 3x3 spectral transport tensor to band/branch resolved files.
 
     character(len = *), intent(in) :: filename
-    real(dp), intent(in) :: data(:,:,:,:)
-    integer(k8), intent(in), optional :: bandlist(:)
+    real(r64), intent(in) :: data(:,:,:,:)
+    integer(i64), intent(in), optional :: bandlist(:)
 
     !Local variables
-    integer(k8) :: ie, ne, ib, nb, ibstart, ibend
+    integer(i64) :: ie, ne, ib, nb, ibstart, ibend
     character(len = 1) :: numcols
     character(len = 1024) :: bandtag
-    real(dp) :: aux(3,3)
+    real(r64) :: aux(3,3)
     
     if(this_image() == 1) then
        !Number of energy points on grid
@@ -351,7 +378,7 @@ contains
        !Band/branch summed
        open(1, file = trim(filename//"tot"), status = "replace")
        do ie = 1, ne
-          aux = 0.0_dp
+          aux = 0.0_r64
           do ib = ibstart, ibend
              aux(:,:) = aux(:,:) + data(ib, :, :, ie)
           end do
@@ -376,8 +403,8 @@ contains
   subroutine int_div(num, denom, q, r)
     !! Quotient(q) and remainder(r) of the integer division num/denom.
 
-    integer(k8), intent(in) :: num, denom
-    integer(k8), intent(out) :: q, r
+    integer(i64), intent(in) :: num, denom
+    integer(i64), intent(out) :: q, r
 
     q = num/denom
     r = mod(num, denom)
@@ -386,8 +413,8 @@ contains
   subroutine distribute_points(npts, chunk, istart, iend, num_active_images)
     !! Distribute points among processes
 
-    integer(k8), intent(in) :: npts
-    integer(k8), intent(out) :: chunk, istart, iend, num_active_images
+    integer(i64), intent(in) :: npts
+    integer(i64), intent(out) :: chunk, istart, iend, num_active_images
 
     !Number of active images
     num_active_images = min(npts, num_images())
@@ -405,47 +432,77 @@ contains
     end if
   end subroutine distribute_points
   
-  function cross_product(A, B)
+  pure function cross_product(A, B)
     !! Cross product of A and B.
 
-    real(dp), intent(in) :: A(3), B(3)
-    real(dp) :: cross_product(3)
+    real(r64), intent(in) :: A(3), B(3)
+    real(r64) :: cross_product(3)
 
     cross_product(1) = A(2)*B(3) - A(3)*B(2)
     cross_product(2) = A(3)*B(1) - A(1)*B(3)
     cross_product(3) = A(1)*B(2) - A(2)*B(1)
   end function cross_product
 
-  pure complex(dp) function expi(x)
+  pure integer(i64) function kronecker(i, j)
+    !! Kronecker delta
+
+    integer(i64), intent(in) :: i, j
+    
+    if(i == j) then
+       kronecker = 1
+    else
+       kronecker = 0
+    end if
+  end function kronecker
+  
+  pure complex(r64) function expi(x)
     !! Calculate exp(i*x) = cos(x) + isin(x)
 
-    real(dp), intent(in) :: x
+    real(r64), intent(in) :: x
 
-    expi = cmplx(cos(x), sin(x), dp)
+    expi = cmplx(cos(x), sin(x), r64)
   end function expi
 
-  pure real(dp) function twonorm(v)
-    !! 2-norm of a vector
+  pure real(r64) function twonorm_real_rank1(v)
+    !! 2-norm of a rank-1 real vector
 
-    real(dp), intent(in) :: v(:)
-    integer(k8) :: i, s
+    real(r64), intent(in) :: v(:)
+    integer(i64) :: i, s
 
     s = size(v)
-    twonorm = 0.0_dp
+    twonorm_real_rank1 = 0.0_r64
     do i = 1, s
-       twonorm = v(i)**2 + twonorm
+       twonorm_real_rank1 = v(i)**2 + twonorm_real_rank1
     end do
-    twonorm = sqrt(twonorm)
-  end function twonorm
+    twonorm_real_rank1 = sqrt(twonorm_real_rank1)
+  end function twonorm_real_rank1
 
-  pure real(dp) function trace(mat)
+  pure real(r64) function twonorm_real_rank2(T)
+    !! Custom 2-norm of a rank-2 real tensor
+
+    real(r64), intent(in) :: T(:, :)
+    integer(i64) :: i, j, s1, s2
+
+    s1 = size(T(:, 1))
+    s2 = size(T(1, :))
+    
+    twonorm_real_rank2 = 0.0_r64
+    do i = 1, s1
+       do j = 1, s2
+          twonorm_real_rank2 = T(i, j)**2 + twonorm_real_rank2
+       end do
+    end do
+    twonorm_real_rank2 = sqrt(twonorm_real_rank2)
+  end function twonorm_real_rank2
+
+  pure real(r64) function trace(mat)
     !! Trace of square matrix
 
-    real(dp), intent(in) :: mat(:,:)
-    integer(k8) :: i, dim
+    real(r64), intent(in) :: mat(:,:)
+    integer(i64) :: i, dim
 
     dim = size(mat(:, 1))
-    trace = 0.0_dp
+    trace = 0.0_r64
     do i = 1, dim
        trace = trace + mat(i, i)
     end do
@@ -454,9 +511,9 @@ contains
   subroutine sort_int(list)
     !! Swap sort list of integers
 
-    integer(k8), intent(inout) :: list(:)
-    integer(k8) :: i, j, n
-    integer(k8) :: aux, tmp
+    integer(i64), intent(inout) :: list(:)
+    integer(i64) :: i, j, n
+    integer(i64) :: aux, tmp
     
     n = size(list)
 
@@ -476,9 +533,9 @@ contains
   subroutine sort_real(list)
     !! Swap sort list of reals
     
-    real(dp), intent(inout) :: list(:)
-    real(dp) :: aux, tmp
-    integer(k8) :: i, j, n
+    real(r64), intent(inout) :: list(:)
+    real(r64) :: aux, tmp
+    integer(i64) :: i, j, n
 
     n = size(list)
 
@@ -498,9 +555,9 @@ contains
   subroutine binsearch(array, e, m)
     !! Binary search in a list of integers and return index.
     
-    integer(k8), intent(in) :: array(:), e
-    integer(k8), intent(out) :: m
-    integer(k8) :: a, b, mid
+    integer(i64), intent(in) :: array(:), e
+    integer(i64), intent(out) :: m
+    integer(i64) :: a, b, mid
 
     a = 1
     b = size(array)
@@ -521,6 +578,56 @@ contains
        mid = array(m)
     end do
   end subroutine binsearch
+
+  subroutine compsimps(f, h, s)
+    !! Composite Simpson's rule for real function
+    !! f integrand
+    !! h integration variable spacing
+    !! s result
+
+    real(r64), intent(in) :: h, f(:)
+    real(r64), intent(out) :: s
+
+    !Local variables
+    integer(i64) :: i, numint, n
+    real(r64) :: a, b
+
+    n = size(f)
+    
+    s = 0.0_r64
+
+    a = f(1)
+
+    !If n is odd then number of intervals is even, carry on.
+    !Otherwise, do trapezoidal rule in the last interval.
+    if(mod(n, 2) /= 0) then
+       numint = n - 1
+       b = f(n)
+    else
+       !Note: Number of sample points is even, so
+       !I will do trapezoidal rule in the last interval.
+       numint = n - 2
+       b = f(n - 1)
+    end if
+
+    s = s + a + b
+
+    !even sites
+    do i = 2, numint, 2
+       s = s + 4.0_r64*f(i)
+    end do
+
+    !odd sites
+    do i = 3, numint, 2
+       s = s + 2.0_r64*f(i)
+    end do
+    s = s*h/3.0_r64
+
+    if(mod(n, 2) == 0) then
+       !trapezoidal rule
+       s = s + 0.5_r64*(f(n) + f(n - 1))*h
+    end if
+  end subroutine compsimps
   
   function mux_vector(v, mesh, base)
     !! Multiplex index of a single wave vector.
@@ -529,8 +636,8 @@ contains
     !! mesh is the number of wave vectors along the three reciprocal lattice vectors.
     !! base states whether v has 0- or 1-based indexing.
 
-    integer(k8), intent(in) :: v(3), mesh(3), base
-    integer(k8) :: mux_vector
+    integer(i64), intent(in) :: v(3), mesh(3), base
+    integer(i64) :: mux_vector
 
     if(base < 0 .or. base > 1) then
        call exit_with_message("Base has to be either 0 or 1 in misc.f90:mux_vector")
@@ -550,9 +657,9 @@ contains
     !! mesh is the number of wave vectors along the three reciprocal lattice vectors.
     !! base chooses whether v has 0- or 1-based indexing.
     
-    integer(k8), intent(in) :: i, mesh(3), base
-    integer(k8), intent(out) :: v(3)
-    integer(k8) :: aux
+    integer(i64), intent(in) :: i, mesh(3), base
+    integer(i64), intent(out) :: v(3)
+    integer(i64) :: aux
 
     if(base < 0 .or. base > 1) then
        call exit_with_message("Base has to be either 0 or 1 in misc.f90:demux_vector")
@@ -572,10 +679,10 @@ contains
     !! (optionally, from a list of indices).
     !! Internally uses demux_vector.
 
-    integer(k8), intent(in) :: nmesh, mesh(3), base
-    integer(k8), optional, intent(in) :: indexlist(nmesh)
-    integer(k8), intent(out) :: index_mesh(3, nmesh)
-    integer(k8) :: i
+    integer(i64), intent(in) :: nmesh, mesh(3), base
+    integer(i64), optional, intent(in) :: indexlist(nmesh)
+    integer(i64), intent(out) :: index_mesh(3, nmesh)
+    integer(i64) :: i
 
     do i = 1, nmesh !over total number of wave vectors
        if(present(indexlist)) then
@@ -586,14 +693,14 @@ contains
     end do
   end subroutine demux_mesh
 
-  pure integer(k8) function mux_state(nbands, iband, ik)
+  pure integer(i64) function mux_state(nbands, iband, ik)
     !! Multiplex a (band index, wave vector index) pair into a state index 
     !!
     !! nbands is the number of bands
     !! iband is the band index
     !! ik is the wave vector index
     
-    integer(k8), intent(in) :: nbands, ik, iband 
+    integer(i64), intent(in) :: nbands, ik, iband 
 
     mux_state = (ik - 1)*nbands + iband
   end function mux_state
@@ -606,30 +713,30 @@ contains
     !! iband is the band index
     !! ik is the wave vector index
     
-    integer(k8), intent(in) :: m, nbands
-    integer(k8), intent(out) :: ik, iband 
+    integer(i64), intent(in) :: m, nbands
+    integer(i64), intent(out) :: ik, iband 
 
     iband = modulo(m - 1, nbands) + 1
     ik = int((m - 1)/nbands) + 1
   end subroutine demux_state
 
-  pure real(dp) function Bose(e, T)
+  pure real(r64) function Bose(e, T)
     !! e Energy in eV
     !! T temperature in K
 
-    real(dp), intent(in) :: e, T
+    real(r64), intent(in) :: e, T
     
-    Bose = 1.0_dp/(exp(e/kB/T) - 1.0_dp)
+    Bose = 1.0_r64/(exp(e/kB/T) - 1.0_r64)
   end function Bose
 
-  pure real(dp) function Fermi(e, chempot, T)
+  pure real(r64) function Fermi(e, chempot, T)
     !! e Energy in eV
     !! chempot Chemical potential in eV
     !! T temperature in K
 
-    real(dp), intent(in) :: e, chempot, T
+    real(r64), intent(in) :: e, chempot, T
 
-    Fermi = 1.0_dp/(exp((e - chempot)/kB/T) + 1.0_dp)
+    Fermi = 1.0_r64/(exp((e - chempot)/kB/T) + 1.0_r64)
   end function Fermi
 
   subroutine interpolate(coarsemesh, refinement, f, q, interpolation)
@@ -641,22 +748,22 @@ contains
     !! q The 0-based index vector where to evaluate f.
     !! interpolation The result
     
-    integer(k8), intent(in) :: coarsemesh(3), q(3), refinement(3)
-    real(dp), intent(in) :: f(:)
-    real(dp), intent(out) :: interpolation
+    integer(i64), intent(in) :: coarsemesh(3), q(3), refinement(3)
+    real(r64), intent(in) :: f(:)
+    real(r64), intent(out) :: interpolation
     
-    integer(k8) :: info, r0(3), r1(3), ipol, mode, count
-    integer(k8), allocatable :: pivot(:)
-    integer(k8) :: i000, i100, i010, i110, i001, i101, i011, i111, equalpol
-    real(dp) :: x0, x1, y0, y1, z0, z1, x, y, z, v(2), v0(2), v1(2)
-    real(dp), allocatable :: T(:, :), c(:)
-    real(dp) :: aux
+    integer(i64) :: info, r0(3), r1(3), ipol, mode, count
+    integer(i64), allocatable :: pivot(:)
+    integer(i64) :: i000, i100, i010, i110, i001, i101, i011, i111, equalpol
+    real(r64) :: x0, x1, y0, y1, z0, z1, x, y, z, v(2), v0(2), v1(2)
+    real(r64), allocatable :: T(:, :), c(:)
+    real(r64) :: aux
 
     !External procedures
     external :: dgesv
     
-    aux = 0.0_dp
-    equalpol = 0_k8
+    aux = 0.0_r64
+    equalpol = 0_i64
 
     !Find on the coarse mesh the two diagonals.
     r0 = modulo(floor(q/dble(refinement)), coarsemesh)
@@ -703,14 +810,14 @@ contains
             f(i001), f(i101), f(i011), f(i111) /)
 
        !Form the transformation matrix T
-       T(1,:) = (/1.0_dp, x0, y0, z0, x0*y0, x0*z0, y0*z0, x0*y0*z0/)
-       T(2,:) = (/1.0_dp, x1, y0, z0, x1*y0, x1*z0, y0*z0, x1*y0*z0/)
-       T(3,:) = (/1.0_dp, x0, y1, z0, x0*y1, x0*z0, y1*z0, x0*y1*z0/)
-       T(4,:) = (/1.0_dp, x1, y1, z0, x1*y1, x1*z0, y1*z0, x1*y1*z0/)
-       T(5,:) = (/1.0_dp, x0, y0, z1, x0*y0, x0*z1, y0*z1, x0*y0*z1/)
-       T(6,:) = (/1.0_dp, x1, y0, z1, x1*y0, x1*z1, y0*z1, x1*y0*z1/)
-       T(7,:) = (/1.0_dp, x0, y1, z1, x0*y1, x0*z1, y1*z1, x0*y1*z1/)
-       T(8,:) = (/1.0_dp, x1, y1, z1, x1*y1, x1*z1, y1*z1, x1*y1*z1/)
+       T(1,:) = (/1.0_r64, x0, y0, z0, x0*y0, x0*z0, y0*z0, x0*y0*z0/)
+       T(2,:) = (/1.0_r64, x1, y0, z0, x1*y0, x1*z0, y0*z0, x1*y0*z0/)
+       T(3,:) = (/1.0_r64, x0, y1, z0, x0*y1, x0*z0, y1*z0, x0*y1*z0/)
+       T(4,:) = (/1.0_r64, x1, y1, z0, x1*y1, x1*z0, y1*z0, x1*y1*z0/)
+       T(5,:) = (/1.0_r64, x0, y0, z1, x0*y0, x0*z1, y0*z1, x0*y0*z1/)
+       T(6,:) = (/1.0_r64, x1, y0, z1, x1*y0, x1*z1, y0*z1, x1*y0*z1/)
+       T(7,:) = (/1.0_r64, x0, y1, z1, x0*y1, x0*z1, y1*z1, x0*y1*z1/)
+       T(8,:) = (/1.0_r64, x1, y1, z1, x1*y1, x1*z1, y1*z1, x1*y1*z1/)
 
        !Solve Ta = c for a,
        !where c is an array containing the function values at the 8 corners.
@@ -751,10 +858,10 @@ contains
 
        c = (/ f(i000), f(i010), f(i100), f(i110)/)
 
-       T(1,:) = (/1.0_dp, v0(1), v0(2), v0(1)*v0(2)/)
-       T(2,:) = (/1.0_dp, v0(1), v1(2), v0(1)*v1(2)/)
-       T(3,:) = (/1.0_dp, v1(1), v0(2), v1(1)*v0(2)/)
-       T(4,:) = (/1.0_dp, v1(1), v1(2), v1(1)*v1(2)/)
+       T(1,:) = (/1.0_r64, v0(1), v0(2), v0(1)*v0(2)/)
+       T(2,:) = (/1.0_r64, v0(1), v1(2), v0(1)*v1(2)/)
+       T(3,:) = (/1.0_r64, v1(1), v0(2), v1(1)*v0(2)/)
+       T(4,:) = (/1.0_r64, v1(1), v1(2), v1(1)*v1(2)/)
 
        call dgesv(4,1,T,4,pivot,c,4,info)
 
@@ -781,6 +888,105 @@ contains
     
     interpolation = aux
   end subroutine interpolate
+
+  pure function Pade_coeffs(iomegas, us)
+    !! Evaluate eqs. A2 from the following article: 
+    !! Solving the Eliashberg equations by means of N-point Pade' approximants
+    !! Vidberg and Serene Journal of Low Temperature Physics, Vol. 29, Nos. 3/4, 1977
+
+    complex(r64), intent(in) :: iomegas(:)
+    real(r64), intent(in) :: us(:)
+    complex(r64) :: Pade_coeffs(size(iomegas))
+
+    !Local variables
+    integer(i64) :: N, p, i
+    complex(r64), allocatable :: g(:, :)
+    
+    N = size(iomegas)
+
+    allocate(g(N, N))
+
+    !Base condition
+    g(1, :) = us(:)
+    Pade_coeffs(1) = g(1, 1)
+
+    do p = 2, N
+       do i = p, N
+          g(p, i) = (g(p - 1, p - 1)/g(p - 1, i) - 1.0_r64)/ &
+               (iomegas(i) - iomegas(p - 1))
+       end do
+       Pade_coeffs(p) = g(p, p)
+    end do
+  end function Pade_coeffs
+
+  pure function Pade_continued(iomegas, us, xs)
+    !! Analytically continue from the upper imaginary plane to
+    !! the positive real axis by solving equation A3 of the following article:
+    !! Solving the Eliashberg equations by means of N-point Pade' approximants
+    !! Vidberg and Serene Journal of Low Temperature Physics, Vol. 29, Nos. 3/4, 1977
+
+    complex(r64), intent(in) :: iomegas(:)
+    real(r64), intent(in) :: us(:)
+    real(r64), intent(in) :: xs(:)
+    complex(r64) :: Pade_continued(size(xs))
+
+    !Local variables
+    integer(i64) :: N_matsubara, N_real, i, n
+    real(r64) :: xi
+    complex(r64), allocatable :: A(:), B(:), as(:)
+
+    N_matsubara = size(iomegas)
+    N_real = size(xs)
+
+    allocate(as(N_matsubara))
+    allocate(A(0:N_matsubara), B(0:N_matsubara))
+
+    as = Pade_coeffs(iomegas, us)
+    
+    !Base conditions
+    A(0) = 0.0_r64
+    A(1) = as(1)
+    B(0) = 1.0_r64
+    B(1) = 1.0_r64
+
+    do i = 1, N_real
+       xi = xs(i)
+
+       do n = 1, N_matsubara - 1
+          A(n + 1) = A(n) + (xi - iomegas(n))*as(n + 1)*A(n - 1)
+          B(n + 1) = B(n) + (xi - iomegas(n))*as(n + 1)*B(n - 1)
+       end do
+
+       Pade_continued(i) = A(N_matsubara)/B(N_matsubara)
+    end do
+  end function Pade_continued
+
+  subroutine invert_complex_square(mat)
+    !! Wrapper for lapack complex matrix inversion
+
+    complex(r64), intent(inout) :: mat(:, :)
+
+    !Local variables
+    integer :: N, info, lwork
+    complex(r64), allocatable :: work(:), ipivot(:)
+
+    !Size of matrix
+    N = size(mat, 1)
+
+    if(N /= size(mat, 2)) &
+         call exit_with_message("invert_complex_square called with non-zquare matrix. Exiting.")
+
+    allocate(work(N), ipivot(N))
+
+    call zgetrf(N, N, mat, N, ipivot, info)
+    if(info /= 0) &
+         call exit_with_message("Matrix is singular in invert_complex_square. Exiting.")
+    
+    call zgetri(N, mat, N, ipivot, work, lwork, info)
+    if(info /= 0) &
+         call exit_with_message("Matrix inversion failed in invert_complex_square. Exiting.")
+    
+  end subroutine invert_complex_square
 
   subroutine welcome
     !! Subroutine to print a pretty banner.
@@ -817,7 +1023,7 @@ contains
     !! Subroutine to print a subtitle.
 
     character(len = *), intent(in) :: text
-    integer(k8) :: length
+    integer(i64) :: length
     character(len = 75) :: string2print
 
     length = len(text)

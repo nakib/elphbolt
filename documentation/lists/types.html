@@ -4,24 +4,18 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-   
    <meta name="description" content="A solver for the coupled and decoupled electron and phonon Boltzmann transport equations.">
-    
     <meta name="author" content="Nakib Haider Protik" >
     <link rel="icon" href="../favicon.png">
 
-    <title>
-All Types &ndash; elphbolt
+    <title>All Types &ndash; elphbolt
 </title>
 
     <link href="../css/bootstrap.min.css" rel="stylesheet">
     <link href="../css/pygments.css" rel="stylesheet">
     <link href="../css/font-awesome.min.css" rel="stylesheet">
     <link href="../css/local.css" rel="stylesheet">
-    
     <link  href="../tipuesearch/tipuesearch.css" rel="stylesheet">
-    
-    
 
     <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
     <!--[if lt IE 9]>
@@ -50,53 +44,29 @@ All Types &ndash; elphbolt
         </div>
         <div id="navbar" class="navbar-collapse collapse">
           <ul class="nav navbar-nav">
-        
             <li class="dropdown hidden-xs visible-sm visible-md hidden-lg">
               <a href="#" class="dropdown-toggle"
               data-toggle="dropdown" role="button"
               aria-haspopup="true"
      aria-expanded="false">Contents <span class="caret"></span></a>
         <ul class="dropdown-menu">
-          
-              
             <li><a href="../lists/files.html">Source Files</a></li>
-        
-        
-        
             <li><a href="../lists/modules.html">Modules</a></li>
-        
-            
-                                
             <li><a href="../lists/procedures.html">Procedures</a></li>
-        
-               
-            <li><a href="../lists/types.html">Derived Types</a></li>
-        
-        
-            <li><a href="../program/elphbolt.html">Program</a></li>
-      
+            <li><a href="../lists/absint.html">Abstract Interfaces</a></li>
+                   <li><a href="../lists/types.html">Derived Types</a></li>
+            <li><a href="../program/supersweet.html">Program</a></li>
+       
             </ul>
-            </li>
-
-
-<li class="visible-xs hidden-sm visible-lg"><a href="../lists/files.html">Source Files</a></li>
-
-
-
-<li class="visible-xs hidden-sm visible-lg"><a href="../lists/modules.html">Modules</a></li>
-
-
-
-<li class="visible-xs hidden-sm visible-lg"><a href="../lists/procedures.html">Procedures</a></li>
-
-                             
-<li class="visible-xs hidden-sm visible-lg"><a href="../lists/types.html">Derived Types</a></li>
-
-
-<li class="visible-xs hidden-sm visible-lg"><a href="../program/elphbolt.html">Program</a></li>
-
-          </ul>
         
+            </li>
+<li class="visible-xs hidden-sm visible-lg"><a href="../lists/files.html">Source Files</a></li>
+<li class="visible-xs hidden-sm visible-lg"><a href="../lists/modules.html">Modules</a></li>
+<li class="visible-xs hidden-sm visible-lg"><a href="../lists/procedures.html">Procedures</a></li>
+<li class="visible-xs hidden-sm visible-lg"><a href="../lists/absint.html">Abstract Interfaces</a></li>
+                             <li class="visible-xs hidden-sm visible-lg"><a href="../lists/types.html">Derived Types</a></li>
+<li class="visible-xs hidden-sm visible-lg"><a href="../program/supersweet.html">Program</a></li>
+          </ul>
         <form action="../search.html" class="navbar-form navbar-right" role="search">
         <div class="form-group">
           <input type="text" class="form-control" placeholder="Search" name="q" id="tipue_search_input" autocomplete="off" required>
@@ -105,13 +75,11 @@ All Types &ndash; elphbolt
         <button type="submit" class="btn btn-default">Submit</button>
 -->
         </form>
-        
         </div><!--/.nav-collapse -->
       </div>
     </nav>
 
     <div class="container">
-    
       <div class="row">
         <div class="col-lg-12" id='text'>
 			 <h1>Derived Types</h1>
@@ -119,185 +87,39 @@ All Types &ndash; elphbolt
 			 <thead>
 			 <tr><th>Type</th><th>Location</th><th>Extends</th><th>Description</th></tr>
 			 </thead><tbody>
-			 
 			   <tr><td><a href='../type/bte.html'>bte</a></td><td><a href='../module/bte_module.html'>bte_module</a></td><td>None</td><td><p>Data and procedures related to the BTE.</p></td></tr>
-			 
 			   <tr><td><a href='../type/crystal.html'>crystal</a></td><td><a href='../module/crystal_module.html'>crystal_module</a></td><td>None</td><td><p>Data and procedures related to the crystal structure.</p></td></tr>
-			 
 			   <tr><td><a href='../type/electron.html'>electron</a></td><td><a href='../module/electron_module.html'>electron_module</a></td><td><a href='../type/particle.html'>particle</a></td><td><p>Data and procedures related to the electronic properties.</p></td></tr>
-			 
 			   <tr><td><a href='../type/epw_wannier.html'>epw_wannier</a></td><td><a href='../module/wannier_module.html'>wannier_module</a></td><td>None</td><td><p>Data and procedures related to Wannierization.</p></td></tr>
-			 
+			   <tr><td><a href='../type/fc2.html'>FC2</a></td><td><a href='../module/fc2_parser_factory_module.html'>FC2_parser_factory_module</a></td><td>None</td><td></td></tr>
+			   <tr><td><a href='../type/fc2_parser_factory.html'>FC2_parser_factory</a></td><td><a href='../module/fc2_parser_factory_module.html'>FC2_parser_factory_module</a></td><td>None</td><td></td></tr>
+			   <tr><td><a href='../type/fc2_qe.html'>fc2_qe</a></td><td><a href='../module/fc2_parser_factory_module.html'>FC2_parser_factory_module</a></td><td><a href='../type/fc2.html'>FC2</a></td><td><p>Quantum Espresso 2nd order force constants format</p></td></tr>
+			   <tr><td><a href='../type/fc2_siesta.html'>fc2_siesta</a></td><td><a href='../module/fc2_parser_factory_module.html'>FC2_parser_factory_module</a></td><td><a href='../type/fc2.html'>FC2</a></td><td><p>Siesta 2nd order force constants format</p></td></tr>
+			   <tr><td><a href='../type/migel_sc.html'>MigEl_sc</a></td><td><a href='../module/migel_sc_module.html'>MigEl_sc_module</a></td><td>None</td><td><p>Data and procedures related to the Migdal-Eliashberg equations solver environment.</p></td></tr>
 			   <tr><td><a href='../type/numerics.html'>numerics</a></td><td><a href='../module/numerics_module.html'>numerics_module</a></td><td>None</td><td><p>Data and procedures related to the numerics.</p></td></tr>
-			 
 			   <tr><td><a href='../type/particle.html'>particle</a></td><td><a href='../module/particle_module.html'>particle_module</a></td><td>None</td><td><p>Data related to generic particle properties.</p></td></tr>
-			 
 			   <tr><td><a href='../type/phonon.html'>phonon</a></td><td><a href='../module/phonon_module.html'>phonon_module</a></td><td><a href='../type/particle.html'>particle</a></td><td><p>Data and procedures related to phonons.</p></td></tr>
-			 
+			   <tr><td><a href='../type/phonon_defect.html'>phonon_defect</a></td><td><a href='../module/phonon_defect_module.html'>phonon_defect_module</a></td><td>None</td><td><p>Data and procedures related to phonon defects.</p></td></tr>
 			   <tr><td><a href='../type/symmetry.html'>symmetry</a></td><td><a href='../module/symmetry_module.html'>symmetry_module</a></td><td>None</td><td><p>Data and procedure related to symmetries.</p></td></tr>
-			 
 			   <tr><td><a href='../type/timer.html'>timer</a></td><td><a href='../module/misc.html'>misc</a></td><td>None</td><td><p>Container for timing related data and procedures.</p></td></tr>
-			 
 			 </tbody></table>
-             <div class="depgraph"><?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
- "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<!-- Generated by graphviz version 2.43.0 (0)
- -->
-<!-- Title: type~~graph~~TypeGraph Pages: 1 -->
-<svg id="typegraphTypeGraph" width="174pt" height="326pt"
- viewBox="0.00 0.00 174.00 326.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-<g id="type~~graph~~TypeGraph" class="graph" transform="scale(1 1) rotate(0) translate(4 322)">
-<title>type~~graph~~TypeGraph</title>
-<polygon fill="white" stroke="transparent" points="-4,4 -4,-322 170,-322 170,4 -4,4"/>
-<!-- type~electron -->
-<g id="type~~graph~~TypeGraph_node1" class="node">
-<title>type~electron</title>
-<g id="a_type~~graph~~TypeGraph_node1"><a xlink:href=".././type/electron.html" xlink:title="electron">
-<polygon fill="#5cb85c" stroke="#5cb85c" points="155,-66 101,-66 101,-42 155,-42 155,-66"/>
-<text text-anchor="middle" x="128" y="-51.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">electron</text>
-</a>
-</g>
-</g>
-<!-- type~particle -->
-<g id="type~~graph~~TypeGraph_node8" class="node">
-<title>type~particle</title>
-<g id="a_type~~graph~~TypeGraph_node8"><a xlink:href=".././type/particle.html" xlink:title="particle">
-<polygon fill="#5cb85c" stroke="#5cb85c" points="54,-45 0,-45 0,-21 54,-21 54,-45"/>
-<text text-anchor="middle" x="27" y="-30.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">particle</text>
-</a>
-</g>
-</g>
-<!-- type~electron&#45;&gt;type~particle -->
-<g id="type~~graph~~TypeGraph_edge1" class="edge">
-<title>type~electron&#45;&gt;type~particle</title>
-<path fill="none" stroke="#000000" d="M100.99,-48.48C89.71,-46.09 76.31,-43.25 64.09,-40.66"/>
-<polygon fill="#000000" stroke="#000000" points="64.69,-37.2 54.18,-38.55 63.24,-44.05 64.69,-37.2"/>
-</g>
-<!-- type~crystal -->
-<g id="type~~graph~~TypeGraph_node2" class="node">
-<title>type~crystal</title>
-<g id="a_type~~graph~~TypeGraph_node2"><a xlink:href=".././type/crystal.html" xlink:title="crystal">
-<polygon fill="#5cb85c" stroke="#5cb85c" points="155,-108 101,-108 101,-84 155,-84 155,-108"/>
-<text text-anchor="middle" x="128" y="-93.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">crystal</text>
-</a>
-</g>
-</g>
-<!-- type~timer -->
-<g id="type~~graph~~TypeGraph_node3" class="node">
-<title>type~timer</title>
-<g id="a_type~~graph~~TypeGraph_node3"><a xlink:href=".././type/timer.html" xlink:title="timer">
-<polygon fill="#5cb85c" stroke="#5cb85c" points="155,-150 101,-150 101,-126 155,-126 155,-150"/>
-<text text-anchor="middle" x="128" y="-135.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">timer</text>
-</a>
-</g>
-</g>
-<!-- type~symmetry -->
-<g id="type~~graph~~TypeGraph_node4" class="node">
-<title>type~symmetry</title>
-<g id="a_type~~graph~~TypeGraph_node4"><a xlink:href=".././type/symmetry.html" xlink:title="symmetry">
-<polygon fill="#5cb85c" stroke="#5cb85c" points="157.5,-192 98.5,-192 98.5,-168 157.5,-168 157.5,-192"/>
-<text text-anchor="middle" x="128" y="-177.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">symmetry</text>
-</a>
-</g>
-</g>
-<!-- type~epw_wannier -->
-<g id="type~~graph~~TypeGraph_node5" class="node">
-<title>type~epw_wannier</title>
-<g id="a_type~~graph~~TypeGraph_node5"><a xlink:href=".././type/epw_wannier.html" xlink:title="epw_wannier">
-<polygon fill="#5cb85c" stroke="#5cb85c" points="166,-234 90,-234 90,-210 166,-210 166,-234"/>
-<text text-anchor="middle" x="128" y="-219.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">epw_wannier</text>
-</a>
-</g>
-</g>
-<!-- type~phonon -->
-<g id="type~~graph~~TypeGraph_node6" class="node">
-<title>type~phonon</title>
-<g id="a_type~~graph~~TypeGraph_node6"><a xlink:href=".././type/phonon.html" xlink:title="phonon">
-<polygon fill="#5cb85c" stroke="#5cb85c" points="155,-24 101,-24 101,0 155,0 155,-24"/>
-<text text-anchor="middle" x="128" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">phonon</text>
-</a>
-</g>
-</g>
-<!-- type~phonon&#45;&gt;type~particle -->
-<g id="type~~graph~~TypeGraph_edge2" class="edge">
-<title>type~phonon&#45;&gt;type~particle</title>
-<path fill="none" stroke="#000000" d="M100.99,-17.52C89.71,-19.91 76.31,-22.75 64.09,-25.34"/>
-<polygon fill="#000000" stroke="#000000" points="63.24,-21.95 54.18,-27.45 64.69,-28.8 63.24,-21.95"/>
-</g>
-<!-- type~bte -->
-<g id="type~~graph~~TypeGraph_node7" class="node">
-<title>type~bte</title>
-<g id="a_type~~graph~~TypeGraph_node7"><a xlink:href=".././type/bte.html" xlink:title="bte">
-<polygon fill="#5cb85c" stroke="#5cb85c" points="155,-276 101,-276 101,-252 155,-252 155,-276"/>
-<text text-anchor="middle" x="128" y="-261.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">bte</text>
-</a>
-</g>
-</g>
-<!-- type~numerics -->
-<g id="type~~graph~~TypeGraph_node9" class="node">
-<title>type~numerics</title>
-<g id="a_type~~graph~~TypeGraph_node9"><a xlink:href=".././type/numerics.html" xlink:title="numerics">
-<polygon fill="#5cb85c" stroke="#5cb85c" points="156,-318 100,-318 100,-294 156,-294 156,-318"/>
-<text text-anchor="middle" x="128" y="-303.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">numerics</text>
-</a>
-</g>
-</g>
-</g>
-</svg>
-</div><div><a type="button" class="graph-help" data-toggle="modal" href="#graph-help-text">Help</a></div><div class="modal fade" id="graph-help-text" tabindex="-1" role="dialog"><div class="modal-dialog modal-lg" role="document"><div class="modal-content"><div class="modal-header"><button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button><h4 class="modal-title" id="-graph-help-label">Graph Key</h4></div><div class="modal-body">
-    <p>Nodes of different colours represent the following: </p>
-    <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
- "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<!-- Generated by graphviz version 2.43.0 (0)
- -->
-<!-- Title: Graph Key Pages: 1 -->
-<svg width="178pt" height="32pt"
- viewBox="0.00 0.00 177.50 32.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 28)">
-<title>Graph Key</title>
-<polygon fill="white" stroke="transparent" points="-4,4 -4,-28 173.5,-28 173.5,4 -4,4"/>
-<!-- Type -->
-<g id="node1" class="node">
-<title>Type</title>
-<polygon fill="#5cb85c" stroke="#5cb85c" points="54,-24 0,-24 0,0 54,0 54,-24"/>
-<text text-anchor="middle" x="27" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">Type</text>
-</g>
-<!-- This Page&#39;s Entity -->
-<g id="node2" class="node">
-<title>This Page&#39;s Entity</title>
-<polygon fill="none" stroke="black" points="169.5,-24 72.5,-24 72.5,0 169.5,0 169.5,-24"/>
-<text text-anchor="middle" x="121" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50">This Page&#39;s Entity</text>
-</g>
-</g>
-</svg>
-
-    
-    <p>Solid arrows point from a derived type to the parent type which it
-    extends. Dashed arrows point from a derived type to the other
-    types it contains as a components, with a label listing the name(s) of
-    said component(s).
-    </p>
-    </div></div></div></div>
+             
         </div>
       </div>
-
     <hr>    
     </div> <!-- /container -->
     <footer>
       <div class="container">
       <div class="row">
-        <div class="col-xs-6 col-md-4"><p>&copy; 2022 
-                                          </p></div>
-        <div class="col-xs-6 col-md-4 col-md-push-4">
+        <div class="col-xs-6 col-md-6"><p>elphbolt was developed by Nakib Haider Protik<br>&copy; 2023 GNU General Public License 3.0
+</p>
+        </div>
+        <div class="col-xs-6 col-md-6">
           <p class="text-right">
             Documentation generated by 
-            <a href="https://github.com/cmacmackin/ford">FORD</a>
-            
+            <a href="https://github.com/Fortran-FOSS-Programmers/ford">FORD</a>
           </p>
         </div>
-        <div class="col-xs-12 col-md-4 col-md-pull-4"><p class="text-center"> elphbolt was developed by Nakib Haider Protik</p></div>
       </div>
       <br>
       </div> <!-- /container -->    
@@ -323,14 +145,11 @@ All Types &ndash; elphbolt
         extensions: ['tex2jax.js','mml2jax.js','MathMenu.js','MathZoom.js']
       });
     </script>
-    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-    
     
     <script src="../tipuesearch/tipuesearch_content.js"></script>
     <script src="../tipuesearch/tipuesearch_set.js"></script>
     <script src="../tipuesearch/tipuesearch.js"></script>
-    
     
   </body>
 </html>

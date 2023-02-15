@@ -4,9 +4,7 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-   
    <meta name="description" content="A solver for the coupled and decoupled electron and phonon Boltzmann transport equations.">
-    
     <meta name="author" content="Nakib Haider Protik" >
     <link rel="icon" href="../favicon.png">
 
@@ -16,10 +14,7 @@
     <link href="../css/pygments.css" rel="stylesheet">
     <link href="../css/font-awesome.min.css" rel="stylesheet">
     <link href="../css/local.css" rel="stylesheet">
-    
     <link  href="../tipuesearch/tipuesearch.css" rel="stylesheet">
-    
-    
 
     <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
     <!--[if lt IE 9]>
@@ -48,53 +43,29 @@
         </div>
         <div id="navbar" class="navbar-collapse collapse">
           <ul class="nav navbar-nav">
-        
             <li class="dropdown hidden-xs visible-sm visible-md hidden-lg">
               <a href="#" class="dropdown-toggle"
               data-toggle="dropdown" role="button"
               aria-haspopup="true"
      aria-expanded="false">Contents <span class="caret"></span></a>
         <ul class="dropdown-menu">
-          
-              
             <li><a href="../lists/files.html">Source Files</a></li>
-        
-        
-        
             <li><a href="../lists/modules.html">Modules</a></li>
-        
-            
-                                
             <li><a href="../lists/procedures.html">Procedures</a></li>
-        
-               
-            <li><a href="../lists/types.html">Derived Types</a></li>
-        
-        
-            <li><a href="../program/elphbolt.html">Program</a></li>
-      
+            <li><a href="../lists/absint.html">Abstract Interfaces</a></li>
+                   <li><a href="../lists/types.html">Derived Types</a></li>
+            <li><a href="../program/supersweet.html">Program</a></li>
+       
             </ul>
-            </li>
-
-
-<li class="visible-xs hidden-sm visible-lg"><a href="../lists/files.html">Source Files</a></li>
-
-
-
-<li class="visible-xs hidden-sm visible-lg"><a href="../lists/modules.html">Modules</a></li>
-
-
-
-<li class="visible-xs hidden-sm visible-lg"><a href="../lists/procedures.html">Procedures</a></li>
-
-                             
-<li class="visible-xs hidden-sm visible-lg"><a href="../lists/types.html">Derived Types</a></li>
-
-
-<li class="visible-xs hidden-sm visible-lg"><a href="../program/elphbolt.html">Program</a></li>
-
-          </ul>
         
+            </li>
+<li class="visible-xs hidden-sm visible-lg"><a href="../lists/files.html">Source Files</a></li>
+<li class="visible-xs hidden-sm visible-lg"><a href="../lists/modules.html">Modules</a></li>
+<li class="visible-xs hidden-sm visible-lg"><a href="../lists/procedures.html">Procedures</a></li>
+<li class="visible-xs hidden-sm visible-lg"><a href="../lists/absint.html">Abstract Interfaces</a></li>
+                             <li class="visible-xs hidden-sm visible-lg"><a href="../lists/types.html">Derived Types</a></li>
+<li class="visible-xs hidden-sm visible-lg"><a href="../program/supersweet.html">Program</a></li>
+          </ul>
         <form action="../search.html" class="navbar-form navbar-right" role="search">
         <div class="form-group">
           <input type="text" class="form-control" placeholder="Search" name="q" id="tipue_search_input" autocomplete="off" required>
@@ -103,767 +74,135 @@
         <button type="submit" class="btn btn-default">Submit</button>
 -->
         </form>
-        
         </div><!--/.nav-collapse -->
       </div>
     </nav>
 
     <div class="container">
-    
-  
   <div class="row">
     <h1>params.f90
-    <small>Source File</small>
-    
+      <small>Source File</small>
+      
     </h1>
-    
-<div class="row">
-  <div class="col-lg-12">
-<div class="well well-sm">
-  <ul class="list-inline" style="margin-bottom:0px;display:inline">
-     
-     
-     
-     
-    
-    
-     <li><i class="fa fa-list-ol"></i>
-       <a data-toggle="tooltip"
-    data-placement="bottom" data-html="true"
-    title=" 0.4% of total for source files.">27 statements</a>
-     </li> 
-     
-     
-     
-    <li><i class="fa fa-code"></i><a href="../src/params.f90"> Source File</a></li>
-     
-     
-  </ul>
-  <ol class="breadcrumb in-well text-right">
-  
-    
-  
-     <li class="active">params.f90</li>
-  </ol>
-</div>
-</div>
-</div>
-<script>
-  $(function () {
-  $('[data-toggle="tooltip"]').tooltip()
-  })
-</script>
+      <div class="row" id="info-bar">
+    <div class="col-lg-12">
+      <div class="well well-sm">
+        <ul class="list-inline" style="margin-bottom:0px;display:inline">
+            <li id="meta-license"><i class="fa fa-legal"></i> GNU General Public License 3.0</li>
+
+          <li id="statements"><i class="fa fa-list-ol"></i>
+            <a data-toggle="tooltip"
+               data-placement="bottom" data-html="true"
+               title=" 0.3% of total for source files.">25 statements</a>
+          </li>
+
+            <li id="source-file">
+              <i class="fa fa-code"></i>
+              <a href="../src/params.f90"> Source File</a>
+            </li>
+        </ul>
+        <ol class="breadcrumb in-well text-right">
+          <li class="active">params.f90</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+  <script>
+    $(function () {
+    $('[data-toggle="tooltip"]').tooltip()
+    })
+  </script>
 
   </div>
   <div class="row">
     <div class="col-md-3 hidden-xs hidden-sm visible-md visible-lg">
-    
-<div id="sidebar">
+      <div id="sidebar">
+      <h3>Contents</h3>
   
-<h3>Contents</h3>
- 
-
-
-
-
-
-
-
-<div class="panel panel-primary">
-  <div class="panel-heading text-left"><h3 class="panel-title"><a data-toggle="collapse" href="#mods-0">Modules</a></h3></div>
-  <div id="mods-0" class="panel-collapse collapse">
-    <div class="list-group">
-      
-      <a class="list-group-item" href="../module/params.html">params</a>
-      
+  
+  
+  
+  
+      <div class="panel panel-primary">
+      <div class="panel-heading text-left">
+        <h3 class="panel-title">
+          <a data-toggle="collapse" href="#mods-0">Modules</a>
+        </h3>
+      </div>
+      <div id="mods-0" class="panel-collapse collapse">
+        <div class="list-group">
+            <a class="list-group-item" href="../module/params.html">params</a>
+        </div>
+      </div>
     </div>
+
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+    <div class="panel panel-primary">
+      <div class="panel-heading text-left"><h3 class="panel-title">Source Code</h3></div>
+      <div class="list-group">
+        <a class="list-group-item" href="../sourcefile/params.f90.html#src">params.f90</a>
+      </div>
+    </div>
+
+
   </div>
-</div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div class="panel panel-primary">
-  <div class="panel-heading text-left"><h3 class="panel-title">Source Code</h3></div>
-  <div class="list-group">
-    <a class="list-group-item" href="../sourcefile/params.f90.html#src">params.f90</a>
-  </div>
-</div>
-
-
-
-</div>
 
     </div>
     <div class="col-md-9" id='text'>
       
       <br>
-    
-      
-    <div class="panel panel-default">
-      <div class="panel-heading">
-  <h3 class="panel-title">Files dependent on this one</h3>
-      </div>
-      <div class="panel-body">
-  <div class="depgraph"><?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
- "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<!-- Generated by graphviz version 2.43.0 (0)
- -->
-<!-- Title: sourcefile~~params.f90~~AfferentGraph Pages: 1 -->
-<svg id="sourcefileparamsf90AfferentGraph" width="641pt" height="508pt"
- viewBox="0.00 0.00 641.00 507.83" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-<g id="sourcefile~~params.f90~~AfferentGraph" class="graph" transform="scale(1.48 1.48) rotate(0) translate(4 745.46)">
-<title>sourcefile~~params.f90~~AfferentGraph</title>
-<polygon fill="white" stroke="transparent" points="-4,4 -4,-745.46 942,-745.46 942,4 -4,4"/>
-<!-- sourcefile~params.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_node1" class="node">
-<title>sourcefile~params.f90</title>
-<polygon fill="none" stroke="black" points="67,-321.93 0,-321.93 0,-297.93 67,-297.93 67,-321.93"/>
-<text text-anchor="middle" x="33.5" y="-307.53" font-family="Helvetica,sans-Serif" font-size="10.50">params.f90</text>
-</g>
-<!-- sourcefile~bz_sums.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_node2" class="node">
-<title>sourcefile~bz_sums.f90</title>
-<g id="a_sourcefile~~params.f90~~AfferentGraph_node2"><a xlink:href=".././sourcefile/bz_sums.f90.html" xlink:title="bz_sums.f90">
-<polygon fill="#f0ad4e" stroke="#f0ad4e" points="738,-673.93 665,-673.93 665,-649.93 738,-649.93 738,-673.93"/>
-<text text-anchor="middle" x="701.5" y="-659.53" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">bz_sums.f90</text>
-</a>
-</g>
-</g>
-<!-- sourcefile~bz_sums.f90&#45;&gt;sourcefile~params.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge4" class="edge">
-<title>sourcefile~bz_sums.f90&#45;&gt;sourcefile~params.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M587.5,-661.93C537.38,-655.24 530.12,-689.93 481,-701.93"/>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M479,-701.93C355.36,-732.16 310.79,-765.16 193,-716.93 157.23,-702.28 166.08,-672.17 131,-655.93"/>
-</g>
-<!-- sourcefile~crystal.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_node3" class="node">
-<title>sourcefile~crystal.f90</title>
-<g id="a_sourcefile~~params.f90~~AfferentGraph_node3"><a xlink:href=".././sourcefile/crystal.f90.html" xlink:title="crystal.f90">
-<polygon fill="#f0ad4e" stroke="#f0ad4e" points="275,-321.93 214,-321.93 214,-297.93 275,-297.93 275,-321.93"/>
-<text text-anchor="middle" x="244.5" y="-307.53" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">crystal.f90</text>
-</a>
-</g>
-</g>
-<!-- sourcefile~bz_sums.f90&#45;&gt;sourcefile~crystal.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge18" class="edge">
-<title>sourcefile~bz_sums.f90&#45;&gt;sourcefile~crystal.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M587.5,-661.93C562.44,-658.59 502.81,-634.72 481,-621.93"/>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M479,-621.93C462.09,-612.01 453.42,-613.86 442,-597.93 404.07,-545.01 443.59,-509.09 406,-455.93 394.9,-440.23 384.71,-444.32 370,-431.93"/>
-</g>
-<!-- sourcefile~misc.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_node4" class="node">
-<title>sourcefile~misc.f90</title>
-<g id="a_sourcefile~~params.f90~~AfferentGraph_node4"><a xlink:href=".././sourcefile/misc.f90.html" xlink:title="misc.f90">
-<polygon fill="#f0ad4e" stroke="#f0ad4e" points="157,-321.93 103,-321.93 103,-297.93 157,-297.93 157,-321.93"/>
-<text text-anchor="middle" x="130" y="-307.53" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">misc.f90</text>
-</a>
-</g>
-</g>
-<!-- sourcefile~bz_sums.f90&#45;&gt;sourcefile~misc.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge28" class="edge">
-<title>sourcefile~bz_sums.f90&#45;&gt;sourcefile~misc.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M479,-621.93C422.39,-588.72 393.46,-630.96 332,-607.93 287.71,-591.34 283.72,-573.8 245.5,-545.93"/>
-</g>
-<!-- sourcefile~electron.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_node8" class="node">
-<title>sourcefile~electron.f90</title>
-<g id="a_sourcefile~~params.f90~~AfferentGraph_node8"><a xlink:href=".././sourcefile/electron.f90.html" xlink:title="electron.f90">
-<polygon fill="#f0ad4e" stroke="#f0ad4e" points="623,-515.93 554,-515.93 554,-491.93 623,-491.93 623,-515.93"/>
-<text text-anchor="middle" x="588.5" y="-501.53" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">electron.f90</text>
-</a>
-</g>
-</g>
-<!-- sourcefile~bz_sums.f90&#45;&gt;sourcefile~electron.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge42" class="edge">
-<title>sourcefile~bz_sums.f90&#45;&gt;sourcefile~electron.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M676.48,-649.86C670.29,-645.99 663.97,-641.29 659,-635.93 628.39,-602.93 607.31,-553.9 596.93,-525.82"/>
-<polygon fill="#000000" stroke="#000000" points="600.14,-524.39 593.47,-516.15 593.54,-526.75 600.14,-524.39"/>
-</g>
-<!-- sourcefile~symmetry.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_node10" class="node">
-<title>sourcefile~symmetry.f90</title>
-<g id="a_sourcefile~~params.f90~~AfferentGraph_node10"><a xlink:href=".././sourcefile/symmetry.f90.html" xlink:title="symmetry.f90">
-<polygon fill="#f0ad4e" stroke="#f0ad4e" points="518,-673.93 442,-673.93 442,-649.93 518,-649.93 518,-673.93"/>
-<text text-anchor="middle" x="480" y="-659.53" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">symmetry.f90</text>
-</a>
-</g>
-</g>
-<!-- sourcefile~bz_sums.f90&#45;&gt;sourcefile~symmetry.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge45" class="edge">
-<title>sourcefile~bz_sums.f90&#45;&gt;sourcefile~symmetry.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M587.5,-661.93C568.26,-659.36 546.89,-658.9 528.37,-659.25"/>
-<polygon fill="#000000" stroke="#000000" points="528.03,-655.76 518.13,-659.53 528.22,-662.76 528.03,-655.76"/>
-</g>
-<!-- sourcefile~phonon.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_node12" class="node">
-<title>sourcefile~phonon.f90</title>
-<g id="a_sourcefile~~params.f90~~AfferentGraph_node12"><a xlink:href=".././sourcefile/phonon.f90.html" xlink:title="phonon.f90">
-<polygon fill="#f0ad4e" stroke="#f0ad4e" points="622,-319.93 555,-319.93 555,-295.93 622,-295.93 622,-319.93"/>
-<text text-anchor="middle" x="588.5" y="-305.53" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">phonon.f90</text>
-</a>
-</g>
-</g>
-<!-- sourcefile~bz_sums.f90&#45;&gt;sourcefile~phonon.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge58" class="edge">
-<title>sourcefile~bz_sums.f90&#45;&gt;sourcefile~phonon.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M696.68,-649.75C680.5,-598.15 617.51,-397.26 596.42,-330.01"/>
-<polygon fill="#000000" stroke="#000000" points="599.64,-328.56 593.3,-320.07 592.96,-330.66 599.64,-328.56"/>
-</g>
-<!-- sourcefile~delta.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_node13" class="node">
-<title>sourcefile~delta.f90</title>
-<g id="a_sourcefile~~params.f90~~AfferentGraph_node13"><a xlink:href=".././sourcefile/delta.f90.html" xlink:title="delta.f90">
-<polygon fill="#f0ad4e" stroke="#f0ad4e" points="507,-555.93 453,-555.93 453,-531.93 507,-531.93 507,-555.93"/>
-<text text-anchor="middle" x="480" y="-541.53" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">delta.f90</text>
-</a>
-</g>
-</g>
-<!-- sourcefile~bz_sums.f90&#45;&gt;sourcefile~delta.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge62" class="edge">
-<title>sourcefile~bz_sums.f90&#45;&gt;sourcefile~delta.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M664.85,-664.32C643,-665.2 614.52,-665.27 589.5,-661.93"/>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M587.5,-661.93C536.71,-655.15 554.85,-605.54 518,-569.93 515.24,-567.27 512.19,-564.67 509.05,-562.22"/>
-<polygon fill="#000000" stroke="#000000" points="510.84,-559.19 500.7,-556.09 506.7,-564.83 510.84,-559.19"/>
-</g>
-<!-- sourcefile~crystal.f90&#45;&gt;sourcefile~params.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge1" class="edge">
-<title>sourcefile~crystal.f90&#45;&gt;sourcefile~params.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M242.15,-322.1C234.7,-386.79 196.49,-686.24 131,-655.93"/>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M129,-655.93C68.52,-627.95 43.11,-404.87 36.41,-332.51"/>
-<polygon fill="#000000" stroke="#000000" points="39.87,-331.89 35.49,-322.24 32.9,-332.51 39.87,-331.89"/>
-</g>
-<!-- sourcefile~crystal.f90&#45;&gt;sourcefile~misc.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge26" class="edge">
-<title>sourcefile~crystal.f90&#45;&gt;sourcefile~misc.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M213.94,-309.93C199.66,-309.93 182.39,-309.93 167.31,-309.93"/>
-<polygon fill="#000000" stroke="#000000" points="167.29,-306.43 157.29,-309.93 167.29,-313.43 167.29,-306.43"/>
-</g>
-<!-- sourcefile~misc.f90&#45;&gt;sourcefile~params.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge3" class="edge">
-<title>sourcefile~misc.f90&#45;&gt;sourcefile~params.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M102.93,-309.93C95,-309.93 86.06,-309.93 77.33,-309.93"/>
-<polygon fill="#000000" stroke="#000000" points="77.24,-306.43 67.24,-309.93 77.24,-313.43 77.24,-306.43"/>
-</g>
-<!-- sourcefile~elphbolt.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_node5" class="node">
-<title>sourcefile~elphbolt.f90</title>
-<g id="a_sourcefile~~params.f90~~AfferentGraph_node5"><a xlink:href=".././sourcefile/elphbolt.f90.html" xlink:title="elphbolt.f90">
-<polygon fill="#f0ad4e" stroke="#f0ad4e" points="938,-359.93 870,-359.93 870,-335.93 938,-335.93 938,-359.93"/>
-<text text-anchor="middle" x="904" y="-345.53" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">elphbolt.f90</text>
-</a>
-</g>
-</g>
-<!-- sourcefile~elphbolt.f90&#45;&gt;sourcefile~params.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge6" class="edge">
-<title>sourcefile~elphbolt.f90&#45;&gt;sourcefile~params.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M871.31,-335.78C852.62,-328.32 828.65,-318.24 808,-307.93"/>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M806,-307.93C719.26,-264.64 775.23,-180.03 702.5,-115.93"/>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M700.5,-115.93C618.03,-43.25 590.51,7.61 481,-1.93"/>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M479,-1.93C430.57,-0.66 418.3,-5.72 370,-1.93"/>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M368,-1.93C334.82,0.67 303.63,13.39 193,-89.93 154.23,-126.14 168.38,-154.29 131,-191.93"/>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M129,-191.93C95.17,-221.43 64.37,-264.17 47.65,-289.3"/>
-<polygon fill="#000000" stroke="#000000" points="44.69,-287.42 42.14,-297.7 50.55,-291.26 44.69,-287.42"/>
-</g>
-<!-- sourcefile~elphbolt.f90&#45;&gt;sourcefile~bz_sums.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge15" class="edge">
-<title>sourcefile~elphbolt.f90&#45;&gt;sourcefile~bz_sums.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M806,-661.93C790.26,-675.07 767.98,-676.49 748.13,-674.04"/>
-<polygon fill="#000000" stroke="#000000" points="748.44,-670.54 738.02,-672.44 747.35,-677.46 748.44,-670.54"/>
-</g>
-<!-- sourcefile~elphbolt.f90&#45;&gt;sourcefile~crystal.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge19" class="edge">
-<title>sourcefile~elphbolt.f90&#45;&gt;sourcefile~crystal.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M806,-307.93C780.52,-295.72 771.72,-316.51 744,-321.93 610.48,-348.04 565.7,-315.29 442,-371.93 404.13,-389.27 401.58,-459.1 370,-431.93"/>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M368,-431.93C328.99,-397.95 286.99,-354.43 263.7,-329.61"/>
-<polygon fill="#000000" stroke="#000000" points="266.2,-327.17 256.82,-322.25 261.09,-331.95 266.2,-327.17"/>
-</g>
-<!-- sourcefile~elphbolt.f90&#45;&gt;sourcefile~misc.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge29" class="edge">
-<title>sourcefile~elphbolt.f90&#45;&gt;sourcefile~misc.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M479,-1.93C306.98,-16.55 179.4,-221.91 142.15,-288.94"/>
-<polygon fill="#000000" stroke="#000000" points="139.04,-287.33 137.31,-297.79 145.18,-290.69 139.04,-287.33"/>
-</g>
-<!-- sourcefile~bte.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_node7" class="node">
-<title>sourcefile~bte.f90</title>
-<g id="a_sourcefile~~params.f90~~AfferentGraph_node7"><a xlink:href=".././sourcefile/bte.f90.html" xlink:title="bte.f90">
-<polygon fill="#f0ad4e" stroke="#f0ad4e" points="834,-359.93 780,-359.93 780,-335.93 834,-335.93 834,-359.93"/>
-<text text-anchor="middle" x="807" y="-345.53" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">bte.f90</text>
-</a>
-</g>
-</g>
-<!-- sourcefile~elphbolt.f90&#45;&gt;sourcefile~bte.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge39" class="edge">
-<title>sourcefile~elphbolt.f90&#45;&gt;sourcefile~bte.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M869.77,-347.93C861.57,-347.93 852.74,-347.93 844.4,-347.93"/>
-<polygon fill="#000000" stroke="#000000" points="844.18,-344.43 834.18,-347.93 844.18,-351.43 844.18,-344.43"/>
-</g>
-<!-- sourcefile~elphbolt.f90&#45;&gt;sourcefile~electron.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge40" class="edge">
-<title>sourcefile~elphbolt.f90&#45;&gt;sourcefile~electron.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M903.6,-360.05C905.22,-407.46 904.21,-581.66 808,-661.93"/>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M806,-661.93C787.81,-677.11 661.54,-568.14 610.67,-522.95"/>
-<polygon fill="#000000" stroke="#000000" points="612.7,-520.07 602.9,-516.03 608.04,-525.29 612.7,-520.07"/>
-</g>
-<!-- sourcefile~elphbolt.f90&#45;&gt;sourcefile~symmetry.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge46" class="edge">
-<title>sourcefile~elphbolt.f90&#45;&gt;sourcefile~symmetry.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M806,-661.93C778.2,-683.4 776.93,-698.72 744,-710.93 664.8,-740.3 633.9,-743.35 554,-715.93 534.83,-709.35 534.3,-699.99 518,-687.93 514.52,-685.36 510.82,-682.69 507.16,-680.08"/>
-<polygon fill="#000000" stroke="#000000" points="509,-677.1 498.82,-674.19 504.97,-682.82 509,-677.1"/>
-</g>
-<!-- sourcefile~numerics.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_node11" class="node">
-<title>sourcefile~numerics.f90</title>
-<g id="a_sourcefile~~params.f90~~AfferentGraph_node11"><a xlink:href=".././sourcefile/numerics.f90.html" xlink:title="numerics.f90">
-<polygon fill="#f0ad4e" stroke="#f0ad4e" points="406,-243.93 332,-243.93 332,-219.93 406,-219.93 406,-243.93"/>
-<text text-anchor="middle" x="369" y="-229.53" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">numerics.f90</text>
-</a>
-</g>
-</g>
-<!-- sourcefile~elphbolt.f90&#45;&gt;sourcefile~numerics.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge51" class="edge">
-<title>sourcefile~elphbolt.f90&#45;&gt;sourcefile~numerics.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M700.5,-115.93C652.19,-71.71 616.79,-81.28 554,-99.93 497.04,-116.86 488.95,-136.51 442,-172.93 424.85,-186.24 422.83,-192.22 406,-205.93 402.71,-208.62 399.16,-211.35 395.63,-213.99"/>
-<polygon fill="#000000" stroke="#000000" points="393.54,-211.18 387.52,-219.9 397.66,-216.84 393.54,-211.18"/>
-</g>
-<!-- sourcefile~elphbolt.f90&#45;&gt;sourcefile~phonon.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge56" class="edge">
-<title>sourcefile~elphbolt.f90&#45;&gt;sourcefile~phonon.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M806,-307.93C764.52,-288.05 748.3,-312.24 702.5,-307.93"/>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M700.5,-307.93C678.01,-305.82 652.85,-305.64 632.18,-306.07"/>
-<polygon fill="#000000" stroke="#000000" points="632.02,-302.57 622.12,-306.33 632.2,-309.57 632.02,-302.57"/>
-</g>
-<!-- sourcefile~interactions.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_node14" class="node">
-<title>sourcefile~interactions.f90</title>
-<g id="a_sourcefile~~params.f90~~AfferentGraph_node14"><a xlink:href=".././sourcefile/interactions.f90.html" xlink:title="interactions.f90">
-<polygon fill="#f0ad4e" stroke="#f0ad4e" points="744,-241.93 659,-241.93 659,-217.93 744,-217.93 744,-241.93"/>
-<text text-anchor="middle" x="701.5" y="-227.53" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">interactions.f90</text>
-</a>
-</g>
-</g>
-<!-- sourcefile~elphbolt.f90&#45;&gt;sourcefile~interactions.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge64" class="edge">
-<title>sourcefile~elphbolt.f90&#45;&gt;sourcefile~interactions.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M806,-307.93C773.57,-292.39 773.09,-277.09 744,-255.93 740.08,-253.08 735.85,-250.21 731.64,-247.47"/>
-<polygon fill="#000000" stroke="#000000" points="733.45,-244.48 723.13,-242.08 729.71,-250.39 733.45,-244.48"/>
-</g>
-<!-- sourcefile~wannier.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_node15" class="node">
-<title>sourcefile~wannier.f90</title>
-<g id="a_sourcefile~~params.f90~~AfferentGraph_node15"><a xlink:href=".././sourcefile/wannier.f90.html" xlink:title="wannier.f90">
-<polygon fill="#f0ad4e" stroke="#f0ad4e" points="513.5,-205.93 446.5,-205.93 446.5,-181.93 513.5,-181.93 513.5,-205.93"/>
-<text text-anchor="middle" x="480" y="-191.53" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">wannier.f90</text>
-</a>
-</g>
-</g>
-<!-- sourcefile~elphbolt.f90&#45;&gt;sourcefile~wannier.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge68" class="edge">
-<title>sourcefile~elphbolt.f90&#45;&gt;sourcefile~wannier.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M700.5,-115.93C639.56,-64.98 542.93,-138.12 501.24,-174.94"/>
-<polygon fill="#000000" stroke="#000000" points="498.75,-172.47 493.66,-181.77 503.43,-177.67 498.75,-172.47"/>
-</g>
-<!-- sourcefile~particle.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_node6" class="node">
-<title>sourcefile~particle.f90</title>
-<g id="a_sourcefile~~params.f90~~AfferentGraph_node6"><a xlink:href=".././sourcefile/particle.f90.html" xlink:title="particle.f90">
-<polygon fill="#f0ad4e" stroke="#f0ad4e" points="512.5,-475.93 447.5,-475.93 447.5,-451.93 512.5,-451.93 512.5,-475.93"/>
-<text text-anchor="middle" x="480" y="-461.53" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">particle.f90</text>
-</a>
-</g>
-</g>
-<!-- sourcefile~particle.f90&#45;&gt;sourcefile~params.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge5" class="edge">
-<title>sourcefile~particle.f90&#45;&gt;sourcefile~params.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M461.4,-475.94C409.15,-511.53 257.79,-614.22 245.5,-617.93"/>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M243.5,-617.93C217.95,-624.53 154.95,-667.01 131,-655.93"/>
-</g>
-<!-- sourcefile~bte.f90&#45;&gt;sourcefile~params.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge14" class="edge">
-<title>sourcefile~bte.f90&#45;&gt;sourcefile~params.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M587.5,-701.93C540.28,-698.67 527.25,-691.85 481,-701.93"/>
-</g>
-<!-- sourcefile~bte.f90&#45;&gt;sourcefile~bz_sums.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge16" class="edge">
-<title>sourcefile~bte.f90&#45;&gt;sourcefile~bz_sums.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M801.94,-360.24C786.32,-407.63 729.95,-578.65 709.76,-639.91"/>
-<polygon fill="#000000" stroke="#000000" points="706.34,-639.12 706.53,-649.71 712.98,-641.31 706.34,-639.12"/>
-</g>
-<!-- sourcefile~bte.f90&#45;&gt;sourcefile~crystal.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge17" class="edge">
-<title>sourcefile~bte.f90&#45;&gt;sourcefile~crystal.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M700.5,-461.93C624.24,-490.82 599.23,-450.18 518,-442.93 501.58,-441.47 382.61,-442.55 370,-431.93"/>
-</g>
-<!-- sourcefile~bte.f90&#45;&gt;sourcefile~misc.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge36" class="edge">
-<title>sourcefile~bte.f90&#45;&gt;sourcefile~misc.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M800.1,-359.97C786.87,-385.31 752.05,-443.33 702.5,-461.93"/>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M700.5,-461.93C624.15,-490.6 599.44,-447.16 518,-442.93 484.27,-441.18 475.24,-436.91 442,-442.93 408.37,-449.03 402.68,-459.95 370,-469.93"/>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M368,-469.93C304.87,-480.89 297.81,-582.93 245.5,-545.93"/>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M243.5,-545.93C169.75,-493.78 142.68,-380.1 134.28,-332.07"/>
-<polygon fill="#000000" stroke="#000000" points="137.72,-331.4 132.64,-322.1 130.81,-332.53 137.72,-331.4"/>
-</g>
-<!-- sourcefile~bte.f90&#45;&gt;sourcefile~electron.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge43" class="edge">
-<title>sourcefile~bte.f90&#45;&gt;sourcefile~electron.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M700.5,-461.93C677.55,-470.63 651.92,-480.33 631.07,-488.21"/>
-<polygon fill="#000000" stroke="#000000" points="629.68,-485 621.56,-491.81 632.15,-491.54 629.68,-485"/>
-</g>
-<!-- sourcefile~bte.f90&#45;&gt;sourcefile~symmetry.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge49" class="edge">
-<title>sourcefile~bte.f90&#45;&gt;sourcefile~symmetry.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M805.6,-360.2C803.53,-415.1 792.24,-637.53 744,-682.93 693.62,-730.35 658.4,-708.23 589.5,-701.93"/>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M587.5,-701.93C560.5,-700.07 531.9,-688.74 511.14,-678.61"/>
-<polygon fill="#000000" stroke="#000000" points="512.69,-675.48 502.19,-674.08 509.53,-681.72 512.69,-675.48"/>
-</g>
-<!-- sourcefile~bte.f90&#45;&gt;sourcefile~numerics.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge50" class="edge">
-<title>sourcefile~bte.f90&#45;&gt;sourcefile~numerics.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M793.63,-335.86C778.89,-321.7 754.88,-299.46 744,-293.93 717.28,-280.35 510.88,-236.26 481,-233.93"/>
-</g>
-<!-- sourcefile~bte.f90&#45;&gt;sourcefile~phonon.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge59" class="edge">
-<title>sourcefile~bte.f90&#45;&gt;sourcefile~phonon.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M785.05,-335.88C764.72,-325.17 732.61,-310.76 702.5,-307.93"/>
-</g>
-<!-- sourcefile~bte.f90&#45;&gt;sourcefile~interactions.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge65" class="edge">
-<title>sourcefile~bte.f90&#45;&gt;sourcefile~interactions.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M792.53,-335.91C788.25,-331.72 783.67,-326.84 780,-321.93 759.98,-295.18 766.9,-280.26 744,-255.93 741.26,-253.02 738.12,-250.3 734.83,-247.8"/>
-<polygon fill="#000000" stroke="#000000" points="736.69,-244.83 726.47,-242.06 732.73,-250.6 736.69,-244.83"/>
-</g>
-<!-- sourcefile~electron.f90&#45;&gt;sourcefile~params.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge7" class="edge">
-<title>sourcefile~electron.f90&#45;&gt;sourcefile~params.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M479,-583.93C387.59,-635.33 346.97,-591.43 245.5,-617.93"/>
-</g>
-<!-- sourcefile~electron.f90&#45;&gt;sourcefile~crystal.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge20" class="edge">
-<title>sourcefile~electron.f90&#45;&gt;sourcefile~crystal.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M479,-503.93C462.77,-495.09 457.5,-495.01 442,-484.93 424.77,-473.74 422.56,-468.09 406,-455.93 390.5,-444.56 384.71,-444.32 370,-431.93"/>
-</g>
-<!-- sourcefile~electron.f90&#45;&gt;sourcefile~misc.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge30" class="edge">
-<title>sourcefile~electron.f90&#45;&gt;sourcefile~misc.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M575.46,-516.17C562.17,-529.25 539.77,-550.12 518,-564.93 502.72,-575.33 498.01,-576.69 481,-583.93"/>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M479,-583.93C382.26,-625.11 334.61,-601.74 245.5,-545.93"/>
-</g>
-<!-- sourcefile~electron.f90&#45;&gt;sourcefile~particle.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge38" class="edge">
-<title>sourcefile~electron.f90&#45;&gt;sourcefile~particle.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M555.55,-491.93C545.03,-487.98 533.18,-483.53 522.08,-479.36"/>
-<polygon fill="#000000" stroke="#000000" points="523.16,-476.03 512.56,-475.79 520.69,-482.58 523.16,-476.03"/>
-</g>
-<!-- sourcefile~electron.f90&#45;&gt;sourcefile~symmetry.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge47" class="edge">
-<title>sourcefile~electron.f90&#45;&gt;sourcefile~symmetry.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M583.36,-516.01C574.46,-540.69 551.53,-597.82 518,-635.93 515.65,-638.61 512.97,-641.15 510.15,-643.53"/>
-<polygon fill="#000000" stroke="#000000" points="507.83,-640.89 501.99,-649.74 512.07,-646.46 507.83,-640.89"/>
-</g>
-<!-- sourcefile~electron.f90&#45;&gt;sourcefile~numerics.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge52" class="edge">
-<title>sourcefile~electron.f90&#45;&gt;sourcefile~numerics.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M553.79,-511.86C531.76,-515.21 503.08,-515.96 481,-503.93"/>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M479,-503.93C462.77,-495.09 453.07,-499.73 442,-484.93 390.78,-416.46 435.35,-376.25 406,-295.93 400.42,-280.67 391.47,-264.73 383.89,-252.58"/>
-<polygon fill="#000000" stroke="#000000" points="386.79,-250.62 378.44,-244.1 380.9,-254.4 386.79,-250.62"/>
-</g>
-<!-- sourcefile~electron.f90&#45;&gt;sourcefile~delta.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge61" class="edge">
-<title>sourcefile~electron.f90&#45;&gt;sourcefile~delta.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M555.55,-515.93C543.36,-520.51 529.4,-525.75 516.88,-530.46"/>
-<polygon fill="#000000" stroke="#000000" points="515.33,-527.3 507.2,-534.09 517.79,-533.85 515.33,-527.3"/>
-</g>
-<!-- sourcefile~electron.f90&#45;&gt;sourcefile~wannier.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge67" class="edge">
-<title>sourcefile~electron.f90&#45;&gt;sourcefile~wannier.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M585.06,-491.81C574.67,-440.57 533.92,-243.25 518,-219.93 516.14,-217.21 513.9,-214.68 511.44,-212.35"/>
-<polygon fill="#000000" stroke="#000000" points="513.59,-209.59 503.63,-206 509.17,-215.02 513.59,-209.59"/>
-</g>
-<!-- sourcefile~spglib_wrapper.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_node9" class="node">
-<title>sourcefile~spglib_wrapper.f90</title>
-<g id="a_sourcefile~~params.f90~~AfferentGraph_node9"><a xlink:href=".././sourcefile/spglib_wrapper.f90.html" xlink:title="spglib_wrapper.f90">
-<polygon fill="#f0ad4e" stroke="#f0ad4e" points="296,-707.93 193,-707.93 193,-683.93 296,-683.93 296,-707.93"/>
-<text text-anchor="middle" x="244.5" y="-693.53" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">spglib_wrapper.f90</text>
-</a>
-</g>
-</g>
-<!-- sourcefile~spglib_wrapper.f90&#45;&gt;sourcefile~params.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge8" class="edge">
-<title>sourcefile~spglib_wrapper.f90&#45;&gt;sourcefile~params.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M204.01,-683.86C182.11,-676.68 154.61,-666.86 131,-655.93"/>
-</g>
-<!-- sourcefile~symmetry.f90&#45;&gt;sourcefile~params.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge9" class="edge">
-<title>sourcefile~symmetry.f90&#45;&gt;sourcefile~params.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M243.5,-655.93C203.87,-625.45 176.38,-676.93 131,-655.93"/>
-</g>
-<!-- sourcefile~symmetry.f90&#45;&gt;sourcefile~crystal.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge22" class="edge">
-<title>sourcefile~symmetry.f90&#45;&gt;sourcefile~crystal.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M455.83,-649.7C450.58,-645.93 445.52,-641.33 442,-635.93 397.44,-567.59 451.4,-523.72 406,-455.93 395.3,-439.96 384.71,-444.32 370,-431.93"/>
-</g>
-<!-- sourcefile~symmetry.f90&#45;&gt;sourcefile~misc.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge32" class="edge">
-<title>sourcefile~symmetry.f90&#45;&gt;sourcefile~misc.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M454.18,-674.08C432.55,-683.7 400.02,-695.85 370,-697.93"/>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M368,-697.93C364.41,-698.18 248.35,-658.13 245.5,-655.93"/>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M243.5,-655.93C138.65,-575.27 130.06,-395.03 130.41,-332.11"/>
-<polygon fill="#000000" stroke="#000000" points="133.9,-332.14 130.54,-322.1 126.91,-332.05 133.9,-332.14"/>
-</g>
-<!-- sourcefile~symmetry.f90&#45;&gt;sourcefile~spglib_wrapper.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge44" class="edge">
-<title>sourcefile~symmetry.f90&#45;&gt;sourcefile~spglib_wrapper.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M368,-697.93C347.94,-699.33 326,-699.42 306.29,-698.98"/>
-<polygon fill="#000000" stroke="#000000" points="306.3,-695.48 296.21,-698.71 306.11,-702.48 306.3,-695.48"/>
-</g>
-<!-- sourcefile~numerics.f90&#45;&gt;sourcefile~params.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge10" class="edge">
-<title>sourcefile~numerics.f90&#45;&gt;sourcefile~params.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M345.24,-219.75C321.17,-208.02 281.74,-192.03 245.5,-191.93"/>
-</g>
-<!-- sourcefile~numerics.f90&#45;&gt;sourcefile~crystal.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge23" class="edge">
-<title>sourcefile~numerics.f90&#45;&gt;sourcefile~crystal.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M349.13,-243.95C328.86,-256.85 296.46,-277.48 273.29,-292.24"/>
-<polygon fill="#000000" stroke="#000000" points="271.15,-289.45 264.6,-297.77 274.91,-295.36 271.15,-289.45"/>
-</g>
-<!-- sourcefile~numerics.f90&#45;&gt;sourcefile~misc.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge33" class="edge">
-<title>sourcefile~numerics.f90&#45;&gt;sourcefile~misc.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M331.87,-224.28C306.76,-220.63 273.01,-219.11 245.5,-229.93"/>
-</g>
-<!-- sourcefile~phonon.f90&#45;&gt;sourcefile~params.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge11" class="edge">
-<title>sourcefile~phonon.f90&#45;&gt;sourcefile~params.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M581.03,-295.69C574.25,-282.82 563.31,-261.99 554,-243.93 537.8,-212.48 548.15,-191.45 518,-172.93 489.22,-155.26 475.77,-172.17 442,-172.93 393.07,-174.04 380.68,-172.9 332,-177.93 293.26,-181.93 284.44,-192.04 245.5,-191.93"/>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M243.5,-191.93C193.53,-190.33 166.23,-156.45 131,-191.93"/>
-</g>
-<!-- sourcefile~phonon.f90&#45;&gt;sourcefile~crystal.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge21" class="edge">
-<title>sourcefile~phonon.f90&#45;&gt;sourcefile~crystal.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M368,-309.93C340.64,-305.65 309.41,-305.72 285.34,-306.83"/>
-<polygon fill="#000000" stroke="#000000" points="284.95,-303.34 275.15,-307.38 285.33,-310.33 284.95,-303.34"/>
-</g>
-<!-- sourcefile~phonon.f90&#45;&gt;sourcefile~misc.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge31" class="edge">
-<title>sourcefile~phonon.f90&#45;&gt;sourcefile~misc.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M479,-309.93C431.17,-302.23 417.86,-317.43 370,-309.93"/>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M368,-309.93C303.76,-299.87 306.01,-206.13 245.5,-229.93"/>
-</g>
-<!-- sourcefile~phonon.f90&#45;&gt;sourcefile~particle.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge37" class="edge">
-<title>sourcefile~phonon.f90&#45;&gt;sourcefile~particle.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M579.14,-320.17C560.95,-346.83 517.57,-410.37 495.07,-443.32"/>
-<polygon fill="#000000" stroke="#000000" points="492.07,-441.52 489.32,-451.75 497.85,-445.46 492.07,-441.52"/>
-</g>
-<!-- sourcefile~phonon.f90&#45;&gt;sourcefile~symmetry.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge48" class="edge">
-<title>sourcefile~phonon.f90&#45;&gt;sourcefile~symmetry.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M585.16,-320.21C574.08,-378.17 527.04,-622.24 518,-635.93 516.34,-638.45 514.34,-640.8 512.15,-642.97"/>
-<polygon fill="#000000" stroke="#000000" points="509.56,-640.57 504.13,-649.67 514.05,-645.95 509.56,-640.57"/>
-</g>
-<!-- sourcefile~phonon.f90&#45;&gt;sourcefile~numerics.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge53" class="edge">
-<title>sourcefile~phonon.f90&#45;&gt;sourcefile~numerics.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M554.66,-311.55C533.5,-313.14 505.46,-313.87 481,-309.93"/>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M479,-309.93C440.7,-303.76 406.06,-272.55 386.56,-251.53"/>
-<polygon fill="#000000" stroke="#000000" points="389.13,-249.16 379.84,-244.05 383.91,-253.83 389.13,-249.16"/>
-</g>
-<!-- sourcefile~phonon.f90&#45;&gt;sourcefile~delta.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge60" class="edge">
-<title>sourcefile~phonon.f90&#45;&gt;sourcefile~delta.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M583.51,-320.06C568.86,-364.64 518.78,-516.88 518,-517.93 516.03,-520.58 513.72,-523.06 511.22,-525.35"/>
-<polygon fill="#000000" stroke="#000000" points="508.95,-522.68 503.34,-531.66 513.33,-528.14 508.95,-522.68"/>
-</g>
-<!-- sourcefile~phonon.f90&#45;&gt;sourcefile~wannier.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge66" class="edge">
-<title>sourcefile~phonon.f90&#45;&gt;sourcefile~wannier.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M579.49,-295.64C567.48,-277.73 543.46,-244.01 518,-219.93 515.13,-217.22 511.96,-214.57 508.72,-212.06"/>
-<polygon fill="#000000" stroke="#000000" points="510.78,-209.23 500.64,-206.16 506.65,-214.89 510.78,-209.23"/>
-</g>
-<!-- sourcefile~delta.f90&#45;&gt;sourcefile~params.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge12" class="edge">
-<title>sourcefile~delta.f90&#45;&gt;sourcefile~params.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M452.66,-553.31C409.69,-568.37 321.67,-598.25 245.5,-617.93"/>
-</g>
-<!-- sourcefile~delta.f90&#45;&gt;sourcefile~misc.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge34" class="edge">
-<title>sourcefile~delta.f90&#45;&gt;sourcefile~misc.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M461.26,-531.63C430.71,-510.49 371.3,-469.54 370,-469.93"/>
-</g>
-<!-- sourcefile~interactions.f90&#45;&gt;sourcefile~params.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge2" class="edge">
-<title>sourcefile~interactions.f90&#45;&gt;sourcefile~params.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M691.32,-217.83C655.84,-172.53 522.11,-14.86 370,-1.93"/>
-</g>
-<!-- sourcefile~interactions.f90&#45;&gt;sourcefile~crystal.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge24" class="edge">
-<title>sourcefile~interactions.f90&#45;&gt;sourcefile~crystal.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M587.5,-229.93C555.6,-230.42 549,-240.39 518,-247.93 435.35,-268.03 338.11,-289.68 285.02,-301.33"/>
-<polygon fill="#000000" stroke="#000000" points="284.02,-297.96 275,-303.52 285.52,-304.8 284.02,-297.96"/>
-</g>
-<!-- sourcefile~interactions.f90&#45;&gt;sourcefile~misc.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge27" class="edge">
-<title>sourcefile~interactions.f90&#45;&gt;sourcefile~misc.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M671.44,-217.84C635.96,-203.79 573.78,-181.44 518,-172.93 436.25,-160.46 409.59,-149.33 332,-177.93 312.98,-184.94 313.26,-195.3 296,-205.93 274.85,-218.97 268.63,-220.84 245.5,-229.93"/>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M243.5,-229.93C206.4,-242.27 170.89,-271.38 150.02,-290.87"/>
-<polygon fill="#000000" stroke="#000000" points="147.57,-288.37 142.76,-297.81 152.41,-293.42 147.57,-288.37"/>
-</g>
-<!-- sourcefile~interactions.f90&#45;&gt;sourcefile~electron.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge41" class="edge">
-<title>sourcefile~interactions.f90&#45;&gt;sourcefile~electron.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M696.43,-242.32C685.63,-274.85 654.87,-365.23 623,-437.93 616.34,-453.13 607.88,-469.78 601.12,-482.56"/>
-<polygon fill="#000000" stroke="#000000" points="597.98,-481.01 596.35,-491.48 604.15,-484.31 597.98,-481.01"/>
-</g>
-<!-- sourcefile~interactions.f90&#45;&gt;sourcefile~numerics.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge54" class="edge">
-<title>sourcefile~interactions.f90&#45;&gt;sourcefile~numerics.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M587.5,-229.93C540.14,-230.66 528.22,-237.61 481,-233.93"/>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M479,-233.93C458.53,-232.34 435.83,-231.74 416.47,-231.57"/>
-<polygon fill="#000000" stroke="#000000" points="416.4,-228.07 406.39,-231.52 416.37,-235.07 416.4,-228.07"/>
-</g>
-<!-- sourcefile~interactions.f90&#45;&gt;sourcefile~phonon.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge57" class="edge">
-<title>sourcefile~interactions.f90&#45;&gt;sourcefile~phonon.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M683.16,-242.12C664.91,-254.94 636,-275.26 615.12,-289.93"/>
-<polygon fill="#000000" stroke="#000000" points="612.89,-287.22 606.72,-295.83 616.92,-292.94 612.89,-287.22"/>
-</g>
-<!-- sourcefile~interactions.f90&#45;&gt;sourcefile~delta.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge63" class="edge">
-<title>sourcefile~interactions.f90&#45;&gt;sourcefile~delta.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M694.99,-242.05C675.5,-283.98 606.23,-425.39 518,-517.93 515.41,-520.65 512.5,-523.26 509.47,-525.71"/>
-<polygon fill="#000000" stroke="#000000" points="507.27,-522.98 501.35,-531.76 511.45,-528.59 507.27,-522.98"/>
-</g>
-<!-- sourcefile~interactions.f90&#45;&gt;sourcefile~wannier.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge69" class="edge">
-<title>sourcefile~interactions.f90&#45;&gt;sourcefile~wannier.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M658.86,-229.63C638.03,-229.56 612.43,-229.58 589.5,-229.93"/>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M587.5,-229.93C561.05,-230.34 532.76,-220.22 511.98,-210.61"/>
-<polygon fill="#000000" stroke="#000000" points="513.24,-207.34 502.72,-206.13 510.19,-213.64 513.24,-207.34"/>
-</g>
-<!-- sourcefile~wannier.f90&#45;&gt;sourcefile~params.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge13" class="edge">
-<title>sourcefile~wannier.f90&#45;&gt;sourcefile~params.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M446.27,-189.84C424.47,-187.97 395.28,-187.1 370,-191.93"/>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M368,-191.93C314.52,-202.15 299.94,-192.08 245.5,-191.93"/>
-</g>
-<!-- sourcefile~wannier.f90&#45;&gt;sourcefile~crystal.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge25" class="edge">
-<title>sourcefile~wannier.f90&#45;&gt;sourcefile~crystal.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M368,-191.93C350.23,-195.33 346.19,-199.71 332,-210.93 302.73,-234.08 275.57,-268.03 259.76,-289.55"/>
-<polygon fill="#000000" stroke="#000000" points="256.91,-287.52 253.9,-297.68 262.59,-291.62 256.91,-287.52"/>
-</g>
-<!-- sourcefile~wannier.f90&#45;&gt;sourcefile~misc.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge35" class="edge">
-<title>sourcefile~wannier.f90&#45;&gt;sourcefile~misc.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M368,-191.93C312.01,-202.63 298.55,-209.07 245.5,-229.93"/>
-</g>
-<!-- sourcefile~wannier.f90&#45;&gt;sourcefile~numerics.f90 -->
-<g id="sourcefile~~params.f90~~AfferentGraph_edge55" class="edge">
-<title>sourcefile~wannier.f90&#45;&gt;sourcefile~numerics.f90</title>
-<path fill="none" stroke="#000000" stroke-dasharray="5,2" d="M446.3,-205.33C436.21,-208.85 424.94,-212.78 414.22,-216.52"/>
-<polygon fill="#000000" stroke="#000000" points="412.87,-213.28 404.57,-219.88 415.17,-219.89 412.87,-213.28"/>
-</g>
-</g>
-</svg>
-</div><script>var pansourcefileparamsf90AfferentGraph = svgPanZoom('#sourcefileparamsf90AfferentGraph', {zoomEnabled: true,controlIconsEnabled: true, fit: true, center: true,}); </script><div><a type="button" class="graph-help" data-toggle="modal" href="#graph-help-text">Help</a></div><div class="modal fade" id="graph-help-text" tabindex="-1" role="dialog"><div class="modal-dialog modal-lg" role="document"><div class="modal-content"><div class="modal-header"><button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button><h4 class="modal-title" id="-graph-help-label">Graph Key</h4></div><div class="modal-body">
-    <p>Nodes of different colours represent the following: </p>
-    <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
- "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<!-- Generated by graphviz version 2.43.0 (0)
- -->
-<!-- Title: Graph Key Pages: 1 -->
-<svg width="190pt" height="32pt"
- viewBox="0.00 0.00 190.00 32.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 28)">
-<title>Graph Key</title>
-<polygon fill="white" stroke="transparent" points="-4,4 -4,-28 186,-28 186,4 -4,4"/>
-<!-- Source File -->
-<g id="node1" class="node">
-<title>Source File</title>
-<polygon fill="#f0ad4e" stroke="#f0ad4e" points="67,-24 0,-24 0,0 67,0 67,-24"/>
-<text text-anchor="middle" x="33.5" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">Source File</text>
-</g>
-<!-- This Page&#39;s Entity -->
-<g id="node2" class="node">
-<title>This Page&#39;s Entity</title>
-<polygon fill="none" stroke="black" points="182,-24 85,-24 85,0 182,0 182,-24"/>
-<text text-anchor="middle" x="133.5" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50">This Page&#39;s Entity</text>
-</g>
-</g>
-</svg>
-
-    
-    <p>Solid arrows point from a file to a file which it depends on. A file
-    is dependent upon another if the latter must be compiled before the former
-    can be.
-    </p>
-    </div></div></div></div>
-      </div>
-    </div>
-      
-      <br>
 
     <section class="visible-xs visible-sm hidden-md">
-      
-<h3>Contents</h3>
- 
-
-
-
-
-
-
-
-<div class="panel panel-primary">
-  <div class="panel-heading text-left"><h3 class="panel-title"><a data-toggle="collapse" href="#mods-1">Modules</a></h3></div>
-  <div id="mods-1" class="panel-collapse collapse">
-    <div class="list-group">
-      
-      <a class="list-group-item" href="../module/params.html">params</a>
-      
+        <h3>Contents</h3>
+  
+  
+  
+  
+  
+      <div class="panel panel-primary">
+      <div class="panel-heading text-left">
+        <h3 class="panel-title">
+          <a data-toggle="collapse" href="#mods-1">Modules</a>
+        </h3>
+      </div>
+      <div id="mods-1" class="panel-collapse collapse">
+        <div class="list-group">
+            <a class="list-group-item" href="../module/params.html">params</a>
+        </div>
+      </div>
     </div>
-  </div>
-</div>
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<div class="panel panel-primary">
-  <div class="panel-heading text-left"><h3 class="panel-title">Source Code</h3></div>
-  <div class="list-group">
-    <a class="list-group-item" href="../sourcefile/params.f90.html#src">params.f90</a>
-  </div>
-</div>
-
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+    <div class="panel panel-primary">
+      <div class="panel-heading text-left"><h3 class="panel-title">Source Code</h3></div>
+      <div class="list-group">
+        <a class="list-group-item" href="../sourcefile/params.f90.html#src">params.f90</a>
+      </div>
+    </div>
 
 
     </section>
@@ -871,107 +210,99 @@
 
     <section>
       <h2><span class="anchor" id="src"></span>Source Code</h2>
-    <div class="hl"><pre><span></span><a name="ln-1"></a><span class="c">! Copyright (C) 2020- Nakib Haider Protik &lt;nakib.haider.protik@gmail.com&gt;</span>
-<a name="ln-2"></a><span class="c">! This file is part of elphbolt &lt;https://github.com/nakib/elphbolt&gt;.</span>
-<a name="ln-3"></a><span class="c">!</span>
-<a name="ln-4"></a><span class="c">! elphbolt is free software: you can redistribute it and/or modify</span>
-<a name="ln-5"></a><span class="c">! it under the terms of the GNU General Public License as published by</span>
-<a name="ln-6"></a><span class="c">! the Free Software Foundation, either version 3 of the License, or</span>
-<a name="ln-7"></a><span class="c">! (at your option) any later version.</span>
-<a name="ln-8"></a><span class="c">!</span>
-<a name="ln-9"></a><span class="c">! elphbolt is distributed in the hope that it will be useful,</span>
-<a name="ln-10"></a><span class="c">! but WITHOUT ANY WARRANTY; without even the implied warranty of</span>
-<a name="ln-11"></a><span class="c">! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the</span>
-<a name="ln-12"></a><span class="c">! GNU General Public License for more details.</span>
-<a name="ln-13"></a><span class="c">!</span>
-<a name="ln-14"></a><span class="c">! You should have received a copy of the GNU General Public License</span>
-<a name="ln-15"></a><span class="c">! along with elphbolt. If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
-<a name="ln-16"></a>
-<a name="ln-17"></a><span class="k">module </span><span class="n">params</span>
-<a name="ln-18"></a>  <span class="c">!! Module containing various parameters and constants.</span>
-<a name="ln-19"></a>  
-<a name="ln-20"></a>  <span class="k">implicit none</span>
-<a name="ln-21"></a>
-<a name="ln-22"></a><span class="k">  </span><span class="kt">integer</span><span class="p">,</span> <span class="k">parameter</span> <span class="kd">::</span> <span class="n">r_int</span> <span class="o">=</span> <span class="mi">12</span>
-<a name="ln-23"></a>  <span class="c">!! Exponent range for reals.</span>
-<a name="ln-24"></a>  <span class="kt">integer</span><span class="p">,</span> <span class="k">parameter</span> <span class="kd">::</span> <span class="n">r_real</span> <span class="o">=</span> <span class="mi">200</span>
-<a name="ln-25"></a>  <span class="c">!! Exponent range for reals.</span>
-<a name="ln-26"></a>  <span class="kt">integer</span><span class="p">,</span> <span class="k">parameter</span> <span class="kd">::</span> <span class="n">p_real</span> <span class="o">=</span> <span class="mi">14</span>
-<a name="ln-27"></a>  <span class="c">!! Number of digits for reals.</span>
-<a name="ln-28"></a>  <span class="kt">integer</span><span class="p">,</span> <span class="k">parameter</span> <span class="kd">::</span> <span class="n">dp</span> <span class="o">=</span> <span class="nb">selected_real_kind</span><span class="p">(</span><span class="n">p_real</span><span class="p">,</span> <span class="n">r_real</span><span class="p">)</span>
-<a name="ln-29"></a>  <span class="c">!! Custom real precision.</span>
-<a name="ln-30"></a>  <span class="kt">integer</span><span class="p">,</span> <span class="k">parameter</span> <span class="kd">::</span> <span class="n">k8</span> <span class="o">=</span> <span class="nb">selected_int_kind</span><span class="p">(</span><span class="n">r_int</span><span class="p">)</span>
-<a name="ln-31"></a>  <span class="c">!! Custom integer precision.</span>
-<a name="ln-32"></a>
-<a name="ln-33"></a>  <span class="c">!Physical constants:</span>
-<a name="ln-34"></a>  <span class="kt">real</span><span class="p">(</span><span class="n">dp</span><span class="p">),</span> <span class="k">parameter</span> <span class="kd">::</span> <span class="n">qe</span> <span class="o">=</span> <span class="mf">1.602176634e-19_dp</span>
-<a name="ln-35"></a>  <span class="c">!! Electron charge magnitude (C)</span>
-<a name="ln-36"></a>  <span class="kt">real</span><span class="p">(</span><span class="n">dp</span><span class="p">),</span> <span class="k">parameter</span> <span class="kd">::</span> <span class="n">me</span> <span class="o">=</span> <span class="mf">9.1093837015e-31_dp</span>
-<a name="ln-37"></a>  <span class="c">!! Electron mass (Kg)</span>
-<a name="ln-38"></a>  <span class="kt">real</span><span class="p">(</span><span class="n">dp</span><span class="p">),</span> <span class="k">parameter</span> <span class="kd">::</span> <span class="n">amu</span> <span class="o">=</span> <span class="mf">1.66053906660e-27_dp</span>
-<a name="ln-39"></a>  <span class="c">!! Atomic mass unit (Kg)</span>
-<a name="ln-40"></a>  <span class="kt">real</span><span class="p">(</span><span class="n">dp</span><span class="p">),</span> <span class="k">parameter</span> <span class="kd">::</span> <span class="n">hbar</span> <span class="o">=</span> <span class="mf">1.05457172647e-22_dp</span>
-<a name="ln-41"></a>  <span class="c">!! Reduced Planck&#39;s constant (J/THz = J.ps)</span>
-<a name="ln-42"></a>  <span class="kt">real</span><span class="p">(</span><span class="n">dp</span><span class="p">),</span> <span class="k">parameter</span> <span class="kd">::</span> <span class="n">hbar_eVps</span> <span class="o">=</span> <span class="n">hbar</span><span class="o">/</span><span class="n">qe</span>
-<a name="ln-43"></a>  <span class="c">!! Reduced Planck&#39;s constant (eV/THz = eV.ps)</span>
-<a name="ln-44"></a>  <span class="kt">real</span><span class="p">(</span><span class="n">dp</span><span class="p">),</span> <span class="k">parameter</span> <span class="kd">::</span> <span class="n">perm0</span> <span class="o">=</span>  <span class="mf">8.854187817e-12_dp</span>
-<a name="ln-45"></a>  <span class="c">!! Permittivity of free space (F/m)</span>
-<a name="ln-46"></a>  <span class="kt">real</span><span class="p">(</span><span class="n">dp</span><span class="p">),</span> <span class="k">parameter</span> <span class="kd">::</span> <span class="n">kB</span> <span class="o">=</span> <span class="mf">1.380649e-23_dp</span><span class="o">/</span><span class="n">qe</span>
-<a name="ln-47"></a>  <span class="c">!! Boltzmann constant (eV/K)</span>
-<a name="ln-48"></a>  <span class="kt">real</span><span class="p">(</span><span class="n">dp</span><span class="p">),</span> <span class="k">parameter</span> <span class="kd">::</span> <span class="n">pi</span> <span class="o">=</span> <span class="mf">4.0_dp</span><span class="o">*</span><span class="nb">atan</span><span class="p">(</span><span class="mf">1.0_dp</span><span class="p">)</span>
-<a name="ln-49"></a>  <span class="c">!! Value of pi</span>
-<a name="ln-50"></a>  <span class="kt">real</span><span class="p">(</span><span class="n">dp</span><span class="p">),</span> <span class="k">parameter</span> <span class="kd">::</span> <span class="n">twopi</span> <span class="o">=</span> <span class="mf">2.0_dp</span><span class="o">*</span><span class="n">pi</span>
-<a name="ln-51"></a>  <span class="c">!! Value of 2pi</span>
-<a name="ln-52"></a>
-<a name="ln-53"></a>  <span class="c">!Conversion factors:</span>
-<a name="ln-54"></a>  <span class="kt">real</span><span class="p">(</span><span class="n">dp</span><span class="p">),</span> <span class="k">parameter</span> <span class="kd">::</span> <span class="n">Hartree2radTHz</span> <span class="o">=</span> <span class="mi">2</span><span class="mf">7.2116_dp</span><span class="o">*</span><span class="n">qe</span><span class="o">/</span><span class="n">hbar</span> <span class="c">!Hartree to rad.THz</span>
-<a name="ln-55"></a>  <span class="kt">real</span><span class="p">(</span><span class="n">dp</span><span class="p">),</span> <span class="k">parameter</span> <span class="kd">::</span> <span class="n">Hartree2eV</span> <span class="o">=</span> <span class="mi">2</span><span class="mf">7.2116_dp</span> <span class="c">!Hartree to eV</span>
-<a name="ln-56"></a>  <span class="kt">real</span><span class="p">(</span><span class="n">dp</span><span class="p">),</span> <span class="k">parameter</span> <span class="kd">::</span> <span class="n">Ryd2radTHz</span> <span class="o">=</span> <span class="mf">0.5_dp</span><span class="o">*</span><span class="n">Hartree2radTHz</span> <span class="c">!Rydberg to rad.THz</span>
-<a name="ln-57"></a>  <span class="kt">real</span><span class="p">(</span><span class="n">dp</span><span class="p">),</span> <span class="k">parameter</span> <span class="kd">::</span> <span class="n">Ryd2eV</span> <span class="o">=</span> <span class="mf">0.5_dp</span><span class="o">*</span><span class="n">Hartree2eV</span> <span class="c">!Rydberg to eV</span>
-<a name="ln-58"></a>  <span class="kt">real</span><span class="p">(</span><span class="n">dp</span><span class="p">),</span> <span class="k">parameter</span> <span class="kd">::</span> <span class="n">Ryd2meV</span> <span class="o">=</span> <span class="n">Ryd2eV</span><span class="o">*</span><span class="mf">1.0e3_dp</span> <span class="c">!Rydberg to meV</span>
-<a name="ln-59"></a>  <span class="kt">real</span><span class="p">(</span><span class="n">dp</span><span class="p">),</span> <span class="k">parameter</span> <span class="kd">::</span> <span class="n">Ryd2amu</span> <span class="o">=</span> <span class="mf">2.0_dp</span><span class="o">*</span><span class="n">me</span><span class="o">/</span><span class="n">amu</span> <span class="c">!Rydberg mass to amu</span>
-<a name="ln-60"></a>  <span class="kt">real</span><span class="p">(</span><span class="n">dp</span><span class="p">),</span> <span class="k">parameter</span> <span class="kd">::</span> <span class="n">bohr2nm</span><span class="o">=</span><span class="mf">0.052917721092_dp</span> <span class="c">!Bohr to nm</span>
-<a name="ln-61"></a>  
-<a name="ln-62"></a>  <span class="c">!Miscellaneous</span>
-<a name="ln-63"></a>  <span class="kt">complex</span><span class="p">(</span><span class="n">dp</span><span class="p">),</span> <span class="k">parameter</span> <span class="kd">::</span> <span class="n">oneI</span> <span class="o">=</span> <span class="p">(</span><span class="mf">0.0_dp</span><span class="p">,</span><span class="mf">1.0_dp</span><span class="p">)</span>
-<a name="ln-64"></a>  <span class="kt">complex</span><span class="p">(</span><span class="n">dp</span><span class="p">),</span> <span class="k">parameter</span> <span class="kd">::</span> <span class="n">twopiI</span> <span class="o">=</span> <span class="n">twopi</span><span class="o">*</span><span class="n">oneI</span>
-<a name="ln-65"></a>
-<a name="ln-66"></a>  <span class="c">!The code below is adapted from ShengBTE (file data.f90):</span>
-<a name="ln-67"></a>  
-<a name="ln-68"></a>  <span class="c">!Periodic table from ShengBTE</span>
-<a name="ln-69"></a>  <span class="kt">character</span><span class="p">(</span><span class="nb">len</span> <span class="o">=</span> <span class="mi">3</span><span class="p">),</span> <span class="k">parameter</span> <span class="kd">::</span> <span class="n">periodic_table</span><span class="p">(</span><span class="mi">114</span><span class="p">)</span><span class="o">=</span><span class="p">[</span><span class="kt">character</span><span class="p">(</span><span class="nb">len</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span> <span class="kd">::</span> <span class="p">&amp;</span>
-<a name="ln-70"></a>       <span class="s2">&quot;H&quot;</span><span class="p">,</span><span class="s2">&quot;He&quot;</span><span class="p">,</span><span class="s2">&quot;Li&quot;</span><span class="p">,</span><span class="s2">&quot;Be&quot;</span><span class="p">,</span><span class="s2">&quot;B&quot;</span><span class="p">,</span><span class="s2">&quot;C&quot;</span><span class="p">,</span><span class="s2">&quot;N&quot;</span><span class="p">,</span><span class="s2">&quot;O&quot;</span><span class="p">,</span> <span class="p">&amp;</span>
-<a name="ln-71"></a>       <span class="s2">&quot;F&quot;</span><span class="p">,</span><span class="s2">&quot;Ne&quot;</span><span class="p">,</span><span class="s2">&quot;Na&quot;</span><span class="p">,</span><span class="s2">&quot;Mg&quot;</span><span class="p">,</span><span class="s2">&quot;Al&quot;</span><span class="p">,</span><span class="s2">&quot;Si&quot;</span><span class="p">,</span><span class="s2">&quot;P&quot;</span><span class="p">,</span><span class="s2">&quot;S&quot;</span><span class="p">,</span><span class="s2">&quot;Cl&quot;</span><span class="p">,</span><span class="s2">&quot;Ar&quot;</span><span class="p">,</span><span class="s2">&quot;K&quot;</span><span class="p">,</span><span class="s2">&quot;Ca&quot;</span><span class="p">,</span><span class="s2">&quot;Sc&quot;</span><span class="p">,</span><span class="s2">&quot;Ti&quot;</span><span class="p">,</span><span class="s2">&quot;V&quot;</span><span class="p">,</span> <span class="p">&amp;</span>
-<a name="ln-72"></a>       <span class="s2">&quot;Cr&quot;</span><span class="p">,</span><span class="s2">&quot;Mn&quot;</span><span class="p">,</span><span class="s2">&quot;Fe&quot;</span><span class="p">,</span><span class="s2">&quot;Co&quot;</span><span class="p">,</span><span class="s2">&quot;Ni&quot;</span><span class="p">,</span><span class="s2">&quot;Cu&quot;</span><span class="p">,</span><span class="s2">&quot;Zn&quot;</span><span class="p">,</span><span class="s2">&quot;Ga&quot;</span><span class="p">,</span><span class="s2">&quot;Ge&quot;</span><span class="p">,</span><span class="s2">&quot;As&quot;</span><span class="p">,</span><span class="s2">&quot;Se&quot;</span><span class="p">,</span><span class="s2">&quot;Br&quot;</span><span class="p">,</span><span class="s2">&quot;Kr&quot;</span><span class="p">,</span><span class="s2">&quot;Rb&quot;</span><span class="p">,</span> <span class="p">&amp;</span>
-<a name="ln-73"></a>       <span class="s2">&quot;Sr&quot;</span><span class="p">,</span><span class="s2">&quot;Y&quot;</span><span class="p">,</span><span class="s2">&quot;Zr&quot;</span><span class="p">,</span><span class="s2">&quot;Nb&quot;</span><span class="p">,</span><span class="s2">&quot;Mo&quot;</span><span class="p">,</span><span class="s2">&quot;Tc&quot;</span><span class="p">,</span><span class="s2">&quot;Ru&quot;</span><span class="p">,</span><span class="s2">&quot;Rh&quot;</span><span class="p">,</span><span class="s2">&quot;Pd&quot;</span><span class="p">,</span><span class="s2">&quot;Ag&quot;</span><span class="p">,</span><span class="s2">&quot;Cd&quot;</span><span class="p">,</span><span class="s2">&quot;In&quot;</span><span class="p">,</span><span class="s2">&quot;Sn&quot;</span><span class="p">,</span><span class="s2">&quot;Sb&quot;</span><span class="p">,</span> <span class="p">&amp;</span>
-<a name="ln-74"></a>       <span class="s2">&quot;Te&quot;</span><span class="p">,</span><span class="s2">&quot;I&quot;</span><span class="p">,</span><span class="s2">&quot;Xe&quot;</span><span class="p">,</span><span class="s2">&quot;Cs&quot;</span><span class="p">,</span><span class="s2">&quot;Ba&quot;</span><span class="p">,</span><span class="s2">&quot;La&quot;</span><span class="p">,</span><span class="s2">&quot;Ce&quot;</span><span class="p">,</span><span class="s2">&quot;Pr&quot;</span><span class="p">,</span><span class="s2">&quot;Nd&quot;</span><span class="p">,</span><span class="s2">&quot;Pm&quot;</span><span class="p">,</span><span class="s2">&quot;Sm&quot;</span><span class="p">,</span><span class="s2">&quot;Eu&quot;</span><span class="p">,</span><span class="s2">&quot;Gd&quot;</span><span class="p">,</span><span class="s2">&quot;Tb&quot;</span><span class="p">,</span> <span class="p">&amp;</span>
-<a name="ln-75"></a>       <span class="s2">&quot;Dy&quot;</span><span class="p">,</span><span class="s2">&quot;Ho&quot;</span><span class="p">,</span><span class="s2">&quot;Er&quot;</span><span class="p">,</span><span class="s2">&quot;Tm&quot;</span><span class="p">,</span><span class="s2">&quot;Yb&quot;</span><span class="p">,</span><span class="s2">&quot;Lu&quot;</span><span class="p">,</span><span class="s2">&quot;Hf&quot;</span><span class="p">,</span><span class="s2">&quot;Ta&quot;</span><span class="p">,</span><span class="s2">&quot;W&quot;</span><span class="p">,</span><span class="s2">&quot;Re&quot;</span><span class="p">,</span><span class="s2">&quot;Os&quot;</span><span class="p">,</span><span class="s2">&quot;Ir&quot;</span><span class="p">,</span><span class="s2">&quot;Pt&quot;</span><span class="p">,</span><span class="s2">&quot;Au&quot;</span><span class="p">,</span><span class="s2">&quot;Hg&quot;</span><span class="p">,</span> <span class="p">&amp;</span>
-<a name="ln-76"></a>       <span class="s2">&quot;Tl&quot;</span><span class="p">,</span><span class="s2">&quot;Pb&quot;</span><span class="p">,</span><span class="s2">&quot;Bi&quot;</span><span class="p">,</span><span class="s2">&quot;Po&quot;</span><span class="p">,</span><span class="s2">&quot;At&quot;</span><span class="p">,</span><span class="s2">&quot;Rn&quot;</span><span class="p">,</span><span class="s2">&quot;Fr&quot;</span><span class="p">,</span><span class="s2">&quot;Ra&quot;</span><span class="p">,</span><span class="s2">&quot;Ac&quot;</span><span class="p">,</span><span class="s2">&quot;Th&quot;</span><span class="p">,</span><span class="s2">&quot;Pa&quot;</span><span class="p">,</span><span class="s2">&quot;U&quot;</span><span class="p">,</span><span class="s2">&quot;Np&quot;</span><span class="p">,</span><span class="s2">&quot;Pu&quot;</span><span class="p">,</span><span class="s2">&quot;Am&quot;</span><span class="p">,</span> <span class="p">&amp;</span>
-<a name="ln-77"></a>       <span class="s2">&quot;Cm&quot;</span><span class="p">,</span><span class="s2">&quot;Bk&quot;</span><span class="p">,</span><span class="s2">&quot;Cf&quot;</span><span class="p">,</span><span class="s2">&quot;Es&quot;</span><span class="p">,</span><span class="s2">&quot;Fm&quot;</span><span class="p">,</span><span class="s2">&quot;Md&quot;</span><span class="p">,</span><span class="s2">&quot;No&quot;</span><span class="p">,</span><span class="s2">&quot;Lr&quot;</span><span class="p">,</span><span class="s2">&quot;Rf&quot;</span><span class="p">,</span><span class="s2">&quot;Db&quot;</span><span class="p">,</span><span class="s2">&quot;Sg&quot;</span><span class="p">,</span><span class="s2">&quot;Bh&quot;</span><span class="p">,</span><span class="s2">&quot;Hs&quot;</span><span class="p">,</span><span class="s2">&quot;Mt&quot;</span><span class="p">,</span><span class="s2">&quot;Ds&quot;</span> <span class="p">,&amp;</span>
-<a name="ln-78"></a>       <span class="s2">&quot;Rg&quot;</span><span class="p">,</span><span class="s2">&quot;Cn&quot;</span><span class="p">,</span><span class="s2">&quot;Uuq&quot;</span><span class="p">,</span><span class="s2">&quot;Uuh&quot;</span><span class="p">]</span>
-<a name="ln-79"></a><span class="k">end module </span><span class="n">params</span>
+    <div class="hl"><pre><span></span><a id="ln-1" name="ln-1" href="#ln-1"></a><span class="c">! Copyright 2020 elphbolt contributors.</span>
+<a id="ln-2" name="ln-2" href="#ln-2"></a><span class="c">! This file is part of elphbolt &lt;https://github.com/nakib/elphbolt&gt;.</span>
+<a id="ln-3" name="ln-3" href="#ln-3"></a><span class="c">!</span>
+<a id="ln-4" name="ln-4" href="#ln-4"></a><span class="c">! elphbolt is free software: you can redistribute it and/or modify</span>
+<a id="ln-5" name="ln-5" href="#ln-5"></a><span class="c">! it under the terms of the GNU General Public License as published by</span>
+<a id="ln-6" name="ln-6" href="#ln-6"></a><span class="c">! the Free Software Foundation, either version 3 of the License, or</span>
+<a id="ln-7" name="ln-7" href="#ln-7"></a><span class="c">! (at your option) any later version.</span>
+<a id="ln-8" name="ln-8" href="#ln-8"></a><span class="c">!</span>
+<a id="ln-9" name="ln-9" href="#ln-9"></a><span class="c">! elphbolt is distributed in the hope that it will be useful,</span>
+<a id="ln-10" name="ln-10" href="#ln-10"></a><span class="c">! but WITHOUT ANY WARRANTY; without even the implied warranty of</span>
+<a id="ln-11" name="ln-11" href="#ln-11"></a><span class="c">! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the</span>
+<a id="ln-12" name="ln-12" href="#ln-12"></a><span class="c">! GNU General Public License for more details.</span>
+<a id="ln-13" name="ln-13" href="#ln-13"></a><span class="c">!</span>
+<a id="ln-14" name="ln-14" href="#ln-14"></a><span class="c">! You should have received a copy of the GNU General Public License</span>
+<a id="ln-15" name="ln-15" href="#ln-15"></a><span class="c">! along with elphbolt. If not, see &lt;http://www.gnu.org/licenses/&gt;.</span>
+<a id="ln-16" name="ln-16" href="#ln-16"></a>
+<a id="ln-17" name="ln-17" href="#ln-17"></a><span class="k">module </span><span class="n">params</span><span class="w"></span>
+<a id="ln-18" name="ln-18" href="#ln-18"></a><span class="w">  </span><span class="c">!! Module containing various parameters and constants.</span>
+<a id="ln-19" name="ln-19" href="#ln-19"></a>
+<a id="ln-20" name="ln-20" href="#ln-20"></a><span class="w">  </span><span class="k">use </span><span class="n">iso_fortran_env</span><span class="p">,</span><span class="w"> </span><span class="k">only</span><span class="p">:</span><span class="w"> </span><span class="n">real64</span><span class="p">,</span><span class="w"> </span><span class="n">int64</span><span class="w"></span>
+<a id="ln-21" name="ln-21" href="#ln-21"></a><span class="w">  </span>
+<a id="ln-22" name="ln-22" href="#ln-22"></a><span class="w">  </span><span class="k">implicit none</span>
+<a id="ln-23" name="ln-23" href="#ln-23"></a>
+<a id="ln-24" name="ln-24" href="#ln-24"></a><span class="k">  </span><span class="kt">integer</span><span class="p">,</span><span class="w"> </span><span class="k">parameter</span><span class="w"> </span><span class="kd">::</span><span class="w"> </span><span class="n">r64</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">real64</span><span class="w"></span>
+<a id="ln-25" name="ln-25" href="#ln-25"></a><span class="w">  </span><span class="kt">integer</span><span class="p">,</span><span class="w"> </span><span class="k">parameter</span><span class="w"> </span><span class="kd">::</span><span class="w"> </span><span class="n">i64</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">int64</span><span class="w"></span>
+<a id="ln-26" name="ln-26" href="#ln-26"></a>
+<a id="ln-27" name="ln-27" href="#ln-27"></a><span class="w">  </span><span class="c">!Physical constants:</span>
+<a id="ln-28" name="ln-28" href="#ln-28"></a><span class="w">  </span><span class="kt">real</span><span class="p">(</span><span class="n">r64</span><span class="p">),</span><span class="w"> </span><span class="k">parameter</span><span class="w"> </span><span class="kd">::</span><span class="w"> </span><span class="n">qe</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">1.602176634e-19_r64</span><span class="w"></span>
+<a id="ln-29" name="ln-29" href="#ln-29"></a><span class="w">  </span><span class="c">!! Electron charge magnitude (C)</span>
+<a id="ln-30" name="ln-30" href="#ln-30"></a><span class="w">  </span><span class="kt">real</span><span class="p">(</span><span class="n">r64</span><span class="p">),</span><span class="w"> </span><span class="k">parameter</span><span class="w"> </span><span class="kd">::</span><span class="w"> </span><span class="n">me</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">9.1093837015e-31_r64</span><span class="w"></span>
+<a id="ln-31" name="ln-31" href="#ln-31"></a><span class="w">  </span><span class="c">!! Electron mass (Kg)</span>
+<a id="ln-32" name="ln-32" href="#ln-32"></a><span class="w">  </span><span class="kt">real</span><span class="p">(</span><span class="n">r64</span><span class="p">),</span><span class="w"> </span><span class="k">parameter</span><span class="w"> </span><span class="kd">::</span><span class="w"> </span><span class="n">amu</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">1.66053906660e-27_r64</span><span class="w"></span>
+<a id="ln-33" name="ln-33" href="#ln-33"></a><span class="w">  </span><span class="c">!! Atomic mass unit (Kg)</span>
+<a id="ln-34" name="ln-34" href="#ln-34"></a><span class="w">  </span><span class="kt">real</span><span class="p">(</span><span class="n">r64</span><span class="p">),</span><span class="w"> </span><span class="k">parameter</span><span class="w"> </span><span class="kd">::</span><span class="w"> </span><span class="n">hbar</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">1.05457172647e-22_r64</span><span class="w"></span>
+<a id="ln-35" name="ln-35" href="#ln-35"></a><span class="w">  </span><span class="c">!! Reduced Planck&#39;s constant (J/THz = J.ps)</span>
+<a id="ln-36" name="ln-36" href="#ln-36"></a><span class="w">  </span><span class="kt">real</span><span class="p">(</span><span class="n">r64</span><span class="p">),</span><span class="w"> </span><span class="k">parameter</span><span class="w"> </span><span class="kd">::</span><span class="w"> </span><span class="n">hbar_eVps</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">hbar</span><span class="o">/</span><span class="n">qe</span><span class="w"></span>
+<a id="ln-37" name="ln-37" href="#ln-37"></a><span class="w">  </span><span class="c">!! Reduced Planck&#39;s constant (eV/THz = eV.ps)</span>
+<a id="ln-38" name="ln-38" href="#ln-38"></a><span class="w">  </span><span class="kt">real</span><span class="p">(</span><span class="n">r64</span><span class="p">),</span><span class="w"> </span><span class="k">parameter</span><span class="w"> </span><span class="kd">::</span><span class="w"> </span><span class="n">perm0</span><span class="w"> </span><span class="o">=</span><span class="w">  </span><span class="mf">8.854187817e-12_r64</span><span class="w"></span>
+<a id="ln-39" name="ln-39" href="#ln-39"></a><span class="w">  </span><span class="c">!! Permittivity of free space (F/m)</span>
+<a id="ln-40" name="ln-40" href="#ln-40"></a><span class="w">  </span><span class="kt">real</span><span class="p">(</span><span class="n">r64</span><span class="p">),</span><span class="w"> </span><span class="k">parameter</span><span class="w"> </span><span class="kd">::</span><span class="w"> </span><span class="n">kB</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">1.380649e-23_r64</span><span class="o">/</span><span class="n">qe</span><span class="w"></span>
+<a id="ln-41" name="ln-41" href="#ln-41"></a><span class="w">  </span><span class="c">!! Boltzmann constant (eV/K)</span>
+<a id="ln-42" name="ln-42" href="#ln-42"></a><span class="w">  </span><span class="kt">real</span><span class="p">(</span><span class="n">r64</span><span class="p">),</span><span class="w"> </span><span class="k">parameter</span><span class="w"> </span><span class="kd">::</span><span class="w"> </span><span class="n">pi</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">4.0_r64</span><span class="o">*</span><span class="nb">atan</span><span class="p">(</span><span class="mf">1.0_r64</span><span class="p">)</span><span class="w"></span>
+<a id="ln-43" name="ln-43" href="#ln-43"></a><span class="w">  </span><span class="c">!! Value of pi</span>
+<a id="ln-44" name="ln-44" href="#ln-44"></a><span class="w">  </span><span class="kt">real</span><span class="p">(</span><span class="n">r64</span><span class="p">),</span><span class="w"> </span><span class="k">parameter</span><span class="w"> </span><span class="kd">::</span><span class="w"> </span><span class="n">twopi</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">2.0_r64</span><span class="o">*</span><span class="n">pi</span><span class="w"></span>
+<a id="ln-45" name="ln-45" href="#ln-45"></a><span class="w">  </span><span class="c">!! Value of 2pi</span>
+<a id="ln-46" name="ln-46" href="#ln-46"></a>
+<a id="ln-47" name="ln-47" href="#ln-47"></a><span class="w">  </span><span class="c">!Conversion factors:</span>
+<a id="ln-48" name="ln-48" href="#ln-48"></a><span class="w">  </span><span class="kt">real</span><span class="p">(</span><span class="n">r64</span><span class="p">),</span><span class="w"> </span><span class="k">parameter</span><span class="w"> </span><span class="kd">::</span><span class="w"> </span><span class="n">Hartree2radTHz</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="mf">7.2116_r64</span><span class="o">*</span><span class="n">qe</span><span class="o">/</span><span class="n">hbar</span><span class="w"> </span><span class="c">!Hartree to rad.THz</span>
+<a id="ln-49" name="ln-49" href="#ln-49"></a><span class="w">  </span><span class="kt">real</span><span class="p">(</span><span class="n">r64</span><span class="p">),</span><span class="w"> </span><span class="k">parameter</span><span class="w"> </span><span class="kd">::</span><span class="w"> </span><span class="n">Hartree2eV</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="mf">7.2116_r64</span><span class="w"> </span><span class="c">!Hartree to eV</span>
+<a id="ln-50" name="ln-50" href="#ln-50"></a><span class="w">  </span><span class="kt">real</span><span class="p">(</span><span class="n">r64</span><span class="p">),</span><span class="w"> </span><span class="k">parameter</span><span class="w"> </span><span class="kd">::</span><span class="w"> </span><span class="n">Ryd2radTHz</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.5_r64</span><span class="o">*</span><span class="n">Hartree2radTHz</span><span class="w"> </span><span class="c">!Rydberg to rad.THz</span>
+<a id="ln-51" name="ln-51" href="#ln-51"></a><span class="w">  </span><span class="kt">real</span><span class="p">(</span><span class="n">r64</span><span class="p">),</span><span class="w"> </span><span class="k">parameter</span><span class="w"> </span><span class="kd">::</span><span class="w"> </span><span class="n">Ryd2eV</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">0.5_r64</span><span class="o">*</span><span class="n">Hartree2eV</span><span class="w"> </span><span class="c">!Rydberg to eV</span>
+<a id="ln-52" name="ln-52" href="#ln-52"></a><span class="w">  </span><span class="kt">real</span><span class="p">(</span><span class="n">r64</span><span class="p">),</span><span class="w"> </span><span class="k">parameter</span><span class="w"> </span><span class="kd">::</span><span class="w"> </span><span class="n">Ryd2meV</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Ryd2eV</span><span class="o">*</span><span class="mf">1.0e3_r64</span><span class="w"> </span><span class="c">!Rydberg to meV</span>
+<a id="ln-53" name="ln-53" href="#ln-53"></a><span class="w">  </span><span class="kt">real</span><span class="p">(</span><span class="n">r64</span><span class="p">),</span><span class="w"> </span><span class="k">parameter</span><span class="w"> </span><span class="kd">::</span><span class="w"> </span><span class="n">Ryd2amu</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mf">2.0_r64</span><span class="o">*</span><span class="n">me</span><span class="o">/</span><span class="n">amu</span><span class="w"> </span><span class="c">!Rydberg mass to amu</span>
+<a id="ln-54" name="ln-54" href="#ln-54"></a><span class="w">  </span><span class="kt">real</span><span class="p">(</span><span class="n">r64</span><span class="p">),</span><span class="w"> </span><span class="k">parameter</span><span class="w"> </span><span class="kd">::</span><span class="w"> </span><span class="n">bohr2nm</span><span class="o">=</span><span class="mf">0.052917721092_r64</span><span class="w"> </span><span class="c">!Bohr to nm</span>
+<a id="ln-55" name="ln-55" href="#ln-55"></a><span class="w">  </span>
+<a id="ln-56" name="ln-56" href="#ln-56"></a><span class="w">  </span><span class="c">!Miscellaneous</span>
+<a id="ln-57" name="ln-57" href="#ln-57"></a><span class="w">  </span><span class="kt">complex</span><span class="p">(</span><span class="n">r64</span><span class="p">),</span><span class="w"> </span><span class="k">parameter</span><span class="w"> </span><span class="kd">::</span><span class="w"> </span><span class="n">oneI</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="mf">0.0_r64</span><span class="p">,</span><span class="mf">1.0_r64</span><span class="p">)</span><span class="w"></span>
+<a id="ln-58" name="ln-58" href="#ln-58"></a><span class="w">  </span><span class="kt">complex</span><span class="p">(</span><span class="n">r64</span><span class="p">),</span><span class="w"> </span><span class="k">parameter</span><span class="w"> </span><span class="kd">::</span><span class="w"> </span><span class="n">twopiI</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">twopi</span><span class="o">*</span><span class="n">oneI</span><span class="w"></span>
+<a id="ln-59" name="ln-59" href="#ln-59"></a>
+<a id="ln-60" name="ln-60" href="#ln-60"></a><span class="w">  </span><span class="c">!The code below is adapted from ShengBTE (file data.f90):</span>
+<a id="ln-61" name="ln-61" href="#ln-61"></a><span class="w">  </span>
+<a id="ln-62" name="ln-62" href="#ln-62"></a><span class="w">  </span><span class="c">!Periodic table from ShengBTE</span>
+<a id="ln-63" name="ln-63" href="#ln-63"></a><span class="w">  </span><span class="kt">character</span><span class="p">(</span><span class="nb">len</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">3</span><span class="p">),</span><span class="w"> </span><span class="k">parameter</span><span class="w"> </span><span class="kd">::</span><span class="w"> </span><span class="n">periodic_table</span><span class="p">(</span><span class="mi">114</span><span class="p">)</span><span class="o">=</span><span class="p">[</span><span class="kt">character</span><span class="p">(</span><span class="nb">len</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span><span class="w"> </span><span class="kd">::</span><span class="w"> </span><span class="p">&amp;</span><span class="w"></span>
+<a id="ln-64" name="ln-64" href="#ln-64"></a><span class="w">       </span><span class="s2">&quot;H&quot;</span><span class="p">,</span><span class="s2">&quot;He&quot;</span><span class="p">,</span><span class="s2">&quot;Li&quot;</span><span class="p">,</span><span class="s2">&quot;Be&quot;</span><span class="p">,</span><span class="s2">&quot;B&quot;</span><span class="p">,</span><span class="s2">&quot;C&quot;</span><span class="p">,</span><span class="s2">&quot;N&quot;</span><span class="p">,</span><span class="s2">&quot;O&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">&amp;</span><span class="w"></span>
+<a id="ln-65" name="ln-65" href="#ln-65"></a><span class="w">       </span><span class="s2">&quot;F&quot;</span><span class="p">,</span><span class="s2">&quot;Ne&quot;</span><span class="p">,</span><span class="s2">&quot;Na&quot;</span><span class="p">,</span><span class="s2">&quot;Mg&quot;</span><span class="p">,</span><span class="s2">&quot;Al&quot;</span><span class="p">,</span><span class="s2">&quot;Si&quot;</span><span class="p">,</span><span class="s2">&quot;P&quot;</span><span class="p">,</span><span class="s2">&quot;S&quot;</span><span class="p">,</span><span class="s2">&quot;Cl&quot;</span><span class="p">,</span><span class="s2">&quot;Ar&quot;</span><span class="p">,</span><span class="s2">&quot;K&quot;</span><span class="p">,</span><span class="s2">&quot;Ca&quot;</span><span class="p">,</span><span class="s2">&quot;Sc&quot;</span><span class="p">,</span><span class="s2">&quot;Ti&quot;</span><span class="p">,</span><span class="s2">&quot;V&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">&amp;</span><span class="w"></span>
+<a id="ln-66" name="ln-66" href="#ln-66"></a><span class="w">       </span><span class="s2">&quot;Cr&quot;</span><span class="p">,</span><span class="s2">&quot;Mn&quot;</span><span class="p">,</span><span class="s2">&quot;Fe&quot;</span><span class="p">,</span><span class="s2">&quot;Co&quot;</span><span class="p">,</span><span class="s2">&quot;Ni&quot;</span><span class="p">,</span><span class="s2">&quot;Cu&quot;</span><span class="p">,</span><span class="s2">&quot;Zn&quot;</span><span class="p">,</span><span class="s2">&quot;Ga&quot;</span><span class="p">,</span><span class="s2">&quot;Ge&quot;</span><span class="p">,</span><span class="s2">&quot;As&quot;</span><span class="p">,</span><span class="s2">&quot;Se&quot;</span><span class="p">,</span><span class="s2">&quot;Br&quot;</span><span class="p">,</span><span class="s2">&quot;Kr&quot;</span><span class="p">,</span><span class="s2">&quot;Rb&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">&amp;</span><span class="w"></span>
+<a id="ln-67" name="ln-67" href="#ln-67"></a><span class="w">       </span><span class="s2">&quot;Sr&quot;</span><span class="p">,</span><span class="s2">&quot;Y&quot;</span><span class="p">,</span><span class="s2">&quot;Zr&quot;</span><span class="p">,</span><span class="s2">&quot;Nb&quot;</span><span class="p">,</span><span class="s2">&quot;Mo&quot;</span><span class="p">,</span><span class="s2">&quot;Tc&quot;</span><span class="p">,</span><span class="s2">&quot;Ru&quot;</span><span class="p">,</span><span class="s2">&quot;Rh&quot;</span><span class="p">,</span><span class="s2">&quot;Pd&quot;</span><span class="p">,</span><span class="s2">&quot;Ag&quot;</span><span class="p">,</span><span class="s2">&quot;Cd&quot;</span><span class="p">,</span><span class="s2">&quot;In&quot;</span><span class="p">,</span><span class="s2">&quot;Sn&quot;</span><span class="p">,</span><span class="s2">&quot;Sb&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">&amp;</span><span class="w"></span>
+<a id="ln-68" name="ln-68" href="#ln-68"></a><span class="w">       </span><span class="s2">&quot;Te&quot;</span><span class="p">,</span><span class="s2">&quot;I&quot;</span><span class="p">,</span><span class="s2">&quot;Xe&quot;</span><span class="p">,</span><span class="s2">&quot;Cs&quot;</span><span class="p">,</span><span class="s2">&quot;Ba&quot;</span><span class="p">,</span><span class="s2">&quot;La&quot;</span><span class="p">,</span><span class="s2">&quot;Ce&quot;</span><span class="p">,</span><span class="s2">&quot;Pr&quot;</span><span class="p">,</span><span class="s2">&quot;Nd&quot;</span><span class="p">,</span><span class="s2">&quot;Pm&quot;</span><span class="p">,</span><span class="s2">&quot;Sm&quot;</span><span class="p">,</span><span class="s2">&quot;Eu&quot;</span><span class="p">,</span><span class="s2">&quot;Gd&quot;</span><span class="p">,</span><span class="s2">&quot;Tb&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">&amp;</span><span class="w"></span>
+<a id="ln-69" name="ln-69" href="#ln-69"></a><span class="w">       </span><span class="s2">&quot;Dy&quot;</span><span class="p">,</span><span class="s2">&quot;Ho&quot;</span><span class="p">,</span><span class="s2">&quot;Er&quot;</span><span class="p">,</span><span class="s2">&quot;Tm&quot;</span><span class="p">,</span><span class="s2">&quot;Yb&quot;</span><span class="p">,</span><span class="s2">&quot;Lu&quot;</span><span class="p">,</span><span class="s2">&quot;Hf&quot;</span><span class="p">,</span><span class="s2">&quot;Ta&quot;</span><span class="p">,</span><span class="s2">&quot;W&quot;</span><span class="p">,</span><span class="s2">&quot;Re&quot;</span><span class="p">,</span><span class="s2">&quot;Os&quot;</span><span class="p">,</span><span class="s2">&quot;Ir&quot;</span><span class="p">,</span><span class="s2">&quot;Pt&quot;</span><span class="p">,</span><span class="s2">&quot;Au&quot;</span><span class="p">,</span><span class="s2">&quot;Hg&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">&amp;</span><span class="w"></span>
+<a id="ln-70" name="ln-70" href="#ln-70"></a><span class="w">       </span><span class="s2">&quot;Tl&quot;</span><span class="p">,</span><span class="s2">&quot;Pb&quot;</span><span class="p">,</span><span class="s2">&quot;Bi&quot;</span><span class="p">,</span><span class="s2">&quot;Po&quot;</span><span class="p">,</span><span class="s2">&quot;At&quot;</span><span class="p">,</span><span class="s2">&quot;Rn&quot;</span><span class="p">,</span><span class="s2">&quot;Fr&quot;</span><span class="p">,</span><span class="s2">&quot;Ra&quot;</span><span class="p">,</span><span class="s2">&quot;Ac&quot;</span><span class="p">,</span><span class="s2">&quot;Th&quot;</span><span class="p">,</span><span class="s2">&quot;Pa&quot;</span><span class="p">,</span><span class="s2">&quot;U&quot;</span><span class="p">,</span><span class="s2">&quot;Np&quot;</span><span class="p">,</span><span class="s2">&quot;Pu&quot;</span><span class="p">,</span><span class="s2">&quot;Am&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">&amp;</span><span class="w"></span>
+<a id="ln-71" name="ln-71" href="#ln-71"></a><span class="w">       </span><span class="s2">&quot;Cm&quot;</span><span class="p">,</span><span class="s2">&quot;Bk&quot;</span><span class="p">,</span><span class="s2">&quot;Cf&quot;</span><span class="p">,</span><span class="s2">&quot;Es&quot;</span><span class="p">,</span><span class="s2">&quot;Fm&quot;</span><span class="p">,</span><span class="s2">&quot;Md&quot;</span><span class="p">,</span><span class="s2">&quot;No&quot;</span><span class="p">,</span><span class="s2">&quot;Lr&quot;</span><span class="p">,</span><span class="s2">&quot;Rf&quot;</span><span class="p">,</span><span class="s2">&quot;Db&quot;</span><span class="p">,</span><span class="s2">&quot;Sg&quot;</span><span class="p">,</span><span class="s2">&quot;Bh&quot;</span><span class="p">,</span><span class="s2">&quot;Hs&quot;</span><span class="p">,</span><span class="s2">&quot;Mt&quot;</span><span class="p">,</span><span class="s2">&quot;Ds&quot;</span><span class="w"> </span><span class="p">,&amp;</span><span class="w"></span>
+<a id="ln-72" name="ln-72" href="#ln-72"></a><span class="w">       </span><span class="s2">&quot;Rg&quot;</span><span class="p">,</span><span class="s2">&quot;Cn&quot;</span><span class="p">,</span><span class="s2">&quot;Uuq&quot;</span><span class="p">,</span><span class="s2">&quot;Uuh&quot;</span><span class="p">]</span><span class="w"></span>
+<a id="ln-73" name="ln-73" href="#ln-73"></a><span class="k">end module </span><span class="n">params</span><span class="w"></span>
 </pre></div>
 
     </section>
     </div>
   </div>
 
-  
     <hr>    
     </div> <!-- /container -->
     <footer>
       <div class="container">
       <div class="row">
-        <div class="col-xs-6 col-md-4"><p>&copy; 2022 
-                                          </p></div>
-        <div class="col-xs-6 col-md-4 col-md-push-4">
+        <div class="col-xs-6 col-md-6"><p>elphbolt was developed by Nakib Haider Protik<br>&copy; 2023 GNU General Public License 3.0
+</p>
+        </div>
+        <div class="col-xs-6 col-md-6">
           <p class="text-right">
             Documentation generated by 
-            <a href="https://github.com/cmacmackin/ford">FORD</a>
-            
+            <a href="https://github.com/Fortran-FOSS-Programmers/ford">FORD</a>
           </p>
         </div>
-        <div class="col-xs-12 col-md-4 col-md-pull-4"><p class="text-center"> elphbolt was developed by Nakib Haider Protik</p></div>
       </div>
       <br>
       </div> <!-- /container -->    
@@ -997,14 +328,11 @@
         extensions: ['tex2jax.js','mml2jax.js','MathMenu.js','MathZoom.js']
       });
     </script>
-    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-    
     
     <script src="../tipuesearch/tipuesearch_content.js"></script>
     <script src="../tipuesearch/tipuesearch_set.js"></script>
     <script src="../tipuesearch/tipuesearch.js"></script>
-    
     
   </body>
 </html>

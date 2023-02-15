@@ -1,4 +1,4 @@
-! Copyright (C) 2020- Nakib Haider Protik <nakib.haider.protik@gmail.com>
+! Copyright 2020 elphbolt contributors.
 ! This file is part of elphbolt <https://github.com/nakib/elphbolt>.
 !
 ! elphbolt is free software: you can redistribute it and/or modify
@@ -17,7 +17,7 @@
 module wannier_module
   !! Module containing type and procedures related to Wannierization.
 
-  use params, only: dp, k8, Ryd2eV, Ryd2radTHz, oneI, pi, twopi, twopiI, &
+  use params, only: r64, i64, Ryd2eV, Ryd2radTHz, oneI, pi, twopi, twopiI, &
        Ryd2amu, bohr2nm
   use misc, only: exit_with_message, print_message, expi, twonorm, &
        distribute_points, demux_state, mux_vector, subtitle
@@ -29,51 +29,40 @@ module wannier_module
   private
   public epw_wannier
 
-  !EPW File names
-  character(len=*), parameter :: filename_epwdata = "epwdata.fmt"
-  character(len=*), parameter :: filename_epwgwann = "epmatwp1"
-  character(len=*), parameter :: filename_elwscells = "rcells_k"
-  character(len=*), parameter :: filename_phwscells = "rcells_q"
-  character(len=*), parameter :: filename_gwscells = "rcells_g"
-  character(len=*), parameter :: filename_elwsdeg = "wsdeg_k"
-  character(len=*), parameter :: filename_phwsdeg = "wsdeg_q"
-  character(len=*), parameter :: filename_gwsdeg = "wsdeg_g"
-
-  !Unit conversion constant
-  real(dp), parameter :: g2unitfactor = Ryd2eV**3*Ryd2amu
+  !external chdir
   
   type epw_wannier
      !! Data and procedures related to Wannierization.
 
-     integer(k8) :: numwannbands
+     integer(i64) :: numwannbands
      !! Number of Wannier bands.
-     integer(k8) :: numbranches
+     integer(i64) :: numbranches
      !! Number of phonon branches.
-     integer(k8) :: nwsk
+     integer(i64) :: nwsk
      !! Number of real space cells for electrons.
-     integer(k8) :: coarse_qmesh(3)
+     integer(i64) :: coarse_qmesh(3)
      !! Coarse phonon wave vector mesh in Wannier calculation.
-     integer(k8) :: nwsq
+     integer(i64) :: nwsq
      !! Number of real space cells for phonons.
-     integer(k8) :: nwsg
+     integer(i64) :: nwsg
      !! Number of real space cells for electron-phonon vertex.
-     integer(k8), allocatable :: rcells_k(:, :)
+     integer(i64), allocatable :: rcells_k(:, :)
      !! Real space cell locations for electrons.
-     integer(k8), allocatable :: rcells_q(:, :)
+     integer(i64), allocatable :: rcells_q(:, :)
      !! Real space cell locations for phonons.
-     integer(k8), allocatable :: rcells_g(:, :)
+     integer(i64), allocatable :: rcells_g(:, :)
      !! Real space cell locations for electron-phonon vertex.     
-     integer(k8), allocatable :: elwsdeg(:)
+     integer(i64), allocatable :: elwsdeg(:)
      !! Real space cell multiplicity for electrons.
-     integer(k8), allocatable :: phwsdeg(:)
+     integer(i64), allocatable :: phwsdeg(:)
      !! Real space cell multiplicity for phonons.
-     integer(k8), allocatable :: gwsdeg(:)
+     integer(i64), allocatable :: gwsdeg(:)
      !! Real space cell multiplicity for electron-phonon vertex.
-     complex(dp), allocatable :: Hwann(:, :, :)
+     complex(r64), allocatable :: Hwann(:, :, :)
      !! Hamiltonian in Wannier representation.
-     complex(dp), allocatable :: Dphwann(:, :, :)
+     complex(r64), allocatable :: Dphwann(:, :, :)
      !! Dynamical matrix in Wannier representation.
-     complex(dp), allocatable :: gwann(:, :, :, :, :)
+     complex(r64), allocatable :: gwann(:, :, :, :, :)
      !! e-ph vertex in Wannier representation.
 
    contains
@@ -93,10 +82,19 @@ contains
     type(numerics), intent(in) :: num
     
     !Local variables
-    integer(k8) :: iuc, ib, jb
-    integer(k8) :: coarse_qmesh(3)
-    real(dp) :: ef
-    real(dp), allocatable :: dummy(:)
+    integer(i64) :: iuc, ib, jb
+    integer(i64) :: coarse_qmesh(3)
+    real(r64) :: ef
+    real(r64), allocatable :: dummy(:)
+    ! EPW File names:
+    character(len=*), parameter :: filename_epwdata = "epwdata.fmt"
+    character(len=*), parameter :: filename_epwgwann = "epmatwp1"
+    character(len=*), parameter :: filename_elwscells = "rcells_k"
+    character(len=*), parameter :: filename_phwscells = "rcells_q"
+    character(len=*), parameter :: filename_gwscells = "rcells_g"
+    character(len=*), parameter :: filename_elwsdeg = "wsdeg_k"
+    character(len=*), parameter :: filename_phwsdeg = "wsdeg_q"
+    character(len=*), parameter :: filename_gwsdeg = "wsdeg_g"
 
     namelist /wannier/ coarse_qmesh
 
@@ -151,7 +149,7 @@ contains
        open(1, file = filename_epwgwann, status = 'old', access = 'stream')
        allocate(self%gwann(self%numwannbands,self%numwannbands,self%nwsk,&
             self%numbranches,self%nwsg))
-       self%gwann = 0.0_dp
+       self%gwann = 0.0_r64
        read(1) self%gwann
     end if
     close(1)
@@ -192,23 +190,24 @@ contains
     close(2)
   end subroutine read_EPW_Wannier
 
-  subroutine el_wann_epw(self, crys, nk, kvecs, energies, velocities, evecs)
+  subroutine el_wann_epw(self, crys, nk, kvecs, energies, velocities, evecs, scissor)
     !! Wannier interpolate electrons on list of arb. k-vecs
 
     class(epw_wannier), intent(in) :: self
     type(crystal), intent(in) :: crys
-    integer(k8), intent(in) :: nk
-    real(dp), intent(in) :: kvecs(nk,3) !Crystal coordinates
-    real(dp), intent(out) :: energies(nk,self%numwannbands)
-    real(dp), optional, intent(out) :: velocities(nk,self%numwannbands,3)
-    complex(dp), optional, intent(out) :: evecs(nk,self%numwannbands,self%numwannbands)
+    integer(i64), intent(in) :: nk
+    real(r64), intent(in) :: kvecs(nk,3) !Crystal coordinates
+    real(r64), intent(out) :: energies(nk,self%numwannbands)
+    real(r64), optional, intent(out) :: velocities(nk,self%numwannbands,3)
+    complex(r64), optional, intent(out) :: evecs(nk,self%numwannbands,self%numwannbands)
+    real(r64), optional, intent(in) :: scissor(self%numwannbands)
 
     !Local variables
-    integer(k8) :: iuc, ib, jb, ipol, ik, nwork, tmp
-    real(dp) :: rcart(3)
-    real(dp),  allocatable :: rwork(:)
-    complex(dp), allocatable :: work(:)
-    complex(dp) :: caux, H(self%numwannbands,self%numwannbands), &
+    integer(i64) :: iuc, ib, jb, ipol, ik, nwork, tmp
+    real(r64) :: rcart(3)
+    real(r64),  allocatable :: rwork(:)
+    complex(r64), allocatable :: work(:)
+    complex(r64) :: caux, H(self%numwannbands,self%numwannbands), &
          dH(3,self%numwannbands,self%numwannbands)
 
     !External procedures
@@ -244,14 +243,14 @@ contains
        !Force Hermiticity
        do ib = 1, self%numwannbands
           do jb = ib + 1, self%numwannbands
-             H(ib,jb) = (H(ib,jb) + conjg(H(jb,ib)))*0.5_dp
+             H(ib,jb) = (H(ib,jb) + conjg(H(jb,ib)))*0.5_r64
              H(jb,ib) = H(ib,jb)
           end do
        end do
 
        !Diagonalize H
        call zheev("V", "U", self%numwannbands, H(:,:), self%numwannbands, energies(ik,:), &
-            work, -1_k8, rwork, tmp)
+            work, -1_i64, rwork, tmp)
        if(real(work(1)) > nwork) then
           nwork = nint(2*real(work(1)))
           deallocate(work)
@@ -260,6 +259,7 @@ contains
        call zheev("V", "U", self%numwannbands, H(:,:), self%numwannbands, energies(ik,:), &
             work, nwork, rwork, tmp)
 
+       !These quantities are U^dagger. See Eq. 31 or prb 76, 165108.
        if(present(evecs)) then
           evecs(ik,:,:)=transpose(H(:,:))
        end if
@@ -276,7 +276,10 @@ contains
 
        !energies(ik,:) = energies(ik,:)*Rydberg2radTHz !2piTHz
        energies(ik,:) = energies(ik,:)*Ryd2eV !eV
-
+       !If present, apply the scissor operator to conduction bands
+       if (present(scissor)) then
+          energies(ik,:) = energies(ik,:) + scissor(:)
+       end if
        if(present(velocities)) then
           velocities(ik,:,:) = velocities(ik,:,:)*Ryd2radTHz !nmTHz = Km/s
        end if
@@ -290,17 +293,17 @@ contains
     type(crystal), intent(in) :: crys
 
     !Local variables
-    integer(k8), intent(in) :: nq
-    real(dp), intent(in) :: qvecs(nq, 3) !Crystal coordinates
-    real(dp), intent(out) :: energies(nq, self%numbranches)
-    complex(dp), intent(out), optional :: evecs(nq, self%numbranches, self%numbranches)
+    integer(i64), intent(in) :: nq
+    real(r64), intent(in) :: qvecs(nq, 3) !Crystal coordinates
+    real(r64), intent(out) :: energies(nq, self%numbranches)
+    complex(r64), intent(out), optional :: evecs(nq, self%numbranches, self%numbranches)
     
-    integer(k8) :: iuc, ib, jb, iq, na, nb, nwork, aux
-    complex(dp) :: caux
-    real(dp), allocatable :: rwork(:)
-    complex(dp), allocatable :: work(:)
-    real(dp) :: omega2(self%numbranches), massnorm
-    complex(dp) :: dynmat(self%numbranches, self%numbranches)
+    integer(i64) :: iuc, ib, jb, iq, na, nb, nwork, aux
+    complex(r64) :: caux
+    real(r64), allocatable :: rwork(:)
+    complex(r64), allocatable :: work(:)
+    real(r64) :: omega2(self%numbranches), massnorm
+    complex(r64) :: dynmat(self%numbranches, self%numbranches)
 
     !External procedures
     external :: zheev
@@ -311,7 +314,7 @@ contains
     
     do iq = 1, nq
        !Form dynamical matrix
-       dynmat = (0.0_dp, 0.0_dp)
+       dynmat = (0.0_r64, 0.0_r64)
        do iuc = 1, self%nwsq
           caux = expi(twopi*dot_product(qvecs(iq, :), self%rcells_q(iuc, :)))&
                /self%phwsdeg(iuc)
@@ -327,7 +330,7 @@ contains
        !Force Hermiticity
        do ib = 1, self%numbranches
           do jb = ib + 1, self%numbranches
-             dynmat(ib, jb) = (dynmat(ib, jb) + conjg(dynmat(jb, ib)))*0.5_dp
+             dynmat(ib, jb) = (dynmat(ib, jb) + conjg(dynmat(jb, ib)))*0.5_r64
              dynmat(jb, ib) = dynmat(ib, jb)
           end do
        end do
@@ -343,7 +346,7 @@ contains
        end do
        
        !Diagonalize dynmat
-       call zheev("V", "U", self%numbranches, dynmat(:, :), self%numbranches, omega2, work, -1_k8, rwork, aux)
+       call zheev("V", "U", self%numbranches, dynmat(:, :), self%numbranches, omega2, work, -1_i64, rwork, aux)
        if(real(work(1)) > nwork) then
           nwork = nint(2*real(work(1)))
           deallocate(work)
@@ -352,12 +355,14 @@ contains
        call zheev("V", "U", self%numbranches, dynmat(:, :), self%numbranches, omega2, work, nwork, rwork, aux)
 
        energies(iq, :) = sign(sqrt(abs(omega2)), omega2)
+
+       !These quantities are u. See Eq. 32 or prb 76, 165108.
        if(present(evecs)) then
           evecs(iq, :, :) = transpose(dynmat(:, :))
        end if
 
        !energies(iq, :) = energies(iq, :)*Rydberg2radTHz !2piTHz
-       !energies(iq, :) = energies(iq, :)*Rydberg2eV*1.0e3_dp !meV
+       !energies(iq, :) = energies(iq, :)*Rydberg2eV*1.0e3_r64 !meV
        energies(iq, :) = energies(iq, :)*Ryd2eV !eV
        
        !Take care of gamma point.
@@ -367,9 +372,9 @@ contains
        
        !Handle negative energy phonons
        do ib = 1, self%numbranches
-          if(energies(iq,ib) < -0.005_dp) then
+          if(energies(iq,ib) < -0.005_r64) then
              call exit_with_message('Large negative phonon energy found! Stopping!')             
-          else if(energies(iq,ib) < 0 .and. energies(iq,ib) > -0.005_dp) then
+          else if(energies(iq,ib) < 0 .and. energies(iq,ib) > -0.005_r64) then
              energies(iq,ib) = 0
           end if
        end do
@@ -390,14 +395,14 @@ contains
     type(crystal), intent(in) :: crys
     
     !Local variables
-    real(dp), intent(in) :: q(3) !Cartesian
-    complex(dp), intent(inout) :: dyn(self%numbranches,self%numbranches)
+    real(r64), intent(in) :: q(3) !Cartesian
+    complex(r64), intent(inout) :: dyn(self%numbranches,self%numbranches)
 
-    complex(dp) :: dyn_l(self%numbranches,self%numbranches), fnat(3)
-    real(dp) :: qeq, arg, zig(3), zjg(3), g(3), gmax, alph, &
+    complex(r64) :: dyn_l(self%numbranches,self%numbranches), fnat(3)
+    real(r64) :: qeq, arg, zig(3), zjg(3), g(3), gmax, alph, &
          tpiba, dgeg(3), rr(crys%numatoms,crys%numatoms,3)
-    integer(k8) :: iat,jat,idim,jdim,ipol,jpol,m1,m2,m3,nq1,nq2,nq3
-    complex(dp) :: fac, facqd, facq
+    integer(i64) :: iat,jat,idim,jdim,ipol,jpol,m1,m2,m3,nq1,nq2,nq3
+    complex(r64) :: fac, facqd, facq
     
     tpiba = twopi/twonorm(crys%lattvecs(:,1))*bohr2nm
 
@@ -407,24 +412,24 @@ contains
     nq2 = self%coarse_qmesh(2)
     nq3 = self%coarse_qmesh(3)
 
-    gmax= 14.0_dp !dimensionless
+    gmax= 14.0_r64 !dimensionless
     alph= tpiba**2 !bohr^-2
     !In Ry units, qe = sqrt(2.0)
-    fac = 8.0_dp*pi/(crys%volume/bohr2nm**3)
+    fac = 8.0_r64*pi/(crys%volume/bohr2nm**3)
 
-    dyn_l = (0.0_dp, 0.0_dp)
+    dyn_l = (0.0_r64, 0.0_r64)
     do m1 = -nq1,nq1
        do m2 = -nq2,nq2
           do m3 = -nq3,nq3
              g(:) = (m1*crys%reclattvecs(:,1)+m2*crys%reclattvecs(:,2)+m3*crys%reclattvecs(:,3))*bohr2nm
              qeq = dot_product(g,matmul(crys%epsilon,g))
 
-             if (qeq > 0.0_dp .and. qeq/alph/4.0_dp < gmax ) then
-                facqd = exp(-qeq/alph/4.0_dp)/qeq
+             if (qeq > 0.0_r64 .and. qeq/alph/4.0_r64 < gmax ) then
+                facqd = exp(-qeq/alph/4.0_r64)/qeq
 
                 do iat = 1,crys%numatoms
                    zig(:)=matmul(g,crys%born(:,:,iat))
-                   fnat(:)= (0.0_dp,0.0_dp)
+                   fnat(:)= (0.0_r64,0.0_r64)
                    do jat = 1,crys%numatoms
                       rr(iat,jat,:) = (crys%basis_cart(:,iat)-crys%basis_cart(:,jat))/bohr2nm
                       arg = dot_product(g,rr(iat,jat,:))
@@ -444,8 +449,8 @@ contains
 
              g = g + q
              qeq = dot_product(g,matmul(crys%epsilon,g))
-             if (qeq > 0.0_dp .and. qeq/alph/4.0_dp < gmax ) then
-                facqd = exp(-qeq/alph/4.0_dp)/qeq
+             if (qeq > 0.0_r64 .and. qeq/alph/4.0_r64 < gmax ) then
+                facqd = exp(-qeq/alph/4.0_r64)/qeq
                 dgeg=matmul(crys%epsilon+transpose(crys%epsilon),g)
                 do iat = 1,crys%numatoms
                    zig(:)=matmul(g,crys%born(:,:,iat))                   
@@ -486,18 +491,19 @@ contains
     class(epw_wannier), intent(in) :: self
     type(crystal), intent(in) :: crys
     
-    real(dp),intent(in) :: kvec(3), qvec(3), ph_en
-    complex(dp),intent(in) :: el_evec_k(self%numwannbands),&
+    real(r64),intent(in) :: kvec(3), qvec(3), ph_en
+    complex(r64),intent(in) :: el_evec_k(self%numwannbands),&
          el_evec_kp(self%numwannbands), ph_evec_q(self%numbranches), &
          gmixed(:,:,:,:)
     character(len = 2) :: wannspace
+    real(r64), parameter :: g2unitfactor = Ryd2eV**3*Ryd2amu
     
     !Local variables
-    integer(k8) :: ip, iws, nws, np, mp, sp, mtype
-    complex(dp) :: caux, u(self%numbranches), gbloch, unm, &
+    integer(i64) :: ip, iws, nws, np, mp, sp, mtype
+    complex(r64) :: caux, u(self%numbranches), gbloch, unm, &
          overlap(self%numwannbands,self%numwannbands), glprefac
-    complex(dp), allocatable :: UkpgUk(:, :), UkpgUkuq(:)
-    real(dp) :: g2_epw
+    complex(r64), allocatable :: UkpgUkdag(:, :), UkpgUkdaguq(:)
+    real(r64) :: g2_epw
 
     if(wannspace /= 'el' .and. wannspace /= 'ph') then
        call exit_with_message(&
@@ -508,11 +514,11 @@ contains
     do ip = 1, self%numbranches ! d.o.f of basis atoms
        !demux atom type from d.o.f
        mtype = (ip - 1)/3 + 1 
-       !normalize and conjugate eigenvector
+       !normalize
        u(ip) = ph_evec_q(ip)/sqrt(crys%masses(crys%atomtypes(mtype)))
     end do
 
-    if(ph_en == 0) then !zero out matrix elements for energy phonons
+    if(ph_en == 0) then !zero out matrix elements for zero energy phonons
        g2_epw = 0
     else
        if(wannspace == 'ph') then
@@ -521,14 +527,16 @@ contains
           nws = self%nwsk
        end if
        
-       allocate(UkpgUk(self%numbranches, nws), UkpgUkuq(nws))
-       UkpgUk = 0 !g(k,Rp) or g(Re,q) rotated by the electron U(k), U(k') matrices
-       UkpgUkuq = 0 !above quantity rotated by the phonon u(q) matrix
+       allocate(UkpgUkdag(self%numbranches, nws), UkpgUkdaguq(nws))
+       !See Eq. 22 of prb 76, 165108.
+       UkpgUkdag = 0 !g(k,Rp) or g(Re,q) (un)rotated by the electron U^\dagger(k) and U(k') matrices
+       UkpgUkdaguq = 0 !above quantity (un)rotated by the phonon u(q) matrix
        gbloch = 0
 
-       !Create the <n'|m'> overlap matrix
+       !Create the matrix U_nn'(k')U_m'm^\dagger(k)
        do np = 1, self%numwannbands !over final electron band
           do mp = 1, self%numwannbands !over initial electron band
+             !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
              overlap(mp,np) = conjg(el_evec_kp(np))*el_evec_k(mp)
           end do
        end do
@@ -542,35 +550,38 @@ contains
                    caux = caux + overlap(mp,np)*gmixed(np, mp, sp, iws)
                 end do
              end do
-             UkpgUk(sp, iws) = UkpgUk(sp, iws) + caux
+             UkpgUkdag(sp, iws) = UkpgUkdag(sp, iws) + caux
           end do
        end do
 
        do iws = 1, nws !over matrix elements WS cell
           !Apply phonon rotation
-          UkpgUkuq(iws) = UkpgUkuq(iws) + dot_product(conjg(u),UkpgUk(:, iws))
+          !(Recall that the phonon eigenvector *did not* come out pre-daggered from ph_wann_epw.)
+          UkpgUkdaguq(iws) = UkpgUkdaguq(iws) + dot_product(conjg(u),UkpgUkdag(:, iws))
        end do
 
        do iws = 1, nws !over matrix elements WS cell
+          !Fourier transform to reciprocal-space
           if(wannspace == 'ph') then
-             !Fourier transform to q-space
              caux = expi(twopi*dot_product(qvec, self%rcells_g(iws, :)))&
                   /self%gwsdeg(iws)
           else
              caux = expi(twopi*dot_product(kvec, self%rcells_k(iws,:)))&
                   /self%elwsdeg(iws)
           end if
-          gbloch = gbloch + caux*UkpgUkuq(iws)
+          gbloch = gbloch + caux*UkpgUkdaguq(iws)
        end do
 
        if(crys%polar) then !Long-range correction
-          unm = dot_product(conjg(el_evec_k),el_evec_kp)
+          !This is [U(k')U^\dagger(k)]_nm, the overlap factor in the dipole correction.
+          !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
+          unm = dot_product(el_evec_kp,el_evec_k)
           call long_range_prefac(self, crys, &
                matmul(crys%reclattvecs,qvec)*bohr2nm,u,glprefac)
           gbloch = gbloch + glprefac*unm
        end if
 
-       g2_epw = 0.5_dp*real(gbloch*conjg(gbloch))/ &
+       g2_epw = 0.5_r64*real(gbloch*conjg(gbloch))/ &
             ph_en*g2unitfactor !eV^2
     end if
   end function g2_epw
@@ -589,13 +600,13 @@ contains
     class(epw_wannier), intent(in) :: self
     type(crystal), intent(in) :: crys
     
-    real(dp), intent(in) :: q(3) !Cartesian
-    complex(dp), intent(in) :: uqs(self%numbranches)
-    complex(dp), intent(out) :: glprefac
+    real(r64), intent(in) :: q(3) !Cartesian
+    complex(r64), intent(in) :: uqs(self%numbranches)
+    complex(r64), intent(out) :: glprefac
 
-    real(dp) :: qeq, arg, zaq, g(3), gmax, alph, tpiba
-    integer(k8) :: na,ipol, m1,m2,m3,nq1,nq2,nq3
-    complex(dp) :: fac, facqd, facq
+    real(r64) :: qeq, arg, zaq, g(3), gmax, alph, tpiba
+    integer(i64) :: na,ipol, m1,m2,m3,nq1,nq2,nq3
+    complex(r64) :: fac, facqd, facq
 
     tpiba = twopi/twonorm(crys%lattvecs(:,1))*bohr2nm
 
@@ -644,13 +655,13 @@ contains
 
     class(epw_wannier), intent(in) :: self
     type(numerics), intent(in) :: num
-    integer(k8), intent(in) :: ik
-    real(dp), intent(in) :: kvec(3)
+    integer(i64), intent(in) :: ik
+    real(r64), intent(in) :: kvec(3)
 
     !Local variables
-    integer(k8) :: iuc
-    complex(dp) :: caux
-    complex(dp), allocatable:: gmixed(:,:,:,:)
+    integer(i64) :: iuc
+    complex(r64) :: caux
+    complex(r64), allocatable:: gmixed(:,:,:,:)
 
     character(len = 1024) :: filename
 
@@ -687,13 +698,13 @@ contains
 
     class(epw_wannier), intent(in) :: self
     type(numerics), intent(in) :: num
-    integer(k8), intent(in) :: iq
-    real(dp), intent(in) :: qvec(3)
+    integer(i64), intent(in) :: iq
+    real(r64), intent(in) :: qvec(3)
 
     !Local variables
-    integer(k8) :: iuc, s
-    complex(dp) :: caux
-    complex(dp), allocatable:: gmixed(:,:,:,:)
+    integer(i64) :: iuc, s
+    complex(r64) :: caux
+    complex(r64), allocatable:: gmixed(:,:,:,:)
 
     character(len = 1024) :: filename
 
@@ -739,21 +750,22 @@ contains
     end if
   end subroutine deallocate_wannier
   
-  subroutine plot_along_path(self, crys, num)
+  subroutine plot_along_path(self, crys, num, scissor)
     !! Subroutine to plot bands, dispersions, e-ph matrix elements
     !! using the Wannier interpolation method with EPW inputs.
 
     class(epw_wannier), intent(in) :: self
     type(crystal), intent(in) :: crys
     type(numerics), intent(in) :: num
+    real(r64), intent(in) :: scissor(self%numwannbands)
 
     !Local variables
-    integer(k8) :: i, nqpath, m, n, s, deg_count, mp, np, sp, icart
-    real(dp) :: k(1, 3), kp(1, 3), thres, aux, el_en, ph_en
-    real(dp), allocatable :: qpathvecs(:,:), ph_ens_path(:,:), &
+    integer(i64) :: i, nqpath, m, n, s, deg_count, mp, np, sp, icart
+    real(r64) :: k(1, 3), kp(1, 3), thres, aux, el_en, ph_en
+    real(r64), allocatable :: qpathvecs(:,:), ph_ens_path(:,:), &
          el_ens_path(:,:), el_ens_kp(:,:), &
          el_vels_kp(:,:,:), g2_qpath(:,:,:,:), el_ens_k(:,:), el_vels_k(:,:,:)
-    complex(dp), allocatable :: ph_evecs_path(:,:,:), el_evecs_kp(:,:,:), &
+    complex(r64), allocatable :: ph_evecs_path(:,:,:), el_evecs_kp(:,:,:), &
          el_evecs_k(:,:,:), gmixed_k(:,:,:,:) 
     character(len = 1024) :: filename
     character(len=8) :: saux
@@ -763,7 +775,7 @@ contains
     if(this_image() == 1) then
 
        !Threshold used to measure degeneracy
-       thres = 1.0e-6_dp !0.001 meV
+       thres = 1.0e-6_r64 !0.001 meV
 
        !Read list of wavevectors in crystal coordinates
        open(1, file = trim('highsympath.txt'), status = 'old')
@@ -788,7 +800,7 @@ contains
 
        !Calculate electron bands
        allocate(el_ens_path(nqpath, self%numwannbands))
-       call el_wann_epw(self, crys, nqpath, qpathvecs, el_ens_path)
+       call el_wann_epw(self, crys, nqpath, qpathvecs, el_ens_path, scissor = scissor)
 
        !Output electron dispersions
        write(saux,"(I0)") self%numwannbands
@@ -809,7 +821,7 @@ contains
        read(1,*) k(1, :)
 
        !Calculate g(k, Rp)
-       call self%gkRp_epw(num, 0_k8, k(1,:))
+       call self%gkRp_epw(num, 0_i64, k(1,:))
 
        !Load gmixed from file
        !Change to data output directory
@@ -822,16 +834,18 @@ contains
        !Change back to working directory
        call chdir(num%cwd)
 
-       call el_wann_epw(self, crys, 1_k8, k, el_ens_k, el_vels_k, el_evecs_k)
+       call el_wann_epw(self, crys, 1_i64, k, el_ens_k, el_vels_k, el_evecs_k, &
+         scissor = scissor)
 
        do i = 1, nqpath !Over phonon wave vectors path
           kp(1, :) = k(1, :) + qpathvecs(i, :)
           do icart = 1, 3
-             if(kp(1,icart) >= 1.0_dp) kp(1, icart) = kp(1, icart) - 1.0_dp
+             if(kp(1,icart) >= 1.0_r64) kp(1, icart) = kp(1, icart) - 1.0_r64
           end do
 
           !Calculate electrons at this final wave vector
-          call el_wann_epw(self, crys, 1_k8, kp, el_ens_kp, el_vels_kp, el_evecs_kp)
+          call el_wann_epw(self, crys, 1_i64, kp, el_ens_kp, el_vels_kp, el_evecs_kp, &
+            scissor = scissor)
 
           do n = 1, self%numwannbands
              do m = 1, self%numwannbands
@@ -857,7 +871,7 @@ contains
              do n = 1, self%numwannbands
                 do s = 1, self%numbranches
                    deg_count = 0
-                   aux = 0.0_dp
+                   aux = 0.0_r64
                    ph_en = ph_ens_path(i, s)
                    do sp = 1, self%numbranches
                       if(abs(ph_en - ph_ens_path(i, sp)) < thres) then
@@ -875,7 +889,7 @@ contains
              do n = 1, self%numwannbands
                 do m = 1, self%numwannbands
                    deg_count = 0
-                   aux = 0.0_dp
+                   aux = 0.0_r64
                    el_en = el_ens_k(1, m)
                    do mp = 1, self%numwannbands
                       if(abs(el_en - el_ens_k(1, mp)) < thres) then
@@ -893,7 +907,7 @@ contains
              do m = 1, self%numwannbands
                 do n = 1, self%numwannbands
                    deg_count = 0
-                   aux = 0.0_dp
+                   aux = 0.0_r64
                    el_en = el_ens_kp(1, n)
                    do np = 1, self%numwannbands
                       if(abs(el_en - el_ens_kp(1, np)) < thres) then

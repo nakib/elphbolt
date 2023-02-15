@@ -4,9 +4,7 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-   
    <meta name="description" content="A solver for the coupled and decoupled electron and phonon Boltzmann transport equations.">
-    
     <meta name="author" content="Nakib Haider Protik" >
     <link rel="icon" href="../favicon.png">
 
@@ -16,10 +14,7 @@
     <link href="../css/pygments.css" rel="stylesheet">
     <link href="../css/font-awesome.min.css" rel="stylesheet">
     <link href="../css/local.css" rel="stylesheet">
-    
     <link  href="../tipuesearch/tipuesearch.css" rel="stylesheet">
-    
-    
 
     <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
     <!--[if lt IE 9]>
@@ -48,53 +43,29 @@
         </div>
         <div id="navbar" class="navbar-collapse collapse">
           <ul class="nav navbar-nav">
-        
             <li class="dropdown hidden-xs visible-sm visible-md hidden-lg">
               <a href="#" class="dropdown-toggle"
               data-toggle="dropdown" role="button"
               aria-haspopup="true"
      aria-expanded="false">Contents <span class="caret"></span></a>
         <ul class="dropdown-menu">
-          
-              
             <li><a href="../lists/files.html">Source Files</a></li>
-        
-        
-        
             <li><a href="../lists/modules.html">Modules</a></li>
-        
-            
-                                
             <li><a href="../lists/procedures.html">Procedures</a></li>
-        
-               
-            <li><a href="../lists/types.html">Derived Types</a></li>
-        
-        
-            <li><a href="../program/elphbolt.html">Program</a></li>
-      
+            <li><a href="../lists/absint.html">Abstract Interfaces</a></li>
+                   <li><a href="../lists/types.html">Derived Types</a></li>
+            <li><a href="../program/supersweet.html">Program</a></li>
+       
             </ul>
-            </li>
-
-
-<li class="visible-xs hidden-sm visible-lg"><a href="../lists/files.html">Source Files</a></li>
-
-
-
-<li class="visible-xs hidden-sm visible-lg"><a href="../lists/modules.html">Modules</a></li>
-
-
-
-<li class="visible-xs hidden-sm visible-lg"><a href="../lists/procedures.html">Procedures</a></li>
-
-                             
-<li class="visible-xs hidden-sm visible-lg"><a href="../lists/types.html">Derived Types</a></li>
-
-
-<li class="visible-xs hidden-sm visible-lg"><a href="../program/elphbolt.html">Program</a></li>
-
-          </ul>
         
+            </li>
+<li class="visible-xs hidden-sm visible-lg"><a href="../lists/files.html">Source Files</a></li>
+<li class="visible-xs hidden-sm visible-lg"><a href="../lists/modules.html">Modules</a></li>
+<li class="visible-xs hidden-sm visible-lg"><a href="../lists/procedures.html">Procedures</a></li>
+<li class="visible-xs hidden-sm visible-lg"><a href="../lists/absint.html">Abstract Interfaces</a></li>
+                             <li class="visible-xs hidden-sm visible-lg"><a href="../lists/types.html">Derived Types</a></li>
+<li class="visible-xs hidden-sm visible-lg"><a href="../program/supersweet.html">Program</a></li>
+          </ul>
         <form action="../search.html" class="navbar-form navbar-right" role="search">
         <div class="form-group">
           <input type="text" class="form-control" placeholder="Search" name="q" id="tipue_search_input" autocomplete="off" required>
@@ -103,568 +74,229 @@
         <button type="submit" class="btn btn-default">Submit</button>
 -->
         </form>
-        
         </div><!--/.nav-collapse -->
       </div>
     </nav>
 
     <div class="container">
-    
-  
   <div class="row">
     <h1>distribute_points
       <small>Subroutine</small>
-    
+      
     </h1>
-    
-<div class="row">
-  <div class="col-lg-12">
-<div class="well well-sm">
-  <ul class="list-inline" style="margin-bottom:0px;display:inline">
-     
-     
-     
-     
-    
-    
-     <li><i class="fa fa-list-ol"></i>
-       <a data-toggle="tooltip"
-    data-placement="bottom" data-html="true"
-    title=" 0.6% of total for procedures.">13 statements</a>
-     </li> 
-     
-     
-     
-    <li><i class="fa fa-code"></i><a href="../src/misc.f90"> Source File</a></li>
-     
-     
-  </ul>
-  <ol class="breadcrumb in-well text-right">
-  
-    
-     <li><a href='../sourcefile/misc.f90.html'>misc.f90</a></li>
-    
-     <li><a href='../module/misc.html'>misc</a></li>
-    
-  
-     <li class="active">distribute_points</li>
-  </ol>
-</div>
-</div>
-</div>
-<script>
-  $(function () {
-  $('[data-toggle="tooltip"]').tooltip()
-  })
-</script>
+      <div class="row" id="info-bar">
+    <div class="col-lg-12">
+      <div class="well well-sm">
+        <ul class="list-inline" style="margin-bottom:0px;display:inline">
+            <li id="meta-license"><i class="fa fa-legal"></i> GNU General Public License 3.0</li>
+
+          <li id="statements"><i class="fa fa-list-ol"></i>
+            <a data-toggle="tooltip"
+               data-placement="bottom" data-html="true"
+               title=" 0.5% of total for procedures.">13 statements</a>
+          </li>
+
+            <li id="source-file">
+              <i class="fa fa-code"></i>
+              <a href="../src/misc.f90"> Source File</a>
+            </li>
+        </ul>
+        <ol class="breadcrumb in-well text-right">
+              <li><a href='../sourcefile/misc.f90.html'>misc.f90</a></li>
+              <li><a href='../module/misc.html'>misc</a></li>
+          <li class="active">distribute_points</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+  <script>
+    $(function () {
+    $('[data-toggle="tooltip"]').tooltip()
+    })
+  </script>
 
   </div>
   
   <div class="row">
     <div class="col-md-3 hidden-xs hidden-sm visible-md visible-lg">
-    
-<div id="sidebar">
+      <div id="sidebar">
+      <h3>Contents</h3>
   
-<h3>Contents</h3>
- 
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<em>None</em>
-
-
-</div>
+  </div>
 
     </div>
     
     <div class="col-md-9" id='text'>
-    <h2>
-public subroutine distribute_points(npts, chunk, istart, iend, num_active_images)
-    
-    
-   
+    <h2>public  subroutine distribute_points(npts, chunk, istart, iend, num_active_images)  
 </h2>
     
-  
 
-
-    
     <p>Distribute points among processes</p>
-    
 
     <h3>Arguments</h3>
-    
-      
-<table class="table table-striped varlist">
-<thead><tr><th>Type</th>
-<th>Intent</th><th>Optional</th>
-<th>Attributes</th><th></th><th>Name</th><th></th></thead>
+        <table class="table table-striped varlist">
+    <thead>
+      <tr>
+        <th>Type</th>
+<th>Intent</th><th>Optional</th>        <th>Attributes</th>
+        <th></th>
+        <th>Name</th>
+        <th></th>
+    </thead>
+    <tbody>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-npts"></span>
+              integer(kind=i64),
+            </td>
+<td>intent(in)</td>
+              <td></td>            <td>
+              
+            </td>
+            <td>::</td>
+            <td><strong>npts</strong></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-chunk"></span>
+              integer(kind=i64),
+            </td>
+<td>intent(out)</td>
+              <td></td>            <td>
+              
+            </td>
+            <td>::</td>
+            <td><strong>chunk</strong></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-istart"></span>
+              integer(kind=i64),
+            </td>
+<td>intent(out)</td>
+              <td></td>            <td>
+              
+            </td>
+            <td>::</td>
+            <td><strong>istart</strong></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-iend"></span>
+              integer(kind=i64),
+            </td>
+<td>intent(out)</td>
+              <td></td>            <td>
+              
+            </td>
+            <td>::</td>
+            <td><strong>iend</strong></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-num_active_images"></span>
+              integer(kind=i64),
+            </td>
+<td>intent(out)</td>
+              <td></td>            <td>
+              
+            </td>
+            <td>::</td>
+            <td><strong>num_active_images</strong></td>
+            <td>
+                
+            </td>
+        </tr>
+    </tbody>
+  </table>
 
-
-
-<tbody>
-
-  
-  
-  
-  
-<tr>
-  
-  <td><span class="anchor" id="variable-npts"></span>integer(kind=k8),</td>
-  <td>intent(in)</td>
-  <td></td>
-  
-  <td></td><td>::</td>
-  <td><strong>npts</strong></td><td></td>
-  
-</tr>
-
-  
-  
-  
-  
-<tr>
-  
-  <td><span class="anchor" id="variable-chunk"></span>integer(kind=k8),</td>
-  <td>intent(out)</td>
-  <td></td>
-  
-  <td></td><td>::</td>
-  <td><strong>chunk</strong></td><td></td>
-  
-</tr>
-
-  
-  
-  
-  
-<tr>
-  
-  <td><span class="anchor" id="variable-istart"></span>integer(kind=k8),</td>
-  <td>intent(out)</td>
-  <td></td>
-  
-  <td></td><td>::</td>
-  <td><strong>istart</strong></td><td></td>
-  
-</tr>
-
-  
-  
-  
-  
-<tr>
-  
-  <td><span class="anchor" id="variable-iend"></span>integer(kind=k8),</td>
-  <td>intent(out)</td>
-  <td></td>
-  
-  <td></td><td>::</td>
-  <td><strong>iend</strong></td><td></td>
-  
-</tr>
-
-  
-  
-  
-  
-<tr>
-  
-  <td><span class="anchor" id="variable-num_active_images"></span>integer(kind=k8),</td>
-  <td>intent(out)</td>
-  <td></td>
-  
-  <td></td><td>::</td>
-  <td><strong>num_active_images</strong></td><td></td>
-  
-</tr>
-
-</tbody>
-</table>
-
-    
-    
-    
-    <br>
-    
-    
-     
-    <div class="panel panel-default">
-      <div class="panel-heading">
-  <h3 class="panel-title">Called by</h3>
-      </div>
-      <div class="panel-body">
-  <div class="depgraph"><?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
- "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<!-- Generated by graphviz version 2.43.0 (0)
- -->
-<!-- Title: proc~~distribute_points~~CalledByGraph Pages: 1 -->
-<svg id="procdistribute_pointsCalledByGraph" width="441pt" height="406pt"
- viewBox="0.00 0.00 441.00 406.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-<g id="proc~~distribute_points~~CalledByGraph" class="graph" transform="scale(1 1) rotate(0) translate(4 402)">
-<title>proc~~distribute_points~~CalledByGraph</title>
-<polygon fill="white" stroke="transparent" points="-4,4 -4,-402 437,-402 437,4 -4,4"/>
-<!-- proc~distribute_points -->
-<g id="proc~~distribute_points~~CalledByGraph_node1" class="node">
-<title>proc~distribute_points</title>
-<polygon fill="none" stroke="black" points="433,-209 342,-209 342,-185 433,-185 433,-209"/>
-<text text-anchor="middle" x="387.5" y="-194.6" font-family="Helvetica,sans-Serif" font-size="10.50">distribute_points</text>
-</g>
-<!-- proc~calculate_eph_interaction_ibzq -->
-<g id="proc~~distribute_points~~CalledByGraph_node2" class="node">
-<title>proc~calculate_eph_interaction_ibzq</title>
-<g id="a_proc~~distribute_points~~CalledByGraph_node2"><a xlink:href=".././proc/calculate_eph_interaction_ibzq.html" xlink:title="calculate_eph_interaction_ibzq">
-<polygon fill="#d9534f" stroke="#d9534f" points="298.5,-398 138.5,-398 138.5,-374 298.5,-374 298.5,-398"/>
-<text text-anchor="middle" x="218.5" y="-383.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">calculate_eph_interaction_ibzq</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_eph_interaction_ibzq&#45;&gt;proc~distribute_points -->
-<g id="proc~~distribute_points~~CalledByGraph_edge1" class="edge">
-<title>proc~calculate_eph_interaction_ibzq&#45;&gt;proc~distribute_points</title>
-<path fill="none" stroke="#000000" d="M291.77,-373.89C296.86,-371.44 301.68,-368.5 306,-365 352.68,-327.17 374,-255.77 382.19,-219.45"/>
-<polygon fill="#000000" stroke="#000000" points="385.67,-219.88 384.32,-209.38 378.83,-218.43 385.67,-219.88"/>
-</g>
-<!-- proc~calculate_eph_interaction_ibzk -->
-<g id="proc~~distribute_points~~CalledByGraph_node3" class="node">
-<title>proc~calculate_eph_interaction_ibzk</title>
-<g id="a_proc~~distribute_points~~CalledByGraph_node3"><a xlink:href=".././proc/calculate_eph_interaction_ibzk.html" xlink:title="calculate_eph_interaction_ibzk">
-<polygon fill="#d9534f" stroke="#d9534f" points="298,-356 139,-356 139,-332 298,-332 298,-356"/>
-<text text-anchor="middle" x="218.5" y="-341.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">calculate_eph_interaction_ibzk</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_eph_interaction_ibzk&#45;&gt;proc~distribute_points -->
-<g id="proc~~distribute_points~~CalledByGraph_edge2" class="edge">
-<title>proc~calculate_eph_interaction_ibzk&#45;&gt;proc~distribute_points</title>
-<path fill="none" stroke="#000000" d="M290.02,-331.86C295.68,-329.43 301.1,-326.5 306,-323 343.06,-296.53 367.13,-247.16 378.61,-218.71"/>
-<polygon fill="#000000" stroke="#000000" points="381.93,-219.85 382.27,-209.26 375.4,-217.32 381.93,-219.85"/>
-</g>
-<!-- proc~calculate_echimp_interaction_ibzk -->
-<g id="proc~~distribute_points~~CalledByGraph_node4" class="node">
-<title>proc~calculate_echimp_interaction_ibzk</title>
-<g id="a_proc~~distribute_points~~CalledByGraph_node4"><a xlink:href=".././proc/calculate_echimp_interaction_ibzk.html" xlink:title="calculate_echimp_interaction_ibzk">
-<polygon fill="#d9534f" stroke="#d9534f" points="306,-314 131,-314 131,-290 306,-290 306,-314"/>
-<text text-anchor="middle" x="218.5" y="-299.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">calculate_echimp_interaction_ibzk</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_echimp_interaction_ibzk&#45;&gt;proc~distribute_points -->
-<g id="proc~~distribute_points~~CalledByGraph_edge3" class="edge">
-<title>proc~calculate_echimp_interaction_ibzk&#45;&gt;proc~distribute_points</title>
-<path fill="none" stroke="#000000" d="M286.19,-289.95C293.1,-287.5 299.84,-284.55 306,-281 333.78,-265.01 358.05,-236.56 372.49,-217.25"/>
-<polygon fill="#000000" stroke="#000000" points="375.37,-219.24 378.41,-209.1 369.7,-215.13 375.37,-219.24"/>
-</g>
-<!-- proc~calculate_greq -->
-<g id="proc~~distribute_points~~CalledByGraph_node5" class="node">
-<title>proc~calculate_greq</title>
-<g id="a_proc~~distribute_points~~CalledByGraph_node5"><a xlink:href=".././proc/calculate_greq.html" xlink:title="calculate_gReq">
-<polygon fill="#d9534f" stroke="#d9534f" points="261.5,-272 175.5,-272 175.5,-248 261.5,-248 261.5,-272"/>
-<text text-anchor="middle" x="218.5" y="-257.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">calculate_gReq</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_greq&#45;&gt;proc~distribute_points -->
-<g id="proc~~distribute_points~~CalledByGraph_edge4" class="edge">
-<title>proc~calculate_greq&#45;&gt;proc~distribute_points</title>
-<path fill="none" stroke="#000000" d="M261.92,-251.86C276.15,-248.57 291.97,-244.27 306,-239 323.84,-232.29 342.79,-222.55 357.81,-214.14"/>
-<polygon fill="#000000" stroke="#000000" points="359.67,-217.11 366.62,-209.11 356.2,-211.03 359.67,-217.11"/>
-</g>
-<!-- proc~calculate_gkrp -->
-<g id="proc~~distribute_points~~CalledByGraph_node6" class="node">
-<title>proc~calculate_gkrp</title>
-<g id="a_proc~~distribute_points~~CalledByGraph_node6"><a xlink:href=".././proc/calculate_gkrp.html" xlink:title="calculate_gkRp">
-<polygon fill="#d9534f" stroke="#d9534f" points="261,-230 176,-230 176,-206 261,-206 261,-230"/>
-<text text-anchor="middle" x="218.5" y="-215.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">calculate_gkRp</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_gkrp&#45;&gt;proc~distribute_points -->
-<g id="proc~~distribute_points~~CalledByGraph_edge7" class="edge">
-<title>proc~calculate_gkrp&#45;&gt;proc~distribute_points</title>
-<path fill="none" stroke="#000000" d="M261.21,-212.75C282.59,-210.07 308.88,-206.76 331.86,-203.87"/>
-<polygon fill="#000000" stroke="#000000" points="332.33,-207.34 341.81,-202.62 331.46,-200.39 332.33,-207.34"/>
-</g>
-<!-- proc~calculate_ph_rta_rates -->
-<g id="proc~~distribute_points~~CalledByGraph_node7" class="node">
-<title>proc~calculate_ph_rta_rates</title>
-<g id="a_proc~~distribute_points~~CalledByGraph_node7"><a xlink:href=".././proc/calculate_ph_rta_rates.html" xlink:title="calculate_ph_rta_rates">
-<polygon fill="#d9534f" stroke="#d9534f" points="279,-146 158,-146 158,-122 279,-122 279,-146"/>
-<text text-anchor="middle" x="218.5" y="-131.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">calculate_ph_rta_rates</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_ph_rta_rates&#45;&gt;proc~distribute_points -->
-<g id="proc~~distribute_points~~CalledByGraph_edge6" class="edge">
-<title>proc~calculate_ph_rta_rates&#45;&gt;proc~distribute_points</title>
-<path fill="none" stroke="#000000" d="M277.79,-146.09C287.33,-148.66 297.03,-151.63 306,-155 323.84,-161.71 342.79,-171.45 357.81,-179.86"/>
-<polygon fill="#000000" stroke="#000000" points="356.2,-182.97 366.62,-184.89 359.67,-176.89 356.2,-182.97"/>
-</g>
-<!-- proc~calculate_el_rta_rates -->
-<g id="proc~~distribute_points~~CalledByGraph_node8" class="node">
-<title>proc~calculate_el_rta_rates</title>
-<g id="a_proc~~distribute_points~~CalledByGraph_node8"><a xlink:href=".././proc/calculate_el_rta_rates.html" xlink:title="calculate_el_rta_rates">
-<polygon fill="#d9534f" stroke="#d9534f" points="277.5,-104 159.5,-104 159.5,-80 277.5,-80 277.5,-104"/>
-<text text-anchor="middle" x="218.5" y="-89.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">calculate_el_rta_rates</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_el_rta_rates&#45;&gt;proc~distribute_points -->
-<g id="proc~~distribute_points~~CalledByGraph_edge5" class="edge">
-<title>proc~calculate_el_rta_rates&#45;&gt;proc~distribute_points</title>
-<path fill="none" stroke="#000000" d="M277.57,-101.26C287.43,-104.17 297.3,-107.99 306,-113 333.78,-128.99 358.05,-157.44 372.49,-176.75"/>
-<polygon fill="#000000" stroke="#000000" points="369.7,-178.87 378.41,-184.9 375.37,-174.76 369.7,-178.87"/>
-</g>
-<!-- proc~calculate_3ph_interaction -->
-<g id="proc~~distribute_points~~CalledByGraph_node9" class="node">
-<title>proc~calculate_3ph_interaction</title>
-<g id="a_proc~~distribute_points~~CalledByGraph_node9"><a xlink:href=".././proc/calculate_3ph_interaction.html" xlink:title="calculate_3ph_interaction">
-<polygon fill="#d9534f" stroke="#d9534f" points="285.5,-188 151.5,-188 151.5,-164 285.5,-164 285.5,-188"/>
-<text text-anchor="middle" x="218.5" y="-173.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">calculate_3ph_interaction</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_3ph_interaction&#45;&gt;proc~distribute_points -->
-<g id="proc~~distribute_points~~CalledByGraph_edge8" class="edge">
-<title>proc~calculate_3ph_interaction&#45;&gt;proc~distribute_points</title>
-<path fill="none" stroke="#000000" d="M285.5,-184.3C300.84,-186.23 316.99,-188.26 331.78,-190.12"/>
-<polygon fill="#000000" stroke="#000000" points="331.41,-193.6 341.77,-191.38 332.29,-186.66 331.41,-193.6"/>
-</g>
-<!-- proc~find_equiv_map -->
-<g id="proc~~distribute_points~~CalledByGraph_node10" class="node">
-<title>proc~find_equiv_map</title>
-<g id="a_proc~~distribute_points~~CalledByGraph_node10"><a xlink:href=".././proc/find_equiv_map.html" xlink:title="find_equiv_map">
-<polygon fill="#d9534f" stroke="#d9534f" points="262.5,-24 174.5,-24 174.5,0 262.5,0 262.5,-24"/>
-<text text-anchor="middle" x="218.5" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">find_equiv_map</text>
-</a>
-</g>
-</g>
-<!-- proc~find_equiv_map&#45;&gt;proc~distribute_points -->
-<g id="proc~~distribute_points~~CalledByGraph_edge9" class="edge">
-<title>proc~find_equiv_map&#45;&gt;proc~distribute_points</title>
-<path fill="none" stroke="#000000" d="M262.88,-17.87C277.83,-21.64 293.86,-27.83 306,-38 349.67,-74.56 372.16,-140.75 381.35,-175.06"/>
-<polygon fill="#000000" stroke="#000000" points="378.02,-176.17 383.88,-185 384.8,-174.45 378.02,-176.17"/>
-</g>
-<!-- proc~find_irred_wedge -->
-<g id="proc~~distribute_points~~CalledByGraph_node11" class="node">
-<title>proc~find_irred_wedge</title>
-<g id="a_proc~~distribute_points~~CalledByGraph_node11"><a xlink:href=".././proc/find_irred_wedge.html" xlink:title="find_irred_wedge">
-<polygon fill="#d9534f" stroke="#d9534f" points="95,-44 0,-44 0,-20 95,-20 95,-44"/>
-<text text-anchor="middle" x="47.5" y="-29.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">find_irred_wedge</text>
-</a>
-</g>
-</g>
-<!-- proc~find_irred_wedge&#45;&gt;proc~distribute_points -->
-<g id="proc~~distribute_points~~CalledByGraph_edge10" class="edge">
-<title>proc~find_irred_wedge&#45;&gt;proc~distribute_points</title>
-<path fill="none" stroke="#000000" d="M95.16,-34.48C159.69,-38.67 272.07,-48.95 306,-71 344.38,-95.94 368.08,-146.31 379.12,-175.24"/>
-<polygon fill="#000000" stroke="#000000" points="375.9,-176.64 382.61,-184.84 382.48,-174.25 375.9,-176.64"/>
-</g>
-<!-- proc~find_irred_wedge&#45;&gt;proc~find_equiv_map -->
-<g id="proc~~distribute_points~~CalledByGraph_edge17" class="edge">
-<title>proc~find_irred_wedge&#45;&gt;proc~find_equiv_map</title>
-<path fill="none" stroke="#000000" d="M95.13,-26.48C116.56,-23.95 142.1,-20.92 164.28,-18.3"/>
-<polygon fill="#000000" stroke="#000000" points="164.69,-21.77 174.21,-17.12 163.87,-14.82 164.69,-21.77"/>
-</g>
-<!-- program~elphbolt -->
-<g id="proc~~distribute_points~~CalledByGraph_node12" class="node">
-<title>program~elphbolt</title>
-<g id="a_proc~~distribute_points~~CalledByGraph_node12"><a xlink:href=".././program/elphbolt.html" xlink:title="elphbolt">
-<polygon fill="#f0ad4e" stroke="#f0ad4e" points="74.5,-293 20.5,-293 20.5,-269 74.5,-269 74.5,-293"/>
-<text text-anchor="middle" x="47.5" y="-278.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">elphbolt</text>
-</a>
-</g>
-</g>
-<!-- program~elphbolt&#45;&gt;proc~calculate_eph_interaction_ibzq -->
-<g id="proc~~distribute_points~~CalledByGraph_edge11" class="edge">
-<title>program~elphbolt&#45;&gt;proc~calculate_eph_interaction_ibzq</title>
-<path fill="none" stroke="#000000" d="M56.86,-293.09C70.29,-311.54 98.47,-346.53 131,-365 134.28,-366.86 137.73,-368.56 141.28,-370.11"/>
-<polygon fill="#000000" stroke="#000000" points="140.27,-373.48 150.85,-373.87 142.83,-366.96 140.27,-373.48"/>
-</g>
-<!-- program~elphbolt&#45;&gt;proc~calculate_eph_interaction_ibzk -->
-<g id="proc~~distribute_points~~CalledByGraph_edge12" class="edge">
-<title>program~elphbolt&#45;&gt;proc~calculate_eph_interaction_ibzk</title>
-<path fill="none" stroke="#000000" d="M68.92,-293.09C85.25,-302.34 108.99,-314.85 131,-323 136.99,-325.22 143.3,-327.27 149.68,-329.14"/>
-<polygon fill="#000000" stroke="#000000" points="149.13,-332.63 159.71,-331.95 151.02,-325.89 149.13,-332.63"/>
-</g>
-<!-- program~elphbolt&#45;&gt;proc~calculate_echimp_interaction_ibzk -->
-<g id="proc~~distribute_points~~CalledByGraph_edge13" class="edge">
-<title>program~elphbolt&#45;&gt;proc~calculate_echimp_interaction_ibzk</title>
-<path fill="none" stroke="#000000" d="M74.54,-284.24C87.38,-285.83 103.77,-287.87 120.83,-289.99"/>
-<polygon fill="#000000" stroke="#000000" points="120.58,-293.48 130.93,-291.24 121.44,-286.54 120.58,-293.48"/>
-</g>
-<!-- program~elphbolt&#45;&gt;proc~calculate_greq -->
-<g id="proc~~distribute_points~~CalledByGraph_edge14" class="edge">
-<title>program~elphbolt&#45;&gt;proc~calculate_greq</title>
-<path fill="none" stroke="#000000" d="M74.54,-277.76C98.66,-274.77 135.25,-270.22 165.38,-266.48"/>
-<polygon fill="#000000" stroke="#000000" points="165.83,-269.95 175.32,-265.24 164.96,-263 165.83,-269.95"/>
-</g>
-<!-- program~elphbolt&#45;&gt;proc~calculate_gkrp -->
-<g id="proc~~distribute_points~~CalledByGraph_edge15" class="edge">
-<title>program~elphbolt&#45;&gt;proc~calculate_gkrp</title>
-<path fill="none" stroke="#000000" d="M68.92,-268.91C85.25,-259.66 108.99,-247.15 131,-239 142.1,-234.89 154.29,-231.36 165.94,-228.43"/>
-<polygon fill="#000000" stroke="#000000" points="167.09,-231.76 175.99,-226.01 165.45,-224.95 167.09,-231.76"/>
-</g>
-<!-- program~elphbolt&#45;&gt;proc~calculate_3ph_interaction -->
-<g id="proc~~distribute_points~~CalledByGraph_edge16" class="edge">
-<title>program~elphbolt&#45;&gt;proc~calculate_3ph_interaction</title>
-<path fill="none" stroke="#000000" d="M56.86,-268.91C70.29,-250.46 98.47,-215.47 131,-197 134.45,-195.04 138.09,-193.26 141.83,-191.65"/>
-<polygon fill="#000000" stroke="#000000" points="143.25,-194.85 151.31,-187.97 140.72,-188.32 143.25,-194.85"/>
-</g>
-</g>
-</svg>
-</div><div><a type="button" class="graph-help" data-toggle="modal" href="#graph-help-text">Help</a></div><div class="modal fade" id="graph-help-text" tabindex="-1" role="dialog"><div class="modal-dialog modal-lg" role="document"><div class="modal-content"><div class="modal-header"><button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button><h4 class="modal-title" id="-graph-help-label">Graph Key</h4></div><div class="modal-body">
-    <p>Nodes of different colours represent the following: </p>
-    <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
- "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<!-- Generated by graphviz version 2.43.0 (0)
- -->
-<!-- Title: Graph Key Pages: 1 -->
-<svg width="560pt" height="32pt"
- viewBox="0.00 0.00 559.50 32.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 28)">
-<title>Graph Key</title>
-<polygon fill="white" stroke="transparent" points="-4,4 -4,-28 555.5,-28 555.5,4 -4,4"/>
-<!-- Subroutine -->
-<g id="node1" class="node">
-<title>Subroutine</title>
-<polygon fill="#d9534f" stroke="#d9534f" points="64,-24 0,-24 0,0 64,0 64,-24"/>
-<text text-anchor="middle" x="32" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">Subroutine</text>
-</g>
-<!-- Function -->
-<g id="node2" class="node">
-<title>Function</title>
-<polygon fill="#d94e8f" stroke="#d94e8f" points="136,-24 82,-24 82,0 136,0 136,-24"/>
-<text text-anchor="middle" x="109" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">Function</text>
-</g>
-<!-- Interface -->
-<g id="node3" class="node">
-<title>Interface</title>
-<polygon fill="#a7506f" stroke="#a7506f" points="209.5,-24 154.5,-24 154.5,0 209.5,0 209.5,-24"/>
-<text text-anchor="middle" x="182" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">Interface</text>
-</g>
-<!-- Unknown Procedure Type -->
-<g id="node4" class="node">
-<title>Unknown Procedure Type</title>
-<polygon fill="#777777" stroke="#777777" points="364,-24 228,-24 228,0 364,0 364,-24"/>
-<text text-anchor="middle" x="296" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">Unknown Procedure Type</text>
-</g>
-<!-- Program -->
-<g id="node5" class="node">
-<title>Program</title>
-<polygon fill="#f0ad4e" stroke="#f0ad4e" points="436,-24 382,-24 382,0 436,0 436,-24"/>
-<text text-anchor="middle" x="409" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">Program</text>
-</g>
-<!-- This Page&#39;s Entity -->
-<g id="node6" class="node">
-<title>This Page&#39;s Entity</title>
-<polygon fill="none" stroke="black" points="551.5,-24 454.5,-24 454.5,0 551.5,0 551.5,-24"/>
-<text text-anchor="middle" x="503" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50">This Page&#39;s Entity</text>
-</g>
-</g>
-</svg>
-
-    
-    <p>Solid arrows point from a procedure to one which it calls. Dashed 
-    arrows point from an interface to procedures which implement that interface.
-    This could include the module procedures in a generic interface or the
-    implementation in a submodule of an interface in a parent module.
-    </p>
-    </div></div></div></div>
-      </div>
-    </div>
-     
     <br>
 
     <section class="visible-xs visible-sm hidden-md">
-      
-<h3>Contents</h3>
- 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<em>None</em>
+        <h3>Contents</h3>
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
 
 
     </section>
     <br class="visible-xs visible-sm hidden-md">
 
-    
 
-    
-    
-    
     
     
 
     
     
-    
-    
-    
 
 
-    
-    
     
     
     </div>
   </div>
-
 
     <hr>    
     </div> <!-- /container -->
     <footer>
       <div class="container">
       <div class="row">
-        <div class="col-xs-6 col-md-4"><p>&copy; 2022 
-                                          </p></div>
-        <div class="col-xs-6 col-md-4 col-md-push-4">
+        <div class="col-xs-6 col-md-6"><p>elphbolt was developed by Nakib Haider Protik<br>&copy; 2023 GNU General Public License 3.0
+</p>
+        </div>
+        <div class="col-xs-6 col-md-6">
           <p class="text-right">
             Documentation generated by 
-            <a href="https://github.com/cmacmackin/ford">FORD</a>
-            
+            <a href="https://github.com/Fortran-FOSS-Programmers/ford">FORD</a>
           </p>
         </div>
-        <div class="col-xs-12 col-md-4 col-md-pull-4"><p class="text-center"> elphbolt was developed by Nakib Haider Protik</p></div>
       </div>
       <br>
       </div> <!-- /container -->    
@@ -690,14 +322,11 @@ public subroutine distribute_points(npts, chunk, istart, iend, num_active_images
         extensions: ['tex2jax.js','mml2jax.js','MathMenu.js','MathZoom.js']
       });
     </script>
-    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-    
     
     <script src="../tipuesearch/tipuesearch_content.js"></script>
     <script src="../tipuesearch/tipuesearch_set.js"></script>
     <script src="../tipuesearch/tipuesearch.js"></script>
-    
     
   </body>
 </html>

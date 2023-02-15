@@ -4,24 +4,18 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-   
    <meta name="description" content="A solver for the coupled and decoupled electron and phonon Boltzmann transport equations.">
-    
     <meta name="author" content="Nakib Haider Protik" >
     <link rel="icon" href="../favicon.png">
 
-    <title>
-All Procedures &ndash; elphbolt
+    <title>All Procedures &ndash; elphbolt
 </title>
 
     <link href="../css/bootstrap.min.css" rel="stylesheet">
     <link href="../css/pygments.css" rel="stylesheet">
     <link href="../css/font-awesome.min.css" rel="stylesheet">
     <link href="../css/local.css" rel="stylesheet">
-    
     <link  href="../tipuesearch/tipuesearch.css" rel="stylesheet">
-    
-    
 
     <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
     <!--[if lt IE 9]>
@@ -50,53 +44,29 @@ All Procedures &ndash; elphbolt
         </div>
         <div id="navbar" class="navbar-collapse collapse">
           <ul class="nav navbar-nav">
-        
             <li class="dropdown hidden-xs visible-sm visible-md hidden-lg">
               <a href="#" class="dropdown-toggle"
               data-toggle="dropdown" role="button"
               aria-haspopup="true"
      aria-expanded="false">Contents <span class="caret"></span></a>
         <ul class="dropdown-menu">
-          
-              
             <li><a href="../lists/files.html">Source Files</a></li>
-        
-        
-        
             <li><a href="../lists/modules.html">Modules</a></li>
-        
-            
-                                
             <li><a href="../lists/procedures.html">Procedures</a></li>
-        
-               
-            <li><a href="../lists/types.html">Derived Types</a></li>
-        
-        
-            <li><a href="../program/elphbolt.html">Program</a></li>
-      
+            <li><a href="../lists/absint.html">Abstract Interfaces</a></li>
+                   <li><a href="../lists/types.html">Derived Types</a></li>
+            <li><a href="../program/supersweet.html">Program</a></li>
+       
             </ul>
-            </li>
-
-
-<li class="visible-xs hidden-sm visible-lg"><a href="../lists/files.html">Source Files</a></li>
-
-
-
-<li class="visible-xs hidden-sm visible-lg"><a href="../lists/modules.html">Modules</a></li>
-
-
-
-<li class="visible-xs hidden-sm visible-lg"><a href="../lists/procedures.html">Procedures</a></li>
-
-                             
-<li class="visible-xs hidden-sm visible-lg"><a href="../lists/types.html">Derived Types</a></li>
-
-
-<li class="visible-xs hidden-sm visible-lg"><a href="../program/elphbolt.html">Program</a></li>
-
-          </ul>
         
+            </li>
+<li class="visible-xs hidden-sm visible-lg"><a href="../lists/files.html">Source Files</a></li>
+<li class="visible-xs hidden-sm visible-lg"><a href="../lists/modules.html">Modules</a></li>
+<li class="visible-xs hidden-sm visible-lg"><a href="../lists/procedures.html">Procedures</a></li>
+<li class="visible-xs hidden-sm visible-lg"><a href="../lists/absint.html">Abstract Interfaces</a></li>
+                             <li class="visible-xs hidden-sm visible-lg"><a href="../lists/types.html">Derived Types</a></li>
+<li class="visible-xs hidden-sm visible-lg"><a href="../program/supersweet.html">Program</a></li>
+          </ul>
         <form action="../search.html" class="navbar-form navbar-right" role="search">
         <div class="form-group">
           <input type="text" class="form-control" placeholder="Search" name="q" id="tipue_search_input" autocomplete="off" required>
@@ -105,1369 +75,159 @@ All Procedures &ndash; elphbolt
         <button type="submit" class="btn btn-default">Submit</button>
 -->
         </form>
-        
         </div><!--/.nav-collapse -->
       </div>
     </nav>
 
     <div class="container">
-    
       <div class="row">
         <div class="col-lg-12" id='text'>
 			 <h1>Procedures</h1>
 			 <table class="table table-striped">
 			 <thead><tr><th>Procedure</th><th>Location</th><th>Procedure Type</th><th>Description</th></tr></thead>
 			 <tbody>
-			 
 			   <tr><td><a href='../proc/append2file_transport_tensor.html'>append2file_transport_tensor</a></td><td><a href='../module/misc.html'>misc</a></td><td>Subroutine</td><td><p>Append 3x3 tensor to band/branch resolved files.</p></td></tr>
-			 
 			   <tr><td><a href='../proc/binsearch.html'>binsearch</a></td><td><a href='../module/misc.html'>misc</a></td><td>Subroutine</td><td><p>Binary search in a list of integers and return index.</p></td></tr>
-			 
 			   <tr><td><a href='../proc/bose.html'>Bose</a></td><td><a href='../module/misc.html'>misc</a></td><td>Function</td><td><p>e Energy in eV
- T temperature in K</p></td></tr>
-			 
+T temperature in K</p></td></tr>
 			   <tr><td><a href='../proc/calculate_3ph_interaction.html'>calculate_3ph_interaction</a></td><td><a href='../module/interactions.html'>interactions</a></td><td>Subroutine</td><td><p>Parallel driver of the 3-ph vertex calculator for all IBZ phonon wave vectors.
- This subroutine calculates |V-(s1<q1>|s2q2,s3q3)|^2, W-(s1<q1>|s2q2,s3q3),
- and W+(s1<q1>|s2q2,s3q3) for each irreducible phonon and saves the results to disk.</p><a href="../proc/calculate_3ph_interaction.html" class="pull-right"><emph>Read more&hellip;</emph></a></td></tr>
-			 
+This subroutine calculates |V-(s1<q1>|s2q2,s3q3)|^2, W-(s1<q1>|s2q2,s3q3),
+and W+(s1<q1>|s2q2,s3q3) for each irreducible phonon and saves the results to disk.</p><a href="../proc/calculate_3ph_interaction.html" class="pull-right"><emph>Read more&hellip;</emph></a></td></tr>
+			   <tr><td><a href='../proc/calculate_4ph_rta_rates.html'>calculate_4ph_rta_rates</a></td><td><a href='../module/interactions.html'>interactions</a></td><td>Subroutine</td><td><p>Subroutine for interporlating 4-ph scattering rates from an
+external coarser mesh calculation.</p></td></tr>
+			   <tr><td><a href='../proc/calculate_a2f.html'>calculate_a2F</a></td><td><a href='../module/eliashberg.html'>eliashberg</a></td><td>Subroutine</td><td><p>Parallel driver of a2F_mk(nk'|sq) over IBZ electron states.
+Other zero temperature quantities such as the isotropic electron-phonon
+coupling (lambda0) and the log-averaged boson energy (omegalog) are
+also calculated here.</p><a href="../proc/calculate_a2f.html" class="pull-right"><emph>Read more&hellip;</emph></a></td></tr>
+			   <tr><td><a href='../proc/calculate_aniso_matsubara_lambda.html'>calculate_aniso_Matsubara_lambda</a></td><td><a href='../module/eliashberg.html'>eliashberg</a></td><td>Subroutine</td><td><p>Parallel driver of lambda_mk(nk'|sq, l) over IBZ electron states.
+Here l is the Bosonic Matsubara energy index. </p><a href="../proc/calculate_aniso_matsubara_lambda.html" class="pull-right"><emph>Read more&hellip;</emph></a></td></tr>
 			   <tr><td><a href='../proc/calculate_bound_scatt_rates.html'>calculate_bound_scatt_rates</a></td><td><a href='../module/interactions.html'>interactions</a></td><td>Subroutine</td><td><p>Subroutine to calculate the phonon/electron-boundary scattering rates.</p><a href="../proc/calculate_bound_scatt_rates.html" class="pull-right"><emph>Read more&hellip;</emph></a></td></tr>
-			 
 			   <tr><td><a href='../interface/calculate_dos.html'>calculate_dos</a></td><td><a href='../module/bz_sums.html'>bz_sums</a></td><td>Interface</td><td></td></tr>
-			 
 			   <tr><td><a href='../proc/calculate_echimp_interaction_ibzk.html'>calculate_echimp_interaction_ibzk</a></td><td><a href='../module/interactions.html'>interactions</a></td><td>Subroutine</td><td><p>Parallel driver of |g_e-chimp(k,k')|^2 over IBZ electron states.</p></td></tr>
-			 
+			   <tr><td><a href='../proc/calculate_el_dos_fermi.html'>calculate_el_dos_Fermi</a></td><td><a href='../module/bz_sums.html'>bz_sums</a></td><td>Subroutine</td><td><p>Calculate spin-normalized electron density of states at the Fermi level</p><a href="../proc/calculate_el_dos_fermi.html" class="pull-right"><emph>Read more&hellip;</emph></a></td></tr>
 			   <tr><td><a href='../proc/calculate_el_rta_rates.html'>calculate_el_rta_rates</a></td><td><a href='../module/interactions.html'>interactions</a></td><td>Subroutine</td><td><p>Subroutine for parallel reading of the e-ph transition probabilities
- from disk and calculating the relaxation time approximation (RTA)
- scattering rates for the e-ph channel.</p></td></tr>
-			 
+from disk and calculating the relaxation time approximation (RTA)
+scattering rates for the e-ph channel.</p></td></tr>
+			   <tr><td><a href='../proc/calculate_el_ws.html'>calculate_el_Ws</a></td><td><a href='../module/bz_sums.html'>bz_sums</a></td><td>Subroutine</td><td><p>Calculate all electron delta functions scaled by spin-normalized DOS(Ef)
+W_mk = delta[E_mk - Ef]/DOS(Ef)</p></td></tr>
 			   <tr><td><a href='../proc/calculate_eph_interaction_ibzk.html'>calculate_eph_interaction_ibzk</a></td><td><a href='../module/interactions.html'>interactions</a></td><td>Subroutine</td><td><p>Parallel driver of g2(k,q) over IBZ electron states.</p><a href="../proc/calculate_eph_interaction_ibzk.html" class="pull-right"><emph>Read more&hellip;</emph></a></td></tr>
-			 
 			   <tr><td><a href='../proc/calculate_eph_interaction_ibzq.html'>calculate_eph_interaction_ibzq</a></td><td><a href='../module/interactions.html'>interactions</a></td><td>Subroutine</td><td><p>Parallel driver of g2(q,k) over IBZ phonon states.</p><a href="../proc/calculate_eph_interaction_ibzq.html" class="pull-right"><emph>Read more&hellip;</emph></a></td></tr>
-			 
 			   <tr><td><a href='../proc/calculate_gkrp.html'>calculate_gkRp</a></td><td><a href='../module/interactions.html'>interactions</a></td><td>Subroutine</td><td><p>Parallel driver of gkRp_epw over IBZ electron wave vectors.</p></td></tr>
-			 
 			   <tr><td><a href='../proc/calculate_greq.html'>calculate_gReq</a></td><td><a href='../module/interactions.html'>interactions</a></td><td>Subroutine</td><td><p>Parallel driver of gReq_epw over IBZ phonon wave vectors.</p></td></tr>
-			 
+			   <tr><td><a href='../proc/calculate_iso_matsubara_lambda.html'>calculate_iso_Matsubara_lambda</a></td><td><a href='../module/eliashberg.html'>eliashberg</a></td><td>Subroutine</td><td><p>Calculate the isotropic Matsubara electron-phonon coupling, lambda(l).
+Here l is the Bosonic Matsubara energy index. </p></td></tr>
+			   <tr><td><a href='../proc/calculate_mfp_cumulative_transport_coeff.html'>calculate_mfp_cumulative_transport_coeff</a></td><td><a href='../module/bz_sums.html'>bz_sums</a></td><td>Subroutine</td><td><p>Subroutine to calculate the mean-free-path cumulative transport coefficients.</p><a href="../proc/calculate_mfp_cumulative_transport_coeff.html" class="pull-right"><emph>Read more&hellip;</emph></a></td></tr>
 			   <tr><td><a href='../proc/calculate_ph_rta_rates.html'>calculate_ph_rta_rates</a></td><td><a href='../module/interactions.html'>interactions</a></td><td>Subroutine</td><td><p>Subroutine for parallel reading of the 3-ph and ph-e transition probabilities
- from disk and calculating the relaxation time approximation (RTA)
- scattering rates for the 3-ph and ph-e channels.</p></td></tr>
-			 
+from disk and calculating the relaxation time approximation (RTA)
+scattering rates for the 3-ph and ph-e channels.</p></td></tr>
 			   <tr><td><a href='../proc/calculate_qtf.html'>calculate_qTF</a></td><td><a href='../module/bz_sums.html'>bz_sums</a></td><td>Subroutine</td><td><p>Calculate Thomas-Fermi screening wavevector in the simple electron-gas model.</p></td></tr>
-			 
+			   <tr><td><a href='../proc/calculate_retarded_phonon_d0.html'>calculate_retarded_phonon_D0</a></td><td><a href='../module/green_function.html'>Green_function</a></td><td>Subroutine</td><td><p>Parallel driver of the retarded, bare phonon Green's function, D0, over
+ the IBZ states.</p><a href="../proc/calculate_retarded_phonon_d0.html" class="pull-right"><emph>Read more&hellip;</emph></a></td></tr>
 			   <tr><td><a href='../proc/calculate_spectral_transport_coeff.html'>calculate_spectral_transport_coeff</a></td><td><a href='../module/bz_sums.html'>bz_sums</a></td><td>Subroutine</td><td><p>Subroutine to calculate the spectral transport coefficients.</p><a href="../proc/calculate_spectral_transport_coeff.html" class="pull-right"><emph>Read more&hellip;</emph></a></td></tr>
-			 
+			   <tr><td><a href='../proc/calculate_thinfilm_scatt_rates.html'>calculate_thinfilm_scatt_rates</a></td><td><a href='../module/interactions.html'>interactions</a></td><td>Subroutine</td><td><p>Subroutine to calculate the phonon/electron-thin-film scattering rates.</p><a href="../proc/calculate_thinfilm_scatt_rates.html" class="pull-right"><emph>Read more&hellip;</emph></a></td></tr>
 			   <tr><td><a href='../proc/calculate_transport_coeff.html'>calculate_transport_coeff</a></td><td><a href='../module/bz_sums.html'>bz_sums</a></td><td>Subroutine</td><td><p>Subroutine to calculate transport coefficients.</p><a href="../proc/calculate_transport_coeff.html" class="pull-right"><emph>Read more&hellip;</emph></a></td></tr>
-			 
 			   <tr><td><a href='../proc/calculate_wavevectors_full.html'>calculate_wavevectors_full</a></td><td><a href='../module/crystal_module.html'>crystal_module</a></td><td>Subroutine</td><td><p>Calculate wave vectors (crystal coords.) of the full Brillouin zone (FBZ)</p><a href="../proc/calculate_wavevectors_full.html" class="pull-right"><emph>Read more&hellip;</emph></a></td></tr>
-			 
+			   <tr><td><a href='../proc/compsimps.html'>compsimps</a></td><td><a href='../module/misc.html'>misc</a></td><td>Subroutine</td><td><p>Composite Simpson's rule for real function
+f integrand
+h integration variable spacing
+s result</p></td></tr>
 			   <tr><td><a href='../proc/create_fbz2ibz_map.html'>create_fbz2ibz_map</a></td><td><a href='../module/symmetry_module.html'>symmetry_module</a></td><td>Subroutine</td><td><p>Subroutine to create map of FBZ blocks to IBZ blocks</p></td></tr>
-			 
 			   <tr><td><a href='../proc/cross_product.html'>cross_product</a></td><td><a href='../module/misc.html'>misc</a></td><td>Function</td><td><p>Cross product of A and B.</p></td></tr>
-			 
 			   <tr><td><a href='../proc/delta_fn_tetra.html'>delta_fn_tetra</a></td><td><a href='../module/delta.html'>delta</a></td><td>Function</td><td><p>Calculate delta function using the tetraheron method.</p><a href="../proc/delta_fn_tetra.html" class="pull-right"><emph>Read more&hellip;</emph></a></td></tr>
-			 
 			   <tr><td><a href='../proc/delta_fn_triang.html'>delta_fn_triang</a></td><td><a href='../module/delta.html'>delta</a></td><td>Function</td><td><p>Calculate delta function using the triangle method a la
- Kurganskii et al. Phys. Stat. Sol.(b) 129, 293 (1985)</p><a href="../proc/delta_fn_triang.html" class="pull-right"><emph>Read more&hellip;</emph></a></td></tr>
-			 
+Kurganskii et al. Phys. Stat. Sol.(b) 129, 293 (1985)</p><a href="../proc/delta_fn_triang.html" class="pull-right"><emph>Read more&hellip;</emph></a></td></tr>
 			   <tr><td><a href='../proc/demux_mesh.html'>demux_mesh</a></td><td><a href='../module/misc.html'>misc</a></td><td>Subroutine</td><td><p>Demultiplex all wave vector indices 
- (optionally, from a list of indices).
- Internally uses demux_vector.</p></td></tr>
-			 
+(optionally, from a list of indices).
+Internally uses demux_vector.</p></td></tr>
 			   <tr><td><a href='../proc/demux_state.html'>demux_state</a></td><td><a href='../module/misc.html'>misc</a></td><td>Subroutine</td><td><p>Demultiplex a state index into (band index, wave vector index) pair</p><a href="../proc/demux_state.html" class="pull-right"><emph>Read more&hellip;</emph></a></td></tr>
-			 
 			   <tr><td><a href='../proc/demux_vector.html'>demux_vector</a></td><td><a href='../module/misc.html'>misc</a></td><td>Subroutine</td><td><p>Demultiplex index of a single wave vector.
- i is the multiplexed index of a wave vector (always 1-based).
- v is the demultiplexed triplet of a wave vector.
- mesh is the number of wave vectors along the three reciprocal lattice vectors.
- base chooses whether v has 0- or 1-based indexing.</p></td></tr>
-			 
+i is the multiplexed index of a wave vector (always 1-based).
+v is the demultiplexed triplet of a wave vector.
+mesh is the number of wave vectors along the three reciprocal lattice vectors.
+base chooses whether v has 0- or 1-based indexing.</p></td></tr>
 			   <tr><td><a href='../proc/distribute_points.html'>distribute_points</a></td><td><a href='../module/misc.html'>misc</a></td><td>Subroutine</td><td><p>Distribute points among processes</p></td></tr>
-			 
 			   <tr><td><a href='../proc/end_timer.html'>end_timer</a></td><td><a href='../module/misc.html'>misc</a></td><td>Subroutine</td><td><p>End the timer and print the elapsed time. This is a blocking call.
- Only image 1 can modify timing information.</p></td></tr>
-			 
+Only image 1 can modify timing information.</p></td></tr>
 			   <tr><td><a href='../proc/exit_with_message.html'>exit_with_message</a></td><td><a href='../module/misc.html'>misc</a></td><td>Subroutine</td><td><p>Exit with error message.</p></td></tr>
-			 
 			   <tr><td><a href='../proc/expi.html'>expi</a></td><td><a href='../module/misc.html'>misc</a></td><td>Function</td><td><p>Calculate exp(i*x) = cos(x) + isin(x)</p></td></tr>
-			 
 			   <tr><td><a href='../proc/fbz2ibz.html'>fbz2ibz</a></td><td><a href='../module/symmetry_module.html'>symmetry_module</a></td><td>Function</td><td><p>Find index in IBZ blocks list for a given FBZ blocks muxed vector index</p></td></tr>
-			 
 			   <tr><td><a href='../proc/fermi.html'>Fermi</a></td><td><a href='../module/misc.html'>misc</a></td><td>Function</td><td><p>e Energy in eV
- chempot Chemical potential in eV
- T temperature in K</p></td></tr>
-			 
+chempot Chemical potential in eV
+T temperature in K</p></td></tr>
 			   <tr><td><a href='../proc/fill_tetrahedra_3d.html'>fill_tetrahedra_3d</a></td><td><a href='../module/delta.html'>delta</a></td><td>Subroutine</td><td><p>Populate the (sorted along the vertices) eigenvalues on all the vertices of the tetrahedra</p><a href="../proc/fill_tetrahedra_3d.html" class="pull-right"><emph>Read more&hellip;</emph></a></td></tr>
-			 
 			   <tr><td><a href='../proc/fill_triangles.html'>fill_triangles</a></td><td><a href='../module/delta.html'>delta</a></td><td>Subroutine</td><td><p>Populate the (sorted along the vertices) eigenvalues on all the vertices of the triangles</p><a href="../proc/fill_triangles.html" class="pull-right"><emph>Read more&hellip;</emph></a></td></tr>
-			 
 			   <tr><td><a href='../proc/find_equiv_map.html'>find_equiv_map</a></td><td><a href='../module/symmetry_module.html'>symmetry_module</a></td><td>Subroutine</td><td><p>Subroutine to create the map of equivalent wave vectors.</p></td></tr>
-			 
 			   <tr><td><a href='../proc/find_irred_wedge.html'>find_irred_wedge</a></td><td><a href='../module/symmetry_module.html'>symmetry_module</a></td><td>Subroutine</td><td><p>Find the irreducible wedge of the FBZ and other quantities.
- Wedge finding algorithm is inspired by ShengBTE.</p><a href="../proc/find_irred_wedge.html" class="pull-right"><emph>Read more&hellip;</emph></a></td></tr>
-			 
+Wedge finding algorithm is inspired by ShengBTE.</p><a href="../proc/find_irred_wedge.html" class="pull-right"><emph>Read more&hellip;</emph></a></td></tr>
 			   <tr><td><a href='../proc/form_tetrahedra_3d.html'>form_tetrahedra_3d</a></td><td><a href='../module/delta.html'>delta</a></td><td>Subroutine</td><td><p>Form all the tetrahedra of a 3d FBZ mesh.</p><a href="../proc/form_tetrahedra_3d.html" class="pull-right"><emph>Read more&hellip;</emph></a></td></tr>
-			 
 			   <tr><td><a href='../proc/form_triangles.html'>form_triangles</a></td><td><a href='../module/delta.html'>delta</a></td><td>Subroutine</td><td><p>Form all the triangles of a 3d FBZ mesh for each z component.</p><a href="../proc/form_triangles.html" class="pull-right"><emph>Read more&hellip;</emph></a></td></tr>
-			 
 			   <tr><td><a href='../proc/get_cartesian_operations.html'>get_cartesian_operations</a></td><td><a href='../module/spglib_wrapper.html'>spglib_wrapper</a></td><td>Subroutine</td><td><p>Return the Cartesian components of the rotations and translations
- returned by get_operations().</p></td></tr>
-			 
+returned by get_operations().</p></td></tr>
 			   <tr><td><a href='../proc/get_num_operations.html'>get_num_operations</a></td><td><a href='../module/spglib_wrapper.html'>spglib_wrapper</a></td><td>Function</td><td><p>Return the number of symmetry operations. Useful for allocating
- memory for get_operations().</p></td></tr>
-			 
+memory for get_operations().</p></td></tr>
 			   <tr><td><a href='../proc/get_operations.html'>get_operations</a></td><td><a href='../module/spglib_wrapper.html'>spglib_wrapper</a></td><td>Subroutine</td><td><p>Return the matrix and vector representations of the symmetry
- operations of the system.</p></td></tr>
-			 
+operations of the system.</p></td></tr>
 			   <tr><td><a href='../proc/int_div.html'>int_div</a></td><td><a href='../module/misc.html'>misc</a></td><td>Subroutine</td><td><p>Quotient(q) and remainder(r) of the integer division num/denom.</p></td></tr>
-			 
 			   <tr><td><a href='../proc/interpolate.html'>interpolate</a></td><td><a href='../module/misc.html'>misc</a></td><td>Subroutine</td><td><p>Subroutine to perform BZ interpolation.</p><a href="../proc/interpolate.html" class="pull-right"><emph>Read more&hellip;</emph></a></td></tr>
-			 
+			   <tr><td><a href='../interface/invert.html'>invert</a></td><td><a href='../module/misc.html'>misc</a></td><td>Interface</td><td></td></tr>
+			   <tr><td><a href='../proc/kronecker.html'>kronecker</a></td><td><a href='../module/misc.html'>misc</a></td><td>Function</td><td><p>Kronecker delta</p></td></tr>
 			   <tr><td><a href='../proc/linspace.html'>linspace</a></td><td><a href='../module/misc.html'>misc</a></td><td>Subroutine</td><td><p>Create equidistant grid.</p></td></tr>
-			 
 			   <tr><td><a href='../proc/mux_state.html'>mux_state</a></td><td><a href='../module/misc.html'>misc</a></td><td>Function</td><td><p>Multiplex a (band index, wave vector index) pair into a state index </p><a href="../proc/mux_state.html" class="pull-right"><emph>Read more&hellip;</emph></a></td></tr>
-			 
 			   <tr><td><a href='../proc/mux_vector.html'>mux_vector</a></td><td><a href='../module/misc.html'>misc</a></td><td>Function</td><td><p>Multiplex index of a single wave vector.
- v is the demultiplexed triplet of a wave vector.
- i is the multiplexed index of a wave vector (always 1-based).
- mesh is the number of wave vectors along the three reciprocal lattice vectors.
- base states whether v has 0- or 1-based indexing.</p></td></tr>
-			 
+v is the demultiplexed triplet of a wave vector.
+i is the multiplexed index of a wave vector (always 1-based).
+mesh is the number of wave vectors along the three reciprocal lattice vectors.
+base states whether v has 0- or 1-based indexing.</p></td></tr>
+			   <tr><td><a href='../proc/pade_continued.html'>Pade_continued</a></td><td><a href='../module/misc.html'>misc</a></td><td>Function</td><td><p>Analytically continue from the upper imaginary plane to
+the positive real axis by solving equation A3 of the following article:
+Solving the Eliashberg equations by means of N-point Pade' approximants
+Vidberg and Serene Journal of Low Temperature Physics, Vol. 29, Nos. 3/4, 1977</p></td></tr>
 			   <tr><td><a href='../proc/print_message.html'>print_message</a></td><td><a href='../module/misc.html'>misc</a></td><td>Subroutine</td><td><p>Print message.</p></td></tr>
-			 
+			   <tr><td><a href='../interface/qe_parser.html'>qe_parser</a></td><td><a href='../module/fc2_parser_factory_module.html'>FC2_parser_factory_module</a></td><td>Interface</td><td></td></tr>
 			   <tr><td><a href='../proc/read_transition_probs_e.html'>read_transition_probs_e</a></td><td><a href='../module/interactions.html'>interactions</a></td><td>Subroutine</td><td><p>Subroutine to read transition probabilities from disk for interaction processes.</p></td></tr>
-			 
 			   <tr><td><a href='../proc/readfile_response.html'>readfile_response</a></td><td><a href='../module/misc.html'>misc</a></td><td>Subroutine</td><td><p>Read list of vectors to band/branch resolved files.</p></td></tr>
-			 
+			   <tr><td><a href='../proc/real_tetra.html'>real_tetra</a></td><td><a href='../module/delta.html'>delta</a></td><td>Function</td><td><p>Calculate the real part of the matrix elements of the resolvent operator
+using the analytic tetraheron method.
+Lambin and Vigneron Phys. Rev. B 29 6 1984 Eqs. A3-A6
+Note that typos in Eqs. A4 and A5 have been corrected.
+Here we use the expressions given in
+V. Eyert The Augmented Spherical Wave Method DOI 10.1007/978-3-642-25864-0.</p><a href="../proc/real_tetra.html" class="pull-right"><emph>Read more&hellip;</emph></a></td></tr>
+			   <tr><td><a href='../proc/set_format.html'>set_format</a></td><td><a href='../module/fc2_parser_factory_module.html'>FC2_parser_factory_module</a></td><td>Function</td><td></td></tr>
+			   <tr><td><a href='../interface/siesta_parser.html'>siesta_parser</a></td><td><a href='../module/fc2_parser_factory_module.html'>FC2_parser_factory_module</a></td><td>Interface</td><td></td></tr>
 			   <tr><td><a href='../interface/sort.html'>sort</a></td><td><a href='../module/misc.html'>misc</a></td><td>Interface</td><td></td></tr>
-			 
 			   <tr><td><a href='../interface/spg_get_international.html'>spg_get_international</a></td><td><a href='../module/spglib_wrapper.html'>spglib_wrapper</a></td><td>Interface</td><td></td></tr>
-			 
 			   <tr><td><a href='../interface/spg_get_multiplicity.html'>spg_get_multiplicity</a></td><td><a href='../module/spglib_wrapper.html'>spglib_wrapper</a></td><td>Interface</td><td></td></tr>
-			 
 			   <tr><td><a href='../interface/spg_get_symmetry.html'>spg_get_symmetry</a></td><td><a href='../module/spglib_wrapper.html'>spglib_wrapper</a></td><td>Interface</td><td></td></tr>
-			 
 			   <tr><td><a href='../proc/start_timer.html'>start_timer</a></td><td><a href='../module/misc.html'>misc</a></td><td>Subroutine</td><td><p>Start/Reset the timer. This is a blocking call.
- Only image 1 can modify timing information.</p></td></tr>
-			 
+Only image 1 can modify timing information.</p></td></tr>
 			   <tr><td><a href='../proc/subtitle.html'>subtitle</a></td><td><a href='../module/misc.html'>misc</a></td><td>Subroutine</td><td><p>Subroutine to print a subtitle.</p></td></tr>
-			 
 			   <tr><td><a href='../proc/symmetrize_3x3_tensor.html'>symmetrize_3x3_tensor</a></td><td><a href='../module/symmetry_module.html'>symmetry_module</a></td><td>Subroutine</td><td><p>Symmetrize a 3x3 tensor.</p></td></tr>
-			 
 			   <tr><td><a href='../proc/trace.html'>trace</a></td><td><a href='../module/misc.html'>misc</a></td><td>Function</td><td><p>Trace of square matrix</p></td></tr>
-			 
-			   <tr><td><a href='../proc/twonorm.html'>twonorm</a></td><td><a href='../module/misc.html'>misc</a></td><td>Function</td><td><p>2-norm of a vector</p></td></tr>
-			 
+			   <tr><td><a href='../interface/twonorm.html'>twonorm</a></td><td><a href='../module/misc.html'>misc</a></td><td>Interface</td><td></td></tr>
 			   <tr><td><a href='../proc/welcome.html'>welcome</a></td><td><a href='../module/misc.html'>misc</a></td><td>Subroutine</td><td><p>Subroutine to print a pretty banner.</p></td></tr>
-			 
+			   <tr><td><a href='../proc/write2file_rank1_real.html'>write2file_rank1_real</a></td><td><a href='../module/misc.html'>misc</a></td><td>Subroutine</td><td><p>Write rank-1 data to file.</p></td></tr>
 			   <tr><td><a href='../proc/write2file_rank2_real.html'>write2file_rank2_real</a></td><td><a href='../module/misc.html'>misc</a></td><td>Subroutine</td><td><p>Write rank-2 data to file.</p></td></tr>
-			 
 			   <tr><td><a href='../proc/write2file_rank3_real.html'>write2file_rank3_real</a></td><td><a href='../module/misc.html'>misc</a></td><td>Subroutine</td><td><p>Write rank-3 data to file.</p></td></tr>
-			 
 			   <tr><td><a href='../proc/write2file_response.html'>write2file_response</a></td><td><a href='../module/misc.html'>misc</a></td><td>Subroutine</td><td><p>Write list of vectors to band/branch resolved files.</p></td></tr>
-			 
 			   <tr><td><a href='../proc/write2file_spectral_tensor.html'>write2file_spectral_tensor</a></td><td><a href='../module/misc.html'>misc</a></td><td>Subroutine</td><td><p>Append 3x3 spectral transport tensor to band/branch resolved files.</p></td></tr>
-			 
 			 </tbody></table>
-             <div class="depgraph"><?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
- "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<!-- Generated by graphviz version 2.43.0 (0)
- -->
-<!-- Title: call~~graph~~CallGraph Pages: 1 -->
-<svg id="callgraphCallGraph" width="660pt" height="1734pt"
- viewBox="0.00 0.00 660.00 1734.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-<g id="call~~graph~~CallGraph" class="graph" transform="scale(1 1) rotate(0) translate(4 1730)">
-<title>call~~graph~~CallGraph</title>
-<polygon fill="white" stroke="transparent" points="-4,4 -4,-1730 656,-1730 656,4 -4,4"/>
-<!-- interface~calculate_dos -->
-<g id="call~~graph~~CallGraph_node1" class="node">
-<title>interface~calculate_dos</title>
-<g id="a_call~~graph~~CallGraph_node1"><a xlink:href=".././interface/calculate_dos.html" xlink:title="calculate_dos">
-<polygon fill="#a7506f" stroke="#a7506f" points="316,-268 238,-268 238,-244 316,-244 316,-268"/>
-<text text-anchor="middle" x="277" y="-253.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">calculate_dos</text>
-</a>
-</g>
-</g>
-<!-- proc~cross_product -->
-<g id="call~~graph~~CallGraph_node2" class="node">
-<title>proc~cross_product</title>
-<g id="a_call~~graph~~CallGraph_node2"><a xlink:href=".././proc/cross_product.html" xlink:title="cross_product">
-<polygon fill="#d94e8f" stroke="#d94e8f" points="116.5,-895 36.5,-895 36.5,-871 116.5,-871 116.5,-895"/>
-<text text-anchor="middle" x="76.5" y="-880.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">cross_product</text>
-</a>
-</g>
-</g>
-<!-- interface~sort -->
-<g id="call~~graph~~CallGraph_node3" class="node">
-<title>interface~sort</title>
-<g id="a_call~~graph~~CallGraph_node3"><a xlink:href=".././interface/sort.html" xlink:title="sort">
-<polygon fill="#a7506f" stroke="#a7506f" points="103.5,-946 49.5,-946 49.5,-922 103.5,-922 103.5,-946"/>
-<text text-anchor="middle" x="76.5" y="-931.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">sort</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_ph_rta_rates -->
-<g id="call~~graph~~CallGraph_node4" class="node">
-<title>proc~calculate_ph_rta_rates</title>
-<g id="a_call~~graph~~CallGraph_node4"><a xlink:href=".././proc/calculate_ph_rta_rates.html" xlink:title="calculate_ph_rta_rates">
-<polygon fill="#d9534f" stroke="#d9534f" points="337.5,-520 216.5,-520 216.5,-496 337.5,-496 337.5,-520"/>
-<text text-anchor="middle" x="277" y="-505.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">calculate_ph_rta_rates</text>
-</a>
-</g>
-</g>
-<!-- proc~demux_state -->
-<g id="call~~graph~~CallGraph_node37" class="node">
-<title>proc~demux_state</title>
-<g id="a_call~~graph~~CallGraph_node37"><a xlink:href=".././proc/demux_state.html" xlink:title="demux_state">
-<polygon fill="#d9534f" stroke="#d9534f" points="494,-432 420,-432 420,-408 494,-408 494,-432"/>
-<text text-anchor="middle" x="457" y="-417.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">demux_state</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_ph_rta_rates&#45;&gt;proc~demux_state -->
-<g id="call~~graph~~CallGraph_edge1" class="edge">
-<title>proc~calculate_ph_rta_rates&#45;&gt;proc~demux_state</title>
-<path fill="none" stroke="#000000" d="M337.75,-499.22C347.32,-496.26 356.77,-492.3 365,-487 386.83,-472.95 380.11,-456.42 401,-441 404.01,-438.78 407.29,-436.76 410.7,-434.93"/>
-<polygon fill="#000000" stroke="#000000" points="412.39,-438 419.92,-430.54 409.38,-431.68 412.39,-438"/>
-</g>
-<!-- proc~distribute_points -->
-<g id="call~~graph~~CallGraph_node60" class="node">
-<title>proc~distribute_points</title>
-<g id="a_call~~graph~~CallGraph_node60"><a xlink:href=".././proc/distribute_points.html" xlink:title="distribute_points">
-<polygon fill="#d9534f" stroke="#d9534f" points="502.5,-634 411.5,-634 411.5,-610 502.5,-610 502.5,-634"/>
-<text text-anchor="middle" x="457" y="-619.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">distribute_points</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_ph_rta_rates&#45;&gt;proc~distribute_points -->
-<g id="call~~graph~~CallGraph_edge2" class="edge">
-<title>proc~calculate_ph_rta_rates&#45;&gt;proc~distribute_points</title>
-<path fill="none" stroke="#000000" d="M337.67,-515.32C347.46,-518.44 357,-522.83 365,-529 391.76,-549.65 376.49,-572.72 401,-596 404.55,-599.37 408.61,-602.37 412.89,-605.03"/>
-<polygon fill="#000000" stroke="#000000" points="411.43,-608.22 421.87,-610 414.82,-602.09 411.43,-608.22"/>
-</g>
-<!-- proc~delta_fn_triang -->
-<g id="call~~graph~~CallGraph_node5" class="node">
-<title>proc~delta_fn_triang</title>
-<g id="a_call~~graph~~CallGraph_node5"><a xlink:href=".././proc/delta_fn_triang.html" xlink:title="delta_fn_triang">
-<polygon fill="#d94e8f" stroke="#d94e8f" points="499,-268 415,-268 415,-244 499,-244 499,-268"/>
-<text text-anchor="middle" x="457" y="-253.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">delta_fn_triang</text>
-</a>
-</g>
-</g>
-<!-- proc~find_irred_wedge -->
-<g id="call~~graph~~CallGraph_node6" class="node">
-<title>proc~find_irred_wedge</title>
-<g id="a_call~~graph~~CallGraph_node6"><a xlink:href=".././proc/find_irred_wedge.html" xlink:title="find_irred_wedge">
-<polygon fill="#d9534f" stroke="#d9534f" points="124,-848 29,-848 29,-824 124,-824 124,-848"/>
-<text text-anchor="middle" x="76.5" y="-833.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">find_irred_wedge</text>
-</a>
-</g>
-</g>
-<!-- proc~demux_vector -->
-<g id="call~~graph~~CallGraph_node27" class="node">
-<title>proc~demux_vector</title>
-<g id="a_call~~graph~~CallGraph_node27"><a xlink:href=".././proc/demux_vector.html" xlink:title="demux_vector">
-<polygon fill="#d9534f" stroke="#d9534f" points="497,-932 417,-932 417,-908 497,-908 497,-932"/>
-<text text-anchor="middle" x="457" y="-917.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">demux_vector</text>
-</a>
-</g>
-</g>
-<!-- proc~find_irred_wedge&#45;&gt;proc~demux_vector -->
-<g id="call~~graph~~CallGraph_edge4" class="edge">
-<title>proc~find_irred_wedge&#45;&gt;proc~demux_vector</title>
-<path fill="none" stroke="#000000" d="M124.22,-844.47C134.82,-848.31 145.23,-853.89 153,-862 191.82,-902.51 144.02,-949.46 189,-983 251.7,-1029.76 293.93,-1015.69 365,-983 387.34,-972.73 380.9,-955.15 401,-941 403.23,-939.43 405.6,-937.95 408.05,-936.58"/>
-<polygon fill="#000000" stroke="#000000" points="409.81,-939.61 417.18,-932 406.67,-933.35 409.81,-939.61"/>
-</g>
-<!-- proc~find_equiv_map -->
-<g id="call~~graph~~CallGraph_node42" class="node">
-<title>proc~find_equiv_map</title>
-<g id="a_call~~graph~~CallGraph_node42"><a xlink:href=".././proc/find_equiv_map.html" xlink:title="find_equiv_map">
-<polygon fill="#d9534f" stroke="#d9534f" points="321,-848 233,-848 233,-824 321,-824 321,-848"/>
-<text text-anchor="middle" x="277" y="-833.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">find_equiv_map</text>
-</a>
-</g>
-</g>
-<!-- proc~find_irred_wedge&#45;&gt;proc~find_equiv_map -->
-<g id="call~~graph~~CallGraph_edge3" class="edge">
-<title>proc~find_irred_wedge&#45;&gt;proc~find_equiv_map</title>
-<path fill="none" stroke="#000000" d="M124.04,-836C153.59,-836 191.91,-836 222.69,-836"/>
-<polygon fill="#000000" stroke="#000000" points="222.81,-839.5 232.81,-836 222.81,-832.5 222.81,-839.5"/>
-</g>
-<!-- proc~find_irred_wedge&#45;&gt;proc~distribute_points -->
-<g id="call~~graph~~CallGraph_edge5" class="edge">
-<title>proc~find_irred_wedge&#45;&gt;proc~distribute_points</title>
-<path fill="none" stroke="#000000" d="M124.1,-827.08C204.36,-811.64 360.59,-781.15 365,-777 409.89,-734.72 359.68,-688.78 401,-643 401.91,-642 402.86,-641.04 403.87,-640.13"/>
-<polygon fill="#000000" stroke="#000000" points="406.28,-642.71 412.32,-634.01 402.17,-637.04 406.28,-642.71"/>
-</g>
-<!-- proc~readfile_response -->
-<g id="call~~graph~~CallGraph_node7" class="node">
-<title>proc~readfile_response</title>
-<g id="a_call~~graph~~CallGraph_node7"><a xlink:href=".././proc/readfile_response.html" xlink:title="readfile_response">
-<polygon fill="#d9534f" stroke="#d9534f" points="125.5,-1007 27.5,-1007 27.5,-983 125.5,-983 125.5,-1007"/>
-<text text-anchor="middle" x="76.5" y="-992.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">readfile_response</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_3ph_interaction -->
-<g id="call~~graph~~CallGraph_node8" class="node">
-<title>proc~calculate_3ph_interaction</title>
-<g id="a_call~~graph~~CallGraph_node8"><a xlink:href=".././proc/calculate_3ph_interaction.html" xlink:title="calculate_3ph_interaction">
-<polygon fill="#d9534f" stroke="#d9534f" points="344,-310 210,-310 210,-286 344,-286 344,-310"/>
-<text text-anchor="middle" x="277" y="-295.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">calculate_3ph_interaction</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_3ph_interaction&#45;&gt;proc~delta_fn_triang -->
-<g id="call~~graph~~CallGraph_edge15" class="edge">
-<title>proc~calculate_3ph_interaction&#45;&gt;proc~delta_fn_triang</title>
-<path fill="none" stroke="#000000" d="M329.01,-285.96C352.83,-280.34 381.12,-273.67 404.95,-268.05"/>
-<polygon fill="#000000" stroke="#000000" points="405.93,-271.41 414.86,-265.71 404.32,-264.6 405.93,-271.41"/>
-</g>
-<!-- proc~bose -->
-<g id="call~~graph~~CallGraph_node18" class="node">
-<title>proc~bose</title>
-<g id="a_call~~graph~~CallGraph_node18"><a xlink:href=".././proc/bose.html" xlink:title="Bose">
-<polygon fill="#d94e8f" stroke="#d94e8f" points="484,-352 430,-352 430,-328 484,-328 484,-352"/>
-<text text-anchor="middle" x="457" y="-337.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">Bose</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_3ph_interaction&#45;&gt;proc~bose -->
-<g id="call~~graph~~CallGraph_edge12" class="edge">
-<title>proc~calculate_3ph_interaction&#45;&gt;proc~bose</title>
-<path fill="none" stroke="#000000" d="M329.01,-310.04C358.03,-316.88 393.69,-325.3 419.82,-331.46"/>
-<polygon fill="#000000" stroke="#000000" points="419.15,-334.9 429.69,-333.79 420.76,-328.09 419.15,-334.9"/>
-</g>
-<!-- proc~expi -->
-<g id="call~~graph~~CallGraph_node19" class="node">
-<title>proc~expi</title>
-<g id="a_call~~graph~~CallGraph_node19"><a xlink:href=".././proc/expi.html" xlink:title="expi">
-<polygon fill="#d94e8f" stroke="#d94e8f" points="484,-146 430,-146 430,-122 484,-122 484,-146"/>
-<text text-anchor="middle" x="457" y="-131.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">expi</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_3ph_interaction&#45;&gt;proc~expi -->
-<g id="call~~graph~~CallGraph_edge8" class="edge">
-<title>proc~calculate_3ph_interaction&#45;&gt;proc~expi</title>
-<path fill="none" stroke="#000000" d="M344.04,-289.97C351.76,-286.85 359,-282.64 365,-277 404.64,-239.73 365.38,-201.12 401,-160 406.3,-153.88 413.36,-149.1 420.64,-145.39"/>
-<polygon fill="#000000" stroke="#000000" points="422.18,-148.54 429.88,-141.27 419.32,-142.15 422.18,-148.54"/>
-</g>
-<!-- proc~exit_with_message -->
-<g id="call~~graph~~CallGraph_node21" class="node">
-<title>proc~exit_with_message</title>
-<g id="a_call~~graph~~CallGraph_node21"><a xlink:href=".././proc/exit_with_message.html" xlink:title="exit_with_message">
-<polygon fill="#d9534f" stroke="#d9534f" points="652,-554 549,-554 549,-530 652,-530 652,-554"/>
-<text text-anchor="middle" x="600.5" y="-539.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">exit_with_message</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_3ph_interaction&#45;&gt;proc~exit_with_message -->
-<g id="call~~graph~~CallGraph_edge10" class="edge">
-<title>proc~calculate_3ph_interaction&#45;&gt;proc~exit_with_message</title>
-<path fill="none" stroke="#000000" d="M344.37,-289.01C351.85,-286.02 358.95,-282.11 365,-277 396.03,-250.79 367.09,-215.36 401,-193 442.56,-165.6 473.8,-162.33 513,-193 565.5,-234.08 590.61,-449.52 597.49,-519.81"/>
-<polygon fill="#000000" stroke="#000000" points="594,-520.17 598.44,-529.79 600.97,-519.5 594,-520.17"/>
-</g>
-<!-- proc~calculate_3ph_interaction&#45;&gt;proc~demux_state -->
-<g id="call~~graph~~CallGraph_edge13" class="edge">
-<title>proc~calculate_3ph_interaction&#45;&gt;proc~demux_state</title>
-<path fill="none" stroke="#000000" d="M344.37,-309.35C351.61,-311.93 358.64,-315.1 365,-319 385.97,-331.84 384.61,-342.67 401,-361 412.98,-374.4 426.78,-389.2 437.55,-400.62"/>
-<polygon fill="#000000" stroke="#000000" points="435.06,-403.08 444.47,-407.93 440.14,-398.26 435.06,-403.08"/>
-</g>
-<!-- proc~delta_fn_tetra -->
-<g id="call~~graph~~CallGraph_node41" class="node">
-<title>proc~delta_fn_tetra</title>
-<g id="a_call~~graph~~CallGraph_node41"><a xlink:href=".././proc/delta_fn_tetra.html" xlink:title="delta_fn_tetra">
-<polygon fill="#d94e8f" stroke="#d94e8f" points="496.5,-226 417.5,-226 417.5,-202 496.5,-202 496.5,-226"/>
-<text text-anchor="middle" x="457" y="-211.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">delta_fn_tetra</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_3ph_interaction&#45;&gt;proc~delta_fn_tetra -->
-<g id="call~~graph~~CallGraph_edge14" class="edge">
-<title>proc~calculate_3ph_interaction&#45;&gt;proc~delta_fn_tetra</title>
-<path fill="none" stroke="#000000" d="M344.37,-286.65C351.61,-284.07 358.64,-280.9 365,-277 385.97,-264.16 380.9,-249.15 401,-235 403.35,-233.35 405.85,-231.8 408.43,-230.36"/>
-<polygon fill="#000000" stroke="#000000" points="410.07,-233.46 417.47,-225.87 406.95,-227.19 410.07,-233.46"/>
-</g>
-<!-- proc~mux_state -->
-<g id="call~~graph~~CallGraph_node44" class="node">
-<title>proc~mux_state</title>
-<g id="a_call~~graph~~CallGraph_node44"><a xlink:href=".././proc/mux_state.html" xlink:title="mux_state">
-<polygon fill="#d94e8f" stroke="#d94e8f" points="488,-310 426,-310 426,-286 488,-286 488,-310"/>
-<text text-anchor="middle" x="457" y="-295.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">mux_state</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_3ph_interaction&#45;&gt;proc~mux_state -->
-<g id="call~~graph~~CallGraph_edge9" class="edge">
-<title>proc~calculate_3ph_interaction&#45;&gt;proc~mux_state</title>
-<path fill="none" stroke="#000000" d="M344.03,-298C368.07,-298 394.5,-298 415.65,-298"/>
-<polygon fill="#000000" stroke="#000000" points="415.88,-301.5 425.88,-298 415.88,-294.5 415.88,-301.5"/>
-</g>
-<!-- proc~print_message -->
-<g id="call~~graph~~CallGraph_node47" class="node">
-<title>proc~print_message</title>
-<g id="a_call~~graph~~CallGraph_node47"><a xlink:href=".././proc/print_message.html" xlink:title="print_message">
-<polygon fill="#d9534f" stroke="#d9534f" points="498.5,-554 415.5,-554 415.5,-530 498.5,-530 498.5,-554"/>
-<text text-anchor="middle" x="457" y="-539.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">print_message</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_3ph_interaction&#45;&gt;proc~print_message -->
-<g id="call~~graph~~CallGraph_edge11" class="edge">
-<title>proc~calculate_3ph_interaction&#45;&gt;proc~print_message</title>
-<path fill="none" stroke="#000000" d="M344.05,-305.39C351.86,-308.61 359.13,-313.01 365,-319 417.22,-372.31 366.33,-416.92 401,-483 408.98,-498.21 421.95,-512.4 433.28,-523.04"/>
-<polygon fill="#000000" stroke="#000000" points="431.02,-525.71 440.79,-529.82 435.71,-520.52 431.02,-525.71"/>
-</g>
-<!-- proc~mux_vector -->
-<g id="call~~graph~~CallGraph_node59" class="node">
-<title>proc~mux_vector</title>
-<g id="a_call~~graph~~CallGraph_node59"><a xlink:href=".././proc/mux_vector.html" xlink:title="mux_vector">
-<polygon fill="#d94e8f" stroke="#d94e8f" points="491,-676 423,-676 423,-652 491,-652 491,-676"/>
-<text text-anchor="middle" x="457" y="-661.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">mux_vector</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_3ph_interaction&#45;&gt;proc~mux_vector -->
-<g id="call~~graph~~CallGraph_edge6" class="edge">
-<title>proc~calculate_3ph_interaction&#45;&gt;proc~mux_vector</title>
-<path fill="none" stroke="#000000" d="M344.23,-304.65C352.11,-307.96 359.35,-312.59 365,-319 460.79,-427.71 312.36,-528.4 401,-643 404.4,-647.4 408.84,-650.87 413.72,-653.62"/>
-<polygon fill="#000000" stroke="#000000" points="412.3,-656.82 422.85,-657.82 415.23,-650.46 412.3,-656.82"/>
-</g>
-<!-- proc~calculate_3ph_interaction&#45;&gt;proc~distribute_points -->
-<g id="call~~graph~~CallGraph_edge7" class="edge">
-<title>proc~calculate_3ph_interaction&#45;&gt;proc~distribute_points</title>
-<path fill="none" stroke="#000000" d="M344.02,-304.84C351.93,-308.12 359.24,-312.69 365,-319 438.93,-399.93 353.48,-464.22 401,-563 408.45,-578.48 421.39,-592.68 432.85,-603.26"/>
-<polygon fill="#000000" stroke="#000000" points="430.65,-605.99 440.46,-609.98 435.28,-600.74 430.65,-605.99"/>
-</g>
-<!-- proc~calculate_bound_scatt_rates -->
-<g id="call~~graph~~CallGraph_node9" class="node">
-<title>proc~calculate_bound_scatt_rates</title>
-<g id="a_call~~graph~~CallGraph_node9"><a xlink:href=".././proc/calculate_bound_scatt_rates.html" xlink:title="calculate_bound_scatt_rates">
-<polygon fill="#d9534f" stroke="#d9534f" points="351.5,-66 202.5,-66 202.5,-42 351.5,-42 351.5,-66"/>
-<text text-anchor="middle" x="277" y="-51.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">calculate_bound_scatt_rates</text>
-</a>
-</g>
-</g>
-<!-- proc~twonorm -->
-<g id="call~~graph~~CallGraph_node24" class="node">
-<title>proc~twonorm</title>
-<g id="a_call~~graph~~CallGraph_node24"><a xlink:href=".././proc/twonorm.html" xlink:title="twonorm">
-<polygon fill="#d94e8f" stroke="#d94e8f" points="484,-24 430,-24 430,0 484,0 484,-24"/>
-<text text-anchor="middle" x="457" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">twonorm</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_bound_scatt_rates&#45;&gt;proc~twonorm -->
-<g id="call~~graph~~CallGraph_edge17" class="edge">
-<title>proc~calculate_bound_scatt_rates&#45;&gt;proc~twonorm</title>
-<path fill="none" stroke="#000000" d="M329.01,-41.96C358.03,-35.12 393.69,-26.7 419.82,-20.54"/>
-<polygon fill="#000000" stroke="#000000" points="420.76,-23.91 429.69,-18.21 419.15,-17.1 420.76,-23.91"/>
-</g>
-<!-- proc~write2file_rank2_real -->
-<g id="call~~graph~~CallGraph_node32" class="node">
-<title>proc~write2file_rank2_real</title>
-<g id="a_call~~graph~~CallGraph_node32"><a xlink:href=".././proc/write2file_rank2_real.html" xlink:title="write2file_rank2_real">
-<polygon fill="#d9534f" stroke="#d9534f" points="513,-66 401,-66 401,-42 513,-42 513,-66"/>
-<text text-anchor="middle" x="457" y="-51.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">write2file_rank2_real</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_bound_scatt_rates&#45;&gt;proc~write2file_rank2_real -->
-<g id="call~~graph~~CallGraph_edge16" class="edge">
-<title>proc~calculate_bound_scatt_rates&#45;&gt;proc~write2file_rank2_real</title>
-<path fill="none" stroke="#000000" d="M351.68,-54C364.66,-54 378.09,-54 390.82,-54"/>
-<polygon fill="#000000" stroke="#000000" points="390.86,-57.5 400.85,-54 390.85,-50.5 390.86,-57.5"/>
-</g>
-<!-- proc~form_triangles -->
-<g id="call~~graph~~CallGraph_node10" class="node">
-<title>proc~form_triangles</title>
-<g id="a_call~~graph~~CallGraph_node10"><a xlink:href=".././proc/form_triangles.html" xlink:title="form_triangles">
-<polygon fill="#d9534f" stroke="#d9534f" points="317.5,-932 236.5,-932 236.5,-908 317.5,-908 317.5,-932"/>
-<text text-anchor="middle" x="277" y="-917.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">form_triangles</text>
-</a>
-</g>
-</g>
-<!-- proc~form_triangles&#45;&gt;proc~demux_vector -->
-<g id="call~~graph~~CallGraph_edge18" class="edge">
-<title>proc~form_triangles&#45;&gt;proc~demux_vector</title>
-<path fill="none" stroke="#000000" d="M317.5,-920C343.87,-920 378.72,-920 406.87,-920"/>
-<polygon fill="#000000" stroke="#000000" points="406.91,-923.5 416.91,-920 406.91,-916.5 406.91,-923.5"/>
-</g>
-<!-- proc~binsearch -->
-<g id="call~~graph~~CallGraph_node54" class="node">
-<title>proc~binsearch</title>
-<g id="a_call~~graph~~CallGraph_node54"><a xlink:href=".././proc/binsearch.html" xlink:title="binsearch">
-<polygon fill="#d9534f" stroke="#d9534f" points="486.5,-890 427.5,-890 427.5,-866 486.5,-866 486.5,-890"/>
-<text text-anchor="middle" x="457" y="-875.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">binsearch</text>
-</a>
-</g>
-</g>
-<!-- proc~form_triangles&#45;&gt;proc~binsearch -->
-<g id="call~~graph~~CallGraph_edge19" class="edge">
-<title>proc~form_triangles&#45;&gt;proc~binsearch</title>
-<path fill="none" stroke="#000000" d="M317.5,-910.68C347.28,-903.65 387.9,-894.07 417.44,-887.1"/>
-<polygon fill="#000000" stroke="#000000" points="418.46,-890.45 427.39,-884.75 416.86,-883.64 418.46,-890.45"/>
-</g>
-<!-- proc~form_triangles&#45;&gt;proc~mux_vector -->
-<g id="call~~graph~~CallGraph_edge20" class="edge">
-<title>proc~form_triangles&#45;&gt;proc~mux_vector</title>
-<path fill="none" stroke="#000000" d="M317.63,-918.35C333.94,-915.82 352.02,-910.36 365,-899 373.52,-891.54 427.82,-742.34 448.24,-685.62"/>
-<polygon fill="#000000" stroke="#000000" points="451.55,-686.76 451.64,-676.16 444.97,-684.39 451.55,-686.76"/>
-</g>
-<!-- proc~demux_mesh -->
-<g id="call~~graph~~CallGraph_node11" class="node">
-<title>proc~demux_mesh</title>
-<g id="a_call~~graph~~CallGraph_node11"><a xlink:href=".././proc/demux_mesh.html" xlink:title="demux_mesh">
-<polygon fill="#d9534f" stroke="#d9534f" points="495.5,-848 418.5,-848 418.5,-824 495.5,-824 495.5,-848"/>
-<text text-anchor="middle" x="457" y="-833.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">demux_mesh</text>
-</a>
-</g>
-</g>
-<!-- proc~get_num_operations -->
-<g id="call~~graph~~CallGraph_node12" class="node">
-<title>proc~get_num_operations</title>
-<g id="a_call~~graph~~CallGraph_node12"><a xlink:href=".././proc/get_num_operations.html" xlink:title="get_num_operations">
-<polygon fill="#d94e8f" stroke="#d94e8f" points="132,-1054 21,-1054 21,-1030 132,-1030 132,-1054"/>
-<text text-anchor="middle" x="76.5" y="-1039.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">get_num_operations</text>
-</a>
-</g>
-</g>
-<!-- interface~spg_get_multiplicity -->
-<g id="call~~graph~~CallGraph_node53" class="node">
-<title>interface~spg_get_multiplicity</title>
-<g id="a_call~~graph~~CallGraph_node53"><a xlink:href=".././interface/spg_get_multiplicity.html" xlink:title="spg_get_multiplicity">
-<polygon fill="#a7506f" stroke="#a7506f" points="330,-1054 224,-1054 224,-1030 330,-1030 330,-1054"/>
-<text text-anchor="middle" x="277" y="-1039.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">spg_get_multiplicity</text>
-</a>
-</g>
-</g>
-<!-- proc~get_num_operations&#45;&gt;interface~spg_get_multiplicity -->
-<g id="call~~graph~~CallGraph_edge21" class="edge">
-<title>proc~get_num_operations&#45;&gt;interface~spg_get_multiplicity</title>
-<path fill="none" stroke="#000000" d="M132,-1042C157.23,-1042 187.34,-1042 213.49,-1042"/>
-<polygon fill="#000000" stroke="#000000" points="213.67,-1045.5 223.67,-1042 213.67,-1038.5 213.67,-1045.5"/>
-</g>
-<!-- proc~create_fbz2ibz_map -->
-<g id="call~~graph~~CallGraph_node13" class="node">
-<title>proc~create_fbz2ibz_map</title>
-<g id="a_call~~graph~~CallGraph_node13"><a xlink:href=".././proc/create_fbz2ibz_map.html" xlink:title="create_fbz2ibz_map">
-<polygon fill="#d9534f" stroke="#d9534f" points="131,-1096 22,-1096 22,-1072 131,-1072 131,-1096"/>
-<text text-anchor="middle" x="76.5" y="-1081.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">create_fbz2ibz_map</text>
-</a>
-</g>
-</g>
-<!-- proc~fbz2ibz -->
-<g id="call~~graph~~CallGraph_node17" class="node">
-<title>proc~fbz2ibz</title>
-<g id="a_call~~graph~~CallGraph_node17"><a xlink:href=".././proc/fbz2ibz.html" xlink:title="fbz2ibz">
-<polygon fill="#d94e8f" stroke="#d94e8f" points="304,-1096 250,-1096 250,-1072 304,-1072 304,-1096"/>
-<text text-anchor="middle" x="277" y="-1081.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">fbz2ibz</text>
-</a>
-</g>
-</g>
-<!-- proc~create_fbz2ibz_map&#45;&gt;proc~fbz2ibz -->
-<g id="call~~graph~~CallGraph_edge22" class="edge">
-<title>proc~create_fbz2ibz_map&#45;&gt;proc~fbz2ibz</title>
-<path fill="none" stroke="#000000" d="M131.22,-1084C165.62,-1084 209.35,-1084 239.7,-1084"/>
-<polygon fill="#000000" stroke="#000000" points="239.84,-1087.5 249.84,-1084 239.84,-1080.5 239.84,-1087.5"/>
-</g>
-<!-- proc~interpolate -->
-<g id="call~~graph~~CallGraph_node14" class="node">
-<title>proc~interpolate</title>
-<g id="a_call~~graph~~CallGraph_node14"><a xlink:href=".././proc/interpolate.html" xlink:title="interpolate">
-<polygon fill="#d9534f" stroke="#d9534f" points="108,-1180 45,-1180 45,-1156 108,-1156 108,-1180"/>
-<text text-anchor="middle" x="76.5" y="-1165.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">interpolate</text>
-</a>
-</g>
-</g>
-<!-- dgesv -->
-<g id="call~~graph~~CallGraph_node63" class="node">
-<title>dgesv</title>
-<polygon fill="#777777" stroke="#777777" points="304,-1159 250,-1159 250,-1135 304,-1135 304,-1159"/>
-<text text-anchor="middle" x="277" y="-1144.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">dgesv</text>
-</g>
-<!-- proc~interpolate&#45;&gt;dgesv -->
-<g id="call~~graph~~CallGraph_edge23" class="edge">
-<title>proc~interpolate&#45;&gt;dgesv</title>
-<path fill="none" stroke="#000000" d="M108.08,-1164.76C143.57,-1161.01 202.03,-1154.83 239.77,-1150.83"/>
-<polygon fill="#000000" stroke="#000000" points="240.25,-1154.3 249.82,-1149.77 239.51,-1147.34 240.25,-1154.3"/>
-</g>
-<!-- proc~calculate_eph_interaction_ibzq -->
-<g id="call~~graph~~CallGraph_node15" class="node">
-<title>proc~calculate_eph_interaction_ibzq</title>
-<g id="a_call~~graph~~CallGraph_node15"><a xlink:href=".././proc/calculate_eph_interaction_ibzq.html" xlink:title="calculate_eph_interaction_ibzq">
-<polygon fill="#d9534f" stroke="#d9534f" points="357,-394 197,-394 197,-370 357,-370 357,-394"/>
-<text text-anchor="middle" x="277" y="-379.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">calculate_eph_interaction_ibzq</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_eph_interaction_ibzq&#45;&gt;proc~delta_fn_triang -->
-<g id="call~~graph~~CallGraph_edge34" class="edge">
-<title>proc~calculate_eph_interaction_ibzq&#45;&gt;proc~delta_fn_triang</title>
-<path fill="none" stroke="#000000" d="M351.28,-369.92C356.2,-367.45 360.85,-364.51 365,-361 396.03,-334.79 371.71,-305.14 401,-277 402.62,-275.45 404.36,-274.01 406.2,-272.67"/>
-<polygon fill="#000000" stroke="#000000" points="408.03,-275.65 414.74,-267.45 404.39,-269.67 408.03,-275.65"/>
-</g>
-<!-- proc~calculate_eph_interaction_ibzq&#45;&gt;proc~bose -->
-<g id="call~~graph~~CallGraph_edge31" class="edge">
-<title>proc~calculate_eph_interaction_ibzq&#45;&gt;proc~bose</title>
-<path fill="none" stroke="#000000" d="M329.01,-369.96C358.03,-363.12 393.69,-354.7 419.82,-348.54"/>
-<polygon fill="#000000" stroke="#000000" points="420.76,-351.91 429.69,-346.21 419.15,-345.1 420.76,-351.91"/>
-</g>
-<!-- proc~calculate_eph_interaction_ibzq&#45;&gt;proc~exit_with_message -->
-<g id="call~~graph~~CallGraph_edge27" class="edge">
-<title>proc~calculate_eph_interaction_ibzq&#45;&gt;proc~exit_with_message</title>
-<path fill="none" stroke="#000000" d="M351.21,-394.17C356.15,-396.61 360.81,-399.53 365,-403 395.01,-427.89 371.65,-457.34 401,-483 411.83,-492.47 486.7,-513.16 541.3,-527.34"/>
-<polygon fill="#000000" stroke="#000000" points="540.68,-530.79 551.24,-529.9 542.43,-524.01 540.68,-530.79"/>
-</g>
-<!-- proc~calculate_eph_interaction_ibzq&#45;&gt;proc~demux_state -->
-<g id="call~~graph~~CallGraph_edge32" class="edge">
-<title>proc~calculate_eph_interaction_ibzq&#45;&gt;proc~demux_state</title>
-<path fill="none" stroke="#000000" d="M334.32,-394.02C358.72,-399.23 386.92,-405.25 410.03,-410.19"/>
-<polygon fill="#000000" stroke="#000000" points="409.42,-413.63 419.93,-412.3 410.88,-406.79 409.42,-413.63"/>
-</g>
-<!-- proc~calculate_eph_interaction_ibzq&#45;&gt;proc~delta_fn_tetra -->
-<g id="call~~graph~~CallGraph_edge33" class="edge">
-<title>proc~calculate_eph_interaction_ibzq&#45;&gt;proc~delta_fn_tetra</title>
-<path fill="none" stroke="#000000" d="M353.02,-369.81C357.36,-367.35 361.41,-364.44 365,-361 407.03,-320.68 361.64,-277.92 401,-235 403.25,-232.55 405.81,-230.39 408.57,-228.47"/>
-<polygon fill="#000000" stroke="#000000" points="410.4,-231.46 417.34,-223.45 406.92,-225.38 410.4,-231.46"/>
-</g>
-<!-- proc~calculate_eph_interaction_ibzq&#45;&gt;proc~mux_state -->
-<g id="call~~graph~~CallGraph_edge26" class="edge">
-<title>proc~calculate_eph_interaction_ibzq&#45;&gt;proc~mux_state</title>
-<path fill="none" stroke="#000000" d="M346.18,-369.99C352.77,-367.53 359.17,-364.57 365,-361 385.97,-348.16 380.9,-333.15 401,-319 405.65,-315.73 410.87,-312.88 416.21,-310.44"/>
-<polygon fill="#000000" stroke="#000000" points="417.91,-313.52 425.82,-306.46 415.24,-307.05 417.91,-313.52"/>
-</g>
-<!-- proc~calculate_eph_interaction_ibzq&#45;&gt;proc~print_message -->
-<g id="call~~graph~~CallGraph_edge30" class="edge">
-<title>proc~calculate_eph_interaction_ibzq&#45;&gt;proc~print_message</title>
-<path fill="none" stroke="#000000" d="M352.49,-394.09C357.02,-396.56 361.25,-399.51 365,-403 403.58,-438.91 366.29,-476.33 401,-516 403.82,-519.22 407.12,-522.07 410.68,-524.59"/>
-<polygon fill="#000000" stroke="#000000" points="409,-527.67 419.37,-529.88 412.65,-521.69 409,-527.67"/>
-</g>
-<!-- proc~calculate_eph_interaction_ibzq&#45;&gt;proc~binsearch -->
-<g id="call~~graph~~CallGraph_edge29" class="edge">
-<title>proc~calculate_eph_interaction_ibzq&#45;&gt;proc~binsearch</title>
-<path fill="none" stroke="#000000" d="M355,-394.17C358.7,-396.65 362.07,-399.57 365,-403 430.7,-479.98 340.35,-775.98 401,-857 405.24,-862.66 411.21,-866.8 417.66,-869.82"/>
-<polygon fill="#000000" stroke="#000000" points="416.72,-873.21 427.31,-873.49 419.21,-866.66 416.72,-873.21"/>
-</g>
-<!-- proc~fermi -->
-<g id="call~~graph~~CallGraph_node57" class="node">
-<title>proc~fermi</title>
-<g id="a_call~~graph~~CallGraph_node57"><a xlink:href=".././proc/fermi.html" xlink:title="Fermi">
-<polygon fill="#d94e8f" stroke="#d94e8f" points="484,-474 430,-474 430,-450 484,-450 484,-474"/>
-<text text-anchor="middle" x="457" y="-459.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">Fermi</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_eph_interaction_ibzq&#45;&gt;proc~fermi -->
-<g id="call~~graph~~CallGraph_edge28" class="edge">
-<title>proc~calculate_eph_interaction_ibzq&#45;&gt;proc~fermi</title>
-<path fill="none" stroke="#000000" d="M345.55,-394.14C352.34,-396.58 358.95,-399.5 365,-403 385.14,-414.65 381.65,-428.08 401,-441 406.88,-444.93 413.6,-448.27 420.28,-451.05"/>
-<polygon fill="#000000" stroke="#000000" points="419.34,-454.43 429.93,-454.73 421.83,-447.89 419.34,-454.43"/>
-</g>
-<!-- proc~calculate_eph_interaction_ibzq&#45;&gt;proc~mux_vector -->
-<g id="call~~graph~~CallGraph_edge24" class="edge">
-<title>proc~calculate_eph_interaction_ibzq&#45;&gt;proc~mux_vector</title>
-<path fill="none" stroke="#000000" d="M354.34,-394.16C358.25,-396.64 361.85,-399.56 365,-403 437.84,-482.55 333.39,-558.96 401,-643 404.36,-647.17 408.65,-650.52 413.34,-653.2"/>
-<polygon fill="#000000" stroke="#000000" points="412.2,-656.53 422.74,-657.58 415.15,-650.18 412.2,-656.53"/>
-</g>
-<!-- proc~calculate_eph_interaction_ibzq&#45;&gt;proc~distribute_points -->
-<g id="call~~graph~~CallGraph_edge25" class="edge">
-<title>proc~calculate_eph_interaction_ibzq&#45;&gt;proc~distribute_points</title>
-<path fill="none" stroke="#000000" d="M353.65,-394.2C357.78,-396.66 361.62,-399.57 365,-403 416.14,-454.94 366.97,-498.54 401,-563 409.02,-578.19 421.99,-592.37 433.32,-603.02"/>
-<polygon fill="#000000" stroke="#000000" points="431.05,-605.69 440.82,-609.8 435.74,-600.5 431.05,-605.69"/>
-</g>
-<!-- proc~start_timer -->
-<g id="call~~graph~~CallGraph_node16" class="node">
-<title>proc~start_timer</title>
-<g id="a_call~~graph~~CallGraph_node16"><a xlink:href=".././proc/start_timer.html" xlink:title="start_timer">
-<polygon fill="#d9534f" stroke="#d9534f" points="108.5,-1222 44.5,-1222 44.5,-1198 108.5,-1198 108.5,-1222"/>
-<text text-anchor="middle" x="76.5" y="-1207.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">start_timer</text>
-</a>
-</g>
-</g>
-<!-- proc~end_timer -->
-<g id="call~~graph~~CallGraph_node20" class="node">
-<title>proc~end_timer</title>
-<g id="a_call~~graph~~CallGraph_node20"><a xlink:href=".././proc/end_timer.html" xlink:title="end_timer">
-<polygon fill="#d9534f" stroke="#d9534f" points="487.5,-974 426.5,-974 426.5,-950 487.5,-950 487.5,-974"/>
-<text text-anchor="middle" x="457" y="-959.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">end_timer</text>
-</a>
-</g>
-</g>
-<!-- proc~end_timer&#45;&gt;proc~exit_with_message -->
-<g id="call~~graph~~CallGraph_edge35" class="edge">
-<title>proc~end_timer&#45;&gt;proc~exit_with_message</title>
-<path fill="none" stroke="#000000" d="M487.53,-956.56C496.88,-953.46 506.47,-948.6 513,-941 562.76,-883.09 590.03,-640.06 597.42,-564.51"/>
-<polygon fill="#000000" stroke="#000000" points="600.93,-564.54 598.4,-554.25 593.97,-563.87 600.93,-564.54"/>
-</g>
-<!-- proc~calculate_spectral_transport_coeff -->
-<g id="call~~graph~~CallGraph_node22" class="node">
-<title>proc~calculate_spectral_transport_coeff</title>
-<g id="a_call~~graph~~CallGraph_node22"><a xlink:href=".././proc/calculate_spectral_transport_coeff.html" xlink:title="calculate_spectral_transport_coeff">
-<polygon fill="#d9534f" stroke="#d9534f" points="365,-184 189,-184 189,-160 365,-160 365,-184"/>
-<text text-anchor="middle" x="277" y="-169.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">calculate_spectral_transport_coeff</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_spectral_transport_coeff&#45;&gt;proc~delta_fn_triang -->
-<g id="call~~graph~~CallGraph_edge39" class="edge">
-<title>proc~calculate_spectral_transport_coeff&#45;&gt;proc~delta_fn_triang</title>
-<path fill="none" stroke="#000000" d="M346.18,-184.01C352.77,-186.47 359.17,-189.43 365,-193 385.97,-205.84 380.9,-220.85 401,-235 403.23,-236.57 405.6,-238.05 408.05,-239.42"/>
-<polygon fill="#000000" stroke="#000000" points="406.67,-242.65 417.18,-244 409.81,-236.39 406.67,-242.65"/>
-</g>
-<!-- proc~calculate_spectral_transport_coeff&#45;&gt;proc~bose -->
-<g id="call~~graph~~CallGraph_edge38" class="edge">
-<title>proc~calculate_spectral_transport_coeff&#45;&gt;proc~bose</title>
-<path fill="none" stroke="#000000" d="M353.02,-184.19C357.36,-186.65 361.41,-189.56 365,-193 407.03,-233.32 361.64,-276.08 401,-319 406.18,-324.64 413.04,-328.78 420.15,-331.82"/>
-<polygon fill="#000000" stroke="#000000" points="419.28,-335.22 429.87,-335.3 421.64,-328.63 419.28,-335.22"/>
-</g>
-<!-- proc~calculate_spectral_transport_coeff&#45;&gt;proc~exit_with_message -->
-<g id="call~~graph~~CallGraph_edge36" class="edge">
-<title>proc~calculate_spectral_transport_coeff&#45;&gt;proc~exit_with_message</title>
-<path fill="none" stroke="#000000" d="M293.72,-159.85C334.64,-129.76 445.94,-58.12 513,-113 577.02,-165.4 594.71,-439.06 598.57,-519.65"/>
-<polygon fill="#000000" stroke="#000000" points="595.08,-519.86 599.03,-529.7 602.07,-519.55 595.08,-519.86"/>
-</g>
-<!-- proc~calculate_spectral_transport_coeff&#45;&gt;proc~delta_fn_tetra -->
-<g id="call~~graph~~CallGraph_edge40" class="edge">
-<title>proc~calculate_spectral_transport_coeff&#45;&gt;proc~delta_fn_tetra</title>
-<path fill="none" stroke="#000000" d="M329.01,-184.04C353.75,-189.87 383.31,-196.85 407.68,-202.6"/>
-<polygon fill="#000000" stroke="#000000" points="406.9,-206.01 417.44,-204.9 408.51,-199.2 406.9,-206.01"/>
-</g>
-<!-- proc~calculate_spectral_transport_coeff&#45;&gt;proc~fermi -->
-<g id="call~~graph~~CallGraph_edge37" class="edge">
-<title>proc~calculate_spectral_transport_coeff&#45;&gt;proc~fermi</title>
-<path fill="none" stroke="#000000" d="M354.35,-184.15C358.26,-186.63 361.86,-189.55 365,-193 440.02,-275.32 331.39,-354.05 401,-441 405.87,-447.09 412.73,-451.41 419.95,-454.49"/>
-<polygon fill="#000000" stroke="#000000" points="419.28,-457.96 429.88,-457.94 421.59,-451.35 419.28,-457.96"/>
-</g>
-<!-- proc~calculate_greq -->
-<g id="call~~graph~~CallGraph_node23" class="node">
-<title>proc~calculate_greq</title>
-<g id="a_call~~graph~~CallGraph_node23"><a xlink:href=".././proc/calculate_greq.html" xlink:title="calculate_gReq">
-<polygon fill="#d9534f" stroke="#d9534f" points="320,-726 234,-726 234,-702 320,-702 320,-726"/>
-<text text-anchor="middle" x="277" y="-711.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">calculate_gReq</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_greq&#45;&gt;proc~print_message -->
-<g id="call~~graph~~CallGraph_edge42" class="edge">
-<title>proc~calculate_greq&#45;&gt;proc~print_message</title>
-<path fill="none" stroke="#000000" d="M320.28,-709.11C335.87,-705.46 352.71,-699.09 365,-688 396.06,-659.96 378.37,-636.2 401,-601 410.35,-586.45 423.48,-572.21 434.57,-561.36"/>
-<polygon fill="#000000" stroke="#000000" points="437.01,-563.87 441.84,-554.44 432.19,-558.8 437.01,-563.87"/>
-</g>
-<!-- proc~calculate_greq&#45;&gt;proc~distribute_points -->
-<g id="call~~graph~~CallGraph_edge41" class="edge">
-<title>proc~calculate_greq&#45;&gt;proc~distribute_points</title>
-<path fill="none" stroke="#000000" d="M320.1,-706.85C335.15,-702.94 351.67,-696.99 365,-688 386.24,-673.68 380.31,-658.1 401,-643 403.06,-641.5 405.24,-640.09 407.5,-638.77"/>
-<polygon fill="#000000" stroke="#000000" points="409.22,-641.82 416.5,-634.11 406.01,-635.6 409.22,-641.82"/>
-</g>
-<!-- proc~calculate_gkrp -->
-<g id="call~~graph~~CallGraph_node25" class="node">
-<title>proc~calculate_gkrp</title>
-<g id="a_call~~graph~~CallGraph_node25"><a xlink:href=".././proc/calculate_gkrp.html" xlink:title="calculate_gkRp">
-<polygon fill="#d9534f" stroke="#d9534f" points="319.5,-768 234.5,-768 234.5,-744 319.5,-744 319.5,-768"/>
-<text text-anchor="middle" x="277" y="-753.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">calculate_gkRp</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_gkrp&#45;&gt;proc~print_message -->
-<g id="call~~graph~~CallGraph_edge44" class="edge">
-<title>proc~calculate_gkrp&#45;&gt;proc~print_message</title>
-<path fill="none" stroke="#000000" d="M319.56,-754.8C335.62,-752.28 352.98,-746.71 365,-735 409.16,-691.96 371.09,-654.93 401,-601 409.39,-585.88 422.48,-571.61 433.79,-560.9"/>
-<polygon fill="#000000" stroke="#000000" points="436.23,-563.41 441.26,-554.08 431.51,-558.24 436.23,-563.41"/>
-</g>
-<!-- proc~calculate_gkrp&#45;&gt;proc~distribute_points -->
-<g id="call~~graph~~CallGraph_edge43" class="edge">
-<title>proc~calculate_gkrp&#45;&gt;proc~distribute_points</title>
-<path fill="none" stroke="#000000" d="M319.82,-753.97C335.54,-751.29 352.59,-745.83 365,-735 398.09,-706.14 369.82,-673.92 401,-643 402.22,-641.79 403.52,-640.64 404.88,-639.57"/>
-<polygon fill="#000000" stroke="#000000" points="406.81,-642.49 413.25,-634.07 402.97,-636.63 406.81,-642.49"/>
-</g>
-<!-- proc~linspace -->
-<g id="call~~graph~~CallGraph_node26" class="node">
-<title>proc~linspace</title>
-<g id="a_call~~graph~~CallGraph_node26"><a xlink:href=".././proc/linspace.html" xlink:title="linspace">
-<polygon fill="#d9534f" stroke="#d9534f" points="103.5,-1264 49.5,-1264 49.5,-1240 103.5,-1240 103.5,-1264"/>
-<text text-anchor="middle" x="76.5" y="-1249.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">linspace</text>
-</a>
-</g>
-</g>
-<!-- proc~demux_vector&#45;&gt;proc~exit_with_message -->
-<g id="call~~graph~~CallGraph_edge45" class="edge">
-<title>proc~demux_vector&#45;&gt;proc~exit_with_message</title>
-<path fill="none" stroke="#000000" d="M497.11,-910.57C503.08,-907.68 508.68,-903.91 513,-899 557.91,-847.99 588,-634.46 596.81,-564.39"/>
-<polygon fill="#000000" stroke="#000000" points="600.34,-564.42 598.09,-554.07 593.39,-563.56 600.34,-564.42"/>
-</g>
-<!-- proc~write2file_spectral_tensor -->
-<g id="call~~graph~~CallGraph_node28" class="node">
-<title>proc~write2file_spectral_tensor</title>
-<g id="a_call~~graph~~CallGraph_node28"><a xlink:href=".././proc/write2file_spectral_tensor.html" xlink:title="write2file_spectral_tensor">
-<polygon fill="#d9534f" stroke="#d9534f" points="143.5,-1306 9.5,-1306 9.5,-1282 143.5,-1282 143.5,-1306"/>
-<text text-anchor="middle" x="76.5" y="-1291.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">write2file_spectral_tensor</text>
-</a>
-</g>
-</g>
-<!-- proc~welcome -->
-<g id="call~~graph~~CallGraph_node29" class="node">
-<title>proc~welcome</title>
-<g id="a_call~~graph~~CallGraph_node29"><a xlink:href=".././proc/welcome.html" xlink:title="welcome">
-<polygon fill="#d9534f" stroke="#d9534f" points="304.5,-604 249.5,-604 249.5,-580 304.5,-580 304.5,-604"/>
-<text text-anchor="middle" x="277" y="-589.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">welcome</text>
-</a>
-</g>
-</g>
-<!-- proc~form_tetrahedra_3d -->
-<g id="call~~graph~~CallGraph_node30" class="node">
-<title>proc~form_tetrahedra_3d</title>
-<g id="a_call~~graph~~CallGraph_node30"><a xlink:href=".././proc/form_tetrahedra_3d.html" xlink:title="form_tetrahedra_3d">
-<polygon fill="#d9534f" stroke="#d9534f" points="331,-890 223,-890 223,-866 331,-866 331,-890"/>
-<text text-anchor="middle" x="277" y="-875.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">form_tetrahedra_3d</text>
-</a>
-</g>
-</g>
-<!-- proc~form_tetrahedra_3d&#45;&gt;proc~demux_vector -->
-<g id="call~~graph~~CallGraph_edge46" class="edge">
-<title>proc~form_tetrahedra_3d&#45;&gt;proc~demux_vector</title>
-<path fill="none" stroke="#000000" d="M329.01,-890.04C353.46,-895.8 382.62,-902.69 406.83,-908.4"/>
-<polygon fill="#000000" stroke="#000000" points="406.33,-911.88 416.87,-910.77 407.94,-905.06 406.33,-911.88"/>
-</g>
-<!-- proc~form_tetrahedra_3d&#45;&gt;proc~binsearch -->
-<g id="call~~graph~~CallGraph_edge47" class="edge">
-<title>proc~form_tetrahedra_3d&#45;&gt;proc~binsearch</title>
-<path fill="none" stroke="#000000" d="M331.41,-878C359,-878 392.07,-878 417.2,-878"/>
-<polygon fill="#000000" stroke="#000000" points="417.44,-881.5 427.44,-878 417.44,-874.5 417.44,-881.5"/>
-</g>
-<!-- proc~form_tetrahedra_3d&#45;&gt;proc~mux_vector -->
-<g id="call~~graph~~CallGraph_edge48" class="edge">
-<title>proc~form_tetrahedra_3d&#45;&gt;proc~mux_vector</title>
-<path fill="none" stroke="#000000" d="M331.16,-873C343.25,-869.84 355.36,-864.85 365,-857 393.45,-833.83 432.35,-730.98 448.5,-685.62"/>
-<polygon fill="#000000" stroke="#000000" points="451.82,-686.72 451.84,-676.13 445.22,-684.39 451.82,-686.72"/>
-</g>
-<!-- proc~get_cartesian_operations -->
-<g id="call~~graph~~CallGraph_node31" class="node">
-<title>proc~get_cartesian_operations</title>
-<g id="a_call~~graph~~CallGraph_node31"><a xlink:href=".././proc/get_cartesian_operations.html" xlink:title="get_cartesian_operations">
-<polygon fill="#d9534f" stroke="#d9534f" points="143,-1138 10,-1138 10,-1114 143,-1114 143,-1138"/>
-<text text-anchor="middle" x="76.5" y="-1123.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">get_cartesian_operations</text>
-</a>
-</g>
-</g>
-<!-- proc~get_cartesian_operations&#45;&gt;dgesv -->
-<g id="call~~graph~~CallGraph_edge49" class="edge">
-<title>proc~get_cartesian_operations&#45;&gt;dgesv</title>
-<path fill="none" stroke="#000000" d="M143.05,-1132.93C175.25,-1136.34 212.82,-1140.32 239.79,-1143.17"/>
-<polygon fill="#000000" stroke="#000000" points="239.62,-1146.67 249.94,-1144.24 240.36,-1139.71 239.62,-1146.67"/>
-</g>
-<!-- proc~calculate_eph_interaction_ibzk -->
-<g id="call~~graph~~CallGraph_node33" class="node">
-<title>proc~calculate_eph_interaction_ibzk</title>
-<g id="a_call~~graph~~CallGraph_node33"><a xlink:href=".././proc/calculate_eph_interaction_ibzk.html" xlink:title="calculate_eph_interaction_ibzk">
-<polygon fill="#d9534f" stroke="#d9534f" points="356.5,-352 197.5,-352 197.5,-328 356.5,-328 356.5,-352"/>
-<text text-anchor="middle" x="277" y="-337.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">calculate_eph_interaction_ibzk</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_eph_interaction_ibzk&#45;&gt;proc~delta_fn_triang -->
-<g id="call~~graph~~CallGraph_edge59" class="edge">
-<title>proc~calculate_eph_interaction_ibzk&#45;&gt;proc~delta_fn_triang</title>
-<path fill="none" stroke="#000000" d="M346.18,-327.99C352.77,-325.53 359.17,-322.57 365,-319 385.97,-306.16 380.9,-291.15 401,-277 403.23,-275.43 405.6,-273.95 408.05,-272.58"/>
-<polygon fill="#000000" stroke="#000000" points="409.81,-275.61 417.18,-268 406.67,-269.35 409.81,-275.61"/>
-</g>
-<!-- proc~calculate_eph_interaction_ibzk&#45;&gt;proc~bose -->
-<g id="call~~graph~~CallGraph_edge56" class="edge">
-<title>proc~calculate_eph_interaction_ibzk&#45;&gt;proc~bose</title>
-<path fill="none" stroke="#000000" d="M356.59,-340C378.55,-340 401.36,-340 419.58,-340"/>
-<polygon fill="#000000" stroke="#000000" points="419.74,-343.5 429.74,-340 419.74,-336.5 419.74,-343.5"/>
-</g>
-<!-- proc~calculate_eph_interaction_ibzk&#45;&gt;proc~exit_with_message -->
-<g id="call~~graph~~CallGraph_edge53" class="edge">
-<title>proc~calculate_eph_interaction_ibzk&#45;&gt;proc~exit_with_message</title>
-<path fill="none" stroke="#000000" d="M351.01,-352.02C410.07,-362.88 487.47,-380.03 513,-399 555.06,-430.25 580.82,-488.57 592.35,-520.22"/>
-<polygon fill="#000000" stroke="#000000" points="589.12,-521.57 595.72,-529.85 595.72,-519.26 589.12,-521.57"/>
-</g>
-<!-- proc~calculate_eph_interaction_ibzk&#45;&gt;proc~demux_state -->
-<g id="call~~graph~~CallGraph_edge57" class="edge">
-<title>proc~calculate_eph_interaction_ibzk&#45;&gt;proc~demux_state</title>
-<path fill="none" stroke="#000000" d="M343.93,-352.12C351.24,-354.56 358.42,-357.49 365,-361 384.16,-371.2 382.99,-381.89 401,-394 406,-397.36 411.5,-400.51 417.03,-403.38"/>
-<polygon fill="#000000" stroke="#000000" points="415.76,-406.66 426.28,-407.94 418.85,-400.38 415.76,-406.66"/>
-</g>
-<!-- proc~calculate_eph_interaction_ibzk&#45;&gt;proc~delta_fn_tetra -->
-<g id="call~~graph~~CallGraph_edge58" class="edge">
-<title>proc~calculate_eph_interaction_ibzk&#45;&gt;proc~delta_fn_tetra</title>
-<path fill="none" stroke="#000000" d="M351.28,-327.92C356.2,-325.45 360.85,-322.51 365,-319 396.03,-292.79 371.71,-263.14 401,-235 403.25,-232.84 405.74,-230.9 408.39,-229.15"/>
-<polygon fill="#000000" stroke="#000000" points="410.24,-232.13 417.27,-224.2 406.83,-226.01 410.24,-232.13"/>
-</g>
-<!-- proc~calculate_eph_interaction_ibzk&#45;&gt;proc~mux_state -->
-<g id="call~~graph~~CallGraph_edge52" class="edge">
-<title>proc~calculate_eph_interaction_ibzk&#45;&gt;proc~mux_state</title>
-<path fill="none" stroke="#000000" d="M329.01,-327.96C356.67,-321.44 390.36,-313.49 416.08,-307.42"/>
-<polygon fill="#000000" stroke="#000000" points="416.95,-310.81 425.88,-305.11 415.34,-304 416.95,-310.81"/>
-</g>
-<!-- proc~calculate_eph_interaction_ibzk&#45;&gt;proc~print_message -->
-<g id="call~~graph~~CallGraph_edge55" class="edge">
-<title>proc~calculate_eph_interaction_ibzk&#45;&gt;proc~print_message</title>
-<path fill="none" stroke="#000000" d="M352.99,-352.23C357.34,-354.68 361.4,-357.57 365,-361 405.96,-399.96 372.98,-433.9 401,-483 409.57,-498.02 422.67,-512.28 433.94,-523.02"/>
-<polygon fill="#000000" stroke="#000000" points="431.64,-525.66 441.37,-529.85 436.38,-520.51 431.64,-525.66"/>
-</g>
-<!-- proc~calculate_eph_interaction_ibzk&#45;&gt;proc~fermi -->
-<g id="call~~graph~~CallGraph_edge54" class="edge">
-<title>proc~calculate_eph_interaction_ibzk&#45;&gt;proc~fermi</title>
-<path fill="none" stroke="#000000" d="M351.21,-352.17C356.15,-354.61 360.81,-357.53 365,-361 395.01,-385.89 372.64,-414.24 401,-441 406.47,-446.16 413.34,-450.09 420.35,-453.07"/>
-<polygon fill="#000000" stroke="#000000" points="419.28,-456.41 429.88,-456.57 421.7,-449.83 419.28,-456.41"/>
-</g>
-<!-- proc~calculate_eph_interaction_ibzk&#45;&gt;proc~mux_vector -->
-<g id="call~~graph~~CallGraph_edge50" class="edge">
-<title>proc~calculate_eph_interaction_ibzk&#45;&gt;proc~mux_vector</title>
-<path fill="none" stroke="#000000" d="M354.42,-352.08C358.31,-354.58 361.89,-357.53 365,-361 449.3,-455.11 322.88,-543.69 401,-643 404.44,-647.37 408.89,-650.83 413.78,-653.57"/>
-<polygon fill="#000000" stroke="#000000" points="412.38,-656.77 422.93,-657.77 415.3,-650.41 412.38,-656.77"/>
-</g>
-<!-- proc~calculate_eph_interaction_ibzk&#45;&gt;proc~distribute_points -->
-<g id="call~~graph~~CallGraph_edge51" class="edge">
-<title>proc~calculate_eph_interaction_ibzk&#45;&gt;proc~distribute_points</title>
-<path fill="none" stroke="#000000" d="M353.83,-352.02C357.92,-354.53 361.7,-357.49 365,-361 427.5,-427.4 360.24,-481.42 401,-563 408.68,-578.37 421.63,-592.56 433.04,-603.17"/>
-<polygon fill="#000000" stroke="#000000" points="430.81,-605.87 440.6,-609.91 435.47,-600.65 430.81,-605.87"/>
-</g>
-<!-- proc~subtitle -->
-<g id="call~~graph~~CallGraph_node34" class="node">
-<title>proc~subtitle</title>
-<g id="a_call~~graph~~CallGraph_node34"><a xlink:href=".././proc/subtitle.html" xlink:title="subtitle">
-<polygon fill="#d9534f" stroke="#d9534f" points="304,-562 250,-562 250,-538 304,-538 304,-562"/>
-<text text-anchor="middle" x="277" y="-547.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">subtitle</text>
-</a>
-</g>
-</g>
-<!-- proc~read_transition_probs_e -->
-<g id="call~~graph~~CallGraph_node35" class="node">
-<title>proc~read_transition_probs_e</title>
-<g id="a_call~~graph~~CallGraph_node35"><a xlink:href=".././proc/read_transition_probs_e.html" xlink:title="read_transition_probs_e">
-<polygon fill="#d9534f" stroke="#d9534f" points="141,-1348 12,-1348 12,-1324 141,-1324 141,-1348"/>
-<text text-anchor="middle" x="76.5" y="-1333.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">read_transition_probs_e</text>
-</a>
-</g>
-</g>
-<!-- proc~write2file_rank3_real -->
-<g id="call~~graph~~CallGraph_node36" class="node">
-<title>proc~write2file_rank3_real</title>
-<g id="a_call~~graph~~CallGraph_node36"><a xlink:href=".././proc/write2file_rank3_real.html" xlink:title="write2file_rank3_real">
-<polygon fill="#d9534f" stroke="#d9534f" points="132.5,-1390 20.5,-1390 20.5,-1366 132.5,-1366 132.5,-1390"/>
-<text text-anchor="middle" x="76.5" y="-1375.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">write2file_rank3_real</text>
-</a>
-</g>
-</g>
-<!-- proc~trace -->
-<g id="call~~graph~~CallGraph_node38" class="node">
-<title>proc~trace</title>
-<g id="a_call~~graph~~CallGraph_node38"><a xlink:href=".././proc/trace.html" xlink:title="trace">
-<polygon fill="#d94e8f" stroke="#d94e8f" points="103.5,-1432 49.5,-1432 49.5,-1408 103.5,-1408 103.5,-1432"/>
-<text text-anchor="middle" x="76.5" y="-1417.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">trace</text>
-</a>
-</g>
-</g>
-<!-- proc~get_operations -->
-<g id="call~~graph~~CallGraph_node39" class="node">
-<title>proc~get_operations</title>
-<g id="a_call~~graph~~CallGraph_node39"><a xlink:href=".././proc/get_operations.html" xlink:title="get_operations">
-<polygon fill="#d9534f" stroke="#d9534f" points="118.5,-1474 34.5,-1474 34.5,-1450 118.5,-1450 118.5,-1474"/>
-<text text-anchor="middle" x="76.5" y="-1459.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">get_operations</text>
-</a>
-</g>
-</g>
-<!-- interface~spg_get_symmetry -->
-<g id="call~~graph~~CallGraph_node49" class="node">
-<title>interface~spg_get_symmetry</title>
-<g id="a_call~~graph~~CallGraph_node49"><a xlink:href=".././interface/spg_get_symmetry.html" xlink:title="spg_get_symmetry">
-<polygon fill="#a7506f" stroke="#a7506f" points="328.5,-1495 225.5,-1495 225.5,-1471 328.5,-1471 328.5,-1495"/>
-<text text-anchor="middle" x="277" y="-1480.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">spg_get_symmetry</text>
-</a>
-</g>
-</g>
-<!-- proc~get_operations&#45;&gt;interface~spg_get_symmetry -->
-<g id="call~~graph~~CallGraph_edge60" class="edge">
-<title>proc~get_operations&#45;&gt;interface~spg_get_symmetry</title>
-<path fill="none" stroke="#000000" d="M118.63,-1466.35C146.6,-1469.31 184.09,-1473.28 215.46,-1476.59"/>
-<polygon fill="#000000" stroke="#000000" points="215.09,-1480.08 225.41,-1477.65 215.83,-1473.11 215.09,-1480.08"/>
-</g>
-<!-- interface~spg_get_international -->
-<g id="call~~graph~~CallGraph_node51" class="node">
-<title>interface~spg_get_international</title>
-<g id="a_call~~graph~~CallGraph_node51"><a xlink:href=".././interface/spg_get_international.html" xlink:title="spg_get_international">
-<polygon fill="#a7506f" stroke="#a7506f" points="334.5,-1453 219.5,-1453 219.5,-1429 334.5,-1429 334.5,-1453"/>
-<text text-anchor="middle" x="277" y="-1438.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">spg_get_international</text>
-</a>
-</g>
-</g>
-<!-- proc~get_operations&#45;&gt;interface~spg_get_international -->
-<g id="call~~graph~~CallGraph_edge61" class="edge">
-<title>proc~get_operations&#45;&gt;interface~spg_get_international</title>
-<path fill="none" stroke="#000000" d="M118.63,-1457.65C144.85,-1454.87 179.43,-1451.22 209.49,-1448.04"/>
-<polygon fill="#000000" stroke="#000000" points="209.92,-1451.51 219.49,-1446.98 209.18,-1444.55 209.92,-1451.51"/>
-</g>
-<!-- proc~calculate_wavevectors_full -->
-<g id="call~~graph~~CallGraph_node40" class="node">
-<title>proc~calculate_wavevectors_full</title>
-<g id="a_call~~graph~~CallGraph_node40"><a xlink:href=".././proc/calculate_wavevectors_full.html" xlink:title="calculate_wavevectors_full">
-<polygon fill="#d9534f" stroke="#d9534f" points="346.5,-974 207.5,-974 207.5,-950 346.5,-950 346.5,-974"/>
-<text text-anchor="middle" x="277" y="-959.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">calculate_wavevectors_full</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_wavevectors_full&#45;&gt;proc~demux_vector -->
-<g id="call~~graph~~CallGraph_edge62" class="edge">
-<title>proc~calculate_wavevectors_full&#45;&gt;proc~demux_vector</title>
-<path fill="none" stroke="#000000" d="M329.01,-949.96C353.46,-944.2 382.62,-937.31 406.83,-931.6"/>
-<polygon fill="#000000" stroke="#000000" points="407.94,-934.94 416.87,-929.23 406.33,-928.12 407.94,-934.94"/>
-</g>
-<!-- proc~find_equiv_map&#45;&gt;proc~demux_mesh -->
-<g id="call~~graph~~CallGraph_edge65" class="edge">
-<title>proc~find_equiv_map&#45;&gt;proc~demux_mesh</title>
-<path fill="none" stroke="#000000" d="M321.09,-836C347.46,-836 381.23,-836 408.38,-836"/>
-<polygon fill="#000000" stroke="#000000" points="408.44,-839.5 418.44,-836 408.44,-832.5 408.44,-839.5"/>
-</g>
-<!-- proc~find_equiv_map&#45;&gt;proc~mux_vector -->
-<g id="call~~graph~~CallGraph_edge63" class="edge">
-<title>proc~find_equiv_map&#45;&gt;proc~mux_vector</title>
-<path fill="none" stroke="#000000" d="M321.14,-829.57C336.13,-825.74 352.34,-819.66 365,-810 407.88,-777.28 435.54,-718.07 448.12,-686.03"/>
-<polygon fill="#000000" stroke="#000000" points="451.55,-686.87 451.81,-676.28 445,-684.39 451.55,-686.87"/>
-</g>
-<!-- proc~find_equiv_map&#45;&gt;proc~distribute_points -->
-<g id="call~~graph~~CallGraph_edge64" class="edge">
-<title>proc~find_equiv_map&#45;&gt;proc~distribute_points</title>
-<path fill="none" stroke="#000000" d="M321.37,-832.22C337.11,-828.71 353.76,-822.15 365,-810 416.55,-754.26 351.55,-700.62 401,-643 401.86,-642 402.78,-641.04 403.74,-640.13"/>
-<polygon fill="#000000" stroke="#000000" points="405.99,-642.82 411.87,-634.01 401.78,-637.23 405.99,-642.82"/>
-</g>
-<!-- proc~calculate_echimp_interaction_ibzk -->
-<g id="call~~graph~~CallGraph_node43" class="node">
-<title>proc~calculate_echimp_interaction_ibzk</title>
-<g id="a_call~~graph~~CallGraph_node43"><a xlink:href=".././proc/calculate_echimp_interaction_ibzk.html" xlink:title="calculate_echimp_interaction_ibzk">
-<polygon fill="#d9534f" stroke="#d9534f" points="364.5,-226 189.5,-226 189.5,-202 364.5,-202 364.5,-226"/>
-<text text-anchor="middle" x="277" y="-211.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">calculate_echimp_interaction_ibzk</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_echimp_interaction_ibzk&#45;&gt;proc~delta_fn_triang -->
-<g id="call~~graph~~CallGraph_edge71" class="edge">
-<title>proc~calculate_echimp_interaction_ibzk&#45;&gt;proc~delta_fn_triang</title>
-<path fill="none" stroke="#000000" d="M329.01,-226.04C352.83,-231.66 381.12,-238.33 404.95,-243.95"/>
-<polygon fill="#000000" stroke="#000000" points="404.32,-247.4 414.86,-246.29 405.93,-240.59 404.32,-247.4"/>
-</g>
-<!-- proc~calculate_echimp_interaction_ibzk&#45;&gt;proc~demux_state -->
-<g id="call~~graph~~CallGraph_edge70" class="edge">
-<title>proc~calculate_echimp_interaction_ibzk&#45;&gt;proc~demux_state</title>
-<path fill="none" stroke="#000000" d="M353.02,-226.19C357.36,-228.65 361.41,-231.56 365,-235 407.03,-275.32 372.35,-310.29 401,-361 409.51,-376.06 422.61,-390.32 433.89,-401.05"/>
-<polygon fill="#000000" stroke="#000000" points="431.59,-403.69 441.33,-407.87 436.33,-398.53 431.59,-403.69"/>
-</g>
-<!-- proc~calculate_echimp_interaction_ibzk&#45;&gt;proc~delta_fn_tetra -->
-<g id="call~~graph~~CallGraph_edge69" class="edge">
-<title>proc~calculate_echimp_interaction_ibzk&#45;&gt;proc~delta_fn_tetra</title>
-<path fill="none" stroke="#000000" d="M364.65,-214C379.16,-214 393.76,-214 406.89,-214"/>
-<polygon fill="#000000" stroke="#000000" points="407.08,-217.5 417.08,-214 407.08,-210.5 407.08,-217.5"/>
-</g>
-<!-- proc~calculate_echimp_interaction_ibzk&#45;&gt;proc~mux_state -->
-<g id="call~~graph~~CallGraph_edge67" class="edge">
-<title>proc~calculate_echimp_interaction_ibzk&#45;&gt;proc~mux_state</title>
-<path fill="none" stroke="#000000" d="M346.18,-226.01C352.77,-228.47 359.17,-231.43 365,-235 385.97,-247.84 380.9,-262.85 401,-277 405.65,-280.27 410.87,-283.12 416.21,-285.56"/>
-<polygon fill="#000000" stroke="#000000" points="415.24,-288.95 425.82,-289.54 417.91,-282.48 415.24,-288.95"/>
-</g>
-<!-- proc~calculate_echimp_interaction_ibzk&#45;&gt;proc~print_message -->
-<g id="call~~graph~~CallGraph_edge68" class="edge">
-<title>proc~calculate_echimp_interaction_ibzk&#45;&gt;proc~print_message</title>
-<path fill="none" stroke="#000000" d="M354.35,-226.15C358.26,-228.63 361.86,-231.55 365,-235 440.02,-317.32 352.83,-382.58 401,-483 408.43,-498.49 421.37,-512.68 432.83,-523.27"/>
-<polygon fill="#000000" stroke="#000000" points="430.63,-525.99 440.45,-529.99 435.27,-520.75 430.63,-525.99"/>
-</g>
-<!-- proc~calculate_echimp_interaction_ibzk&#45;&gt;proc~distribute_points -->
-<g id="call~~graph~~CallGraph_edge66" class="edge">
-<title>proc~calculate_echimp_interaction_ibzk&#45;&gt;proc~distribute_points</title>
-<path fill="none" stroke="#000000" d="M354.5,-226.02C358.37,-228.53 361.92,-231.5 365,-235 413.44,-290.05 370.44,-496.34 401,-563 408.11,-578.51 420.92,-592.63 432.38,-603.16"/>
-<polygon fill="#000000" stroke="#000000" points="430.19,-605.89 440.02,-609.85 434.81,-600.63 430.19,-605.89"/>
-</g>
-<!-- proc~calculate_el_rta_rates -->
-<g id="call~~graph~~CallGraph_node45" class="node">
-<title>proc~calculate_el_rta_rates</title>
-<g id="a_call~~graph~~CallGraph_node45"><a xlink:href=".././proc/calculate_el_rta_rates.html" xlink:title="calculate_el_rta_rates">
-<polygon fill="#d9534f" stroke="#d9534f" points="336,-478 218,-478 218,-454 336,-454 336,-478"/>
-<text text-anchor="middle" x="277" y="-463.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">calculate_el_rta_rates</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_el_rta_rates&#45;&gt;proc~demux_state -->
-<g id="call~~graph~~CallGraph_edge72" class="edge">
-<title>proc~calculate_el_rta_rates&#45;&gt;proc~demux_state</title>
-<path fill="none" stroke="#000000" d="M329.13,-453.94C340.93,-451.08 353.42,-447.99 365,-445 379.69,-441.21 395.67,-436.89 410.07,-432.92"/>
-<polygon fill="#000000" stroke="#000000" points="411.06,-436.28 419.76,-430.24 409.19,-429.53 411.06,-436.28"/>
-</g>
-<!-- proc~calculate_el_rta_rates&#45;&gt;proc~distribute_points -->
-<g id="call~~graph~~CallGraph_edge73" class="edge">
-<title>proc~calculate_el_rta_rates&#45;&gt;proc~distribute_points</title>
-<path fill="none" stroke="#000000" d="M336.37,-471.48C346.87,-474.72 357,-479.63 365,-487 402.53,-521.56 367.2,-557.78 401,-596 403.87,-599.25 407.24,-602.12 410.87,-604.66"/>
-<polygon fill="#000000" stroke="#000000" points="409.33,-607.82 419.7,-609.99 412.94,-601.83 409.33,-607.82"/>
-</g>
-<!-- proc~calculate_qtf -->
-<g id="call~~graph~~CallGraph_node46" class="node">
-<title>proc~calculate_qtf</title>
-<g id="a_call~~graph~~CallGraph_node46"><a xlink:href=".././proc/calculate_qtf.html" xlink:title="calculate_qTF">
-<polygon fill="#d9534f" stroke="#d9534f" points="317,-646 237,-646 237,-622 317,-622 317,-646"/>
-<text text-anchor="middle" x="277" y="-631.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">calculate_qTF</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_qtf&#45;&gt;proc~print_message -->
-<g id="call~~graph~~CallGraph_edge75" class="edge">
-<title>proc~calculate_qtf&#45;&gt;proc~print_message</title>
-<path fill="none" stroke="#000000" d="M317.33,-628.19C332.7,-624.99 350.17,-620.16 365,-613 392.39,-599.78 419.28,-577.28 436.64,-561.15"/>
-<polygon fill="#000000" stroke="#000000" points="439.08,-563.67 443.92,-554.25 434.26,-558.6 439.08,-563.67"/>
-</g>
-<!-- proc~calculate_qtf&#45;&gt;proc~fermi -->
-<g id="call~~graph~~CallGraph_edge74" class="edge">
-<title>proc~calculate_qtf&#45;&gt;proc~fermi</title>
-<path fill="none" stroke="#000000" d="M317.17,-632.4C333.59,-629.89 351.89,-624.44 365,-613 398.09,-584.14 377.62,-558.16 401,-521 410.21,-506.36 423.33,-492.12 434.45,-481.29"/>
-<polygon fill="#000000" stroke="#000000" points="436.9,-483.8 441.76,-474.38 432.09,-478.71 436.9,-483.8"/>
-</g>
-<!-- proc~append2file_transport_tensor -->
-<g id="call~~graph~~CallGraph_node48" class="node">
-<title>proc~append2file_transport_tensor</title>
-<g id="a_call~~graph~~CallGraph_node48"><a xlink:href=".././proc/append2file_transport_tensor.html" xlink:title="append2file_transport_tensor">
-<polygon fill="#d9534f" stroke="#d9534f" points="153,-1516 0,-1516 0,-1492 153,-1492 153,-1516"/>
-<text text-anchor="middle" x="76.5" y="-1501.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">append2file_transport_tensor</text>
-</a>
-</g>
-</g>
-<!-- proc~int_div -->
-<g id="call~~graph~~CallGraph_node50" class="node">
-<title>proc~int_div</title>
-<g id="a_call~~graph~~CallGraph_node50"><a xlink:href=".././proc/int_div.html" xlink:title="int_div">
-<polygon fill="#d9534f" stroke="#d9534f" points="103.5,-1558 49.5,-1558 49.5,-1534 103.5,-1534 103.5,-1558"/>
-<text text-anchor="middle" x="76.5" y="-1543.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">int_div</text>
-</a>
-</g>
-</g>
-<!-- proc~fill_triangles -->
-<g id="call~~graph~~CallGraph_node52" class="node">
-<title>proc~fill_triangles</title>
-<g id="a_call~~graph~~CallGraph_node52"><a xlink:href=".././proc/fill_triangles.html" xlink:title="fill_triangles">
-<polygon fill="#d9534f" stroke="#d9534f" points="111,-1600 42,-1600 42,-1576 111,-1576 111,-1600"/>
-<text text-anchor="middle" x="76.5" y="-1585.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">fill_triangles</text>
-</a>
-</g>
-</g>
-<!-- proc~fill_tetrahedra_3d -->
-<g id="call~~graph~~CallGraph_node55" class="node">
-<title>proc~fill_tetrahedra_3d</title>
-<g id="a_call~~graph~~CallGraph_node55"><a xlink:href=".././proc/fill_tetrahedra_3d.html" xlink:title="fill_tetrahedra_3d">
-<polygon fill="#d9534f" stroke="#d9534f" points="124.5,-1642 28.5,-1642 28.5,-1618 124.5,-1618 124.5,-1642"/>
-<text text-anchor="middle" x="76.5" y="-1627.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">fill_tetrahedra_3d</text>
-</a>
-</g>
-</g>
-<!-- proc~symmetrize_3x3_tensor -->
-<g id="call~~graph~~CallGraph_node56" class="node">
-<title>proc~symmetrize_3x3_tensor</title>
-<g id="a_call~~graph~~CallGraph_node56"><a xlink:href=".././proc/symmetrize_3x3_tensor.html" xlink:title="symmetrize_3x3_tensor">
-<polygon fill="#d9534f" stroke="#d9534f" points="140,-1684 13,-1684 13,-1660 140,-1660 140,-1684"/>
-<text text-anchor="middle" x="76.5" y="-1669.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">symmetrize_3x3_tensor</text>
-</a>
-</g>
-</g>
-<!-- proc~write2file_response -->
-<g id="call~~graph~~CallGraph_node58" class="node">
-<title>proc~write2file_response</title>
-<g id="a_call~~graph~~CallGraph_node58"><a xlink:href=".././proc/write2file_response.html" xlink:title="write2file_response">
-<polygon fill="#d9534f" stroke="#d9534f" points="129,-1726 24,-1726 24,-1702 129,-1702 129,-1726"/>
-<text text-anchor="middle" x="76.5" y="-1711.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">write2file_response</text>
-</a>
-</g>
-</g>
-<!-- proc~mux_vector&#45;&gt;proc~exit_with_message -->
-<g id="call~~graph~~CallGraph_edge76" class="edge">
-<title>proc~mux_vector&#45;&gt;proc~exit_with_message</title>
-<path fill="none" stroke="#000000" d="M491.05,-654.43C498.63,-651.43 506.4,-647.65 513,-643 544.19,-621.03 571.15,-585.35 586.35,-562.8"/>
-<polygon fill="#000000" stroke="#000000" points="589.37,-564.58 591.94,-554.3 583.52,-560.73 589.37,-564.58"/>
-</g>
-<!-- proc~calculate_transport_coeff -->
-<g id="call~~graph~~CallGraph_node61" class="node">
-<title>proc~calculate_transport_coeff</title>
-<g id="a_call~~graph~~CallGraph_node61"><a xlink:href=".././proc/calculate_transport_coeff.html" xlink:title="calculate_transport_coeff">
-<polygon fill="#d9534f" stroke="#d9534f" points="343.5,-436 210.5,-436 210.5,-412 343.5,-412 343.5,-436"/>
-<text text-anchor="middle" x="277" y="-421.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">calculate_transport_coeff</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_transport_coeff&#45;&gt;proc~bose -->
-<g id="call~~graph~~CallGraph_edge77" class="edge">
-<title>proc~calculate_transport_coeff&#45;&gt;proc~bose</title>
-<path fill="none" stroke="#000000" d="M340.25,-411.95C348.74,-409.46 357.2,-406.49 365,-403 390.62,-391.52 416.63,-372.63 434.25,-358.52"/>
-<polygon fill="#000000" stroke="#000000" points="436.66,-361.07 442.18,-352.03 432.23,-355.65 436.66,-361.07"/>
-</g>
-<!-- proc~calculate_transport_coeff&#45;&gt;proc~exit_with_message -->
-<g id="call~~graph~~CallGraph_edge78" class="edge">
-<title>proc~calculate_transport_coeff&#45;&gt;proc~exit_with_message</title>
-<path fill="none" stroke="#000000" d="M343.61,-431.84C351.49,-434.98 358.89,-439.25 365,-445 404.9,-482.61 356.93,-530.37 401,-563 449.45,-598.87 523.7,-576.3 566.33,-558.14"/>
-<polygon fill="#000000" stroke="#000000" points="567.95,-561.25 575.69,-554.01 565.12,-554.85 567.95,-561.25"/>
-</g>
-<!-- proc~calculate_transport_coeff&#45;&gt;proc~fermi -->
-<g id="call~~graph~~CallGraph_edge79" class="edge">
-<title>proc~calculate_transport_coeff&#45;&gt;proc~fermi</title>
-<path fill="none" stroke="#000000" d="M334.32,-436.02C362.3,-442 395.29,-449.04 419.86,-454.28"/>
-<polygon fill="#000000" stroke="#000000" points="419.32,-457.75 429.83,-456.41 420.78,-450.9 419.32,-457.75"/>
-</g>
-<!-- program~elphbolt -->
-<g id="call~~graph~~CallGraph_node62" class="node">
-<title>program~elphbolt</title>
-<g id="a_call~~graph~~CallGraph_node62"><a xlink:href=".././program/elphbolt.html" xlink:title="elphbolt">
-<polygon fill="#f0ad4e" stroke="#f0ad4e" points="103.5,-478 49.5,-478 49.5,-454 103.5,-454 103.5,-478"/>
-<text text-anchor="middle" x="76.5" y="-463.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">elphbolt</text>
-</a>
-</g>
-</g>
-<!-- program~elphbolt&#45;&gt;interface~calculate_dos -->
-<g id="call~~graph~~CallGraph_edge90" class="edge">
-<title>program~elphbolt&#45;&gt;interface~calculate_dos</title>
-<path fill="none" stroke="#000000" d="M81.07,-453.53C91.51,-419.45 125.31,-324.15 189,-277 200.15,-268.75 214.09,-263.7 227.54,-260.62"/>
-<polygon fill="#000000" stroke="#000000" points="228.52,-263.99 237.66,-258.63 227.17,-257.12 228.52,-263.99"/>
-</g>
-<!-- program~elphbolt&#45;&gt;proc~calculate_3ph_interaction -->
-<g id="call~~graph~~CallGraph_edge86" class="edge">
-<title>program~elphbolt&#45;&gt;proc~calculate_3ph_interaction</title>
-<path fill="none" stroke="#000000" d="M83.06,-453.87C96.74,-425.47 134.85,-354.42 189,-319 192.58,-316.66 196.4,-314.57 200.37,-312.72"/>
-<polygon fill="#000000" stroke="#000000" points="201.93,-315.86 209.84,-308.81 199.26,-309.39 201.93,-315.86"/>
-</g>
-<!-- program~elphbolt&#45;&gt;proc~calculate_bound_scatt_rates -->
-<g id="call~~graph~~CallGraph_edge83" class="edge">
-<title>program~elphbolt&#45;&gt;proc~calculate_bound_scatt_rates</title>
-<path fill="none" stroke="#000000" d="M80,-453.83C89.31,-410.32 124.75,-259.25 189,-151 206.96,-120.74 235.22,-91.44 254.63,-73.1"/>
-<polygon fill="#000000" stroke="#000000" points="257.15,-75.54 262.1,-66.17 252.39,-70.41 257.15,-75.54"/>
-</g>
-<!-- program~elphbolt&#45;&gt;proc~calculate_eph_interaction_ibzq -->
-<g id="call~~graph~~CallGraph_edge80" class="edge">
-<title>program~elphbolt&#45;&gt;proc~calculate_eph_interaction_ibzq</title>
-<path fill="none" stroke="#000000" d="M95.27,-453.89C116.65,-439.82 154.04,-416.78 189,-403 194.56,-400.81 200.41,-398.8 206.33,-396.98"/>
-<polygon fill="#000000" stroke="#000000" points="207.72,-400.22 216.35,-394.07 205.77,-393.49 207.72,-400.22"/>
-</g>
-<!-- program~elphbolt&#45;&gt;proc~calculate_greq -->
-<g id="call~~graph~~CallGraph_edge84" class="edge">
-<title>program~elphbolt&#45;&gt;proc~calculate_greq</title>
-<path fill="none" stroke="#000000" d="M80.04,-478.21C88.45,-515.56 118.94,-629.24 189,-688 198.91,-696.31 211.41,-701.97 223.82,-705.81"/>
-<polygon fill="#000000" stroke="#000000" points="223.12,-709.25 233.69,-708.53 224.98,-702.5 223.12,-709.25"/>
-</g>
-<!-- program~elphbolt&#45;&gt;proc~calculate_gkrp -->
-<g id="call~~graph~~CallGraph_edge85" class="edge">
-<title>program~elphbolt&#45;&gt;proc~calculate_gkrp</title>
-<path fill="none" stroke="#000000" d="M78.7,-478.16C83.58,-520.66 105.81,-663.88 189,-735 198.88,-743.45 211.59,-748.61 224.23,-751.74"/>
-<polygon fill="#000000" stroke="#000000" points="223.79,-755.23 234.29,-753.84 225.21,-748.38 223.79,-755.23"/>
-</g>
-<!-- program~elphbolt&#45;&gt;proc~welcome -->
-<g id="call~~graph~~CallGraph_edge88" class="edge">
-<title>program~elphbolt&#45;&gt;proc~welcome</title>
-<path fill="none" stroke="#000000" d="M86.78,-478.19C104.25,-500.27 144.34,-546.82 189,-571 204.36,-579.31 223,-584.37 239.08,-587.44"/>
-<polygon fill="#000000" stroke="#000000" points="238.77,-590.93 249.22,-589.17 239.95,-584.03 238.77,-590.93"/>
-</g>
-<!-- program~elphbolt&#45;&gt;proc~calculate_eph_interaction_ibzk -->
-<g id="call~~graph~~CallGraph_edge81" class="edge">
-<title>program~elphbolt&#45;&gt;proc~calculate_eph_interaction_ibzk</title>
-<path fill="none" stroke="#000000" d="M86.78,-453.81C104.25,-431.73 144.34,-385.18 189,-361 192.69,-359 196.57,-357.19 200.56,-355.55"/>
-<polygon fill="#000000" stroke="#000000" points="201.87,-358.8 210.02,-352.03 199.43,-352.24 201.87,-358.8"/>
-</g>
-<!-- program~elphbolt&#45;&gt;proc~subtitle -->
-<g id="call~~graph~~CallGraph_edge89" class="edge">
-<title>program~elphbolt&#45;&gt;proc~subtitle</title>
-<path fill="none" stroke="#000000" d="M95.27,-478.11C116.65,-492.18 154.04,-515.22 189,-529 205.24,-535.41 223.99,-540.23 239.92,-543.64"/>
-<polygon fill="#000000" stroke="#000000" points="239.42,-547.11 249.92,-545.67 240.81,-540.25 239.42,-547.11"/>
-</g>
-<!-- program~elphbolt&#45;&gt;proc~calculate_echimp_interaction_ibzk -->
-<g id="call~~graph~~CallGraph_edge82" class="edge">
-<title>program~elphbolt&#45;&gt;proc~calculate_echimp_interaction_ibzk</title>
-<path fill="none" stroke="#000000" d="M79.58,-453.95C86.88,-415.49 115.01,-294.71 189,-235 190.77,-233.57 192.62,-232.24 194.54,-231"/>
-<polygon fill="#000000" stroke="#000000" points="196.3,-234.02 203.32,-226.09 192.88,-227.91 196.3,-234.02"/>
-</g>
-<!-- program~elphbolt&#45;&gt;proc~calculate_qtf -->
-<g id="call~~graph~~CallGraph_edge91" class="edge">
-<title>program~elphbolt&#45;&gt;proc~calculate_qtf</title>
-<path fill="none" stroke="#000000" d="M83.06,-478.13C96.74,-506.53 134.85,-577.58 189,-613 200.29,-620.39 213.94,-625.18 227.04,-628.29"/>
-<polygon fill="#000000" stroke="#000000" points="226.4,-631.73 236.9,-630.35 227.83,-624.88 226.4,-631.73"/>
-</g>
-<!-- program~elphbolt&#45;&gt;proc~print_message -->
-<g id="call~~graph~~CallGraph_edge87" class="edge">
-<title>program~elphbolt&#45;&gt;proc~print_message</title>
-<path fill="none" stroke="#000000" d="M80.28,-478.27C89,-513.56 119.53,-615.32 189,-655 256.93,-693.79 296.03,-691.91 365,-655 390.43,-641.39 383.11,-623.62 401,-601 412.01,-587.08 425.6,-572.48 436.52,-561.29"/>
-<polygon fill="#000000" stroke="#000000" points="439.05,-563.71 443.58,-554.13 434.07,-558.79 439.05,-563.71"/>
-</g>
-</g>
-</svg>
-</div><div><a type="button" class="graph-help" data-toggle="modal" href="#graph-help-text">Help</a></div><div class="modal fade" id="graph-help-text" tabindex="-1" role="dialog"><div class="modal-dialog modal-lg" role="document"><div class="modal-content"><div class="modal-header"><button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button><h4 class="modal-title" id="-graph-help-label">Graph Key</h4></div><div class="modal-body">
-    <p>Nodes of different colours represent the following: </p>
-    <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
- "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<!-- Generated by graphviz version 2.43.0 (0)
- -->
-<!-- Title: Graph Key Pages: 1 -->
-<svg width="560pt" height="32pt"
- viewBox="0.00 0.00 559.50 32.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 28)">
-<title>Graph Key</title>
-<polygon fill="white" stroke="transparent" points="-4,4 -4,-28 555.5,-28 555.5,4 -4,4"/>
-<!-- Subroutine -->
-<g id="node1" class="node">
-<title>Subroutine</title>
-<polygon fill="#d9534f" stroke="#d9534f" points="64,-24 0,-24 0,0 64,0 64,-24"/>
-<text text-anchor="middle" x="32" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">Subroutine</text>
-</g>
-<!-- Function -->
-<g id="node2" class="node">
-<title>Function</title>
-<polygon fill="#d94e8f" stroke="#d94e8f" points="136,-24 82,-24 82,0 136,0 136,-24"/>
-<text text-anchor="middle" x="109" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">Function</text>
-</g>
-<!-- Interface -->
-<g id="node3" class="node">
-<title>Interface</title>
-<polygon fill="#a7506f" stroke="#a7506f" points="209.5,-24 154.5,-24 154.5,0 209.5,0 209.5,-24"/>
-<text text-anchor="middle" x="182" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">Interface</text>
-</g>
-<!-- Unknown Procedure Type -->
-<g id="node4" class="node">
-<title>Unknown Procedure Type</title>
-<polygon fill="#777777" stroke="#777777" points="364,-24 228,-24 228,0 364,0 364,-24"/>
-<text text-anchor="middle" x="296" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">Unknown Procedure Type</text>
-</g>
-<!-- Program -->
-<g id="node5" class="node">
-<title>Program</title>
-<polygon fill="#f0ad4e" stroke="#f0ad4e" points="436,-24 382,-24 382,0 436,0 436,-24"/>
-<text text-anchor="middle" x="409" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">Program</text>
-</g>
-<!-- This Page&#39;s Entity -->
-<g id="node6" class="node">
-<title>This Page&#39;s Entity</title>
-<polygon fill="none" stroke="black" points="551.5,-24 454.5,-24 454.5,0 551.5,0 551.5,-24"/>
-<text text-anchor="middle" x="503" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50">This Page&#39;s Entity</text>
-</g>
-</g>
-</svg>
-
-    
-    <p>Solid arrows point from a procedure to one which it calls. Dashed 
-    arrows point from an interface to procedures which implement that interface.
-    This could include the module procedures in a generic interface or the
-    implementation in a submodule of an interface in a parent module.
-    </p>
-    </div></div></div></div>
+             
         </div>
       </div>
-
     <hr>    
     </div> <!-- /container -->
     <footer>
       <div class="container">
       <div class="row">
-        <div class="col-xs-6 col-md-4"><p>&copy; 2022 
-                                          </p></div>
-        <div class="col-xs-6 col-md-4 col-md-push-4">
+        <div class="col-xs-6 col-md-6"><p>elphbolt was developed by Nakib Haider Protik<br>&copy; 2023 GNU General Public License 3.0
+</p>
+        </div>
+        <div class="col-xs-6 col-md-6">
           <p class="text-right">
             Documentation generated by 
-            <a href="https://github.com/cmacmackin/ford">FORD</a>
-            
+            <a href="https://github.com/Fortran-FOSS-Programmers/ford">FORD</a>
           </p>
         </div>
-        <div class="col-xs-12 col-md-4 col-md-pull-4"><p class="text-center"> elphbolt was developed by Nakib Haider Protik</p></div>
       </div>
       <br>
       </div> <!-- /container -->    
@@ -1493,14 +253,11 @@ All Procedures &ndash; elphbolt
         extensions: ['tex2jax.js','mml2jax.js','MathMenu.js','MathZoom.js']
       });
     </script>
-    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-    
     
     <script src="../tipuesearch/tipuesearch_content.js"></script>
     <script src="../tipuesearch/tipuesearch_set.js"></script>
     <script src="../tipuesearch/tipuesearch.js"></script>
-    
     
   </body>
 </html>

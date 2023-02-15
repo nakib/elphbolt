@@ -1,4 +1,4 @@
-! Copyright (C) 2020- Nakib Haider Protik <nakib.haider.protik@gmail.com>
+! Copyright 2020 elphbolt contributors.
 ! This file is part of elphbolt <https://github.com/nakib/elphbolt>.
 !
 ! elphbolt is free software: you can redistribute it and/or modify
@@ -17,7 +17,7 @@
 module numerics_module
   !! Module containing type and procedures related to the numerics.
 
-  use params, only: dp, k8, twopi
+  use params, only: r64, i64, twopi
   use misc, only: exit_with_message, subtitle
   use crystal_module, only: crystal
 
@@ -26,14 +26,16 @@ module numerics_module
   private
   public numerics
 
+  !external system, getcwd
+  
   type numerics
      !! Data and procedures related to the numerics.
 
-     integer(k8) :: qmesh(3)
+     integer(i64) :: qmesh(3)
      !! Phonon wave vector mesh.
-     integer(k8) :: mesh_ref
+     integer(i64) :: mesh_ref
      !! Electron mesh refinement factor compared to the phonon mesh.
-     real(dp) :: fsthick
+     real(r64) :: fsthick
      !! Fermi surface thickness in eV.
      character(len = 1024) :: cwd
      !! Current working directory.
@@ -53,6 +55,8 @@ module numerics_module
      !! Directory for e-ph transition rates.
      character(len = 1024) :: Ydir
      !! Directory for ph-e transition rates.
+     character(len = 1024) :: scdir
+     !! Directory for the superconductivity temporary data.
      logical :: read_gq2
      !! Choose if earlier e-ph (IBZ q) vertices are to be used.
      logical :: read_gk2
@@ -71,8 +75,14 @@ module numerics_module
      !! Use phonon-substitution scattering?
      logical :: phbound
      !! Use phonon-boundary scattering?
-     logical :: 4ph
-     !! Use 4-phonon scattering?
+     logical :: fourph
+     !! Use 4-ph scattering?
+     integer(i64) :: fourph_mesh_ref
+     !! Mesh refinement factor of phonon wavectors with respect to external 4-ph calculation 
+     logical :: phthinfilm
+     !! Use phonon-thin-film scattering?
+     logical :: phdef_Tmat
+     !! Calculate phonon-defect scattering T-matrix?
      logical :: onlyphbte
      !! Choose if only phonon BTE will be solved.
      logical :: onlyebte
@@ -83,22 +93,24 @@ module numerics_module
      !! Use electron-boundary scattering?
      logical :: drag
      !! Choose if the drag effect will be included.
-     integer(k8) :: maxiter
-     !! Maximum number of iterations in the BTE solver.
-     real(dp) :: conv_thres
-     !! BTE iteration convergence criterion.
+     integer(i64) :: maxiter
+     !! Maximum number of iterations in the BTE/Migdal-Eliashberg equations solver.
+     real(r64) :: conv_thres
+     !! BTE/Migdal-Eliashberg euqations iteration convergence criterion.
      logical :: plot_along_path
      !! Plot Wannierized quantities along high symmetry wave vectors?
-     integer(k8) :: runlevel
+     integer(i64) :: runlevel
      !! Control for the type of calculation.
-     real(dp) :: ph_en_min, ph_en_max
+     real(r64) :: ph_en_min, ph_en_max
      !! Bounds of equidistant phonon energy mesh.
-     integer(k8) :: ph_en_num
+     integer(i64) :: ph_en_num
      !! Number of equidistant phonon energy mesh points.
-     real(dp) :: el_en_min, el_en_max
-     !! Bounds of equidistant phonon energy mesh.
-     integer(k8) :: el_en_num
-     !! Number of equidistant phonon energy mesh points.
+     real(r64) :: el_en_min, el_en_max
+     !! Bounds of equidistant electron energy mesh.
+     integer(i64) :: el_en_num
+     !! Number of equidistant electron energy mesh points.
+     integer(i64) :: ph_mfp_npts
+     !! Number of equidistant phonon mean-free-path mesh points.
    contains
 
      procedure :: initialize=>read_input_and_setup, create_chempot_dirs
@@ -117,16 +129,19 @@ contains
     type(crystal), intent(in) :: crys
     
     !Local variables
-    integer(k8) :: mesh_ref, qmesh(3), maxiter, runlevel, el_en_num, ph_en_num
-    real(dp) :: fsthick, conv_thres, ph_en_min, ph_en_max, el_en_min, el_en_max
+    integer(i64) :: mesh_ref, qmesh(3), maxiter, runlevel, el_en_num, &
+         ph_en_num, ph_mfp_npts, fourph_mesh_ref
+    real(r64) :: fsthick, conv_thres, ph_en_min, ph_en_max, el_en_min, el_en_max
     character(len = 1024) :: datadumpdir, tag
     logical :: read_gq2, read_gk2, read_V, read_W, tetrahedra, phe, phiso, phsubs, &
-         phbound, onlyphbte, onlyebte, elchimp, elbound, drag, plot_along_path, 4ph
+         phbound, phdef_Tmat, onlyphbte, onlyebte, elchimp, elbound, drag, plot_along_path, &
+         phthinfilm, fourph
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
          read_V, read_W, tetrahedra, phe, phiso, phsubs, onlyphbte, onlyebte, maxiter, &
          conv_thres, drag, elchimp, plot_along_path, runlevel, ph_en_min, ph_en_max, &
-         ph_en_num, el_en_min, el_en_max, el_en_num, phbound, elbound, 4ph
+         ph_en_num, el_en_min, el_en_max, el_en_num, phbound, elbound, phdef_Tmat, &
+         ph_mfp_npts, phthinfilm , fourph, fourph_mesh_ref
 
     call subtitle("Reading numerics information...")
     
@@ -136,7 +151,8 @@ contains
     !Read numerics information
     qmesh = (/1, 1, 1/)
     mesh_ref = 1
-    fsthick = 0.0_dp
+    fourph_mesh_ref = 1
+    fsthick = 0.0_r64
     datadumpdir = './'
     read_gq2 = .false.
     read_gk2 = .false.
@@ -147,7 +163,9 @@ contains
     phiso = .false.
     phsubs = .false.
     phbound = .false.
-    4ph = .false.
+    fourph = .false.
+    phthinfilm = .false.
+    phdef_Tmat = .false.
     onlyphbte = .false.
     onlyebte = .false.
     elchimp = .false.
@@ -155,16 +173,17 @@ contains
     drag = .true.
     plot_along_path = .false.
     maxiter = 50
-    conv_thres = 1e-4_dp
+    conv_thres = 1e-4_r64
     runlevel = 1
-    ph_en_min = 0.0_dp
-    ph_en_max = 1.0_dp
+    ph_en_min = 0.0_r64
+    ph_en_max = 1.0_r64
     ph_en_num = 100
-    el_en_min = -10.0_dp
-    el_en_max = 10.0_dp
+    el_en_min = -10.0_r64
+    el_en_max = 10.0_r64
     el_en_num = 100
+    ph_mfp_npts = 100
     read(1, nml = numerics)
-    if(any(qmesh <= 0) .or. mesh_ref < 1 .or. fsthick < 0) then
+    if(any(qmesh <= 0) .or. fourph_mesh_ref < 1 .or. mesh_ref < 1 .or. fsthick < 0) then
        call exit_with_message('Bad input(s) in numerics.')
     end if
     if(crys%twod .and. tetrahedra) then
@@ -175,28 +194,39 @@ contains
             'Need to provide non-zero epsilon0 for e-ch. imp. interaction. Exiting.')
     end if
     self%qmesh = qmesh
-    self%mesh_ref = mesh_ref
+    self%runlevel = runlevel
+    !Runlevels:
+    !1 BTE
+    !2 BTE postproc
+    !3 Superconductivity
+    if(self%runlevel /= 3) then !Non-superconductivity mode
+       self%mesh_ref = mesh_ref
+       self%fourph_mesh_ref = fourph_mesh_ref
+       self%read_gq2 = read_gq2
+       self%read_V = read_V
+       self%read_W = read_W
+       self%phe = phe
+       self%phiso = phiso
+       self%phsubs = phsubs
+       self%phbound = phbound
+       self%fourph = fourph
+       self%phthinfilm = phthinfilm
+       self%phdef_Tmat = phdef_Tmat
+       self%onlyphbte = onlyphbte
+       self%onlyebte = onlyebte
+       self%elchimp = elchimp
+       self%elbound = elbound
+       self%drag = drag
+    else
+       self%mesh_ref = 1 !Enforce this for superconductivity mode
+    end if
+    self%read_gk2 = read_gk2
     self%fsthick = fsthick
     self%datadumpdir = trim(datadumpdir)
-    self%read_gq2 = read_gq2
-    self%read_gk2 = read_gk2
-    self%read_V = read_V
-    self%read_W = read_W
     self%tetrahedra = tetrahedra
-    self%phe = phe
-    self%phiso = phiso
-    self%phsubs = phsubs
-    self%phbound = phbound
-    self%4ph = 4ph
-    self%onlyphbte = onlyphbte
-    self%onlyebte = onlyebte
-    self%elchimp = elchimp
-    self%elbound = elbound
     self%maxiter = maxiter
     self%conv_thres = conv_thres
-    self%drag = drag
     self%plot_along_path = plot_along_path
-    self%runlevel = runlevel
 
     if(runlevel == 2) then
        self%ph_en_min = ph_en_min
@@ -205,6 +235,7 @@ contains
        self%el_en_min = el_en_min
        self%el_en_max = el_en_max
        self%el_en_num = el_en_num
+       self%ph_mfp_npts = ph_mfp_npts
     end if
     
     if(crys%twod .and. self%qmesh(3) /= 1) then
@@ -228,6 +259,11 @@ contains
        self%onlyphbte = .false.
        self%phe = .true.
     end if
+
+    !Check if T-matrix and tetrahedron method consistency
+    if(self%phdef_Tmat .and. .not. self%tetrahedra) then
+       call exit_with_message("Currently T-matrix method is only supported with tetrahedron method. Exiting.")
+    end if
     
     !Create data dump directory
     if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(self%datadumpdir)))
@@ -237,6 +273,10 @@ contains
     if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(self%g2dir)))
     self%Vdir = trim(adjustl(self%datadumpdir))//'V2'
     if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(self%Vdir)))
+
+    !Create superconductivity data dump directory
+    self%scdir = trim(adjustl(self%datadumpdir))//'sc'
+    if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(self%scdir)))
 
     !Create T dependent subdirectory
     write(tag, "(E9.3)") crys%T
@@ -263,38 +303,56 @@ contains
           write(*, "(A, (3I5,x))") "k-mesh = ", self%mesh_ref*self%qmesh(1), self%mesh_ref*self%qmesh(2), &
                self%mesh_ref*self%qmesh(3)
        end if
+       if(self%fourph) then
+          if(crys%twod) then
+             write(*, "(A, (3I5,x))") "external 4ph q-mesh = ", &
+                  self%fourph_mesh_ref*self%qmesh(1), self%fourph_mesh_ref*self%qmesh(2), 1
+          else
+             write(*, "(A, (3I5,x))") "external 4ph q-mesh = ", &
+                  self%fourph_mesh_ref*self%qmesh(1), self%fourph_mesh_ref*self%qmesh(2), &
+                  self%fourph_mesh_ref*self%qmesh(3)
+          end if
+       end if
        write(*, "(A, 1E16.8, A)") "Fermi window thickness (each side of reference energy) = ", self%fsthick, " eV"
        write(*, "(A, A)") "Working directory = ", trim(self%cwd)
        write(*, "(A, A)") "Data dump directory = ", trim(self%datadumpdir)
        write(*, "(A, A)") "T-dependent data dump directory = ", trim(self%datadumpdir_T)
        write(*, "(A, A)") "e-ph directory = ", trim(self%g2dir)
-       write(*, "(A, A)") "ph-ph directory = ", trim(self%Vdir)
+       if(self%runlevel /= 3) write(*, "(A, A)") "ph-ph directory = ", trim(self%Vdir)
        write(*, "(A, L)") "Reuse e-ph matrix elements: ", self%read_gk2
-       write(*, "(A, L)") "Reuse ph-e matrix elements: ", self%read_gq2
-       write(*, "(A, L)") "Reuse ph-ph matrix elements: ", self%read_V
-       write(*, "(A, L)") "Reuse ph-ph transition probabilities: ", self%read_W
+       if(self%runlevel /= 3) then
+          write(*, "(A, L)") "Reuse ph-e matrix elements: ", self%read_gq2
+          write(*, "(A, L)") "Reuse ph-ph matrix elements: ", self%read_V
+          write(*, "(A, L)") "Reuse ph-ph transition probabilities: ", self%read_W
+          write(*, "(A, L)") "Include ph-e interaction: ", self%phe
+          write(*, "(A, L)") "Include ph-isotope interaction: ", self%phiso       
+          write(*, "(A, L)") "Include ph-substitution interaction: ", self%phsubs
+          write(*, "(A, L)") "Include ph-boundary interaction: ", self%phbound
+          write(*, "(A, L)") "Include 4-ph interaction: ", self%fourph
+          write(*, "(A, L)") "Include ph-thin-film interaction: ", self%phthinfilm
+          write(*, "(A, L)") "Include ph-defect interaction using the T-matrix: ", self%phdef_Tmat
+          if(self%phbound) then
+             write(*,"(A,(1E16.8,x),A)") 'Characteristic length for ph-boundary scattering =', &
+                  crys%bound_length, 'mm'
+          end if
+          if(self%phthinfilm) then
+             write(*,"(A,(1E16.8,x),A,A,A)") 'Height for ph-thin-film scattering =', &
+                  crys%thinfilm_height, 'mm along the ', crys%thinfilm_normal, ' direction'
+          end if
+          write(*, "(A, L)") "Include el-charged impurity interaction: ", self%elchimp
+          write(*, "(A, L)") "Include el-boundary interaction: ", self%elbound
+          if(self%elbound) then
+             write(*,"(A,(1E16.8,x),A)") 'Characteristic length for el-boundary scattering =', &
+                  crys%bound_length, 'mm'
+          end if
+          if(self%onlyphbte) write(*, "(A, L)") "Calculate only phonon BTE: ", self%onlyphbte
+          if(self%onlyebte) write(*, "(A, L)") "Calculate only electron BTE: ", self%onlyebte
+          write(*, "(A, L)") "Include drag: ", self%drag
+       end if
        write(*, "(A, L)") "Use tetrahedron method: ", self%tetrahedra
-       write(*, "(A, L)") "Include ph-e interaction: ", self%phe
-       write(*, "(A, L)") "Include ph-isotope interaction: ", self%phiso       
-       write(*, "(A, L)") "Include ph-substitution interaction: ", self%phsubs
-       write(*, "(A, L)") "Include ph-boundary interaction: ", self%phbound
-       write(*, "(A, L)") "Include 4-ph interaction: ", self%4ph
-       if(self%phbound) then
-          write(*,"(A,(1E16.8,x),A)") 'Characteristic length for ph-boundary scattering =', &
-               crys%bound_length, 'mm'
-       end if
-       write(*, "(A, L)") "Include el-charged impurity interaction: ", self%elchimp
-       write(*, "(A, L)") "Include el-boundary interaction: ", self%elbound
-       if(self%elbound) then
-          write(*,"(A,(1E16.8,x),A)") 'Characteristic length for el-boundary scattering =', &
-               crys%bound_length, 'mm'
-       end if
-       if(self%onlyphbte) write(*, "(A, L)") "Calculate only phonon BTE: ", self%onlyphbte
-       if(self%onlyebte) write(*, "(A, L)") "Calculate only electron BTE: ", self%onlyebte
-       write(*, "(A, L)") "Include drag: ", self%drag
        write(*, "(A, L)") "Plot quantities along path: ", self%plot_along_path
-       write(*, "(A, I5)") "Maximum number of BTE iterations = ", self%maxiter
-       write(*, "(A, 1E16.8)") "BTE convergence threshold = ", self%conv_thres
+       write(*, "(A, I5)") "Maximum number of BTE/Migdal-Eliashberg equations iterations = ", self%maxiter
+       write(*, "(A, 1E16.8)") "BTE/Migdal-Eliashberg equations convergence threshold = ", self%conv_thres
     end if
     sync all
   end subroutine read_input_and_setup
@@ -304,7 +362,7 @@ contains
     !! and subdirectories within.
     
     class(numerics), intent(inout) :: self
-    real(dp), intent(in) :: chempot
+    real(r64), intent(in) :: chempot
 
     !Local variables
     character(len = 1024) :: tag

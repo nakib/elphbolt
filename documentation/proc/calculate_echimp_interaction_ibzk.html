@@ -4,9 +4,7 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-   
    <meta name="description" content="A solver for the coupled and decoupled electron and phonon Boltzmann transport equations.">
-    
     <meta name="author" content="Nakib Haider Protik" >
     <link rel="icon" href="../favicon.png">
 
@@ -16,10 +14,7 @@
     <link href="../css/pygments.css" rel="stylesheet">
     <link href="../css/font-awesome.min.css" rel="stylesheet">
     <link href="../css/local.css" rel="stylesheet">
-    
     <link  href="../tipuesearch/tipuesearch.css" rel="stylesheet">
-    
-    
 
     <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
     <!--[if lt IE 9]>
@@ -48,53 +43,29 @@
         </div>
         <div id="navbar" class="navbar-collapse collapse">
           <ul class="nav navbar-nav">
-        
             <li class="dropdown hidden-xs visible-sm visible-md hidden-lg">
               <a href="#" class="dropdown-toggle"
               data-toggle="dropdown" role="button"
               aria-haspopup="true"
      aria-expanded="false">Contents <span class="caret"></span></a>
         <ul class="dropdown-menu">
-          
-              
             <li><a href="../lists/files.html">Source Files</a></li>
-        
-        
-        
             <li><a href="../lists/modules.html">Modules</a></li>
-        
-            
-                                
             <li><a href="../lists/procedures.html">Procedures</a></li>
-        
-               
-            <li><a href="../lists/types.html">Derived Types</a></li>
-        
-        
-            <li><a href="../program/elphbolt.html">Program</a></li>
-      
+            <li><a href="../lists/absint.html">Abstract Interfaces</a></li>
+                   <li><a href="../lists/types.html">Derived Types</a></li>
+            <li><a href="../program/supersweet.html">Program</a></li>
+       
             </ul>
-            </li>
-
-
-<li class="visible-xs hidden-sm visible-lg"><a href="../lists/files.html">Source Files</a></li>
-
-
-
-<li class="visible-xs hidden-sm visible-lg"><a href="../lists/modules.html">Modules</a></li>
-
-
-
-<li class="visible-xs hidden-sm visible-lg"><a href="../lists/procedures.html">Procedures</a></li>
-
-                             
-<li class="visible-xs hidden-sm visible-lg"><a href="../lists/types.html">Derived Types</a></li>
-
-
-<li class="visible-xs hidden-sm visible-lg"><a href="../program/elphbolt.html">Program</a></li>
-
-          </ul>
         
+            </li>
+<li class="visible-xs hidden-sm visible-lg"><a href="../lists/files.html">Source Files</a></li>
+<li class="visible-xs hidden-sm visible-lg"><a href="../lists/modules.html">Modules</a></li>
+<li class="visible-xs hidden-sm visible-lg"><a href="../lists/procedures.html">Procedures</a></li>
+<li class="visible-xs hidden-sm visible-lg"><a href="../lists/absint.html">Abstract Interfaces</a></li>
+                             <li class="visible-xs hidden-sm visible-lg"><a href="../lists/types.html">Derived Types</a></li>
+<li class="visible-xs hidden-sm visible-lg"><a href="../program/supersweet.html">Program</a></li>
+          </ul>
         <form action="../search.html" class="navbar-form navbar-right" role="search">
         <div class="form-group">
           <input type="text" class="form-control" placeholder="Search" name="q" id="tipue_search_input" autocomplete="off" required>
@@ -103,528 +74,199 @@
         <button type="submit" class="btn btn-default">Submit</button>
 -->
         </form>
-        
         </div><!--/.nav-collapse -->
       </div>
     </nav>
 
     <div class="container">
-    
-  
   <div class="row">
     <h1>calculate_echimp_interaction_ibzk
       <small>Subroutine</small>
-    
+      
     </h1>
-    
-<div class="row">
-  <div class="col-lg-12">
-<div class="well well-sm">
-  <ul class="list-inline" style="margin-bottom:0px;display:inline">
-     
-     
-     
-     
-    
-    
-     <li><i class="fa fa-list-ol"></i>
-       <a data-toggle="tooltip"
-    data-placement="bottom" data-html="true"
-    title=" 2.8% of total for procedures.">59 statements</a>
-     </li> 
-     
-     
-     
-    <li><i class="fa fa-code"></i><a href="../src/interactions.f90"> Source File</a></li>
-     
-     
-  </ul>
-  <ol class="breadcrumb in-well text-right">
-  
-    
-     <li><a href='../sourcefile/interactions.f90.html'>interactions.f90</a></li>
-    
-     <li><a href='../module/interactions.html'>interactions</a></li>
-    
-  
-     <li class="active">calculate_echimp_interaction_ibzk</li>
-  </ol>
-</div>
-</div>
-</div>
-<script>
-  $(function () {
-  $('[data-toggle="tooltip"]').tooltip()
-  })
-</script>
+      <div class="row" id="info-bar">
+    <div class="col-lg-12">
+      <div class="well well-sm">
+        <ul class="list-inline" style="margin-bottom:0px;display:inline">
+            <li id="meta-license"><i class="fa fa-legal"></i> GNU General Public License 3.0</li>
+
+          <li id="statements"><i class="fa fa-list-ol"></i>
+            <a data-toggle="tooltip"
+               data-placement="bottom" data-html="true"
+               title=" 2.1% of total for procedures.">59 statements</a>
+          </li>
+
+            <li id="source-file">
+              <i class="fa fa-code"></i>
+              <a href="../src/interactions.f90"> Source File</a>
+            </li>
+        </ul>
+        <ol class="breadcrumb in-well text-right">
+              <li><a href='../sourcefile/interactions.f90.html'>interactions.f90</a></li>
+              <li><a href='../module/interactions.html'>interactions</a></li>
+          <li class="active">calculate_echimp_interaction_ibzk</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+  <script>
+    $(function () {
+    $('[data-toggle="tooltip"]').tooltip()
+    })
+  </script>
 
   </div>
   
   <div class="row">
     <div class="col-md-3 hidden-xs hidden-sm visible-md visible-lg">
-    
-<div id="sidebar">
+      <div id="sidebar">
+      <h3>Contents</h3>
   
-<h3>Contents</h3>
- 
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<em>None</em>
-
-
-</div>
+  </div>
 
     </div>
     
     <div class="col-md-9" id='text'>
-    <h2>
-public subroutine calculate_echimp_interaction_ibzk(crys, el, num)
-    
-    
-   
+    <h2>public  subroutine calculate_echimp_interaction_ibzk(crys, el, num)  
 </h2>
     
-  
 
-
-    
     <p>Parallel driver of |g_e-chimp(k,k')|^2 over IBZ electron states.</p>
-    
 
     <h3>Arguments</h3>
-    
-      
-<table class="table table-striped varlist">
-<thead><tr><th>Type</th>
-<th>Intent</th><th>Optional</th>
-<th>Attributes</th><th></th><th>Name</th><th></th></thead>
+        <table class="table table-striped varlist">
+    <thead>
+      <tr>
+        <th>Type</th>
+<th>Intent</th><th>Optional</th>        <th>Attributes</th>
+        <th></th>
+        <th>Name</th>
+        <th></th>
+    </thead>
+    <tbody>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-crys~16"></span>
+              type(<a href='../type/crystal.html'>crystal</a>),
+            </td>
+<td>intent(in)</td>
+              <td></td>            <td>
+              
+            </td>
+            <td>::</td>
+            <td><strong>crys</strong></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-el~9"></span>
+              type(<a href='../type/electron.html'>electron</a>),
+            </td>
+<td>intent(in)</td>
+              <td></td>            <td>
+              
+            </td>
+            <td>::</td>
+            <td><strong>el</strong></td>
+            <td>
+                
+            </td>
+        </tr>
+        <tr>
+            <td>
+              <span class="anchor" id="variable-num~21"></span>
+              type(<a href='../type/numerics.html'>numerics</a>),
+            </td>
+<td>intent(in)</td>
+              <td></td>            <td>
+              
+            </td>
+            <td>::</td>
+            <td><strong>num</strong></td>
+            <td>
+                
+            </td>
+        </tr>
+    </tbody>
+  </table>
 
-
-
-<tbody>
-
-  
-  
-  
-  
-<tr>
-  
-  <td><span class="anchor" id="variable-crys~5"></span>type(<a href='../type/crystal.html'>crystal</a>),</td>
-  <td>intent(in)</td>
-  <td></td>
-  
-  <td></td><td>::</td>
-  <td><strong>crys</strong></td><td></td>
-  
-</tr>
-
-  
-  
-  
-  
-<tr>
-  
-  <td><span class="anchor" id="variable-el~5"></span>type(<a href='../type/electron.html'>electron</a>),</td>
-  <td>intent(in)</td>
-  <td></td>
-  
-  <td></td><td>::</td>
-  <td><strong>el</strong></td><td></td>
-  
-</tr>
-
-  
-  
-  
-  
-<tr>
-  
-  <td><span class="anchor" id="variable-num~6"></span>type(<a href='../type/numerics.html'>numerics</a>),</td>
-  <td>intent(in)</td>
-  <td></td>
-  
-  <td></td><td>::</td>
-  <td><strong>num</strong></td><td></td>
-  
-</tr>
-
-</tbody>
-</table>
-
-    
-    
-    
-    <br>
-    
-    
-    <div class="panel panel-default">
-      <div class="panel-heading">
-  <h3 class="panel-title">Calls</h3>
-      </div>
-      <div class="panel-body">
-  <div class="depgraph"><?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
- "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<!-- Generated by graphviz version 2.43.0 (0)
- -->
-<!-- Title: proc~~calculate_echimp_interaction_ibzk~~CallsGraph Pages: 1 -->
-<svg id="proccalculate_echimp_interaction_ibzkCallsGraph" width="310pt" height="242pt"
- viewBox="0.00 0.00 310.00 242.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-<g id="proc~~calculate_echimp_interaction_ibzk~~CallsGraph" class="graph" transform="scale(1 1) rotate(0) translate(4 238)">
-<title>proc~~calculate_echimp_interaction_ibzk~~CallsGraph</title>
-<polygon fill="white" stroke="transparent" points="-4,4 -4,-238 306,-238 306,4 -4,4"/>
-<!-- proc~calculate_echimp_interaction_ibzk -->
-<g id="proc~~calculate_echimp_interaction_ibzk~~CallsGraph_node1" class="node">
-<title>proc~calculate_echimp_interaction_ibzk</title>
-<polygon fill="none" stroke="black" points="175,-129 0,-129 0,-105 175,-105 175,-129"/>
-<text text-anchor="middle" x="87.5" y="-114.6" font-family="Helvetica,sans-Serif" font-size="10.50">calculate_echimp_interaction_ibzk</text>
-</g>
-<!-- proc~mux_state -->
-<g id="proc~~calculate_echimp_interaction_ibzk~~CallsGraph_node2" class="node">
-<title>proc~mux_state</title>
-<g id="a_proc~~calculate_echimp_interaction_ibzk~~CallsGraph_node2"><a xlink:href=".././proc/mux_state.html" xlink:title="mux_state">
-<polygon fill="#d94e8f" stroke="#d94e8f" points="287.5,-234 225.5,-234 225.5,-210 287.5,-210 287.5,-234"/>
-<text text-anchor="middle" x="256.5" y="-219.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">mux_state</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_echimp_interaction_ibzk&#45;&gt;proc~mux_state -->
-<g id="proc~~calculate_echimp_interaction_ibzk~~CallsGraph_edge2" class="edge">
-<title>proc~calculate_echimp_interaction_ibzk&#45;&gt;proc~mux_state</title>
-<path fill="none" stroke="#000000" d="M104.6,-129.28C127.52,-146.47 171.19,-178.15 211,-201 213.5,-202.44 216.12,-203.86 218.77,-205.24"/>
-<polygon fill="#000000" stroke="#000000" points="217.34,-208.44 227.85,-209.79 220.48,-202.18 217.34,-208.44"/>
-</g>
-<!-- proc~distribute_points -->
-<g id="proc~~calculate_echimp_interaction_ibzk~~CallsGraph_node3" class="node">
-<title>proc~distribute_points</title>
-<g id="a_proc~~calculate_echimp_interaction_ibzk~~CallsGraph_node3"><a xlink:href=".././proc/distribute_points.html" xlink:title="distribute_points">
-<polygon fill="#d9534f" stroke="#d9534f" points="302,-192 211,-192 211,-168 302,-168 302,-192"/>
-<text text-anchor="middle" x="256.5" y="-177.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">distribute_points</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_echimp_interaction_ibzk&#45;&gt;proc~distribute_points -->
-<g id="proc~~calculate_echimp_interaction_ibzk~~CallsGraph_edge1" class="edge">
-<title>proc~calculate_echimp_interaction_ibzk&#45;&gt;proc~distribute_points</title>
-<path fill="none" stroke="#000000" d="M120.7,-129.15C147.35,-139.2 185.39,-153.55 214.27,-164.45"/>
-<polygon fill="#000000" stroke="#000000" points="213.09,-167.74 223.68,-168 215.56,-161.19 213.09,-167.74"/>
-</g>
-<!-- proc~print_message -->
-<g id="proc~~calculate_echimp_interaction_ibzk~~CallsGraph_node4" class="node">
-<title>proc~print_message</title>
-<g id="a_proc~~calculate_echimp_interaction_ibzk~~CallsGraph_node4"><a xlink:href=".././proc/print_message.html" xlink:title="print_message">
-<polygon fill="#d9534f" stroke="#d9534f" points="298,-150 215,-150 215,-126 298,-126 298,-150"/>
-<text text-anchor="middle" x="256.5" y="-135.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">print_message</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_echimp_interaction_ibzk&#45;&gt;proc~print_message -->
-<g id="proc~~calculate_echimp_interaction_ibzk~~CallsGraph_edge3" class="edge">
-<title>proc~calculate_echimp_interaction_ibzk&#45;&gt;proc~print_message</title>
-<path fill="none" stroke="#000000" d="M175.42,-127.93C185.44,-129.19 195.4,-130.44 204.71,-131.61"/>
-<polygon fill="#000000" stroke="#000000" points="204.55,-135.12 214.91,-132.9 205.43,-128.18 204.55,-135.12"/>
-</g>
-<!-- proc~delta_fn_tetra -->
-<g id="proc~~calculate_echimp_interaction_ibzk~~CallsGraph_node5" class="node">
-<title>proc~delta_fn_tetra</title>
-<g id="a_proc~~calculate_echimp_interaction_ibzk~~CallsGraph_node5"><a xlink:href=".././proc/delta_fn_tetra.html" xlink:title="delta_fn_tetra">
-<polygon fill="#d94e8f" stroke="#d94e8f" points="296,-108 217,-108 217,-84 296,-84 296,-108"/>
-<text text-anchor="middle" x="256.5" y="-93.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">delta_fn_tetra</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_echimp_interaction_ibzk&#45;&gt;proc~delta_fn_tetra -->
-<g id="proc~~calculate_echimp_interaction_ibzk~~CallsGraph_edge4" class="edge">
-<title>proc~calculate_echimp_interaction_ibzk&#45;&gt;proc~delta_fn_tetra</title>
-<path fill="none" stroke="#000000" d="M175.42,-106.07C186.25,-104.71 196.99,-103.36 206.93,-102.11"/>
-<polygon fill="#000000" stroke="#000000" points="207.49,-105.57 216.97,-100.85 206.61,-98.62 207.49,-105.57"/>
-</g>
-<!-- proc~demux_state -->
-<g id="proc~~calculate_echimp_interaction_ibzk~~CallsGraph_node6" class="node">
-<title>proc~demux_state</title>
-<g id="a_proc~~calculate_echimp_interaction_ibzk~~CallsGraph_node6"><a xlink:href=".././proc/demux_state.html" xlink:title="demux_state">
-<polygon fill="#d9534f" stroke="#d9534f" points="293.5,-66 219.5,-66 219.5,-42 293.5,-42 293.5,-66"/>
-<text text-anchor="middle" x="256.5" y="-51.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">demux_state</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_echimp_interaction_ibzk&#45;&gt;proc~demux_state -->
-<g id="proc~~calculate_echimp_interaction_ibzk~~CallsGraph_edge5" class="edge">
-<title>proc~calculate_echimp_interaction_ibzk&#45;&gt;proc~demux_state</title>
-<path fill="none" stroke="#000000" d="M120.7,-104.85C147.35,-94.8 185.39,-80.45 214.27,-69.55"/>
-<polygon fill="#000000" stroke="#000000" points="215.56,-72.81 223.68,-66 213.09,-66.26 215.56,-72.81"/>
-</g>
-<!-- proc~delta_fn_triang -->
-<g id="proc~~calculate_echimp_interaction_ibzk~~CallsGraph_node7" class="node">
-<title>proc~delta_fn_triang</title>
-<g id="a_proc~~calculate_echimp_interaction_ibzk~~CallsGraph_node7"><a xlink:href=".././proc/delta_fn_triang.html" xlink:title="delta_fn_triang">
-<polygon fill="#d94e8f" stroke="#d94e8f" points="298.5,-24 214.5,-24 214.5,0 298.5,0 298.5,-24"/>
-<text text-anchor="middle" x="256.5" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">delta_fn_triang</text>
-</a>
-</g>
-</g>
-<!-- proc~calculate_echimp_interaction_ibzk&#45;&gt;proc~delta_fn_triang -->
-<g id="proc~~calculate_echimp_interaction_ibzk~~CallsGraph_edge6" class="edge">
-<title>proc~calculate_echimp_interaction_ibzk&#45;&gt;proc~delta_fn_triang</title>
-<path fill="none" stroke="#000000" d="M104.6,-104.72C127.52,-87.53 171.19,-55.85 211,-33 213.5,-31.56 216.12,-30.14 218.77,-28.76"/>
-<polygon fill="#000000" stroke="#000000" points="220.48,-31.82 227.85,-24.21 217.34,-25.56 220.48,-31.82"/>
-</g>
-</g>
-</svg>
-</div><div><a type="button" class="graph-help" data-toggle="modal" href="#graph-help-text">Help</a></div><div class="modal fade" id="graph-help-text" tabindex="-1" role="dialog"><div class="modal-dialog modal-lg" role="document"><div class="modal-content"><div class="modal-header"><button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button><h4 class="modal-title" id="-graph-help-label">Graph Key</h4></div><div class="modal-body">
-    <p>Nodes of different colours represent the following: </p>
-    <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
- "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<!-- Generated by graphviz version 2.43.0 (0)
- -->
-<!-- Title: Graph Key Pages: 1 -->
-<svg width="560pt" height="32pt"
- viewBox="0.00 0.00 559.50 32.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 28)">
-<title>Graph Key</title>
-<polygon fill="white" stroke="transparent" points="-4,4 -4,-28 555.5,-28 555.5,4 -4,4"/>
-<!-- Subroutine -->
-<g id="node1" class="node">
-<title>Subroutine</title>
-<polygon fill="#d9534f" stroke="#d9534f" points="64,-24 0,-24 0,0 64,0 64,-24"/>
-<text text-anchor="middle" x="32" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">Subroutine</text>
-</g>
-<!-- Function -->
-<g id="node2" class="node">
-<title>Function</title>
-<polygon fill="#d94e8f" stroke="#d94e8f" points="136,-24 82,-24 82,0 136,0 136,-24"/>
-<text text-anchor="middle" x="109" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">Function</text>
-</g>
-<!-- Interface -->
-<g id="node3" class="node">
-<title>Interface</title>
-<polygon fill="#a7506f" stroke="#a7506f" points="209.5,-24 154.5,-24 154.5,0 209.5,0 209.5,-24"/>
-<text text-anchor="middle" x="182" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">Interface</text>
-</g>
-<!-- Unknown Procedure Type -->
-<g id="node4" class="node">
-<title>Unknown Procedure Type</title>
-<polygon fill="#777777" stroke="#777777" points="364,-24 228,-24 228,0 364,0 364,-24"/>
-<text text-anchor="middle" x="296" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">Unknown Procedure Type</text>
-</g>
-<!-- Program -->
-<g id="node5" class="node">
-<title>Program</title>
-<polygon fill="#f0ad4e" stroke="#f0ad4e" points="436,-24 382,-24 382,0 436,0 436,-24"/>
-<text text-anchor="middle" x="409" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">Program</text>
-</g>
-<!-- This Page&#39;s Entity -->
-<g id="node6" class="node">
-<title>This Page&#39;s Entity</title>
-<polygon fill="none" stroke="black" points="551.5,-24 454.5,-24 454.5,0 551.5,0 551.5,-24"/>
-<text text-anchor="middle" x="503" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50">This Page&#39;s Entity</text>
-</g>
-</g>
-</svg>
-
-    
-    <p>Solid arrows point from a procedure to one which it calls. Dashed 
-    arrows point from an interface to procedures which implement that interface.
-    This could include the module procedures in a generic interface or the
-    implementation in a submodule of an interface in a parent module.
-    </p>
-    </div></div></div></div>
-      </div>
-    </div>
-     
-     
-    <div class="panel panel-default">
-      <div class="panel-heading">
-  <h3 class="panel-title">Called by</h3>
-      </div>
-      <div class="panel-body">
-  <div class="depgraph"><?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
- "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<!-- Generated by graphviz version 2.43.0 (0)
- -->
-<!-- Title: proc~~calculate_echimp_interaction_ibzk~~CalledByGraph Pages: 1 -->
-<svg id="proccalculate_echimp_interaction_ibzkCalledByGraph" width="273pt" height="32pt"
- viewBox="0.00 0.00 273.00 32.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-<g id="proc~~calculate_echimp_interaction_ibzk~~CalledByGraph" class="graph" transform="scale(1 1) rotate(0) translate(4 28)">
-<title>proc~~calculate_echimp_interaction_ibzk~~CalledByGraph</title>
-<polygon fill="white" stroke="transparent" points="-4,4 -4,-28 269,-28 269,4 -4,4"/>
-<!-- proc~calculate_echimp_interaction_ibzk -->
-<g id="proc~~calculate_echimp_interaction_ibzk~~CalledByGraph_node1" class="node">
-<title>proc~calculate_echimp_interaction_ibzk</title>
-<polygon fill="none" stroke="black" points="265,-24 90,-24 90,0 265,0 265,-24"/>
-<text text-anchor="middle" x="177.5" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50">calculate_echimp_interaction_ibzk</text>
-</g>
-<!-- program~elphbolt -->
-<g id="proc~~calculate_echimp_interaction_ibzk~~CalledByGraph_node2" class="node">
-<title>program~elphbolt</title>
-<g id="a_proc~~calculate_echimp_interaction_ibzk~~CalledByGraph_node2"><a xlink:href=".././program/elphbolt.html" xlink:title="elphbolt">
-<polygon fill="#f0ad4e" stroke="#f0ad4e" points="54,-24 0,-24 0,0 54,0 54,-24"/>
-<text text-anchor="middle" x="27" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">elphbolt</text>
-</a>
-</g>
-</g>
-<!-- program~elphbolt&#45;&gt;proc~calculate_echimp_interaction_ibzk -->
-<g id="proc~~calculate_echimp_interaction_ibzk~~CalledByGraph_edge1" class="edge">
-<title>program~elphbolt&#45;&gt;proc~calculate_echimp_interaction_ibzk</title>
-<path fill="none" stroke="#000000" d="M54.21,-12C61.73,-12 70.4,-12 79.59,-12"/>
-<polygon fill="#000000" stroke="#000000" points="79.73,-15.5 89.73,-12 79.72,-8.5 79.73,-15.5"/>
-</g>
-</g>
-</svg>
-</div><div><a type="button" class="graph-help" data-toggle="modal" href="#graph-help-text">Help</a></div><div class="modal fade" id="graph-help-text" tabindex="-1" role="dialog"><div class="modal-dialog modal-lg" role="document"><div class="modal-content"><div class="modal-header"><button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button><h4 class="modal-title" id="-graph-help-label">Graph Key</h4></div><div class="modal-body">
-    <p>Nodes of different colours represent the following: </p>
-    <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN"
- "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<!-- Generated by graphviz version 2.43.0 (0)
- -->
-<!-- Title: Graph Key Pages: 1 -->
-<svg width="560pt" height="32pt"
- viewBox="0.00 0.00 559.50 32.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 28)">
-<title>Graph Key</title>
-<polygon fill="white" stroke="transparent" points="-4,4 -4,-28 555.5,-28 555.5,4 -4,4"/>
-<!-- Subroutine -->
-<g id="node1" class="node">
-<title>Subroutine</title>
-<polygon fill="#d9534f" stroke="#d9534f" points="64,-24 0,-24 0,0 64,0 64,-24"/>
-<text text-anchor="middle" x="32" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">Subroutine</text>
-</g>
-<!-- Function -->
-<g id="node2" class="node">
-<title>Function</title>
-<polygon fill="#d94e8f" stroke="#d94e8f" points="136,-24 82,-24 82,0 136,0 136,-24"/>
-<text text-anchor="middle" x="109" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">Function</text>
-</g>
-<!-- Interface -->
-<g id="node3" class="node">
-<title>Interface</title>
-<polygon fill="#a7506f" stroke="#a7506f" points="209.5,-24 154.5,-24 154.5,0 209.5,0 209.5,-24"/>
-<text text-anchor="middle" x="182" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">Interface</text>
-</g>
-<!-- Unknown Procedure Type -->
-<g id="node4" class="node">
-<title>Unknown Procedure Type</title>
-<polygon fill="#777777" stroke="#777777" points="364,-24 228,-24 228,0 364,0 364,-24"/>
-<text text-anchor="middle" x="296" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">Unknown Procedure Type</text>
-</g>
-<!-- Program -->
-<g id="node5" class="node">
-<title>Program</title>
-<polygon fill="#f0ad4e" stroke="#f0ad4e" points="436,-24 382,-24 382,0 436,0 436,-24"/>
-<text text-anchor="middle" x="409" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50" fill="white">Program</text>
-</g>
-<!-- This Page&#39;s Entity -->
-<g id="node6" class="node">
-<title>This Page&#39;s Entity</title>
-<polygon fill="none" stroke="black" points="551.5,-24 454.5,-24 454.5,0 551.5,0 551.5,-24"/>
-<text text-anchor="middle" x="503" y="-9.6" font-family="Helvetica,sans-Serif" font-size="10.50">This Page&#39;s Entity</text>
-</g>
-</g>
-</svg>
-
-    
-    <p>Solid arrows point from a procedure to one which it calls. Dashed 
-    arrows point from an interface to procedures which implement that interface.
-    This could include the module procedures in a generic interface or the
-    implementation in a submodule of an interface in a parent module.
-    </p>
-    </div></div></div></div>
-      </div>
-    </div>
-     
     <br>
 
     <section class="visible-xs visible-sm hidden-md">
-      
-<h3>Contents</h3>
- 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-<em>None</em>
+        <h3>Contents</h3>
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
 
 
     </section>
     <br class="visible-xs visible-sm hidden-md">
 
-    
 
-    
-    
-    
     
     
 
     
     
-    
-    
-    
 
 
-    
-    
     
     
     </div>
   </div>
-
 
     <hr>    
     </div> <!-- /container -->
     <footer>
       <div class="container">
       <div class="row">
-        <div class="col-xs-6 col-md-4"><p>&copy; 2022 
-                                          </p></div>
-        <div class="col-xs-6 col-md-4 col-md-push-4">
+        <div class="col-xs-6 col-md-6"><p>elphbolt was developed by Nakib Haider Protik<br>&copy; 2023 GNU General Public License 3.0
+</p>
+        </div>
+        <div class="col-xs-6 col-md-6">
           <p class="text-right">
             Documentation generated by 
-            <a href="https://github.com/cmacmackin/ford">FORD</a>
-            
+            <a href="https://github.com/Fortran-FOSS-Programmers/ford">FORD</a>
           </p>
         </div>
-        <div class="col-xs-12 col-md-4 col-md-pull-4"><p class="text-center"> elphbolt was developed by Nakib Haider Protik</p></div>
       </div>
       <br>
       </div> <!-- /container -->    
@@ -650,14 +292,11 @@ public subroutine calculate_echimp_interaction_ibzk(crys, el, num)
         extensions: ['tex2jax.js','mml2jax.js','MathMenu.js','MathZoom.js']
       });
     </script>
-    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
-    
     
     <script src="../tipuesearch/tipuesearch_content.js"></script>
     <script src="../tipuesearch/tipuesearch_set.js"></script>
     <script src="../tipuesearch/tipuesearch.js"></script>
-    
     
   </body>
 </html>
