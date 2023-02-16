@@ -21,7 +21,7 @@ jobs:
 
     - name: Install dependencies
       if: contains( matrix.os, 'ubuntu')
-      run: |
+      run:
         sudo add-apt-repository ppa:ubuntu-toolchain-r/test
         sudo apt update
         sudo apt install -yq curl unzip git make cmake gfortran mpich liblapack-dev libsymspg-dev
@@ -36,7 +36,7 @@ jobs:
     	cafrun --version
 	
     - name: Build with CMake
-      run: |
+      run:
         GFORTRAN=gfortran-${{matrix.gcc_v}}
         mkdir cmake-build; cd cmake-build
         cmake ..; make; ctest
