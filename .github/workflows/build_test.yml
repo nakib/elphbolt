@@ -9,7 +9,7 @@ jobs:
       matrix:
         os: [ubuntu-latest]
     env:
-      GCC_V: 11
+      GCC_V: 12
 
     steps:
     - name: Checkout code
