@@ -19,6 +19,6 @@ cd $workdir
 
 #gcc+opencoarrays
 # if test fails, propagate the error
-cafrun -n 4 ../bin/test_bte_regression || exit -1
+cafrun -n 2 ../bin/test_bte_regression || exit -1
 
 cd ..

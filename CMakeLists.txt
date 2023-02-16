@@ -83,12 +83,12 @@ target_link_libraries(test_bte_regression testify ${LINKS})
 find_program (bash /bin/bash)
 if(bash)
   #For ifort
-  if(CMAKE_Fortran_COMPILER MATCHES "ifort")
+  #if(CMAKE_Fortran_COMPILER MATCHES "ifort")
     #add_test (bte_regression bash ../test/3C-SiC/run_bte_ifort.sh)
-  endif()
+  #endif()
 
   #For caf
   if(CMAKE_Fortran_COMPILER MATCHES "caf")
-    #add_test (bte_regression bash ../test/3C-SiC/run_bte_caf.sh)
+    add_test (bte_regression bash ../test/3C-SiC/run_bte_caf.sh)
   endif()
 endif(bash)
