@@ -21,20 +21,19 @@ jobs:
     - name: Install dependencies
       if: contains( matrix.os, 'ubuntu')
       run: |
-          sudo apt update
-          sudo apt install -yq curl unzip git make cmake gfortran mpich liblapack-dev libsymspg-dev
-	  sudo apt clean -q
-	  git clone https://github.com/sourceryinstitute/OpenCoarrays && \
-    	  mkdir OpenCoarrays/opencoarrays-install  && \
-    	  cd OpenCoarrays/opencoarrays-install && \
-    	  git checkout tags/2.8.0 && \
-    	  FC="$(command -v gfortran)" CC="$(command -v gcc)" cmake .. && \
-    	  sudo make install && \
-    	  caf --version && \
-    	  cafrun --version
-	
+        sudo apt update
+        sudo apt install -yq curl unzip git make cmake gfortran mpich liblapack-dev libsymspg-dev
+        sudo apt clean -q
+        git clone https://github.com/sourceryinstitute/OpenCoarrays && \
+        mkdir OpenCoarrays/opencoarrays-install  && \
+        cd OpenCoarrays/opencoarrays-install && \
+        git checkout tags/2.8.0 && \
+        FC="$(command -v gfortran)" CC="$(command -v gcc)" cmake .. && \
+        sudo make install && \
+        caf --version && \
+        cafrun --version
+        
     - name: Build with CMake
       run: |
-          GFORTRAN=gfortran-${{matrix.gcc_v}}
-          mkdir cmake-build; cd cmake-build
-          cmake ..; make; ctest
+        mkdir cmake-build; cd cmake-build
+        cmake ..; make; ctest
