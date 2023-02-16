@@ -1,0 +1,59 @@
+&allocations
+ numelements = 2
+ numatoms = 2
+/
+
+&crystal_info
+ name = '3C-SiC'
+ elements ='Si' 'C'
+ atomtypes = 1 2
+ polar = .true.
+ lattvecs(:,1) = -0.216954731 0.000000000 0.216954731
+ lattvecs(:,2) =  0.000000000 0.216954731 0.216954731
+ lattvecs(:,3) = -0.216954731 0.216954731 0.000000000
+ basis(:,1) = 0.00 0.00 0.00
+ basis(:,2) = 0.25 0.25 0.25
+ epsilon(:,1) = 7.4190074      0.0000000	   0.0000000
+ epsilon(:,2) = 0.0000000      7.4190074     -0.0000000
+ epsilon(:,3) = 0.0000000     -0.0000000	   7.4190074
+ born(:,1,1) = 2.7514963	   0.0000000	  0.0000000
+ born(:,2,1) = 0.0000000	   2.7514963	  0.0000000
+ born(:,3,1) = 0.0000000	   0.0000000	  2.7514963
+ born(:,1,2) = -2.7514963      0.0000000	   0.0000000
+ born(:,2,2) = 0.0000000     -2.7514963	  0.0000000
+ born(:,3,2) = 0.0000000	   0.0000000     -2.7514963
+ T = 300.0 !K, crystal temperature
+ read_epsiloninf = .true.
+ epsiloninf = 6.52d0
+ epsilon0 = 9.72d0
+/
+
+&electrons
+	spindeg = 2
+        indlowband = 1 !Lowest transport band
+        indhighband = 1 !Highest transport band
+	indlowconduction = 1 !Lowest conduction band
+        numbands = 4 !Total wannier bands
+        enref = 10.7902 !eV, CBM
+        chempot = 0.10886732E+02 !eV, heavy n-type doping
+        Zn = 1.0 !Ionization of the donor impurity
+&end
+
+&numerics
+ qmesh = 5 5 5
+ mesh_ref = 4 !kmesh/qmesh
+ fsthick = 0.40 !eV wrt enref
+ datadumpdir = './dump/'
+ read_gq2 = .f.
+ read_V = .f.
+ read_gk2 = .f.
+ phiso = .t.
+ elchimp = .t.
+ tetrahedra = .true.
+ drag = .t.
+/
+
+&wannier
+ coarse_qmesh = 6 6 6
+/
+
