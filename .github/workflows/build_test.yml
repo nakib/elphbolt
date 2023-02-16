@@ -23,9 +23,9 @@ jobs:
       if: contains( matrix.os, 'ubuntu')
       run:
         sudo add-apt-repository ppa:ubuntu-toolchain-r/test
-        sudo apt update
-        sudo apt install -yq curl unzip git make cmake gfortran mpich liblapack-dev libsymspg-dev
-	sudo apt clean -q
+        sudo apt-get update
+        sudo apt-get install -yq curl unzip git make cmake gfortran mpich liblapack-dev libsymspg-dev
+	sudo apt-get clean -q
 	git clone https://github.com/sourceryinstitute/OpenCoarrays && \
     	mkdir OpenCoarrays/opencoarrays-install  && \
     	cd OpenCoarrays/opencoarrays-install && \
