@@ -35,5 +35,5 @@ jobs:
         
     - name: Build with CMake
       run: |
-        mkdir cmake-build; cd cmake-build
+        mkdir build; cd build
         cmake ..; make; ctest --rerun-failed --output-on-failure
