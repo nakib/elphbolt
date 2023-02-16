@@ -14,6 +14,7 @@ inputdir="../test/3C-SiC"
 mkdir $workdir
 cp $datadir/* $workdir #symbolic links don't seem to work with CMake :(
 cp $inputdir/input.nml $workdir
+rm -r 3C-SiC
 cd $workdir
 
 #gcc+opencoarrays
@@ -21,4 +22,3 @@ cd $workdir
 cafrun -n 4 ../bin/test_bte_regression || exit -1
 
 cd ..
-
