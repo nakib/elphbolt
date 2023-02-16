@@ -7,7 +7,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-      os: [ubuntu-latest]
+        os: [ubuntu-latest]
     env:
       GCC_V: 11
 
