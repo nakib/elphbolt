@@ -27,7 +27,7 @@ jobs:
         git clone https://github.com/sourceryinstitute/OpenCoarrays && \
         mkdir OpenCoarrays/opencoarrays-install  && \
         cd OpenCoarrays/opencoarrays-install && \
-        git checkout tags/2.8.2 && \
+        git checkout tags/2.9.2 && \
         FC="$(command -v gfortran)" CC="$(command -v gcc)" cmake .. && \
         sudo make install && \
         caf --version && \
