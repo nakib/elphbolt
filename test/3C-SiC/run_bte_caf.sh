@@ -5,6 +5,7 @@ curl -X GET "https://nomad-lab.eu/prod/v1/api/v1/uploads/5b-c4JYRSG6qitMFjFUUzQ/
 
 #Extract data
 unzip 3C-SiC.zip
+rm 3C-SiC.zip
 
 workdir="./3C-SiC_test_output"
 datadir="./3C-SiC/elphbolt_input_data"
@@ -17,7 +18,7 @@ cd $workdir
 
 #gcc+opencoarrays
 # if test fails, propagate the error
-cafrun -n 4 ~/elphbolt/build/bin/test_bte_regression || exit -1
+cafrun -n 4 ../bin/test_bte_regression || exit -1
 
 cd ..
 
