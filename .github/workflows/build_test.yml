@@ -7,9 +7,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-20.04]
     env:
-      GCC_V: 12
+      GCC_V: 8
 
     steps:
     - name: Checkout code
