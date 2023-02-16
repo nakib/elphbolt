@@ -36,5 +36,4 @@ jobs:
     - name: Build with CMake
       run: |
         mkdir cmake-build; cd cmake-build
-        cmake ..; make; ctest
-        cat /home/runner/work/elphbolt/elphbolt/cmake-build/Testing/Temporary/LastTest.log
+        cmake ..; make; ctest --rerun-failed --output-on-failure
