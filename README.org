@@ -1,6 +1,6 @@
 #+OPTIONS: ^:{}
 [[./logo/logo.png]]
-* elphbolt
+* elphbolt + superconda
 ~elphbolt~ (short for electron-phonon Boltzmann transport) is a modern Fortran (2018 standard) suite of transport codes. It provides a solver for both the coupled /and/ decoupled electron and phonon Boltzmann transport equations (BTEs). You can read about the methodology and implementation here: [[https://arxiv.org/abs/2109.08547]]. In addition, you get the ~superconda~ app for solving the phonon-mediated superconducting properties within the Eliashberg formalism.
 
 ~elphbolt~ is a "free as in freedom" code distributed under the GNU General Public License (GPL) version 3. You can read more about the philosophy of software freedom here: [[https://www.gnu.org/philosophy/free-sw.en.html]].
