@@ -1,18 +1,23 @@
 #+OPTIONS: ^:{}
 [[./logo/logo.png]]
 * elphbolt
-~elphbolt~ (short for electron-phonon Boltzmann transport) is a modern Fortran (2018 standard) code for solving the coupled electron and phonon Boltzmann transport equations (BTEs). You can read about the methodology and implementation here: [[https://arxiv.org/abs/2109.08547]]. 
+~elphbolt~ (short for electron-phonon Boltzmann transport) is a modern Fortran (2018 standard) suite of transport codes. It provides a solver for both the coupled /and/ decoupled electron and phonon Boltzmann transport equations (BTEs). You can read about the methodology and implementation here: [[https://arxiv.org/abs/2109.08547]]. In addition, you get the ~superconda~ app for solving the phonon-mediated superconducting properties within the Eliashberg formalism.
 
 ~elphbolt~ is a "free as in freedom" code distributed under the GNU General Public License (GPL) version 3. You can read more about the philosophy of software freedom here: [[https://www.gnu.org/philosophy/free-sw.en.html]].
 
-Using /ab initio/ electron-phonon and phonon-phonon interactions and a fully wave vector and electron band/phonon branch resolved formulation of the BTEs, ~elphbolt~ can calculate the
+Using /ab initio/ electron-phonon and phonon-phonon interactions and a fully wave vector and electron band/phonon branch resolved formulation of the BTEs, the ~elphbolt~ app gives you the
 
 - phonon and electronic thermal conductivities;
 - electronic conductivity;
 - phonon and electronic contributions to the thermopower; and
 - effect of the mutual electron-phonon drag on the transport coefficients listed above.
 
-Stylistically, it is designed to be simple, small, fast, and extensible. Object oriented programming concepts are combined with the procedural style, which allows fast development, while resulting in a rather compact source (~ 7000 lines of code, generated using David A. Wheeler's 'SLOCCount'). The symmetries of the crystal are fully exploited and the transport active Fermi window is used to allow the sampling of extremely fine wave vector meshes needed for an accurate solution of the BTEs. Parallelism is achieved through modern Fortran's intrinsic ~coarrays~ feature that is fully supported by recent versions of both the ~gcc~ and ~intel~ compilers.
+Using /ab initio/ electron-phonon and a fully wave vector and electron band/phonon branch resolved, Eliashberg formulation of superconductivity, the ~superconda~ app gives you the
+
+- anisotropic and isotropic Eliashberg spectral function and
+- phonon-mediated superconducting transition temperature.
+
+Stylistically, it is designed to be simple, small, fast, and extensible. Object oriented programming concepts are combined with the procedural style, which allows fast development, while resulting in a rather compact source (~ 8000 lines of code, generated using David A. Wheeler's 'SLOCCount'). The symmetries of the crystal are fully exploited and the transport active Fermi window is used to allow the sampling of extremely fine wave vector meshes needed for accurate solutions of the BTEs and Eliashberg equations. Parallelism is achieved through modern Fortran's intrinsic ~coarrays~ feature that is fully supported by recent versions of both the ~gcc~ and ~intel~ compilers.
 
 ~elphbolt~ currently works with the ~Quantum Espresso~ (https://www.quantum-espresso.org/) suite and its core module ~EPW~ (https://epw-code.org/) for the phonon quantities and the Wannier space information, respectively.
 
@@ -41,6 +46,7 @@ Above, you can change the build path with the additional argument ~--install-pre
 *** 3. Build
 **** Using cmake [Preferred]
 Issue the following commands to build and run tests: ~mkdir build; cd build; cmake ..; make; ctest~. If all goes well, the exectuable will be available as ~build/bin/elphbolt~.
+**** Using fpm (https://fpm.fortran-lang.org/en/index.html) [stay tuned...]
 **** Using make [Deprecated]
 Alternatively, you can use make. In the ~Makefiles~ directory you will find a few ~<title>.make~ files. Adapt them to your own architecture. Then, in the ~Makefile~ include your personal ~<title>.make~ file at the top, commenting out any exiting one. Copy your ~Makefile~ and ~<title>.make~ files to the ~src/~ directory.
 
@@ -50,13 +56,13 @@ Once you have done the above, go into ~src/~ and simply say ~make~. This should 
 
 An example ~Dockerfile~ is provided. I have not yet tested this on any HPC system.
 
-** Tests
+** Examples
 
 A full example for cubic silicon is provided. More examples will be added over time.
 
 ** Workflow
 
-This is a transport code. And it comes after doing some DFT, DFPT, and Wannier calculations. Users of the popular ~ShengBTE~ ([[https://bitbucket.org/sousaw/shengbte/src/master/]]) code will find that just one extra step (an ~EPW~ calculation) on top of the ~ShengBTE~ workflow is needed to obtain all the input files necessary for a coupled BTEs calculation with ~elphbolt~. You can, however, calculate just a decoupled phonon or electron BTE, if you so choose. For these, only a subset of the input files will be needed. For example, if you want to calculate just a decoupled electron BTE, then you do not need to provide the third order force constants. Similarly, if you are interested in just a phonon BTE without the phonon-electron interactions, then the Wannier parameters are not required.
+This is a transport code. And it comes after doing some DFT, DFPT, and Wannier calculations. Users of the popular ~ShengBTE~ ([[https://bitbucket.org/sousaw/shengbte/src/master/]]) code will find that just one extra step (an ~EPW~ calculation) on top of the ~ShengBTE~ workflow is needed to obtain all the input files necessary for a coupled BTEs calculation with ~elphbolt~. You can, however, calculate just a decoupled phonon or electron BTE, or Eliashberg equations if you so choose. For these, only a subset of the input files will be needed. For example, if you want to calculate just a decoupled electron BTE or Eliashberg equations, then you do not need to provide the third order force constants. Similarly, if you are interested in just a phonon BTE without the phonon-electron interactions, then the Wannier parameters are not required.
 
 Following is the full set of input files:
 
@@ -76,7 +82,7 @@ If you seek a solution of the decoupled phonon BTE or the coupled electron-phono
 
 *** Wannier space information
 
-These are required if you want to solve a decoupled electron BTE, include phonon-electron interaction in the decoupled phonon BTE, or solve the coupled electron-phonon BTEs.
+These are required if you want to solve a decoupled electron BTE, include phonon-electron interaction in the decoupled phonon BTE, Eliashberg equations for the phonon-mediated superconducting properties, or the coupled electron-phonon BTEs.
 
 These include the files ~rcells_k~, ~rcells_q~, ~rcells_g~, ~wsdeg_k~, ~wsdeg_q~, and ~wsdeg_g~ which must be printed out of an ~EPW~ calculation. We will also need the files ~epmatwp1~ and ~epwdata.fmt~, both of which are outputted by ~EPW~ after the Bloch -> Wannier calculation step. The first contains the Wannier space electron-phonon matrix elements and the second contains the Wannier space dynamical matrix and Hamiltonian. A couple of modified source files can be found in ~EPW/src/~ directory which are needed to correctly print these quantities out during ~EPW~'s Bloch -> Wannier calculation step. The user must recompile their ~EPW~ code following the replacement with these modified source codes. At this time ~EPW v5.1.0~ (shipped with ~Quantum Espresso v6.4.1~) must be used for this purpose.
 
@@ -89,7 +95,7 @@ You need to provide a wave vector path file named ~highsympath.txt~ (to be used 
 
 ** Description of ~input.nml~
 
-There are 5 Namelists in the ~input.nml~ file: ~allocations~, ~crystal_info~, ~electrons~, ~numerics~, and ~wannier~. Users of the ~ShengBTE~ code will find the format of this file familiar. Below the keys for each Namelist are described.
+For the ~elphbolt~ app, there are 5 Namelists in the ~input.nml~ file: ~allocations~, ~crystal_info~, ~electrons~, ~numerics~, and ~wannier~. For the ~superconda~ app, there is an additional Namelist -- ~superconductivity~. Users of the ~ShengBTE~ code will find the format of this file familiar. Below the keys for each Namelist are described.
 
 *** ~allocations~
 
@@ -165,7 +171,7 @@ There are 5 Namelists in the ~input.nml~ file: ~allocations~, ~crystal_info~, ~e
     | ~drag~            | Logical                 | .True.  | Include electron and phonon drag term in the phonon and electron BTE, respectively.                                                                                                                                                                                                                                                                           |
     | ~maxiter~         | Intger                  | 50      | Maximum number of iteration steps for the BTE(s).                                                                                                                                                                                                                                                                                                             |
     | ~conv_thres~      | Real                    | 1e-4    | Relative convergence threshold for the BTE(s).                                                                                                                                                                                                                                                                                                                |
-    | ~runlevel~        | Integer                 | 1       | Control for the type of calculation. 0: Calculate table of chemical potentials for a given doping type, temperature range, and carrier concentrations. Look up ~dopingtype~, ~numconc~, ~conclist~, ~numT~, and ~Tlist~ under Namelist ~electrons~. 1: Transport calculation(s). 2: Post-processing results to calculate the spectral transport coefficients. |
+    | ~runlevel~        | Integer                 | 1       | Control for the type of calculation. 0: Calculate table of chemical potentials for a given doping type, temperature range, and carrier concentrations. Look up ~dopingtype~, ~numconc~, ~conclist~, ~numT~, and ~Tlist~ under Namelist ~electrons~. 1: Transport calculation(s). 2: Post-processing results to calculate the spectral transport coefficients. 3: Superconductivity calculation, look up keys of the Namelist ~superconductivity~. |
     | ~plot_along_path~ | Logical                 | .False. | Plot Wannier interpolated quantities along high symmetry wave vectors?                                                                                                                                                                                                                                                                                        |
     | ~ph_en_min~       | Real                    | 0.0     | Lower bound of equidistant phonon energy mesh in eV. Only needed for ~runlevel~ 2.                                                                                                                                                                                                                                                                            |
     | ~ph_en_max~       | Real                    | 1.0     | Upper bound of equidistant phonon energy mesh in eV. Only needed for ~runlevel~ 2.                                                                                                                                                                                                                                                                            |
@@ -179,6 +185,20 @@ There are 5 Namelists in the ~input.nml~ file: ~allocations~, ~crystal_info~, ~e
 | key          | Type                    | Default | Description                                                                                                                                               |
 |----------------+-------------------------+---------+-----------------------------------------------------------------------------------------------------------------------------------------------------------|
 | ~coarse_qmesh~ | Integer array of size 3 | 0 0 0   | Coarse phonon wave vector mesh employed in the Wannier calculation. This must match the q-mesh in the Quantum Espresso second order force constants file. |
+
+*** ~superconductivity~
+| key                | Type    | Default | Description                                                         |
+|--------------------+---------+---------+---------------------------------------------------------------------|
+| ~mustar~           | Real    |     0.0 | Dimensionaless Coulomb pseudopotential parameter.                   |
+| ~domega~           | Real    |     0.0 | Equidistant phonon energy mesh spacing.                             |
+| ~matsubara_cutoff~ | Integer |       0 | Matsubara energy cutoff as a factor of the highest phonon energy.   |
+| ~qp_cutoff~        | Integer |       0 | Quasiparticle energy cutoff as factor of the highest phonon energy. |
+| ~isotropic~        | Logical | .False. | Use the isotropic (fast!) version of the Eliashberg theory?         |
+| ~Tstart~           | Real    |     0.0 | Starting point of the temperature sweep.                            |
+| ~Tend~             | Real    |     0.0 | End point of the temperature sweep.                                 |
+| ~Tstart~           | Real    |     0.0 | Starting point of the temperature sweep.                            |
+| ~dT~               | Real    |     0.0 | Temperature difference used in temperature sweep.                   |
+
 ** Description of output files
 
 The code produces a large amount of data. Here, we provide a description of the various types output files.
@@ -187,21 +207,27 @@ Below I(F)BZ = irreducible (full) Brillouin zone; RTA = relaxation time approxim
 
 *** Zero temperature data
 
-| File name                     | Directory         | Units                | Description                                                                                                                                    |
-|-------------------------------+-------------------+----------------------+------------------------------------------------------------------------------------------------------------------------------------------------|
-| ~gk2.istate*~                 | ~datadumpdir/g2/~ | eV^{2}               | Squared e-ph (1-phonon) vertices for every IBZ electron state. Binary.                                                                         |
-| ~gq2.istate*~                 | ~datadumpdir/g2/~ | eV^{2}               | Squared e-ph (1-phonon) vertices for every IBZ electron state. Binary.                                                                         |
-| ~Vm2.istate*~                 | ~datadumpdir/V2/~ | eV^{2}Å^{-6}amu^{-3} | Squared ph-ph (3-phonon) vertices for every IBZ phonon state. Binary.                                                                          |
-| ~el(ph).dos~                  | ~./~              | eV^{-1}              | Band resolved electronic (phononic) density of states. ~numbands~ (~numbranches~) columns of reals.                                            |
-| ~el(ph).ens_ibz~              | ~./~              | eV                   | IBZ electronic (phononic) band energies. ~numbands~ (~numbranches~) columns of reals.                                                          |
-| ~el.inwindow_states_ibz~      | ~./~              | none                 | IBZ electronic states (wave vector index, band index) within the transport active window. 2 columns of integers.                               |
-| ~el(ph).vels_ibz~             | ~./~              | Kms^{-1}             | IBZ electronic (phononic) band (branch) velocities. In each row, there are 3 (Cartesian direction) sets of ~numbands~ (~numbranches~) numbers. |
-| ~el(ph).wavevecs_ibz[fbz]~    | ~./~              | crystal              | IBZ [FBZ] electronic (phononic) wave vectors. For the electrons, these are only within the transport window.                                   |
-| ~el.W_rta_elbound~            | ~./~              | THz                  | IBZ RTA el-bound  scattering rates. ~numbands~ columns of reals.                                                                               |
-| ~ph.W_rta_phiso(bound)[subs]~ | ~./~              | THz                  | IBZ RTA ph-iso (bound) [subs] scattering rates. ~numbranches~ columns of reals.                                                                |
-| ~el.ens_kpath~                | ~./~              | eV                   | Electron energies along the given k-path.                                                                                                      |
-| ~ph.ens_qpath~                | ~./~              | eV                   | Phonon energies along the given q-path.                                                                                                        |
-| ~gk_qpath~                    | ~./~              | eV                   | Absolute value of the e-ph matrix elements (averaged over the degenerate bands and branches) for the given k-vector and q-path.                |
+| File name                        | Directory         | Units                | Description                                                                                                                                    |
+|----------------------------------+-------------------+----------------------+------------------------------------------------------------------------------------------------------------------------------------------------|
+| ~gk2.istate*~                    | ~datadumpdir/g2/~ | eV^{2}               | Squared e-ph (1-phonon) vertices for every IBZ electron state. Binary.                                                                         |
+| ~gq2.istate*~                    | ~datadumpdir/g2/~ | eV^{2}               | Squared e-ph (1-phonon) vertices for every IBZ electron state. Binary.                                                                         |
+| ~Vm2.istate*~                    | ~datadumpdir/V2/~ | eV^{2}Å^{-6}amu^{-3} | Squared ph-ph (3-phonon) vertices for every IBZ phonon state. Binary.                                                                          |
+| ~el(ph).dos~                     | ~./~              | eV^{-1}              | Band resolved electronic (phononic) density of states. ~numbands~ (~numbranches~) columns of reals.                                            |
+| ~el(ph).ens_ibz~                 | ~./~              | eV                   | IBZ electronic (phononic) band energies. ~numbands~ (~numbranches~) columns of reals.                                                          |
+| ~el.inwindow_states_ibz~         | ~./~              | none                 | IBZ electronic states (wave vector index, band index) within the transport active window. 2 columns of integers.                               |
+| ~el(ph).vels_ibz~                | ~./~              | Kms^{-1}             | IBZ electronic (phononic) band (branch) velocities. In each row, there are 3 (Cartesian direction) sets of ~numbands~ (~numbranches~) numbers. |
+| ~el(ph).wavevecs_ibz[fbz]~       | ~./~              | crystal              | IBZ [FBZ] electronic (phononic) wave vectors. For the electrons, these are only within the transport window.                                   |
+| ~el.W_rta_elbound~               | ~./~              | THz                  | IBZ RTA el-bound  scattering rates. ~numbands~ columns of reals.                                                                               |
+| ~ph.W_rta_phiso(bound)[subs]~    | ~./~              | THz                  | IBZ RTA ph-iso (bound) [subs] scattering rates. ~numbranches~ columns of reals.                                                                |
+| ~el.ens_kpath~                   | ~./~              | eV                   | Electron energies along the given k-path.                                                                                                      |
+| ~ph.ens_qpath~                   | ~./~              | eV                   | Phonon energies along the given q-path.                                                                                                        |
+| ~gk_qpath~                       | ~./~              | eV                   | Absolute value of the e-ph matrix elements (averaged over the degenerate bands and branches) for the given k-vector and q-path.                |
+| ~a2F.istate*~                    | ~datadumpdir/sc/~ | none                 | Anisotropic Eliashberg spectral function for every IBZ state. Binary.                                                                          |
+| ~omegas~                         | ~./~              | eV                   | Equidistant phonon energy mesh.                                                                                                                |
+| ~a2F_iso~                        | ~./~              | none                 | Isotropic Eliashberg spectral function on the equidistant phonon energy mesh.                                                                  |
+| ~a2F_iso_branch_resolved~        | ~./~              | none                 | Phonon branch resolved isotropic Eliashberg spectral function on the equidistant phonon energy mesh.                                           |
+| ~cum_lambda_iso_branch_resolved~ | ~./~              | none                 | Phonon branch resolved standard, isotropic electron-phonon coupling parameter on the equidistant phonon energy mesh.                           |
+| ~quasiparticle_ens~              | ~./~              | eV                   | Equidistant electronic quasiparticle energy mesh.                                                                                              |
 
 *** Finite temperature data
 
@@ -223,6 +249,8 @@ Below I(F)BZ = irreducible (full) Brillouin zone; RTA = relaxation time approxim
 | ~RTA{nodrag}(partdcpl)[drag]_J0_*~ | ~./T*/~              | nmC               | Band resolved (~_<integer>~) and total (~_tot~) electronic response function to E-field in the RTA {dragless} (partially decoupled) [drag] theory.        |
 | ~RTA{nodrag}[drag]_F0_*~           | ~./T*/~              | nmeVK^{-1}        | Branch resolved (~_<integer>~) and total (~_tot~) phononic response function to \nabla T-field in the RTA {dragless} [fully coupled] theory.              |
 | ~drag_G0_*~                        | ~./T*/~              | nmC               | Branch resolved (~_<integer>~) and total (~_tot~) phononic response function to E-field in fully coupled theory.                                          |
+| ~iso_quasiparticle_DOS.T*~         | ~./~                 | none              | Scaled quasiparticle density of states on the equidistant electronic quasiparticle energy mesh.                                                           |
+| ~iso_quasiparticle_Delta.T*~       | ~./~                 | eV                | Isotropic superconducting gap on the equidistant electronic quasiparticle energy mesh.                                                                    |
 
 *** Postprocessing (runlevel 2)
 
