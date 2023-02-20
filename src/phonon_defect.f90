@@ -1,4 +1,4 @@
-! Copyright (C) 2022- Nakib Haider Protik <nakib.haider.protik@gmail.com>
+! Copyright 2022 elphbolt contributors.
 ! This file is part of elphbolt <https://github.com/nakib/elphbolt>.
 !
 ! elphbolt is free software: you can redistribute it and/or modify
@@ -201,7 +201,7 @@ contains
     type(phonon), intent(in) :: ph
     type(crystal), intent(in) :: crys
   
-    integer(i64) :: host, ik, i, j, dopant, atom
+    integer(i64) :: host, ik, i, j, dopant
     real(r64) :: def_frac
     real(r64), allocatable :: scatt_rates(:, :), renorm_ens(:, :), lineshifts(:, :)
     complex(r64), allocatable :: irred_diagT(:, :, :)
@@ -240,7 +240,7 @@ contains
                      def_frac*imag(irred_diagT(ik, :, host))/ph%ens(ph%indexlist_irred(ik), :)
 
                 lineshifts(ik, :) = lineshifts(ik, :) + &
-                     + def_frac*real(irred_diagT(ik, :, host))
+                     def_frac*real(irred_diagT(ik, :, host))
              end do
           end do
        end do
@@ -250,7 +250,7 @@ contains
 
     do ik = 1, ph%nwv_irred
        renorm_ens(ik, :) = sqrt(ph%ens(ph%indexlist_irred(ik), :)**2 + &
-            + lineshifts(ik, :))
+            lineshifts(ik, :))
     end do
     
     !Deal with Gamma point acoustic phonons

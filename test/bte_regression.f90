@@ -2,7 +2,7 @@ program bte_regression
 
   use iso_fortran_env, only : r64 => real64, i64 => int64
   use testify_m, only : testify
-  use misc, only: welcome, print_message, subtitle, timer, exit_with_message
+  use misc, only: print_message, subtitle, timer, exit_with_message
   use numerics_module, only: numerics
   use crystal_module, only: crystal
   use symmetry_module, only: symmetry
@@ -32,9 +32,6 @@ program bte_regression
 
   !Test counter
   itest = 0
-  
-  !Print banner and other information
-  call welcome
 
   call t_all%start_timer('elphbolt: BTE')
 

@@ -309,10 +309,12 @@ contains
     if(this_image() == 1) then
        write(*, "(A, A)") 'Material: ', self%name
 
-       write(*, "(A)") "Basis atom sites ready to host a substitution:"
-       do i = 1, self%numelements
-          write(*, '(A, A, A, I5)') " ", self%elements(i), " at site ", self%defect_hosts(i)
-       end do
+       if(any(self%defect_hosts > 0)) then
+          write(*, "(A)") "Basis atom sites ready to host a substitution:"
+          do i = 1, self%numelements
+             write(*, '(A, A, A, I5)') " ", self%elements(i), " at site ", self%defect_hosts(i)
+          end do
+       end if
        
        if(self%autoisotopes) write(*,"(A)") 'Isotopic average of masses will be used.'
        do i = 1, self%numelements

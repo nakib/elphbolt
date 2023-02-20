@@ -1,4 +1,4 @@
-! Copyright (C) 2022- Nakib Haider Protik <nakib.haider.protik@gmail.com>
+! Copyright 2022 elphbolt contributors.
 ! This file is part of elphbolt <https://github.com/nakib/elphbolt>.
 !
 ! elphbolt is free software: you can redistribute it and/or modify

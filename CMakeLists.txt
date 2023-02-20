@@ -29,7 +29,7 @@ find_library(LAPACK_LIB NAMES lapack REQUIRED)
 #Set library links
 set(LINKS "-lblas -llapack ${SPG_LIB}")
 
-#Set elphbolt source
+#Set source
 set(SRC
   src/params.f90
   src/misc.f90
@@ -53,8 +53,12 @@ set(SRC
 #Set elphbolt driver program
 add_executable(elphbolt app/elphbolt.f90 ${SRC})
 
+#Set superconda driver program
+add_executable(superconda app/superconda.f90 ${SRC})
+
 #Link libraries
 target_link_libraries(elphbolt ${LINKS})
+target_link_libraries(superconda ${LINKS})
 
 #Set test library
 add_library(testify thirdparty/testify/src/testify.f90)

@@ -987,37 +987,6 @@ contains
          call exit_with_message("Matrix inversion failed in invert_complex_square. Exiting.")
     
   end subroutine invert_complex_square
-
-  subroutine welcome
-    !! Subroutine to print a pretty banner.
-    
-    if(this_image() == 1) then
-       write(*,'(A75)') "+-------------------------------------------------------------------------+"
-       write(*,'(A75)') "| \                                                                       |"
-       write(*,'(A75)') "|  \                                                                      |"
-       write(*,'(A75)') "|   \   \                                                                 |"
-       write(*,'(A75)') "|    \   \                                                                |"
-       write(*,'(A75)') "|   __\   \              _        _    _           _    _                 |"
-       write(*,'(A75)') "|   \      \         ___|.|      |.|  | |__   ___ |.|_ / /__              |"
-       write(*,'(A75)') "|    \    __\       / _ \.|   _  |.|_ | '_ \ / _ \|.|_  ___/              |"
-       write(*,'(A75)') "|     \  \         |  __/.| |/ \_|/  \| |_) : (_) |.|/ /__                |"
-       write(*,'(A75)') "|      \ \          \___|_|/|__/ |   /| ___/ \___/|_|\___/                |"
-       write(*,'(A75)') "|       \ \                /|                                             |"
-       write(*,'(A75)') "|        \\                \|                                             |"
-       write(*,'(A75)') "|         \\                '                                             |"
-       write(*,'(A75)') "|          \                                                              |"
-       write(*,'(A75)') "|           \                                                             |"
-       write(*,'(A75)') "| A solver for the coupled electron-phonon Boltzmann transport equations. |"
-       write(*,'(A75)') "| Copyright (C) 2020- Nakib Haider Protik.                                |"
-       write(*,'(A75)') "|                                                                         |"
-       write(*,'(A75)') "| This is a 'free as in freedom'[*] software, distributed under the GPLv3.|"
-       write(*,'(A75)') "| [*] https://www.gnu.org/philosophy/free-sw.en.html                      |"
-       write(*,'(A75)') "+-------------------------------------------------------------------------+" 
-       print*, ' '
-
-       write(*, '(A, I5)') 'Number of coarray images = ', num_images()
-    end if
-  end subroutine welcome
   
   subroutine subtitle(text)
     !! Subroutine to print a subtitle.
