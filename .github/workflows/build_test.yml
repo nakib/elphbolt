@@ -9,7 +9,7 @@ jobs:
       matrix:
         os: [ubuntu-22.04]
     env:
-      GCC_V: 10
+      GCC_V: 9
 
     steps:
     - name: Checkout code
@@ -22,13 +22,13 @@ jobs:
       if: contains( matrix.os, 'ubuntu')
       run: |
         sudo apt update
-        sudo apt install -yq cmake gfortran-10 mpich liblapack-dev libsymspg-dev
+        sudo apt install -yq cmake gfortran-9 mpich liblapack-dev libsymspg-dev
         sudo apt clean -q
         git clone https://github.com/sourceryinstitute/OpenCoarrays && \
         mkdir OpenCoarrays/opencoarrays-install  && \
         cd OpenCoarrays/opencoarrays-install && \
         git checkout tags/2.10.1 && \
-        FC="$(command -v gfortran-10)" CC="$(command -v gcc-10)" cmake .. && \
+        FC="$(command -v gfortran-9)" CC="$(command -v gcc-9)" cmake .. && \
         sudo make install && \
         caf --version && \
         cafrun --version
