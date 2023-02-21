@@ -189,15 +189,15 @@ For the ~elphbolt~ app, there are 5 Namelists in the ~input.nml~ file: ~allocati
 *** ~superconductivity~
 | key                | Type    | Default | Description                                                                                                                                      |
 |--------------------+---------+---------+--------------------------------------------------------------------------------------------------------------------------------------------------|
-| ~mustar~           | Real    |     0.0 | Dimensionaless Coulomb pseudopotential parameter.                                                                                                |
-| ~domega~           | Real    |     0.0 | Equidistant phonon energy mesh spacing.                                                                                                          |
-| ~matsubara_cutoff~ | Integer |       0 | Matsubara energy cutoff as a factor of the highest phonon energy.                                                                                |
-| ~qp_cutoff~        | Integer |       0 | Quasiparticle energy cutoff as factor of the highest phonon energy.                                                                              |
+| ~mustar~           | Real    | 0.0     | Dimensionless Coulomb pseudopotential parameter.                                                                                                 |
+| ~domega~           | Real    | 0.0 eV  | Equidistant phonon energy mesh spacing.                                                                                                          |
+| ~matsubara_cutoff~ | Integer | 0       | Matsubara energy cutoff as a factor of the highest phonon energy.                                                                                |
+| ~qp_cutoff~        | Integer | 0       | Quasiparticle energy cutoff as factor of the highest phonon energy.                                                                              |
 | ~isotropic~        | Logical | .False. | Use the isotropic (fast!) version of the Eliashberg theory?                                                                                      |
 | ~use_external_eps~ | Logical | .False. | Use user generated modulus-squared dielectric function to screen the Eliashberg spectral function. For now, only works for the isotropic theory. |
-| ~Tstart~           | Real    |     0.0 | Starting point of the temperature sweep.                                                                                                         |
-| ~Tend~             | Real    |     0.0 | End point of the temperature sweep.                                                                                                              |
-| ~dT~               | Real    |     0.0 | Temperature difference used in temperature sweep.                                                                                                |
+| ~Tstart~           | Real    | 0.0 K   | Starting point of the temperature sweep.                                                                                                         |
+| ~Tend~             | Real    | 0.0 K   | End point of the temperature sweep.                                                                                                              |
+| ~dT~               | Real    | 0.0 K   | Temperature difference used in temperature sweep.                                                                                                |
 
 ** Description of output files
 
