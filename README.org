@@ -45,12 +45,8 @@ Above, you can change the build path with the additional argument ~--install-pre
 
 *** 3. Build
 **** Using cmake [Preferred]
-Issue the following commands to build and run tests: ~mkdir build; cd build; cmake ..; make; ctest~. If all goes well, the exectuable will be available as ~build/bin/elphbolt~.
+Issue the following commands to build and run tests: ~mkdir build; cd build; cmake ..; make; ctest~. If all goes well, the exectuable will be available as ~build/bin/{elphbolt, superconda}~.
 **** Using fpm (https://fpm.fortran-lang.org/en/index.html) [stay tuned...]
-**** Using make [Deprecated]
-Alternatively, you can use make. In the ~Makefiles~ directory you will find a few ~<title>.make~ files. Adapt them to your own architecture. Then, in the ~Makefile~ include your personal ~<title>.make~ file at the top, commenting out any exiting one. Copy your ~Makefile~ and ~<title>.make~ files to the ~src/~ directory.
-
-Once you have done the above, go into ~src/~ and simply say ~make~. This should build the executable ~elphbolt.x~ one directory above.
 
 ** Container solutions
 
@@ -92,6 +88,10 @@ Note that ~elphbolt~ can only read the ~epwdata.fmt~ file only if the ~EPW~ calc
 These are required if you want to plot the electronic bands, phonon dispersions, and the electron-phonon matrix elements along high symmetry paths in the Brillouin zone.
 
 You need to provide a wave vector path file named ~highsympath.txt~ (to be used as both the electron and phonon wave vectors) and an initial electron wave vector file named ~initialk.txt~ if you want the electron bands, phonon dispersions, and electron-phonon matrix elements calculated along the path. The first line of ~highsympath.txt~ must be an integer equaling the number of wave vectors in the path. This should be followed by the same number of rows of wave vectors expressed in crystal coordinates (fractions of the reciprocal lattice vectors). The ~initialk.txt~ file must simply contain one wave vector in crystal coordinates.
+
+*** Bespoke screening for the isotropic Eliashberg spectral function
+
+If needed (see flag ~use_external_eps~ below), the isotropic Eliashberg spectral function can be screened with a bespoke dielectric function. In this case, a file named ~eps_squared~ must be placed into the run directory. This will contain a single column of data, giving the modulus-square of the dielectric function at each point in the equidistant phonon energy mesh (see flag ~domega~ below).
 
 ** Description of ~input.nml~
 
@@ -187,17 +187,17 @@ For the ~elphbolt~ app, there are 5 Namelists in the ~input.nml~ file: ~allocati
 | ~coarse_qmesh~ | Integer array of size 3 | 0 0 0   | Coarse phonon wave vector mesh employed in the Wannier calculation. This must match the q-mesh in the Quantum Espresso second order force constants file. |
 
 *** ~superconductivity~
-| key                | Type    | Default | Description                                                         |
-|--------------------+---------+---------+---------------------------------------------------------------------|
-| ~mustar~           | Real    |     0.0 | Dimensionaless Coulomb pseudopotential parameter.                   |
-| ~domega~           | Real    |     0.0 | Equidistant phonon energy mesh spacing.                             |
-| ~matsubara_cutoff~ | Integer |       0 | Matsubara energy cutoff as a factor of the highest phonon energy.   |
-| ~qp_cutoff~        | Integer |       0 | Quasiparticle energy cutoff as factor of the highest phonon energy. |
-| ~isotropic~        | Logical | .False. | Use the isotropic (fast!) version of the Eliashberg theory?         |
-| ~Tstart~           | Real    |     0.0 | Starting point of the temperature sweep.                            |
-| ~Tend~             | Real    |     0.0 | End point of the temperature sweep.                                 |
-| ~Tstart~           | Real    |     0.0 | Starting point of the temperature sweep.                            |
-| ~dT~               | Real    |     0.0 | Temperature difference used in temperature sweep.                   |
+| key                | Type    | Default | Description                                                                                                                                      |
+|--------------------+---------+---------+--------------------------------------------------------------------------------------------------------------------------------------------------|
+| ~mustar~           | Real    |     0.0 | Dimensionaless Coulomb pseudopotential parameter.                                                                                                |
+| ~domega~           | Real    |     0.0 | Equidistant phonon energy mesh spacing.                                                                                                          |
+| ~matsubara_cutoff~ | Integer |       0 | Matsubara energy cutoff as a factor of the highest phonon energy.                                                                                |
+| ~qp_cutoff~        | Integer |       0 | Quasiparticle energy cutoff as factor of the highest phonon energy.                                                                              |
+| ~isotropic~        | Logical | .False. | Use the isotropic (fast!) version of the Eliashberg theory?                                                                                      |
+| ~use_external_eps~ | Logical | .False. | Use user generated modulus-squared dielectric function to screen the Eliashberg spectral function. For now, only works for the isotropic theory. |
+| ~Tstart~           | Real    |     0.0 | Starting point of the temperature sweep.                                                                                                         |
+| ~Tend~             | Real    |     0.0 | End point of the temperature sweep.                                                                                                              |
+| ~dT~               | Real    |     0.0 | Temperature difference used in temperature sweep.                                                                                                |
 
 ** Description of output files
 
