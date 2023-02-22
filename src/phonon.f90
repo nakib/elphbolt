@@ -35,6 +35,18 @@ module phonon_module
   private
   public phonon
   
+
+  !! Type for isotopic scattering (each image will contain its own block)
+  type massvar_information
+       !! Information about phonons
+       integer(i64), allocatable      :: index1(:)
+       integer(i64), allocatable      :: index2(:)
+       ! Matrix elements for isotopic processes in given proc
+       real(r64), allocatable :: Gamma_massvar(:)
+       !! Number of isotopic processes in given proc
+       integer :: nstates = 0
+  end type massvar_information
+
   type, extends(particle) :: phonon
      !! Data and procedures related to phonons.
      
@@ -60,6 +72,10 @@ module phonon_module
      !Data read from ifc2 file. These will be used in the phonon calculation.
      real(r64) :: rws(124, 0:3), cell_r(1:3, 0:3), cell_g(1:3, 0:3)
      real(r64), allocatable :: mm(:,:), rr(:,:,:)
+     
+
+     !Data for isotopic and substituional variables
+     type(massvar_information) :: phiso, phsubs
       
    contains
 

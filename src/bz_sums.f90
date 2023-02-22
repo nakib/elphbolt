@@ -19,7 +19,7 @@ module bz_sums
 
   use params, only: r64, i64, kB, qe, pi, hbar_eVps, perm0
   use misc, only: exit_with_message, print_message, write2file_rank2_real, &
-       distribute_points, Bose, Fermi, binsearch
+       distribute_points, Bose, Fermi, binsearch, mux_state
   use phonon_module, only: phonon
   use electron_module, only: electron
   use crystal_module, only: crystal
@@ -248,10 +248,10 @@ contains
     real(r64), intent(out), allocatable :: W_phiso(:,:), W_phsubs(:,:)
     
     !Local variables
-    integer(i64) :: iq, ib, iqp, ibp, im, chunk, counter, num_active_images, &
-         pol, a, numatoms
+    integer(i64) :: iq, ib, iqp, ibp, im, chunk, counter, storecounter, &
+         num_active_images, pol, a, numatoms
     integer(i64), allocatable :: start[:], end[:]
-    real(r64) :: e, delta, aux
+    real(r64) :: e, delta, aux, Giso, Gsubs
     real(r64), allocatable :: dos_chunk(:,:)[:], W_phiso_chunk(:,:)[:], &
          W_phsubs_chunk(:,:)[:]
     
@@ -284,7 +284,49 @@ contains
     if(phiso) W_phiso_chunk(:,:) = 0.0_r64
     if(phsubs) W_phsubs_chunk(:,:) = 0.0_r64
 
-    counter = 0
+
+    ! Do some initialization for isotopic and
+    ! phsubs gamma storing for its use
+    ! in iterative procedure
+    if (phiso .or. phsubs) then
+      do iq = start, end !Run over IBZ wave vectors
+         do ib = 1, ph%numbands !Run over wave vectors
+            !Grab sample energy from the IBZ
+            e = ph%ens(ph%indexlist_irred(iq), ib)
+
+            do iqp = 1, ph%nwv !Sum over FBZ wave vectors
+               do ibp = 1, ph%numbands !Sum over wave vectors
+                  !Evaluate delta[E(iq,ib) - E(iq',ib')]
+                  if(usetetra) then
+                     delta = delta_fn_tetra(e, iqp, ibp, ph%wvmesh, ph%tetramap, &
+                           ph%tetracount, ph%tetra_evals)
+                  else
+                     delta = delta_fn_triang(e, iqp, ibp, ph%wvmesh, ph%triangmap, &
+                           ph%triangcount, ph%triang_evals)
+                  end if
+
+                  if (delta > 0.0_r64) then
+                     if(phsubs) ph%phsubs%nstates = ph%phsubs%nstates + 1
+                     if(phiso)  ph%phiso%nstates  = ph%phiso%nstates  + 1
+                  end if
+               end do
+            end do
+         end do
+      end do
+    end if
+    if (phiso .and. (ph%phiso%nstates .ne. 0) ) then
+      allocate(ph%phiso%index1(ph%phiso%nstates),&
+               ph%phiso%index2(ph%phiso%nstates),&
+               ph%phiso%Gamma_massvar(ph%phiso%nstates))
+    end if
+    if (phsubs .and. (ph%phsubs%nstates .ne. 0) ) then
+      allocate(ph%phsubs%index1(ph%phsubs%nstates),&
+               ph%phsubs%index2(ph%phsubs%nstates),&
+               ph%phsubs%Gamma_massvar(ph%phsubs%nstates))
+    end if
+
+    counter    = 0
+    storecounter = 0
     do iq = start, end !Run over IBZ wave vectors
        !Increase counter
        counter = counter + 1
@@ -302,28 +344,51 @@ contains
                    delta = delta_fn_triang(e, iqp, ibp, ph%wvmesh, ph%triangmap, &
                         ph%triangcount, ph%triang_evals)
                 end if
+
+                ! If not energy conserving ignore
+                if (delta .le. 0.0_r64 ) then
+                    cycle
+                end if
+                storecounter = storecounter + 1
+
                 !Sum over delta function
                 dos_chunk(counter, ib) = dos_chunk(counter, ib) + delta
 
                 if(phiso .or. phsubs) then
+                   Giso  = 0.0_r64
+                   Gsubs = 0.0_r64
                    do a = 1, numatoms
                       pol = (a - 1)*3
                       aux = (abs(dot_product(&
                            ph%evecs(ph%indexlist_irred(iq), ib, pol + 1 : pol + 3), &
                            ph%evecs(iqp, ibp, pol + 1 : pol + 3))))**2
-                      
+
                       !Calculate phonon-isotope scattering in the Tamura model                   
                       if(phiso) then
-                         W_phiso_chunk(counter, ib) = W_phiso_chunk(counter, ib) + &
+                         Giso = Giso + &
                               delta*aux*gfactors(atomtypes(a))*e**2
                       end if
                       
                       !Calculate phonon-substitution scattering in the Tamura model
                       if(phsubs) then
-                         W_phsubs_chunk(counter, ib) = W_phsubs_chunk(counter, ib) + &
-                              delta*aux*subs_gfactors(atomtypes(a))*e**2
+                         Gsubs = Gsubs + &
+                           delta*aux*subs_gfactors(atomtypes(a))*e**2
                       end if
                    end do
+                   if(phiso) then
+                      W_phiso_chunk(counter, ib) = W_phiso_chunk(counter, ib) + Giso
+                      ph%phiso%index1(storecounter) =  mux_state(ph%numbands, ib, iq)
+                      ph%phiso%index2(storecounter) =  mux_state(ph%numbands, ibp, iqp)
+                      ph%phiso%Gamma_massvar(storecounter) = Giso*0.5_r64*pi/hbar_eVps
+                   end if
+
+                   if(phsubs) then
+                      W_phsubs_chunk(counter, ib) = W_phsubs_chunk(counter, ib) + Gsubs
+                      ph%phsubs%index1(storecounter) = mux_state(ph%numbands, ib, iq)
+                      ph%phsubs%index2(storecounter) = mux_state(ph%numbands, ibp, iqp)
+                      ph%phsubs%Gamma_massvar(storecounter) = Gsubs*0.5_r64*pi/hbar_eVps
+                   end if
+
                 end if
              end do
           end do
