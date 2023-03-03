@@ -967,7 +967,7 @@ contains
     complex(r64), intent(inout) :: mat(:, :)
 
     !Local variables
-    integer :: N, info, lwork
+    integer(i64) :: N, info, lwork
     complex(r64), allocatable :: work(:), ipivot(:)
 
     !Size of matrix
