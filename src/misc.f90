@@ -967,8 +967,9 @@ contains
     complex(r64), intent(inout) :: mat(:, :)
 
     !Local variables
-    integer(i64) :: N, info, lwork
-    complex(r64), allocatable :: work(:), ipivot(:)
+    integer :: N, info, lwork
+    integer, allocatable :: ipivot(:)
+    complex(r64), allocatable :: work(:)
 
     !Size of matrix
     N = size(mat, 1)
@@ -976,7 +977,9 @@ contains
     if(N /= size(mat, 2)) &
          call exit_with_message("invert_complex_square called with non-zquare matrix. Exiting.")
 
-    allocate(work(N), ipivot(N))
+    !Set and allocate zgetr* variables             
+    lwork = 32*N
+    allocate(work(lwork), ipivot(N))
 
     call zgetrf(N, N, mat, N, ipivot, info)
     if(info /= 0) &
