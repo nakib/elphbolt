@@ -306,11 +306,11 @@ contains
        if(self%fourph) then
           if(crys%twod) then
              write(*, "(A, (3I5,x))") "external 4ph q-mesh = ", &
-                  self%fourph_mesh_ref*self%qmesh(1), self%fourph_mesh_ref*self%qmesh(2), 1
+                  self%qmesh(1)/self%fourph_mesh_ref, self%qmesh(2)/self%fourph_mesh_ref, 1
           else
              write(*, "(A, (3I5,x))") "external 4ph q-mesh = ", &
-                  self%fourph_mesh_ref*self%qmesh(1), self%fourph_mesh_ref*self%qmesh(2), &
-                  self%fourph_mesh_ref*self%qmesh(3)
+                  self%qmesh(1)/self%fourph_mesh_ref, self%qmesh(2)/self%fourph_mesh_ref, &
+                  self%qmesh(3)/self%fourph_mesh_ref
           end if
        end if
        write(*, "(A, 1E16.8, A)") "Fermi window thickness (each side of reference energy) = ", self%fsthick, " eV"
