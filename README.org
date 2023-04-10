@@ -17,7 +17,7 @@ Using /ab initio/ electron-phonon and a fully wave vector and electron band/phon
 - anisotropic and isotropic Eliashberg spectral function and
 - phonon-mediated superconducting transition temperature.
 
-To date (<2023-04-10 Mon>), ~elphbolt~ has been used in the following works:
+To date (April 10, 2023), ~elphbolt~ has been used in the following works:
 | material(s) | physics probed                | publication                                                        |
 |-------------+-------------------------------+--------------------------------------------------------------------|
 | Si          | drag                          | https://www.nature.com/articles/s41524-022-00710-0                 |
