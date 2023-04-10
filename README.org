@@ -1,11 +1,11 @@
 #+OPTIONS: ^:{}
 [[./logo/logo.png]]
 * elphbolt + superconda
-~elphbolt~ (short for electron-phonon Boltzmann transport) is a modern Fortran (2018 standard) suite of transport codes. It provides a solver for both the coupled /and/ decoupled electron and phonon Boltzmann transport equations (BTEs). You can read about the methodology and implementation here: [[https://arxiv.org/abs/2109.08547]]. In addition, you get the ~superconda~ app for solving the phonon-mediated superconducting properties within the Eliashberg formalism.
+~elphbolt~ (short for electron-phonon Boltzmann transport) is a modern Fortran (2018 standard) suite of transport codes. It provides a solver for both the coupled /and/ decoupled electron and phonon Boltzmann transport equations (BTEs). You can read about the methodology and implementation here: https://www.nature.com/articles/s41524-022-00710-0. In addition, you get the ~superconda~ app for solving the phonon-mediated superconducting properties within the Eliashberg formalism.
 
 ~elphbolt~ is a "free as in freedom" code distributed under the GNU General Public License (GPL) version 3. You can read more about the philosophy of software freedom here: [[https://www.gnu.org/philosophy/free-sw.en.html]].
 
-Using /ab initio/ electron-phonon and phonon-phonon interactions and a fully wave vector and electron band/phonon branch resolved formulation of the BTEs, the ~elphbolt~ app gives you the
+Using /ab initio/ electron-phonon and 3- and 4-phonon interactions and a fully wave vector and electron band/phonon branch resolved formulation of the BTEs, the ~elphbolt~ app gives you the
 
 - phonon and electronic thermal conductivities;
 - electronic conductivity;
@@ -17,7 +17,16 @@ Using /ab initio/ electron-phonon and a fully wave vector and electron band/phon
 - anisotropic and isotropic Eliashberg spectral function and
 - phonon-mediated superconducting transition temperature.
 
-Stylistically, it is designed to be simple, small, fast, and extensible. Object oriented programming concepts are combined with the procedural style, which allows fast development, while resulting in a rather compact source (~ 8000 lines of code, generated using David A. Wheeler's 'SLOCCount'). The symmetries of the crystal are fully exploited and the transport active Fermi window is used to allow the sampling of extremely fine wave vector meshes needed for accurate solutions of the BTEs and Eliashberg equations. Parallelism is achieved through modern Fortran's intrinsic ~coarrays~ feature that is fully supported by recent versions of both the ~gcc~ and ~intel~ compilers.
+To date (<2023-04-10 Mon>), ~elphbolt~ has been used in the following works:
+| material(s) | physics probed                | publication                                                        |
+|-------------+-------------------------------+--------------------------------------------------------------------|
+| Si          | drag                          | https://www.nature.com/articles/s41524-022-00710-0                 |
+| Diamond     | drag                          | https://journals.aps.org/prb/abstract/10.1103/PhysRevB.107.L081202 |
+| MgB$_{2}$   | superconductivity enhancement | https://arxiv.org/abs/2109.10247                                   |
+| BAs         | drag                          | https://doi.org/10.1103/PhysRevB.107.L081202                       |
+| GaN & AlN   | drag                          | https://arxiv.org/abs/2304.00165                                   |
+  
+Stylistically, ~elphbolt~ is designed to be simple, small, fast, and extensible. Object oriented programming concepts are combined with the procedural style, which allows fast development, while resulting in a rather compact source (~ 8000 lines of code, generated using David A. Wheeler's 'SLOCCount'). The symmetries of the crystal are fully exploited and the transport active Fermi window is used to allow the sampling of extremely fine wave vector meshes needed for accurate solutions of the BTEs and Eliashberg equations. Parallelism is achieved through modern Fortran's intrinsic ~coarrays~ feature that is fully supported by recent versions of both the ~gcc~ and ~intel~ compilers.
 
 ~elphbolt~ currently works with the ~Quantum Espresso~ (https://www.quantum-espresso.org/) suite and its core module ~EPW~ (https://epw-code.org/) for the phonon quantities and the Wannier space information, respectively.
 
@@ -44,7 +53,7 @@ On the Sirius cluster of Boston College, I was able to build version 2.9.2 by fi
 Above, you can change the build path with the additional argument ~--install-prefix <path to build directory>~ to ~install.sh~.
 
 *** 3. Build
-**** Using cmake [Preferred]
+**** Using cmake
 Issue the following commands to build and run tests: ~mkdir build; cd build; cmake ..; make; ctest~. If all goes well, the exectuable will be available as ~build/bin/{elphbolt, superconda}~.
 **** Using fpm (https://fpm.fortran-lang.org/en/index.html) [stay tuned...]
 
