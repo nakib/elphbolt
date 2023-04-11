@@ -1324,8 +1324,6 @@ contains
        
        !Read coarse mesh, IBZ 4-ph scattering rates
        if(this_image() == 1 .and. num%fourph) then
-          open(1, file=filename, status="old")
-
           do s = 1, ph%numbands
              do iq = 1, coarse_numq_irred
                 read(1, *) ignore, coarse_rta_rates_ibz(iq, s)
