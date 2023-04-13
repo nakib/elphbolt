@@ -779,7 +779,9 @@ contains
     !mode = 0: 3d interpolation
     !mode = 1: 2d interpolation
     !mode = 2: 1d interpolation
-    if(mode == 0) then !3d
+    !mode = 3: no interpolation needed
+    select case(mode)
+    case(0) !3d
        allocate(pivot(8), T(8, 8), c(8))
 
        !Fine mesh point
@@ -806,18 +808,18 @@ contains
        i111 = (r1(3)*coarsemesh(2)+r1(2))*coarsemesh(1)+r1(1)+1
 
        !Evaluate functions at the corners and form rhs    
-       c = (/ f(i000), f(i100), f(i010), f(i110),&
-            f(i001), f(i101), f(i011), f(i111) /)
+       c = [f(i000), f(i100), f(i010), f(i110), &
+            f(i001), f(i101), f(i011), f(i111)]
 
        !Form the transformation matrix T
-       T(1,:) = (/1.0_r64, x0, y0, z0, x0*y0, x0*z0, y0*z0, x0*y0*z0/)
-       T(2,:) = (/1.0_r64, x1, y0, z0, x1*y0, x1*z0, y0*z0, x1*y0*z0/)
-       T(3,:) = (/1.0_r64, x0, y1, z0, x0*y1, x0*z0, y1*z0, x0*y1*z0/)
-       T(4,:) = (/1.0_r64, x1, y1, z0, x1*y1, x1*z0, y1*z0, x1*y1*z0/)
-       T(5,:) = (/1.0_r64, x0, y0, z1, x0*y0, x0*z1, y0*z1, x0*y0*z1/)
-       T(6,:) = (/1.0_r64, x1, y0, z1, x1*y0, x1*z1, y0*z1, x1*y0*z1/)
-       T(7,:) = (/1.0_r64, x0, y1, z1, x0*y1, x0*z1, y1*z1, x0*y1*z1/)
-       T(8,:) = (/1.0_r64, x1, y1, z1, x1*y1, x1*z1, y1*z1, x1*y1*z1/)
+       T(1,:) = [1.0_r64, x0, y0, z0, x0*y0, x0*z0, y0*z0, x0*y0*z0]
+       T(2,:) = [1.0_r64, x1, y0, z0, x1*y0, x1*z0, y0*z0, x1*y0*z0]
+       T(3,:) = [1.0_r64, x0, y1, z0, x0*y1, x0*z0, y1*z0, x0*y1*z0]
+       T(4,:) = [1.0_r64, x1, y1, z0, x1*y1, x1*z0, y1*z0, x1*y1*z0]
+       T(5,:) = [1.0_r64, x0, y0, z1, x0*y0, x0*z1, y0*z1, x0*y0*z1]
+       T(6,:) = [1.0_r64, x1, y0, z1, x1*y0, x1*z1, y0*z1, x1*y0*z1]
+       T(7,:) = [1.0_r64, x0, y1, z1, x0*y1, x0*z1, y1*z1, x0*y1*z1]
+       T(8,:) = [1.0_r64, x1, y1, z1, x1*y1, x1*z1, y1*z1, x1*y1*z1]
 
        !Solve Ta = c for a,
        !where c is an array containing the function values at the 8 corners.
@@ -826,12 +828,13 @@ contains
        !Approximate f(x,y,z) in terms of a.
        aux = c(1) + c(2)*x + c(3)*y + c(4)*z +&
             c(5)*x*y + c(6)*x*z + c(7)*y*z + c(8)*x*y*z
-    else if(mode == 1) then !2d
+
+    case(1) !2d
        allocate(pivot(4), T(4, 4), c(4))
-       
+
        count = 1
        do ipol = 1, 3
-          if(r1(ipol) .eq. r0(ipol)) then
+          if(r1(ipol) == r0(ipol)) then
              equalpol = ipol
           else
              v(count) = q(ipol)/dble(refinement(ipol)*coarsemesh(ipol))
@@ -842,11 +845,11 @@ contains
        end do
 
        i000 = (r0(3)*coarsemesh(2)+r0(2))*coarsemesh(1)+r0(1)+1
-       if(equalpol .eq. 1) then !1st 2 subindices of i are y,z
+       if(equalpol == 1) then !1st 2 subindices of i are y,z
           i010 = (r1(3)*coarsemesh(2)+r0(2))*coarsemesh(1)+r0(1)+1
           i100 = (r0(3)*coarsemesh(2)+r1(2))*coarsemesh(1)+r0(1)+1
           i110 = (r1(3)*coarsemesh(2)+r1(2))*coarsemesh(1)+r0(1)+1
-       else if(equalpol .eq. 2) then !x,z
+       else if(equalpol == 2) then !x,z
           i010 = (r1(3)*coarsemesh(2)+r0(2))*coarsemesh(1)+r0(1)+1
           i100 = (r0(3)*coarsemesh(2)+r0(2))*coarsemesh(1)+r1(1)+1
           i110 = (r1(3)*coarsemesh(2)+r0(2))*coarsemesh(1)+r1(1)+1
@@ -856,17 +859,18 @@ contains
           i110 = (r0(3)*coarsemesh(2)+r1(2))*coarsemesh(1)+r1(1)+1
        end if
 
-       c = (/ f(i000), f(i010), f(i100), f(i110)/)
+       c = [f(i000), f(i010), f(i100), f(i110)]
 
-       T(1,:) = (/1.0_r64, v0(1), v0(2), v0(1)*v0(2)/)
-       T(2,:) = (/1.0_r64, v0(1), v1(2), v0(1)*v1(2)/)
-       T(3,:) = (/1.0_r64, v1(1), v0(2), v1(1)*v0(2)/)
-       T(4,:) = (/1.0_r64, v1(1), v1(2), v1(1)*v1(2)/)
+       T(1,:) = [1.0_r64, v0(1), v0(2), v0(1)*v0(2)]
+       T(2,:) = [1.0_r64, v0(1), v1(2), v0(1)*v1(2)]
+       T(3,:) = [1.0_r64, v1(1), v0(2), v1(1)*v0(2)]
+       T(4,:) = [1.0_r64, v1(1), v1(2), v1(1)*v1(2)]
 
        call dgesv(4,1,T,4,pivot,c,4,info)
 
        aux = c(1) + c(2)*v(1) + c(3)*v(2) + c(4)*v(1)*v(2)
-    else !1d
+
+    case(2) !1d
        do ipol = 1, 3
           if(r1(ipol) /= r0(ipol)) then
              x =  q(ipol)/dble(refinement(ipol)*coarsemesh(ipol))
@@ -874,9 +878,9 @@ contains
              x1 = ceiling(q(ipol)/dble(refinement(ipol)))/dble(coarsemesh(ipol))
 
              i000 = (r0(3)*coarsemesh(2)+r0(2))*coarsemesh(1)+r0(1)+1
-             if(ipol .eq. 1) then
+             if(ipol == 1) then
                 i100 = (r0(3)*coarsemesh(2)+r0(2))*coarsemesh(1)+r1(1)+1
-             else if(ipol .eq. 2) then
+             else if(ipol == 2) then
                 i100 = (r0(3)*coarsemesh(2)+r1(2))*coarsemesh(1)+r0(1)+1
              else
                 i100 = (r1(3)*coarsemesh(2)+r0(2))*coarsemesh(1)+r0(1)+1
@@ -884,7 +888,13 @@ contains
              aux = f(i000) + (x - x0)*(f(i100) - f(i000))/(x1 - x0)
           end if
        end do
-    end if
+
+    case(3) !no interpolation
+       aux = f((r0(3)*coarsemesh(2)+r0(2))*coarsemesh(1)+r0(1)+1)
+
+    case default
+       call exit_with_message("Can't find point to interpolate on. Exiting.")
+    end select
     
     interpolation = aux
   end subroutine interpolate
