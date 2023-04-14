@@ -50,20 +50,28 @@ module wannier_module
      !! Real space cell locations for electrons.
      integer(i64), allocatable :: rcells_q(:, :)
      !! Real space cell locations for phonons.
-     integer(i64), allocatable :: rcells_g(:, :)
+     !integer(i64), allocatable :: rcells_g(:, :)
+     integer(i64), allocatable :: rcells_g(:, :)[:]
      !! Real space cell locations for electron-phonon vertex.     
      integer(i64), allocatable :: elwsdeg(:)
      !! Real space cell multiplicity for electrons.
      integer(i64), allocatable :: phwsdeg(:)
      !! Real space cell multiplicity for phonons.
-     integer(i64), allocatable :: gwsdeg(:)
+     !integer(i64), allocatable :: gwsdeg(:)
+     integer(i64), allocatable :: gwsdeg(:)[:]
      !! Real space cell multiplicity for electron-phonon vertex.
      complex(r64), allocatable :: Hwann(:, :, :)
      !! Hamiltonian in Wannier representation.
      complex(r64), allocatable :: Dphwann(:, :, :)
      !! Dynamical matrix in Wannier representation.
-     complex(r64), allocatable :: gwann(:, :, :, :, :)
+     !complex(r64), allocatable :: gwann(:, :, :, :, :)
+     complex(r64), allocatable :: gwann(:, :, :, :, :)[:]
      !! e-ph vertex in Wannier representation.
+
+     !FOR NOW...
+     integer(i64) :: num_active_images
+     integer(i64), allocatable :: start[:], end[:], chunk[:]
+     !!
 
    contains
 
@@ -82,10 +90,13 @@ contains
     type(numerics), intent(in) :: num
     
     !Local variables
-    integer(i64) :: iuc, ib, jb
+    integer(i64) :: iuc, ib, jb, image
     integer(i64) :: coarse_qmesh(3)
     real(r64) :: ef
     real(r64), allocatable :: dummy(:)
+    complex(r64), allocatable :: gwann_aux(:, :, :, :, :)
+    integer(i64), allocatable :: rcells_g_aux(:, :)
+    integer(i64), allocatable :: gwsdeg_aux(:)
     ! EPW File names:
     character(len=*), parameter :: filename_epwdata = "epwdata.fmt"
     character(len=*), parameter :: filename_epwgwann = "epmatwp1"
@@ -142,17 +153,60 @@ contains
     end do
     close(1)
 
+!!$    if(.not. num%read_gk2 .or. .not. num%read_gq2 .or. &
+!!$         num%plot_along_path) then
+!!$       !Read real space matrix elements
+!!$       call print_message("Reading Wannier rep. e-ph vertex...")
+!!$       open(1, file = filename_epwgwann, status = 'old', access = 'stream')
+!!$       allocate(self%gwann(self%numwannbands,self%numwannbands,self%nwsk,&
+!!$            self%numbranches,self%nwsg))
+!!$       self%gwann = 0.0_r64
+!!$       read(1) self%gwann
+!!$    end if
+!!$    close(1)
+!!$
+
+    allocate(self%start[*], self%end[*], self%chunk[*])
+    !Divide wave vectors among images
+    call distribute_points(self%nwsg, self%chunk, self%start, self%end, self%num_active_images)
+    
     if(.not. num%read_gk2 .or. .not. num%read_gq2 .or. &
          num%plot_along_path) then
-       !Read real space matrix elements
-       call print_message("Reading Wannier rep. e-ph vertex...")
-       open(1, file = filename_epwgwann, status = 'old', access = 'stream')
+              
        allocate(self%gwann(self%numwannbands,self%numwannbands,self%nwsk,&
-            self%numbranches,self%nwsg))
+            self%numbranches, self%chunk)[*])
        self%gwann = 0.0_r64
-       read(1) self%gwann
+
+       if(this_image() == 1) then
+          call print_message("Reading Wannier rep. e-ph vertex and distributing...")
+          
+          open(1, file = filename_epwgwann, status = 'old', access = 'stream')
+
+          allocate(gwann_aux(self%numwannbands,self%numwannbands,self%nwsk,&
+               self%numbranches,self%chunk[1])) !chunk for the 1st image is the largest 
+          
+          do image = 1, self%num_active_images
+             print*, 'image, num_active_images ', image, self%num_active_images
+             print*, 'start, end, chunk ', self%start[image], self%end[image], self%chunk[image]
+             
+             !if(allocated(gwann_aux)) deallocate(gwann_aux)
+             !allocate(gwann_aux(self%numwannbands,self%numwannbands,self%nwsk,&
+             !     self%numbranches,chunk[image]))
+             read(1) gwann_aux(:, :, :, :, 1:self%chunk[image])
+             print*, image, ' setting gwann'
+             !self%gwann(:, :, :, :, :)[image] = gwann_aux
+             self%gwann(:, :, :, :, 1:self%chunk[image])[image] = gwann_aux(:, :, :, :, 1:self%chunk[image])
+             print*, image, ' done setting gwann'
+          end do
+
+          close(1)
+          !deallocate(gwann_aux)
+       end if
+
+       sync all
+
+       if(this_image() == 1) deallocate(gwann_aux)
     end if
-    close(1)
 
     !Read cell maps of q, k, g meshes.
     call print_message("Reading Wannier cells and multiplicities...")
@@ -178,16 +232,43 @@ contains
     close(1)
     close(2)
 
-    allocate(self%rcells_g(self%nwsg, 3))
-    allocate(self%gwsdeg(self%nwsg))
-    open(1, file = filename_gwscells, status = "old")
-    open(2, file = filename_gwsdeg, status = "old")
-    do iuc = 1,self%nwsg
-       read(1, *) self%rcells_g(iuc, :)
-       read(2, *) self%gwsdeg(iuc)
-    end do
-    close(1)
-    close(2)
+!!$    allocate(self%rcells_g(self%nwsg, 3))
+!!$    allocate(self%gwsdeg(self%nwsg))
+!!$    open(1, file = filename_gwscells, status = "old")
+!!$    open(2, file = filename_gwsdeg, status = "old")
+!!$    do iuc = 1,self%nwsg
+!!$       read(1, *) self%rcells_g(iuc, :)
+!!$       read(2, *) self%gwsdeg(iuc)
+!!$    end do
+!!$    close(1)
+!!$    close(2)
+
+
+    allocate(self%rcells_g(self%chunk, 3)[*])
+    allocate(self%gwsdeg(self%chunk)[*])
+    
+    if(this_image() == 1) then
+       allocate(rcells_g_aux(self%chunk[1], 3)) !chunk for the 1st image is the largest 
+       allocate(gwsdeg_aux(self%chunk[1]))
+
+       open(1, file = filename_gwscells, status = "old")
+       open(2, file = filename_gwsdeg, status = "old")
+
+       do image = 1, self%num_active_images
+          do iuc = 1, self%chunk[image]
+             read(1, *) rcells_g_aux(iuc, :)
+             read(2, *) gwsdeg_aux(iuc)
+          end do
+          
+          self%rcells_g(1:self%chunk[image], :)[image] = rcells_g_aux(1:self%chunk[image], :)
+          self%gwsdeg(1:self%chunk[image])[image] = gwsdeg_aux(1:self%chunk[image])
+       end do
+
+       close(1)
+       close(2)
+    end if
+
+    sync all
   end subroutine read_EPW_Wannier
 
   subroutine el_wann_epw(self, crys, nk, kvecs, energies, velocities, evecs, scissor)
@@ -702,7 +783,7 @@ contains
     real(r64), intent(in) :: qvec(3)
 
     !Local variables
-    integer(i64) :: iuc, s
+    integer(i64) :: iuc, s, image, i, image_order(self%num_active_images)
     complex(r64) :: caux
     complex(r64), allocatable:: gmixed(:,:,:,:)
 
@@ -712,10 +793,31 @@ contains
 
     !Fourier transform to q-space
     gmixed = 0
-    do iuc = 1,self%nwsg
-       caux = expi(twopi*dot_product(qvec, self%rcells_g(iuc,:)))/self%gwsdeg(iuc)
-       do s = 1, self%numbranches
-          gmixed(:,:,s,:) = gmixed(:,:,s,:) + caux*self%gwann(:,:,:,s,iuc)
+!!$    do iuc = 1,self%nwsg
+!!$       caux = expi(twopi*dot_product(qvec, self%rcells_g(iuc,:)))/self%gwsdeg(iuc)
+!!$       do s = 1, self%numbranches
+!!$          gmixed(:,:,s,:) = gmixed(:,:,s,:) + caux*self%gwann(:,:,:,s,iuc)
+!!$       end do
+!!$    end do
+!!$
+
+    !Staggering the order of reading of gwann from the diffent images to reduce
+    !simultaneous reading of the same chunk by all images.
+    do i = 0, self%num_active_images - 1
+       image_order(i + 1) = modulo(i + this_image() - 1, self%num_active_images) + 1
+    end do
+    
+    !print*, this_image(), image_order
+    
+    do i = 1, self%num_active_images
+       image = image_order(i)
+
+       do iuc = 1, self%chunk[image]
+          caux = expi(twopi*dot_product(qvec, self%rcells_g(iuc,:)[image]))/self%gwsdeg(iuc)[image]
+
+          do s = 1, self%numbranches
+             gmixed(:,:,s,:) = gmixed(:,:,s,:) + caux*self%gwann(:,:,:,s,iuc)[image]
+          end do
        end do
     end do
 
