@@ -29,6 +29,9 @@ module wannier_module
   private
   public epw_wannier
 
+  complex(r64), allocatable :: gwann(:, :, :, :, :)[:]
+  !! e-ph vertex in Wannier representation.
+  
   !external chdir
   
   type epw_wannier
@@ -65,7 +68,7 @@ module wannier_module
      complex(r64), allocatable :: Dphwann(:, :, :)
      !! Dynamical matrix in Wannier representation.
      !complex(r64), allocatable :: gwann(:, :, :, :, :)
-     complex(r64), allocatable :: gwann(:, :, :, :, :)[:]
+     !complex(r64), allocatable :: gwann(:, :, :, :, :)[:]
      !! e-ph vertex in Wannier representation.
 
      !FOR NOW...
@@ -166,41 +169,40 @@ contains
 !!$    close(1)
 !!$
 
-    allocate(self%start[*], self%end[*], self%chunk[*])
     !Divide wave vectors among images
+    allocate(self%start[*], self%end[*], self%chunk[*])
     call distribute_points(self%nwsg, self%chunk, self%start, self%end, self%num_active_images)
     
     if(.not. num%read_gk2 .or. .not. num%read_gq2 .or. &
          num%plot_along_path) then
               
-       allocate(self%gwann(self%numwannbands,self%numwannbands,self%nwsk,&
-            self%numbranches, self%chunk)[*])
-       self%gwann = 0.0_r64
+!!$       allocate(self%gwann(self%numwannbands,self%numwannbands,self%nwsk,&
+!!$            self%numbranches, self%chunk)[*])
+!!$       self%gwann = 0.0_r64
+       allocate(gwann(self%numwannbands,self%numwannbands,self%nwsk,&
+            self%numbranches, self%chunk[1])[*])
+       gwann = 0.0_r64
 
+       !Below, image 1 will read Wannierized g(Re,Rp) and distribute to all images.
        if(this_image() == 1) then
           call print_message("Reading Wannier rep. e-ph vertex and distributing...")
           
           open(1, file = filename_epwgwann, status = 'old', access = 'stream')
 
           allocate(gwann_aux(self%numwannbands,self%numwannbands,self%nwsk,&
-               self%numbranches,self%chunk[1])) !chunk for the 1st image is the largest 
+               self%numbranches,self%chunk[1])) !chunk for the 1st image is the largest
           
           do image = 1, self%num_active_images
              print*, 'image, num_active_images ', image, self%num_active_images
              print*, 'start, end, chunk ', self%start[image], self%end[image], self%chunk[image]
              
-             !if(allocated(gwann_aux)) deallocate(gwann_aux)
-             !allocate(gwann_aux(self%numwannbands,self%numwannbands,self%nwsk,&
-             !     self%numbranches,chunk[image]))
              read(1) gwann_aux(:, :, :, :, 1:self%chunk[image])
              print*, image, ' setting gwann'
-             !self%gwann(:, :, :, :, :)[image] = gwann_aux
-             self%gwann(:, :, :, :, 1:self%chunk[image])[image] = gwann_aux(:, :, :, :, 1:self%chunk[image])
+             gwann(:,:,:,:,:)[image] = gwann_aux(:,:,:,:,:)
              print*, image, ' done setting gwann'
           end do
 
           close(1)
-          !deallocate(gwann_aux)
        end if
 
        sync all
@@ -244,8 +246,10 @@ contains
 !!$    close(2)
 
 
-    allocate(self%rcells_g(self%chunk, 3)[*])
-    allocate(self%gwsdeg(self%chunk)[*])
+    !allocate(self%rcells_g(self%chunk, 3)[*])
+    !allocate(self%gwsdeg(self%chunk)[*])
+    allocate(self%rcells_g(self%chunk[1], 3)[*])
+    allocate(self%gwsdeg(self%chunk[1])[*])
     
     if(this_image() == 1) then
        allocate(rcells_g_aux(self%chunk[1], 3)) !chunk for the 1st image is the largest 
@@ -260,8 +264,8 @@ contains
              read(2, *) gwsdeg_aux(iuc)
           end do
           
-          self%rcells_g(1:self%chunk[image], :)[image] = rcells_g_aux(1:self%chunk[image], :)
-          self%gwsdeg(1:self%chunk[image])[image] = gwsdeg_aux(1:self%chunk[image])
+          self%rcells_g(:, :)[image] = rcells_g_aux(:, :)
+          self%gwsdeg(:)[image] = gwsdeg_aux(:)
        end do
 
        close(1)
@@ -752,7 +756,8 @@ contains
     gmixed = 0
     do iuc = 1,self%nwsk
        caux = expi(twopi*dot_product(kvec, self%rcells_k(iuc,:)))/self%elwsdeg(iuc)
-       gmixed(:,:,:,:) = gmixed(:,:,:,:) + caux*self%gwann(:,:,iuc,:,:)
+!!$       gmixed(:,:,:,:) = gmixed(:,:,:,:) + caux*self%gwann(:,:,iuc,:,:)
+       gmixed(:,:,:,:) = gmixed(:,:,:,:) + caux*gwann(:,:,iuc,:,:)
     end do
 
     !Change to data output directory
@@ -786,7 +791,6 @@ contains
     integer(i64) :: iuc, s, image, i, image_order(self%num_active_images)
     complex(r64) :: caux
     complex(r64), allocatable:: gmixed(:,:,:,:)
-
     character(len = 1024) :: filename
 
     allocate(gmixed(self%numwannbands, self%numwannbands, self%numbranches, self%nwsk))
@@ -807,16 +811,16 @@ contains
        image_order(i + 1) = modulo(i + this_image() - 1, self%num_active_images) + 1
     end do
     
-    !print*, this_image(), image_order
+    print*, this_image(), image_order
     
     do i = 1, self%num_active_images
        image = image_order(i)
 
        do iuc = 1, self%chunk[image]
           caux = expi(twopi*dot_product(qvec, self%rcells_g(iuc,:)[image]))/self%gwsdeg(iuc)[image]
-
+          
           do s = 1, self%numbranches
-             gmixed(:,:,s,:) = gmixed(:,:,s,:) + caux*self%gwann(:,:,:,s,iuc)[image]
+             gmixed(:,:,s,:) = gmixed(:,:,s,:) + caux*gwann(:,:,:,s,iuc)[image]
           end do
        end do
     end do
@@ -848,7 +852,8 @@ contains
 
     if(.not. num%read_gk2 .and. .not. num%read_gq2 .or. &
          num%plot_along_path) then
-       deallocate(self%gwann)
+!!$       deallocate(self%gwann)
+       deallocate(gwann)
     end if
   end subroutine deallocate_wannier
   
