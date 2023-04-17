@@ -648,8 +648,10 @@ contains
        do iws = 1, nws !over matrix elements WS cell
           !Fourier transform to reciprocal-space
           if(wannspace == 'ph') then
-             caux = expi(twopi*dot_product(qvec, self%rcells_g(iws, :)))&
-                  /self%gwsdeg(iws)
+!!$             caux = expi(twopi*dot_product(qvec, self%rcells_g(iws, :)))&
+!!$                  /self%gwsdeg(iws)
+             caux = expi(twopi*dot_product(qvec, self%rcells_q(iws, :)))&
+                  /self%phwsdeg(iws)
           else
              caux = expi(twopi*dot_product(kvec, self%rcells_k(iws,:)))&
                   /self%elwsdeg(iws)
@@ -744,7 +746,7 @@ contains
     real(r64), intent(in) :: kvec(3)
 
     !Local variables
-    integer(i64) :: iuc
+    integer(i64) :: iuc, image, i, image_order(self%num_active_images), j
     complex(r64) :: caux
     complex(r64), allocatable:: gmixed(:,:,:,:)
 
@@ -754,10 +756,30 @@ contains
 
     !Fourier transform to k-space
     gmixed = 0
+!!$    do iuc = 1,self%nwsk
+!!$       caux = expi(twopi*dot_product(kvec, self%rcells_k(iuc,:)))/self%elwsdeg(iuc)
+!!$       gmixed(:,:,:,:) = gmixed(:,:,:,:) + caux*gwann(:,:,iuc,:,:)
+!!$    end do
+
+    !Staggering the order of reading of gwann from the diffent images to reduce
+    !simultaneous reading of the same chunk by all images.
+    do i = 0, self%num_active_images - 1
+       image_order(i + 1) = modulo(i + this_image() - 1, self%num_active_images) + 1
+    end do
+
+    print*, this_image(), image_order
+    
     do iuc = 1,self%nwsk
        caux = expi(twopi*dot_product(kvec, self%rcells_k(iuc,:)))/self%elwsdeg(iuc)
-!!$       gmixed(:,:,:,:) = gmixed(:,:,:,:) + caux*self%gwann(:,:,iuc,:,:)
-       gmixed(:,:,:,:) = gmixed(:,:,:,:) + caux*gwann(:,:,iuc,:,:)
+
+       do i = 1, self%num_active_images
+          image = image_order(i)
+          
+          gmixed(:,:,:,self%start[image]:self%end[image]) = &
+               gmixed(:,:,:,self%start[image]:self%end[image]) + &
+               caux*gwann(:,:,iuc,:,1:self%chunk[image])[image]
+       end do
+       
     end do
 
     !Change to data output directory
