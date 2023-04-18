@@ -164,19 +164,6 @@ contains
     end do
     close(1)
 
-!!$    if(.not. num%read_gk2 .or. .not. num%read_gq2 .or. &
-!!$         num%plot_along_path) then
-!!$       !Read real space matrix elements
-!!$       call print_message("Reading Wannier rep. e-ph vertex...")
-!!$       open(1, file = filename_epwgwann, status = 'old', access = 'stream')
-!!$       allocate(self%gwann(self%numwannbands,self%numwannbands,self%nwsk,&
-!!$            self%numbranches,self%nwsg))
-!!$       self%gwann = 0.0_r64
-!!$       read(1) self%gwann
-!!$    end if
-!!$    close(1)
-!!$
-
     !Divide wave vectors among images
     allocate(self%gwann_distrib_start[*], self%gwann_distrib_end[*], self%gwann_distrib_chunk[*])
     call distribute_points(self%nwsg, self%gwann_distrib_chunk, self%gwann_distrib_start, &
@@ -185,9 +172,6 @@ contains
     if(.not. num%read_gk2 .or. .not. num%read_gq2 .or. &
          num%plot_along_path) then
               
-!!$       allocate(self%gwann(self%numwannbands,self%numwannbands,self%nwsk,&
-!!$            self%numbranches, self%gwann_distrib_chunk)[*])
-!!$       self%gwann = 0.0_r64
        allocate(gwann(self%numwannbands,self%numwannbands,self%nwsk,&
             self%numbranches, self%gwann_distrib_chunk[1])[*])
        gwann = 0.0_r64
@@ -202,14 +186,14 @@ contains
                self%numbranches,self%gwann_distrib_chunk[1])) !chunk for the 1st image is the largest
           
           do image = 1, self%gwann_distrib_num_active_images
-             print*, 'image, num_active_images ', image, self%gwann_distrib_num_active_images
-             print*, 'start, end, chunk ', self%gwann_distrib_start[image], &
-                  self%gwann_distrib_end[image], self%gwann_distrib_chunk[image]
+!!$             print*, 'image, num_active_images ', image, self%gwann_distrib_num_active_images
+!!$             print*, 'start, end, chunk ', self%gwann_distrib_start[image], &
+!!$                  self%gwann_distrib_end[image], self%gwann_distrib_chunk[image]
              
              read(1) gwann_aux(:, :, :, :, 1:self%gwann_distrib_chunk[image])
-             print*, image, ' setting gwann'
+!!$             print*, image, ' setting gwann'
              gwann(:,:,:,:,:)[image] = gwann_aux(:,:,:,:,:)
-             print*, image, ' done setting gwann'
+!!$             print*, image, ' done setting gwann'
           end do
 
           close(1)
@@ -244,20 +228,6 @@ contains
     close(1)
     close(2)
 
-!!$    allocate(self%rcells_g(self%nwsg, 3))
-!!$    allocate(self%gwsdeg(self%nwsg))
-!!$    open(1, file = filename_gwscells, status = "old")
-!!$    open(2, file = filename_gwsdeg, status = "old")
-!!$    do iuc = 1,self%nwsg
-!!$       read(1, *) self%rcells_g(iuc, :)
-!!$       read(2, *) self%gwsdeg(iuc)
-!!$    end do
-!!$    close(1)
-!!$    close(2)
-
-
-    !allocate(self%rcells_g(self%gwann_distrib_chunk, 3)[*])
-    !allocate(self%gwsdeg(self%gwann_distrib_chunk)[*])
     allocate(self%rcells_g(self%gwann_distrib_chunk[1], 3)[*])
     allocate(self%gwsdeg(self%gwann_distrib_chunk[1])[*])
     
@@ -658,8 +628,6 @@ contains
        do iws = 1, nws !over matrix elements WS cell
           !Fourier transform to reciprocal-space
           if(wannspace == 'ph') then
-!!$             caux = expi(twopi*dot_product(qvec, self%rcells_g(iws, :)))&
-!!$                  /self%gwsdeg(iws)
              caux = expi(twopi*dot_product(qvec, self%rcells_q(iws, :)))&
                   /self%phwsdeg(iws)
           else
@@ -757,17 +725,19 @@ contains
 
     !Local variables
     integer(i64) :: iuc, image, i, image_order(self%gwann_distrib_num_active_images)
-    complex(r64) :: caux
-    complex(r64), allocatable:: gmixed(:,:,:,:)
+    complex(r64) :: phase(self%nwsk), caux
+    complex(r64) :: gmixed(self%numwannbands, self%numwannbands, self%numbranches, self%nwsq)
 
     character(len = 1024) :: filename
-
-    allocate(gmixed(self%numwannbands, self%numwannbands, self%numbranches, self%nwsq))
 
     !Fourier transform to k-space
     gmixed = 0
 
-    !TODO Precalculate caux as an array.
+    !Precalculate phase as an array.
+    do iuc = 1,self%nwsk
+       phase(iuc) = expi(twopi*dot_product(kvec, self%rcells_k(iuc,:)))
+    end do
+    phase = phase/self%elwsdeg
     
     !Staggering the order of reading of gwann from the diffent images to reduce
     !simultaneous reading of the same chunk by all images.
@@ -775,20 +745,19 @@ contains
        image_order(i + 1) = modulo(i + this_image() - 1, self%gwann_distrib_num_active_images) + 1
     end do
 
-    print*, this_image(), image_order
+!!$    print*, this_image(), image_order
 
     do iuc = 1,self%nwsk
-       caux = expi(twopi*dot_product(kvec, self%rcells_k(iuc,:)))/self%elwsdeg(iuc)
-
+       caux = phase(iuc)
+       
        do i = 1, self%gwann_distrib_num_active_images
           image = image_order(i)
-
+          
           gmixed(:,:,:,self%gwann_distrib_start[image]:self%gwann_distrib_end[image]) = &
                gmixed(:,:,:,self%gwann_distrib_start[image]:self%gwann_distrib_end[image]) + &
                caux*gwann(:,:,:,1:self%gwann_distrib_chunk[image], iuc)[image]
        end do
     end do
-
 
     !Change to data output directory
     call chdir(trim(adjustl(num%g2dir)))
@@ -819,7 +788,7 @@ contains
 
     !Local variables
     integer(i64) :: iuc, s, image, i, image_order(self%gwann_distrib_num_active_images)
-    complex(r64) :: caux
+    complex(r64) :: phase
     complex(r64), allocatable:: gmixed(:,:,:,:)
     character(len = 1024) :: filename
 
@@ -834,16 +803,16 @@ contains
        image_order(i + 1) = modulo(i + this_image() - 1, self%gwann_distrib_num_active_images) + 1
     end do
     
-    print*, this_image(), image_order
+!!$    print*, this_image(), image_order
     
     do i = 1, self%gwann_distrib_num_active_images
        image = image_order(i)
 
        do iuc = 1, self%gwann_distrib_chunk[image]
-          caux = expi(twopi*dot_product(qvec, self%rcells_g(iuc,:)[image]))/self%gwsdeg(iuc)[image]
+          phase = expi(twopi*dot_product(qvec, self%rcells_g(iuc,:)[image]))/self%gwsdeg(iuc)[image]
           
           do s = 1, self%numbranches
-             gmixed(:,:,s,:) = gmixed(:,:,s,:) + caux*gwann(:,:,:,s,iuc)[image]
+             gmixed(:,:,s,:) = gmixed(:,:,s,:) + phase*gwann(:,:,:,s,iuc)[image]
           end do
        end do
     end do
