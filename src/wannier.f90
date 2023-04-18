@@ -746,13 +746,16 @@ contains
     real(r64), intent(in) :: kvec(3)
 
     !Local variables
-    integer(i64) :: iuc, image, i, image_order(self%num_active_images), j
+    integer(i64) :: iuc, image, i, image_order(self%num_active_images)
     complex(r64) :: caux
-    complex(r64), allocatable:: gmixed(:,:,:,:)
+    complex(r64), allocatable:: gmixed(:,:,:,:), gwann_local(:,:,:,:,:)
 
     character(len = 1024) :: filename
 
     allocate(gmixed(self%numwannbands, self%numwannbands, self%numbranches, self%nwsq))
+
+    allocate(gwann_local(self%numwannbands,self%numwannbands,&
+         self%numbranches, self%nwsk, self%chunk[1]))
 
     !Fourier transform to k-space
     gmixed = 0
@@ -769,18 +772,21 @@ contains
 
     print*, this_image(), image_order
     
-    do iuc = 1,self%nwsk
-       caux = expi(twopi*dot_product(kvec, self%rcells_k(iuc,:)))/self%elwsdeg(iuc)
+    do i = 1, self%num_active_images
+       image = image_order(i)
 
-       do i = 1, self%num_active_images
-          image = image_order(i)
-          
+       gwann_local = reshape(gwann(:,:,:,:,:)[image], shape = [self%numwannbands,self%numwannbands, self%numbranches,&
+            self%nwsk, self%chunk[1]], order = [1, 2, 4, 3, 5])
+       
+       do iuc = 1,self%nwsk
+          caux = expi(twopi*dot_product(kvec, self%rcells_k(iuc,:)))/self%elwsdeg(iuc)
+
           gmixed(:,:,:,self%start[image]:self%end[image]) = &
                gmixed(:,:,:,self%start[image]:self%end[image]) + &
-               caux*gwann(:,:,iuc,:,1:self%chunk[image])[image]
+               caux*gwann_local(:,:,:,iuc,1:self%chunk[image])
        end do
-       
     end do
+
 
     !Change to data output directory
     call chdir(trim(adjustl(num%g2dir)))
