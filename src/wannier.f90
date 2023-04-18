@@ -29,6 +29,13 @@ module wannier_module
   private
   public epw_wannier
 
+  !Captain's log. April 18, 2023.
+  !I have pulled this out of the epw_wannier data type
+  !and made it a module level, private variable. Doing this leads to
+  !much performance in the calculations involving contractions of gwann's indices.
+  !I suspect that there is a bug in the compiler/OpenCoarrays library 
+  !that causes memory access to be slow when gwann is a member of a data type.
+  !I will move this back into the data type when the bug is fixed. --NHP
   complex(r64), allocatable :: gwann(:, :, :, :, :)[:]
   !! e-ph vertex in Wannier representation.
   
@@ -72,14 +79,15 @@ module wannier_module
      !! e-ph vertex in Wannier representation.
 
      !FOR NOW...
-     integer(i64) :: num_active_images
-     integer(i64), allocatable :: start[:], end[:], chunk[:]
+     integer(i64) :: gwann_distrib_num_active_images
+     integer(i64), allocatable :: gwann_distrib_start[:], gwann_distrib_end[:], gwann_distrib_chunk[:]
      !!
 
    contains
 
      procedure :: read=>read_EPW_Wannier, el_wann_epw, ph_wann_epw, &
-          gkRp_epw, gReq_epw, g2_epw, deallocate_wannier, plot_along_path
+          gkRp_epw, gReq_epw, g2_epw, deallocate_wannier, plot_along_path, &
+          reshape_gwann_for_gkRp
 
   end type epw_wannier
 
@@ -170,17 +178,18 @@ contains
 !!$
 
     !Divide wave vectors among images
-    allocate(self%start[*], self%end[*], self%chunk[*])
-    call distribute_points(self%nwsg, self%chunk, self%start, self%end, self%num_active_images)
+    allocate(self%gwann_distrib_start[*], self%gwann_distrib_end[*], self%gwann_distrib_chunk[*])
+    call distribute_points(self%nwsg, self%gwann_distrib_chunk, self%gwann_distrib_start, &
+         self%gwann_distrib_end, self%gwann_distrib_num_active_images)
     
     if(.not. num%read_gk2 .or. .not. num%read_gq2 .or. &
          num%plot_along_path) then
               
 !!$       allocate(self%gwann(self%numwannbands,self%numwannbands,self%nwsk,&
-!!$            self%numbranches, self%chunk)[*])
+!!$            self%numbranches, self%gwann_distrib_chunk)[*])
 !!$       self%gwann = 0.0_r64
        allocate(gwann(self%numwannbands,self%numwannbands,self%nwsk,&
-            self%numbranches, self%chunk[1])[*])
+            self%numbranches, self%gwann_distrib_chunk[1])[*])
        gwann = 0.0_r64
 
        !Below, image 1 will read Wannierized g(Re,Rp) and distribute to all images.
@@ -190,13 +199,14 @@ contains
           open(1, file = filename_epwgwann, status = 'old', access = 'stream')
 
           allocate(gwann_aux(self%numwannbands,self%numwannbands,self%nwsk,&
-               self%numbranches,self%chunk[1])) !chunk for the 1st image is the largest
+               self%numbranches,self%gwann_distrib_chunk[1])) !chunk for the 1st image is the largest
           
-          do image = 1, self%num_active_images
-             print*, 'image, num_active_images ', image, self%num_active_images
-             print*, 'start, end, chunk ', self%start[image], self%end[image], self%chunk[image]
+          do image = 1, self%gwann_distrib_num_active_images
+             print*, 'image, num_active_images ', image, self%gwann_distrib_num_active_images
+             print*, 'start, end, chunk ', self%gwann_distrib_start[image], &
+                  self%gwann_distrib_end[image], self%gwann_distrib_chunk[image]
              
-             read(1) gwann_aux(:, :, :, :, 1:self%chunk[image])
+             read(1) gwann_aux(:, :, :, :, 1:self%gwann_distrib_chunk[image])
              print*, image, ' setting gwann'
              gwann(:,:,:,:,:)[image] = gwann_aux(:,:,:,:,:)
              print*, image, ' done setting gwann'
@@ -246,20 +256,20 @@ contains
 !!$    close(2)
 
 
-    !allocate(self%rcells_g(self%chunk, 3)[*])
-    !allocate(self%gwsdeg(self%chunk)[*])
-    allocate(self%rcells_g(self%chunk[1], 3)[*])
-    allocate(self%gwsdeg(self%chunk[1])[*])
+    !allocate(self%rcells_g(self%gwann_distrib_chunk, 3)[*])
+    !allocate(self%gwsdeg(self%gwann_distrib_chunk)[*])
+    allocate(self%rcells_g(self%gwann_distrib_chunk[1], 3)[*])
+    allocate(self%gwsdeg(self%gwann_distrib_chunk[1])[*])
     
     if(this_image() == 1) then
-       allocate(rcells_g_aux(self%chunk[1], 3)) !chunk for the 1st image is the largest 
-       allocate(gwsdeg_aux(self%chunk[1]))
+       allocate(rcells_g_aux(self%gwann_distrib_chunk[1], 3)) !chunk for the 1st image is the largest 
+       allocate(gwsdeg_aux(self%gwann_distrib_chunk[1]))
 
        open(1, file = filename_gwscells, status = "old")
        open(2, file = filename_gwsdeg, status = "old")
 
-       do image = 1, self%num_active_images
-          do iuc = 1, self%chunk[image]
+       do image = 1, self%gwann_distrib_num_active_images
+          do iuc = 1, self%gwann_distrib_chunk[image]
              read(1, *) rcells_g_aux(iuc, :)
              read(2, *) gwsdeg_aux(iuc)
           end do
@@ -746,44 +756,36 @@ contains
     real(r64), intent(in) :: kvec(3)
 
     !Local variables
-    integer(i64) :: iuc, image, i, image_order(self%num_active_images)
+    integer(i64) :: iuc, image, i, image_order(self%gwann_distrib_num_active_images)
     complex(r64) :: caux
-    complex(r64), allocatable:: gmixed(:,:,:,:), gwann_local(:,:,:,:,:)
+    complex(r64), allocatable:: gmixed(:,:,:,:)
 
     character(len = 1024) :: filename
 
     allocate(gmixed(self%numwannbands, self%numwannbands, self%numbranches, self%nwsq))
 
-    allocate(gwann_local(self%numwannbands,self%numwannbands,&
-         self%numbranches, self%nwsk, self%chunk[1]))
-
     !Fourier transform to k-space
     gmixed = 0
-!!$    do iuc = 1,self%nwsk
-!!$       caux = expi(twopi*dot_product(kvec, self%rcells_k(iuc,:)))/self%elwsdeg(iuc)
-!!$       gmixed(:,:,:,:) = gmixed(:,:,:,:) + caux*gwann(:,:,iuc,:,:)
-!!$    end do
 
+    !TODO Precalculate caux as an array.
+    
     !Staggering the order of reading of gwann from the diffent images to reduce
     !simultaneous reading of the same chunk by all images.
-    do i = 0, self%num_active_images - 1
-       image_order(i + 1) = modulo(i + this_image() - 1, self%num_active_images) + 1
+    do i = 0, self%gwann_distrib_num_active_images - 1
+       image_order(i + 1) = modulo(i + this_image() - 1, self%gwann_distrib_num_active_images) + 1
     end do
 
     print*, this_image(), image_order
-    
-    do i = 1, self%num_active_images
-       image = image_order(i)
 
-       gwann_local = reshape(gwann(:,:,:,:,:)[image], shape = [self%numwannbands,self%numwannbands, self%numbranches,&
-            self%nwsk, self%chunk[1]], order = [1, 2, 4, 3, 5])
-       
-       do iuc = 1,self%nwsk
-          caux = expi(twopi*dot_product(kvec, self%rcells_k(iuc,:)))/self%elwsdeg(iuc)
+    do iuc = 1,self%nwsk
+       caux = expi(twopi*dot_product(kvec, self%rcells_k(iuc,:)))/self%elwsdeg(iuc)
 
-          gmixed(:,:,:,self%start[image]:self%end[image]) = &
-               gmixed(:,:,:,self%start[image]:self%end[image]) + &
-               caux*gwann_local(:,:,:,iuc,1:self%chunk[image])
+       do i = 1, self%gwann_distrib_num_active_images
+          image = image_order(i)
+
+          gmixed(:,:,:,self%gwann_distrib_start[image]:self%gwann_distrib_end[image]) = &
+               gmixed(:,:,:,self%gwann_distrib_start[image]:self%gwann_distrib_end[image]) + &
+               caux*gwann(:,:,:,1:self%gwann_distrib_chunk[image], iuc)[image]
        end do
     end do
 
@@ -816,7 +818,7 @@ contains
     real(r64), intent(in) :: qvec(3)
 
     !Local variables
-    integer(i64) :: iuc, s, image, i, image_order(self%num_active_images)
+    integer(i64) :: iuc, s, image, i, image_order(self%gwann_distrib_num_active_images)
     complex(r64) :: caux
     complex(r64), allocatable:: gmixed(:,:,:,:)
     character(len = 1024) :: filename
@@ -825,26 +827,19 @@ contains
 
     !Fourier transform to q-space
     gmixed = 0
-!!$    do iuc = 1,self%nwsg
-!!$       caux = expi(twopi*dot_product(qvec, self%rcells_g(iuc,:)))/self%gwsdeg(iuc)
-!!$       do s = 1, self%numbranches
-!!$          gmixed(:,:,s,:) = gmixed(:,:,s,:) + caux*self%gwann(:,:,:,s,iuc)
-!!$       end do
-!!$    end do
-!!$
 
     !Staggering the order of reading of gwann from the diffent images to reduce
     !simultaneous reading of the same chunk by all images.
-    do i = 0, self%num_active_images - 1
-       image_order(i + 1) = modulo(i + this_image() - 1, self%num_active_images) + 1
+    do i = 0, self%gwann_distrib_num_active_images - 1
+       image_order(i + 1) = modulo(i + this_image() - 1, self%gwann_distrib_num_active_images) + 1
     end do
     
     print*, this_image(), image_order
     
-    do i = 1, self%num_active_images
+    do i = 1, self%gwann_distrib_num_active_images
        image = image_order(i)
 
-       do iuc = 1, self%chunk[image]
+       do iuc = 1, self%gwann_distrib_chunk[image]
           caux = expi(twopi*dot_product(qvec, self%rcells_g(iuc,:)[image]))/self%gwsdeg(iuc)[image]
           
           do s = 1, self%numbranches
@@ -880,7 +875,6 @@ contains
 
     if(.not. num%read_gk2 .and. .not. num%read_gq2 .or. &
          num%plot_along_path) then
-!!$       deallocate(self%gwann)
        deallocate(gwann)
     end if
   end subroutine deallocate_wannier
@@ -1072,4 +1066,29 @@ contains
     end if
     sync all
   end subroutine plot_along_path
+
+  subroutine reshape_gwann_for_gkRp(self)
+    !! Subroutine to reshape gwann to the best shape
+    !! for the calculations in the subroutine gkRp_epw_epw.
+
+    class(epw_wannier), intent(in) :: self
+
+    if(this_image() == 1) print*, 'Current shape of gwann = ', shape(gwann)
+
+    !Do the old switcheroo between dimensions 3 and 4.
+    gwann = reshape(gwann, &
+         shape = [self%numwannbands,self%numwannbands, &
+         self%numbranches, self%nwsk, self%gwann_distrib_chunk[1]], &
+         order = [1, 2, 4, 3, 5])
+
+    !if(this_image() == 1) print*, 'Intermediate shape of gwann = ', shape(gwann)
+
+    !Do the old switcheroo between dimensions 4 and 5.
+    gwann = reshape(gwann, &
+         shape = [self%numwannbands,self%numwannbands,&
+         self%numbranches, self%gwann_distrib_chunk[1], self%nwsk], &
+         order = [1, 2, 3, 5, 4])
+
+    if(this_image() == 1) print*, 'New shape of gwann = ', shape(gwann)
+  end subroutine reshape_gwann_for_gkRp
 end module wannier_module

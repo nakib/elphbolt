@@ -484,6 +484,10 @@ contains
 
     call print_message("Calculating g(Re,Rp) -> g(k,Rp) for all IBZ k...")
 
+    !Conform gwann to the best shape for the contraction in gkRp_epw.
+    call wann%reshape_gwann_for_gkRp
+    sync all
+
     call distribute_points(el%nwv_irred, chunk, ikstart, ikend, num_active_images)
 
     if(this_image() == 1) then
