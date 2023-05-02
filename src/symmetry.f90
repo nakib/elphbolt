@@ -350,7 +350,10 @@ contains
           call distribute_points(nrunninglist, chunk, start, end, num_active_images)
           
           check = 0
-          if(any(runninglist(start:end) == imux)) check = 1
+          !if(any(runninglist(start:end) == imux)) check = 1
+          if(start > 0) then
+             if(any(runninglist(start:end) == imux)) check = 1
+          end if
           sync all
           call co_sum(check)
           sync all

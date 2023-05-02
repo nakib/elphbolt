@@ -411,25 +411,43 @@ contains
   end subroutine int_div
 
   subroutine distribute_points(npts, chunk, istart, iend, num_active_images)
-    !! Distribute points among processes
+    !! Distribute points among images
 
     integer(i64), intent(in) :: npts
     integer(i64), intent(out) :: chunk, istart, iend, num_active_images
 
+    integer(i64) :: smallest_chunk, remaining_npts, istart_offset, image_offset
+
     !Number of active images
     num_active_images = min(npts, num_images())
-    !Number of points per process
-    chunk = ceiling(dble(npts)/num_images())
-    !Start index
-    istart = (this_image()-1)*chunk + 1
-    !End index
-    iend = min(chunk*this_image(), npts)
-    !Update chunk
-    if(istart < iend) then
-       chunk = iend - istart + 1
+    !Smallest number of points per image
+    smallest_chunk = npts/num_active_images
+    !The remainder
+    remaining_npts = modulo(npts, num_active_images)
+
+    !print*,'     this_image    istart        iend        chunk'
+
+    if(this_image() <= remaining_npts) then
+       istart_offset = 0
+       image_offset = 0
+       chunk = smallest_chunk + 1
+
+       istart = istart_offset + (this_image() - image_offset - 1)*chunk + 1
+       iend = istart + chunk - 1
+    else if(this_image() > remaining_npts .and. this_image() <= num_active_images) then
+       istart_offset = (smallest_chunk + 1)*remaining_npts
+       image_offset = remaining_npts
+       chunk = smallest_chunk
+
+       istart = istart_offset + (this_image() - image_offset - 1)*chunk + 1
+       iend = istart + chunk - 1
     else
-       chunk = 1
+       chunk = 0
+       istart = 0
+       iend = 0
     end if
+
+    !print*, this_image(), istart, iend, chunk
   end subroutine distribute_points
   
   pure function cross_product(A, B)
