@@ -311,68 +311,71 @@ contains
     !Divide phonon states among images
     call distribute_points(numstates_irred, chunk, start, end, num_active_images)
     
-    do istate = start, end
-       !Demux state index into branch (s) and wave vector (iq) indices
-       call demux_state(istate, ph%numbands, s, iq)
+    !Only work with the active images
+    if(this_image() <= num_active_images) then
+       do istate = start, end
+          !Demux state index into branch (s) and wave vector (iq) indices
+          call demux_state(istate, ph%numbands, s, iq)
 
-       !Squared energy of phonon 1
-       en_sq = ph%ens(ph%indexlist_irred(iq), s)**2
-       
-       !Scale the mass perturbation with squared energy.
-       dof_counter = 0
-       do cell = 1, self%numcells
-          do atom = 1, crys%numatoms !Number of atoms in the unit cell
-             val = en_sq*V_mass(crys%atomtypes(atom))
-             do a = 1, 3 !Cartesian directions
-                dof_counter = dof_counter + 1
-                !Since on-site mass perturbation is forced to be in the central unit cell,
-                !only these elements of V get a non-zero contribution.
-                if(all(self%cell_pos_intvec(:, cell) == 0)) then
-                   V(dof_counter, dof_counter) = val
-                end if
+          !Squared energy of phonon 1
+          en_sq = ph%ens(ph%indexlist_irred(iq), s)**2
+
+          !Scale the mass perturbation with squared energy.
+          dof_counter = 0
+          do cell = 1, self%numcells
+             do atom = 1, crys%numatoms !Number of atoms in the unit cell
+                val = en_sq*V_mass(crys%atomtypes(atom))
+                do a = 1, 3 !Cartesian directions
+                   dof_counter = dof_counter + 1
+                   !Since on-site mass perturbation is forced to be in the central unit cell,
+                   !only these elements of V get a non-zero contribution.
+                   if(all(self%cell_pos_intvec(:, cell) == 0)) then
+                      V(dof_counter, dof_counter) = val
+                   end if
+                end do
              end do
           end do
+
+          select case(self%approx)
+          case('lowest order')
+             ! Lowest order:
+             ! T = V
+             !                            
+             !    *                     
+             !    |                        
+             !  V |                         
+             !    |
+             !                
+             T(:, :, istate) = V
+          case('1st Born')
+             ! 1st Born approximation:
+             ! T = V + V.D0.V
+             !                            
+             !    *             *            
+             !    |            / \              
+             !  V |     +     /   \              
+             !    |          /_____\
+             !                 D0
+             !
+             T(:, :, istate) = V + matmul(V, matmul(self%D0(:, :, istate), V))
+          case('full Born')
+             ! Full Born approximation:
+             ! T = V + V.D0.T = [I - VD0]^-1 . V
+             !                              _                                      _
+             !    *             *          |    *         *            *            |
+             !    |            /           |    |        / \          /|\           |
+             !  V |     +     /       x    |    |   +   /   \   +    / | \  +  ...  |
+             !    |          /_____        |_   |      /_____\      /__|__\        _|
+             !                 D0           
+             !
+             inv_one_minus_VD0 = identity - matmul(V, self%D0(:, :, istate))
+             call invert(inv_one_minus_VD0)
+             T(:, :, istate) = matmul(inv_one_minus_VD0, V)
+          case default
+             call exit_with_message("T-matrix approximation not recognized.")
+          end select
        end do
-       
-       select case(self%approx)
-       case('lowest order')
-          ! Lowest order:
-          ! T = V
-          !                            
-          !    *                     
-          !    |                        
-          !  V |                         
-          !    |
-          !                
-          T(:, :, istate) = V
-       case('1st Born')
-          ! 1st Born approximation:
-          ! T = V + V.D0.V
-          !                            
-          !    *             *            
-          !    |            / \              
-          !  V |     +     /   \              
-          !    |          /_____\
-          !                 D0
-          !
-          T(:, :, istate) = V + matmul(V, matmul(self%D0(:, :, istate), V))
-       case('full Born')
-          ! Full Born approximation:
-          ! T = V + V.D0.T = [I - VD0]^-1 . V
-          !                              _                                      _
-          !    *             *          |    *         *            *            |
-          !    |            /           |    |        / \          /|\           |
-          !  V |     +     /       x    |    |   +   /   \   +    / | \  +  ...  |
-          !    |          /_____        |_   |      /_____\      /__|__\        _|
-          !                 D0           
-          !
-          inv_one_minus_VD0 = identity - matmul(V, self%D0(:, :, istate))
-          call invert(inv_one_minus_VD0)
-          T(:, :, istate) = matmul(inv_one_minus_VD0, V)
-       case default
-          call exit_with_message("T-matrix approximation not recognized.")
-       end select
-    end do
+    end if
 
     !Reduce T
     sync all
@@ -388,24 +391,27 @@ contains
     diagT = 0.0_r64
     
     !Optical theorem
-    do istate = start, end
-       !Demux state index into branch (s) and wave vector (iq) indices
-       call demux_state(istate, ph%numbands, s, iq)
-       
-       !This phonon eigenvector
-       ev = ph%evecs(ph%indexlist_irred(iq), s, :)
-       
-       do dof_counter = 1, num_dof_def
-          phase = expi( &
-               twopi*dot_product(ph%wavevecs_irred(iq, :), &
-               self%dimp_cell_pos_intvec(:, dof_counter)) )
+    ! Only work with the active images
+    if(this_image() <= num_active_images) then
+       do istate = start, end
+          !Demux state index into branch (s) and wave vector (iq) indices
+          call demux_state(istate, ph%numbands, s, iq)
 
-          phi(dof_counter) = phase*ev(self%pcell_atom_dof(dof_counter))
+          !This phonon eigenvector
+          ev = ph%evecs(ph%indexlist_irred(iq), s, :)
+
+          do dof_counter = 1, num_dof_def
+             phase = expi( &
+                  twopi*dot_product(ph%wavevecs_irred(iq, :), &
+                  self%dimp_cell_pos_intvec(:, dof_counter)) )
+
+             phi(dof_counter) = phase*ev(self%pcell_atom_dof(dof_counter))
+          end do
+
+          !<i|T|j> --> <sq|T|sq>
+          diagT(iq, s) = dot_product(phi, matmul(T(:, :, istate), phi))
        end do
-       
-       !<i|T|j> --> <sq|T|sq>
-       diagT(iq, s) = dot_product(phi, matmul(T(:, :, istate), phi))
-    end do
+    end if
     
     !Reduce T
     sync all

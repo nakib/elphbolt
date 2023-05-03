@@ -239,25 +239,28 @@ contains
     !Divide wave vectors among images
     call distribute_points(nmesh, chunk, start, end, num_active_images)
 
-    !Allocate small work variable chunk for each image
-    allocate(equiv_map_chunk(nsymm_rot, chunk)[*])
-    
-    counter = 0
-    do i = start, end !Run over total number of wave vectors.
-       !Increase counter
-       counter = counter + 1
-       call find_star(index_mesh(:,i),vec_star,mesh,qrotations) !Find star of wave vector.
-       do isym = 1, nsymm_rot !Run over all rotational symmetries of system.
-          vec = vec_star(:,isym) !Pick image.
-          ivec = nint(vec) !Snap to nearest integer grid.
-          !Check norm and save mapping:
-          if(dnrm2(3,abs(vec - dble(ivec)),1) >= 1e-2_r64) then
-             equiv_map_chunk(isym, counter) = -1
-          else
-             equiv_map_chunk(isym, counter) = mux_vector(modulo(ivec,mesh),mesh,base)
-          end if
+    !Only work with the active images
+    if(this_image() <= num_active_images) then
+       !Allocate small work variable chunk for each image
+       allocate(equiv_map_chunk(nsymm_rot, chunk)[*])
+
+       counter = 0
+       do i = start, end !Run over total number of wave vectors.
+          !Increase counter
+          counter = counter + 1
+          call find_star(index_mesh(:,i),vec_star,mesh,qrotations) !Find star of wave vector.
+          do isym = 1, nsymm_rot !Run over all rotational symmetries of system.
+             vec = vec_star(:,isym) !Pick image.
+             ivec = nint(vec) !Snap to nearest integer grid.
+             !Check norm and save mapping:
+             if(dnrm2(3,abs(vec - dble(ivec)),1) >= 1e-2_r64) then
+                equiv_map_chunk(isym, counter) = -1
+             else
+                equiv_map_chunk(isym, counter) = mux_vector(modulo(ivec,mesh),mesh,base)
+             end if
+          end do
        end do
-    end do
+    end if
     
     !Gather equiv_map_chunks in equiv_map and broadcast to all
     sync all
@@ -350,7 +353,6 @@ contains
           call distribute_points(nrunninglist, chunk, start, end, num_active_images)
           
           check = 0
-          !if(any(runninglist(start:end) == imux)) check = 1
           if(start > 0) then
              if(any(runninglist(start:end) == imux)) check = 1
           end if

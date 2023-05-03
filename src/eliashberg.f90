@@ -85,28 +85,34 @@ contains
     ph_deltas = 0.0_r64
 
     call distribute_points(numomega, chunk, start, end, num_active_images)
-
+    
     ! Handle tetrahedron vs triangle choice.
     if(num%tetrahedra) then !tetrahedron method
-       do iomega = start, end
-          do iq = 1, ph%nwv
-             do s = 1, wann%numbranches
-                ph_deltas(s, iq, iomega) = &
-                     delta_fn_tetra(omegas(iomega), iq, s, ph%wvmesh, ph%tetramap, &
-                     ph%tetracount, ph%tetra_evals)
+       !Only work with the active images
+       if(this_image() <= num_active_images) then
+          do iomega = start, end
+             do iq = 1, ph%nwv
+                do s = 1, wann%numbranches
+                   ph_deltas(s, iq, iomega) = &
+                        delta_fn_tetra(omegas(iomega), iq, s, ph%wvmesh, ph%tetramap, &
+                        ph%tetracount, ph%tetra_evals)
+                end do
              end do
           end do
-       end do
+       end if
     else !triangle method
-       do iomega = start, end
-          do iq = 1, ph%nwv
-             do s = 1, wann%numbranches
-                ph_deltas(s, iq, iomega) = &
-                     delta_fn_triang(omegas(iomega), iq, s, ph%wvmesh, ph%triangmap, &
-                     ph%triangcount, ph%triang_evals)
+       !Only work with the active images
+       if(this_image() <= num_active_images) then
+          do iomega = start, end
+             do iq = 1, ph%nwv
+                do s = 1, wann%numbranches
+                   ph_deltas(s, iq, iomega) = &
+                        delta_fn_triang(omegas(iomega), iq, s, ph%wvmesh, ph%triangmap, &
+                        ph%triangcount, ph%triang_evals)
+                end do
              end do
           end do
-       end do
+       end if
     end if
 
     ! The delta weights above were supercell number normalized.
@@ -151,104 +157,107 @@ contains
 
     if(this_image() == 1) then
        write(*, "(A, I10)") " #states = ", nstates_irred
-       write(*, "(A, I10)") " #states/image = ", chunk
+       write(*, "(A, I10)") " #states/image <= ", chunk
     end if
 
     !Allocate and initialize isotropic a2F
     allocate(iso_a2F_branches(numomega, wann%numbranches))
     iso_a2F_branches = 0.0_r64
-    
-    do istate = start, end !over IBZ blocks states
-       !Demux state index into band (m) and wave vector (ik) indices
-       call demux_state(istate, wann%numwannbands, m, ik)
 
-       !Electron energy
-       en_el = el%ens_irred(ik, m)
+    !Only work with the active images
+    if(this_image() <= num_active_images) then
+       do istate = start, end !over IBZ blocks states
+          !Demux state index into band (m) and wave vector (ik) indices
+          call demux_state(istate, wann%numwannbands, m, ik)
 
-       !Apply energy window to initial (IBZ blocks) electron
-       if(abs(en_el - el%enref) > el%fsthick) cycle
+          !Electron energy
+          en_el = el%ens_irred(ik, m)
 
-       !Initial (IBZ blocks) wave vector (crystal coords.)
-       k = el%wavevecs_irred(ik, :)
+          !Apply energy window to initial (IBZ blocks) electron
+          if(abs(en_el - el%enref) > el%fsthick) cycle
 
-       !Convert from crystal to 0-based index vector
-       k_indvec = nint(k*el%wvmesh)
-
-       !Load g2_istate from disk for a2F_istate calculation
-       ! Change to data output directory
-       call chdir(trim(adjustl(num%g2dir)))
-
-       ! Read data in binary format
-       write (filename, '(I9)') istate
-       filename = 'gk2.istate'//trim(adjustl(filename))
-       open(1, file = trim(filename), status = 'old', access = 'stream')
-       read(1) nprocs
-       if(allocated(g2_istate)) deallocate(g2_istate, a2F_istate)
-       allocate(g2_istate(nprocs), a2F_istate(nprocs, numomega))
-       if(nprocs > 0) read(1) g2_istate
-       close(1)
-
-       ! Change back to working directory
-       call chdir(num%cwd)
-
-       !Initialize eligible process counter for this state
-       count = 0
-
-       !Run over final (FBZ blocks) electron wave vectors
-       do ikp = 1, el%nwv
-          !Final wave vector (crystal coords.)
-          kp = el%wavevecs(ikp, :)
+          !Initial (IBZ blocks) wave vector (crystal coords.)
+          k = el%wavevecs_irred(ik, :)
 
           !Convert from crystal to 0-based index vector
-          kp_indvec = nint(kp*el%wvmesh)
-          
-          !Find interacting phonon wave vector
-          ! Note that q, k, and k' are all on the same mesh
-          q_indvec = modulo(kp_indvec - k_indvec, el%wvmesh)
+          k_indvec = nint(k*el%wvmesh)
 
-          ! Muxed index of q
-          iq = mux_vector(q_indvec, el%wvmesh, 0_i64)
-          
-          !Run over final electron bands
-          do n = 1, wann%numwannbands
-             !Apply energy window to final electron
-             if(abs(el%ens(ikp, n) - el%enref) > el%fsthick) cycle
+          !Load g2_istate from disk for a2F_istate calculation
+          ! Change to data output directory
+          call chdir(trim(adjustl(num%g2dir)))
 
-             !Delta function contributions and k-point weight
-             WWp = el%Ws_irred(ik, m)*el%Ws(ikp, n)*el%nequiv(ik)
-             
-             !Run over phonon branches
-             do s = 1, wann%numbranches
-                !Increment g2 processes counter
-                count = count + 1
+          ! Read data in binary format
+          write (filename, '(I9)') istate
+          filename = 'gk2.istate'//trim(adjustl(filename))
+          open(1, file = trim(filename), status = 'old', access = 'stream')
+          read(1) nprocs
+          if(allocated(g2_istate)) deallocate(g2_istate, a2F_istate)
+          allocate(g2_istate(nprocs), a2F_istate(nprocs, numomega))
+          if(nprocs > 0) read(1) g2_istate
+          close(1)
 
-                !Note that the phonon branch index iterates last for a2F_istate
-                a2F_istate(count, :) = g2_istate(count)*ph_deltas(s, iq, :)
+          ! Change back to working directory
+          call chdir(num%cwd)
 
-                !Sum contribuion to the isotropic a2F
-                iso_a2F_branches(:, s) = iso_a2F_branches(:, s) + &
-                     a2F_istate(count, :)*WWp
-             end do !s
-          end do !n
-       end do !ikp
-       
-       !Change to data output directory
-       call chdir(trim(adjustl(num%scdir)))
+          !Initialize eligible process counter for this state
+          count = 0
 
-       !Write data in binary format
-       !Note: this will overwrite existing data!
-       write (filename, '(I9)') istate
-       filename = 'a2F.istate'//trim(adjustl(filename))
-       open(1, file = trim(filename), status = 'replace', access = 'stream')
-       write(1) count
-       write(1) a2F_istate
-       close(1)
+          !Run over final (FBZ blocks) electron wave vectors
+          do ikp = 1, el%nwv
+             !Final wave vector (crystal coords.)
+             kp = el%wavevecs(ikp, :)
 
-       !Change back to working directory
-       call chdir(num%cwd)
+             !Convert from crystal to 0-based index vector
+             kp_indvec = nint(kp*el%wvmesh)
 
-       deallocate(g2_istate, a2F_istate)
-    end do
+             !Find interacting phonon wave vector
+             ! Note that q, k, and k' are all on the same mesh
+             q_indvec = modulo(kp_indvec - k_indvec, el%wvmesh)
+
+             ! Muxed index of q
+             iq = mux_vector(q_indvec, el%wvmesh, 0_i64)
+
+             !Run over final electron bands
+             do n = 1, wann%numwannbands
+                !Apply energy window to final electron
+                if(abs(el%ens(ikp, n) - el%enref) > el%fsthick) cycle
+
+                !Delta function contributions and k-point weight
+                WWp = el%Ws_irred(ik, m)*el%Ws(ikp, n)*el%nequiv(ik)
+
+                !Run over phonon branches
+                do s = 1, wann%numbranches
+                   !Increment g2 processes counter
+                   count = count + 1
+
+                   !Note that the phonon branch index iterates last for a2F_istate
+                   a2F_istate(count, :) = g2_istate(count)*ph_deltas(s, iq, :)
+
+                   !Sum contribuion to the isotropic a2F
+                   iso_a2F_branches(:, s) = iso_a2F_branches(:, s) + &
+                        a2F_istate(count, :)*WWp
+                end do !s
+             end do !n
+          end do !ikp
+
+          !Change to data output directory
+          call chdir(trim(adjustl(num%scdir)))
+
+          !Write data in binary format
+          !Note: this will overwrite existing data!
+          write (filename, '(I9)') istate
+          filename = 'a2F.istate'//trim(adjustl(filename))
+          open(1, file = trim(filename), status = 'replace', access = 'stream')
+          write(1) count
+          write(1) a2F_istate
+          close(1)
+
+          !Change back to working directory
+          call chdir(num%cwd)
+
+          deallocate(g2_istate, a2F_istate)
+       end do
+    end if
 
     !Screen, if desired.
     if(use_external_eps) then
@@ -402,80 +411,83 @@ contains
 
     if(this_image() == 1) then
        write(*, "(A, I10)") "    #states = ", nstates_irred
-       write(*, "(A, I10)") "    #states/image = ", chunk
+       write(*, "(A, I10)") "    #states/image <= ", chunk
     end if
 
     !Anisotropic theory
-    do istate = start, end !over IBZ blocks states
-       !Demux state index into band (m) and wave vector (ik) indices
-       call demux_state(istate, wann%numwannbands, m, ik)
+    !Only work with the active images
+    if(this_image() <= num_active_images) then
+       do istate = start, end !over IBZ blocks states
+          !Demux state index into band (m) and wave vector (ik) indices
+          call demux_state(istate, wann%numwannbands, m, ik)
 
-       !Apply energy window to initial (IBZ blocks) electron
-       if(abs(el%ens_irred(ik, m) - el%enref) > el%fsthick) cycle
+          !Apply energy window to initial (IBZ blocks) electron
+          if(abs(el%ens_irred(ik, m) - el%enref) > el%fsthick) cycle
 
-       !Load a2F_istate from disk for matsubara_lambda_istate calculation
-       ! Change to data output directory
-       call chdir(trim(adjustl(num%scdir)))
+          !Load a2F_istate from disk for matsubara_lambda_istate calculation
+          ! Change to data output directory
+          call chdir(trim(adjustl(num%scdir)))
 
-       ! Read data in binary format
-       write (filename, '(I9)') istate
-       filename = 'a2F.istate'//trim(adjustl(filename))
-       open(1, file = trim(filename), status = 'old', access = 'stream')
-       read(1) nprocs
-       if(allocated(a2F_istate)) deallocate(a2F_istate, matsubara_lambda_istate)
-       allocate(a2F_istate(nprocs, numomega), matsubara_lambda_istate(nprocs, nummatsubara))
-       if(nprocs > 0) read(1) a2F_istate
-       close(1)
+          ! Read data in binary format
+          write (filename, '(I9)') istate
+          filename = 'a2F.istate'//trim(adjustl(filename))
+          open(1, file = trim(filename), status = 'old', access = 'stream')
+          read(1) nprocs
+          if(allocated(a2F_istate)) deallocate(a2F_istate, matsubara_lambda_istate)
+          allocate(a2F_istate(nprocs, numomega), matsubara_lambda_istate(nprocs, nummatsubara))
+          if(nprocs > 0) read(1) a2F_istate
+          close(1)
 
-       ! Change back to working directory
-       call chdir(num%cwd)
+          ! Change back to working directory
+          call chdir(num%cwd)
 
-       !Initialize eligible process counter for this state
-       count = 0
+          !Initialize eligible process counter for this state
+          count = 0
 
-       !Run over final (FBZ blocks) electron wave vectors
-       do ikp = 1, el%nwv
-          !Run over final electron bands
-          do n = 1, wann%numwannbands
-             !Apply energy window to final electron
-             if(abs(el%ens(ikp, n) - el%enref) > el%fsthick) cycle
+          !Run over final (FBZ blocks) electron wave vectors
+          do ikp = 1, el%nwv
+             !Run over final electron bands
+             do n = 1, wann%numwannbands
+                !Apply energy window to final electron
+                if(abs(el%ens(ikp, n) - el%enref) > el%fsthick) cycle
 
-             !Run over phonon branches
-             do s = 1, wann%numbranches
-                !Increment g2 processes counter
-                count = count + 1
+                !Run over phonon branches
+                do s = 1, wann%numbranches
+                   !Increment g2 processes counter
+                   count = count + 1
 
-                !Note that the phonon branch index iterates last for a2F_istate
-                !and matsubara_lambda_istate is similarly phonon branch resolved.
-                !
-                !Calculate lambda for each Matsubara energy
-                do l = 1, nummatsubara
-                   call compsimps(&
-                        a2F_istate(count, :)*2.0_r64*omegas(:)/ &
-                        (omegas(:)**2 + bose_matsubara_ens(l)**2), domega, aux)
-                   matsubara_lambda_istate(count, l) = aux
-                end do
-             end do !s
-          end do !n
-       end do !ikp
+                   !Note that the phonon branch index iterates last for a2F_istate
+                   !and matsubara_lambda_istate is similarly phonon branch resolved.
+                   !
+                   !Calculate lambda for each Matsubara energy
+                   do l = 1, nummatsubara
+                      call compsimps(&
+                           a2F_istate(count, :)*2.0_r64*omegas(:)/ &
+                           (omegas(:)**2 + bose_matsubara_ens(l)**2), domega, aux)
+                      matsubara_lambda_istate(count, l) = aux
+                   end do
+                end do !s
+             end do !n
+          end do !ikp
 
-       !Change to data output directory
-       call chdir(trim(adjustl(num%scdir)))
+          !Change to data output directory
+          call chdir(trim(adjustl(num%scdir)))
 
-       !Write data in binary format
-       !Note: this will overwrite existing data!
-       write (filename, '(I9)') istate
-       filename = 'lambda.istate'//trim(adjustl(filename))
-       open(1, file = trim(filename), status = 'replace', access = 'stream')
-       write(1) count
-       write(1) matsubara_lambda_istate
-       close(1)
+          !Write data in binary format
+          !Note: this will overwrite existing data!
+          write (filename, '(I9)') istate
+          filename = 'lambda.istate'//trim(adjustl(filename))
+          open(1, file = trim(filename), status = 'replace', access = 'stream')
+          write(1) count
+          write(1) matsubara_lambda_istate
+          close(1)
 
-       !Change back to working directory
-       call chdir(num%cwd)
+          !Change back to working directory
+          call chdir(num%cwd)
 
-       deallocate(a2F_istate, matsubara_lambda_istate)
-    end do
+          deallocate(a2F_istate, matsubara_lambda_istate)
+       end do
+    end if
     
     sync all
   end subroutine calculate_aniso_Matsubara_lambda

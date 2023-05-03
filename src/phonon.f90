@@ -141,31 +141,36 @@ contains
 
     call print_message("Calculating phonon FBZ quantities...")
 
+    !Calculate FBZ mesh
+    call calculate_wavevectors_full(self%wvmesh, self%wavevecs, blocks)
+
+    !Print phonon FBZ mesh
+    call write2file_rank2_real("ph.wavevecs_fbz", self%wavevecs)
+
+    !Allocate variables
+    allocate(self%ens(self%nwv, self%numbands))
+    allocate(self%vels(self%nwv, self%numbands, 3))
+    allocate(self%evecs(self%nwv, self%numbands, self%numbands))
+    
     !Allocate start and end coarrays
     allocate(start[*], end[*])
 
     !Divide wave vectors among images
     call distribute_points(self%nwv, chunk, start, end, num_active_images)
 
-    !Allocate small work variable chunk for each image
-    allocate(ens_chunk(chunk, self%numbands)[*])
-    allocate(vels_chunk(chunk, self%numbands, 3)[*])
-    allocate(evecs_chunk(chunk, self%numbands, self%numbands)[*])
+    !Only work with the active images
+    if(this_image() <= num_active_images) then
+       !Allocate small work variable chunk for each image
+       allocate(ens_chunk(chunk, self%numbands)[*])
+       allocate(vels_chunk(chunk, self%numbands, 3)[*])
+       allocate(evecs_chunk(chunk, self%numbands, self%numbands)[*])
 
-    !Calculate FBZ mesh
-    call calculate_wavevectors_full(self%wvmesh, self%wavevecs, blocks)
+       !Calculate FBZ phonon quantities
+       call phonon_espresso(self, crys, chunk, self%wavevecs(start:end, :), &
+            ens_chunk, evecs_chunk, vels_chunk)
 
-    !Print phonon FBZ mesh
-    call write2file_rank2_real("ph.wavevecs_fbz", self%wavevecs)
-    
-    !Calculate FBZ phonon quantities
-    call phonon_espresso(self, crys, chunk, self%wavevecs(start:end, :), &
-         ens_chunk, evecs_chunk, vels_chunk)
-
+    end if
     !Gather the chunks from the images and broadcast to all
-    allocate(self%ens(self%nwv, self%numbands))
-    allocate(self%vels(self%nwv, self%numbands, 3))
-    allocate(self%evecs(self%nwv, self%numbands, self%numbands))
     sync all
     if(this_image() == 1) then
        do im = 1, num_active_images
@@ -180,7 +185,7 @@ contains
     call co_broadcast(self%evecs, 1)
     sync all
     
-    deallocate(ens_chunk, vels_chunk, evecs_chunk)
+    if(this_image() <= num_active_images) deallocate(ens_chunk, vels_chunk, evecs_chunk)
     
     !Calculate IBZ mesh
     call print_message("Calculating IBZ and IBZ -> FBZ mappings...")
@@ -191,25 +196,28 @@ contains
     !Print phonon IBZ mesh
     call write2file_rank2_real("ph.wavevecs_ibz", self%wavevecs_irred)
     
-    !Create symmetrizers of wave vector dependent vectors ShengBTE style
-    allocate(symmetrizers_chunk(3, 3, chunk)[*])
-    symmetrizers_chunk = 0.0_r64
-    do iq = start, end
-       kk = 0
-       do jj = 1, sym%nsymm
-          if(self%equiv_map(jj, iq) == iq) then
+    !Only work with the active images
+    if(this_image() <= num_active_images) then
+       !Create symmetrizers of wave vector dependent vectors ShengBTE style
+       allocate(symmetrizers_chunk(3, 3, chunk)[*])
+       symmetrizers_chunk = 0.0_r64
+       do iq = start, end
+          kk = 0
+          do jj = 1, sym%nsymm
+             if(self%equiv_map(jj, iq) == iq) then
+                symmetrizers_chunk(:, :, iq - start + 1) = &
+                     symmetrizers_chunk(:, :, iq - start + 1) + &
+                     sym%crotations_orig(:, :, jj)
+                kk = kk + 1
+             end if
+          end do
+          if(kk > 1) then
              symmetrizers_chunk(:, :, iq - start + 1) = &
-                  symmetrizers_chunk(:, :, iq - start + 1) + &
-                  sym%crotations_orig(:, :, jj)
-             kk = kk + 1
+                  symmetrizers_chunk(:, :, iq - start + 1)/kk
           end if
        end do
-       if(kk > 1) then
-          symmetrizers_chunk(:, :, iq - start + 1) = &
-               symmetrizers_chunk(:, :, iq - start + 1)/kk
-       end if
-    end do
-
+    end if
+    
     !Gather from images and broadcast to all
     allocate(self%symmetrizers(3, 3, self%nwv))
     sync all
@@ -222,7 +230,7 @@ contains
     call co_broadcast(self%symmetrizers, 1)
     sync all
     
-    deallocate(symmetrizers_chunk)
+    if(this_image() <= num_active_images) deallocate(symmetrizers_chunk)
     
     !Symmetrize phonon energies and velocities.
     do i = 1, self%nwv_irred !an irreducible point

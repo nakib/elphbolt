@@ -137,34 +137,37 @@ contains
     !Initialize D0
     D0 = 0.0_r64
     
-    !Run over first (IBZ) phonon states
-    do istate1 = start, end
-       !Demux state index into branch (s) and wave vector (iq) indices
-       call demux_state(istate1, ph%numbands, s1, iq1_ibz)
+    !Only work with the active images
+    if(this_image() <= num_active_images) then
+       !Run over first (IBZ) phonon states
+       do istate1 = start, end
+          !Demux state index into branch (s) and wave vector (iq) indices
+          call demux_state(istate1, ph%numbands, s1, iq1_ibz)
 
-       !Muxed index of wave vector from the IBZ index list.
-       !This will be used to access IBZ information from the FBZ quantities.
-       !Recall that for the phonons, unlike for the electrons, we don't save these IBZ info separately.
-       iq1 = ph%indexlist_irred(iq1_ibz)
-       
-       !Squared energy of phonon 1
-       en1_sq = ph%ens(iq1, s1)**2
-              
-       !Sum over internal (FBZ) phonon wave vectors
-       do iq2 = 1, ph%nwv
-          !Sum over internal phonon bands
-          do s2 = 1, ph%numbands
-             phi_internal(:) = phi(:, s2, iq2)
+          !Muxed index of wave vector from the IBZ index list.
+          !This will be used to access IBZ information from the FBZ quantities.
+          !Recall that for the phonons, unlike for the electrons, we don't save these IBZ info separately.
+          iq1 = ph%indexlist_irred(iq1_ibz)
 
-             d0_istate = resolvent(ph, s2, iq2, en1_sq)
-             
-             do j = 1, num_dof_def
-                D0(:, j, istate1) = D0(:, j, istate1) + &
-                     d0_istate*phi_internal(:)*conjg(phi_internal(j))
+          !Squared energy of phonon 1
+          en1_sq = ph%ens(iq1, s1)**2
+
+          !Sum over internal (FBZ) phonon wave vectors
+          do iq2 = 1, ph%nwv
+             !Sum over internal phonon bands
+             do s2 = 1, ph%numbands
+                phi_internal(:) = phi(:, s2, iq2)
+
+                d0_istate = resolvent(ph, s2, iq2, en1_sq)
+
+                do j = 1, num_dof_def
+                   D0(:, j, istate1) = D0(:, j, istate1) + &
+                        d0_istate*phi_internal(:)*conjg(phi_internal(j))
+                end do
              end do
           end do
        end do
-    end do
+    end if
 
     !Reduce D0
     sync all
@@ -173,25 +176,28 @@ contains
 
 !!$    !Sanity check: print DOS
 !!$    dos = 0.0_r64
-!!$    do istate1 = start, end
-!!$       !Demux state index into branch (s) and wave vector (iq) indices
-!!$       call demux_state(istate1, ph%numbands, s1, iq1_ibz)
+!!$    !Only work with the active images
+!!$    if(this_image() <= num_active_images) then
+!!$       do istate1 = start, end
+!!$          !Demux state index into branch (s) and wave vector (iq) indices
+!!$          call demux_state(istate1, ph%numbands, s1, iq1_ibz)
 !!$
-!!$       iq1 = ph%indexlist_irred(iq1_ibz)
+!!$          iq1 = ph%indexlist_irred(iq1_ibz)
 !!$
-!!$       do i = 1, num_dof_def
-!!$          dos(iq1_ibz, s1) = dos(iq1_ibz, s1) + &
-!!$               D0(i, i, istate1)
+!!$          do i = 1, num_dof_def
+!!$             dos(iq1_ibz, s1) = dos(iq1_ibz, s1) + &
+!!$                  D0(i, i, istate1)
+!!$          end do
+!!$
+!!$          dos(iq1_ibz, s1) = dos(iq1_ibz, s1)*ph%ens(iq1, s1)
 !!$       end do
-!!$       
-!!$       dos(iq1_ibz, s1) = dos(iq1_ibz, s1)*ph%ens(iq1, s1)
-!!$    end do
+!!$    end if
 !!$
 !!$    !Reduce dos
 !!$    sync all
 !!$    call co_sum(dos)
 !!$    sync all
-!!$    
+!!$
 !!$    call write2file_rank2_real(ph%prefix // '.D0test_'//ph%prefix//'dos', imag(-2.0/pi*dos))
 !!$    sync all
 !!$    !!

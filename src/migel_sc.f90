@@ -417,67 +417,70 @@ contains
     pikBT = pi*T*kB !eV
 
     allocate(lambda(nummatsubara))
-    
+
     call distribute_points(nstates_irred, chunk, start, end, num_active_images)
 
     Z = 0.0_r64
-    !Run over IBZ blocks states
-    do istate = start, end
-       !Initialize eligible process counter for this state
-       count = 0
+    !Only work with the active images
+    if(this_image() <= num_active_images) then
+       !Run over IBZ blocks states
+       do istate = start, end
+          !Initialize eligible process counter for this state
+          count = 0
 
-       !Demux state index into band (m) and wave vector (ik) indices
-       call demux_state(istate, wann%numwannbands, m, ik)
+          !Demux state index into band (m) and wave vector (ik) indices
+          call demux_state(istate, wann%numwannbands, m, ik)
 
-       !Apply energy window to initial (IBZ blocks) electron
-       if(abs(el%ens_irred(ik, m) - el%enref) > el%fsthick) cycle
+          !Apply energy window to initial (IBZ blocks) electron
+          if(abs(el%ens_irred(ik, m) - el%enref) > el%fsthick) cycle
 
-       !Read anisotropic lambda_istate from file
-       call chdir(trim(adjustl(num%scdir)))
-       write (filename, '(I9)') istate
-       filename = 'lambda.istate'//trim(adjustl(filename))
-       open(1, file = trim(filename), status = 'old', access = 'stream')
-       read(1) nprocs
-       if(allocated(lambda_istate)) deallocate(lambda_istate)
-       allocate(lambda_istate(nprocs, nummatsubara))
-       if(nprocs > 0) read(1) lambda_istate
-       close(1)
+          !Read anisotropic lambda_istate from file
+          call chdir(trim(adjustl(num%scdir)))
+          write (filename, '(I9)') istate
+          filename = 'lambda.istate'//trim(adjustl(filename))
+          open(1, file = trim(filename), status = 'old', access = 'stream')
+          read(1) nprocs
+          if(allocated(lambda_istate)) deallocate(lambda_istate)
+          allocate(lambda_istate(nprocs, nummatsubara))
+          if(nprocs > 0) read(1) lambda_istate
+          close(1)
 
-       !Sum over final (FBZ blocks) electron wave vectors
-       do ikp = 1, el%nwv
-          !Grab IBZ vector index, ikp_ibz, corresponding to this FBZ vector
-          ikp_ibz = el%fbz2ibz_map(ikp)
+          !Sum over final (FBZ blocks) electron wave vectors
+          do ikp = 1, el%nwv
+             !Grab IBZ vector index, ikp_ibz, corresponding to this FBZ vector
+             ikp_ibz = el%fbz2ibz_map(ikp)
 
-          !Sum over final electron bands
-          do n = 1, wann%numwannbands
-             !Apply energy window to final electron
-             if(abs(el%ens(ikp, n) - el%enref) > el%fsthick) cycle
-             
-             !Mux primed state index
-             istatep_ibz = mux_state(wann%numwannbands, n, ikp_ibz)
+             !Sum over final electron bands
+             do n = 1, wann%numwannbands
+                !Apply energy window to final electron
+                if(abs(el%ens(ikp, n) - el%enref) > el%fsthick) cycle
 
-             !Branch summed lambda
-             lambda = 0.0_r64
-             do s = 1, wann%numbranches
-                !Increment anisotropic lambda_istate processes counter
-                count = count + 1
-                lambda(:) = lambda(:) + lambda_istate(count, :)
-             end do
+                !Mux primed state index
+                istatep_ibz = mux_state(wann%numwannbands, n, ikp_ibz)
 
-             !Run over Matsubara axis
-             do j = 1, nummatsubara
-                !Sum over Matsubara axis
-                aux = 0.0_r64
-                do jp = 1, nummatsubara
-                   aux = aux + el%Ws(ikp, n)* &
-                        lambda(abs(j - jp) + 1)*fermi_matsubara_ens(jp)/ &
-                        sqrt(fermi_matsubara_ens(jp)**2 + Delta(istatep_ibz, jp)**2)
+                !Branch summed lambda
+                lambda = 0.0_r64
+                do s = 1, wann%numbranches
+                   !Increment anisotropic lambda_istate processes counter
+                   count = count + 1
+                   lambda(:) = lambda(:) + lambda_istate(count, :)
                 end do
-                Z(istate, j) = Z(istate, j) + aux/fermi_matsubara_ens(j) 
+
+                !Run over Matsubara axis
+                do j = 1, nummatsubara
+                   !Sum over Matsubara axis
+                   aux = 0.0_r64
+                   do jp = 1, nummatsubara
+                      aux = aux + el%Ws(ikp, n)* &
+                           lambda(abs(j - jp) + 1)*fermi_matsubara_ens(jp)/ &
+                           sqrt(fermi_matsubara_ens(jp)**2 + Delta(istatep_ibz, jp)**2)
+                   end do
+                   Z(istate, j) = Z(istate, j) + aux/fermi_matsubara_ens(j) 
+                end do
              end do
           end do
        end do
-    end do
+    end if
 
     sync all
     call co_sum(Z)
@@ -519,64 +522,67 @@ contains
 
     old_Delta = Delta
     Delta = 0.0_r64
-    
-    !Run over IBZ blocks states
-    do istate = start, end
-       !Initialize eligible process counter for this state
-       count = 0
 
-       !Demux state index into band (m) and wave vector (ik) indices
-       call demux_state(istate, wann%numwannbands, m, ik)
+    !Only work with the active images
+    if(this_image() <= num_active_images) then
+       !Run over IBZ blocks states
+       do istate = start, end
+          !Initialize eligible process counter for this state
+          count = 0
 
-       !Apply energy window to initial (IBZ blocks) electron
-       if(abs(el%ens_irred(ik, m) - el%enref) > el%fsthick) cycle
+          !Demux state index into band (m) and wave vector (ik) indices
+          call demux_state(istate, wann%numwannbands, m, ik)
 
-       !Read anisotropic lambda_istate from file
-       call chdir(trim(adjustl(num%scdir)))
-       write (filename, '(I9)') istate
-       filename = 'lambda.istate'//trim(adjustl(filename))
-       open(1, file = trim(filename), status = 'old', access = 'stream')
-       read(1) nprocs
-       if(allocated(lambda_istate)) deallocate(lambda_istate)
-       allocate(lambda_istate(nprocs, nummatsubara))
-       if(nprocs > 0) read(1) lambda_istate
-       close(1)
+          !Apply energy window to initial (IBZ blocks) electron
+          if(abs(el%ens_irred(ik, m) - el%enref) > el%fsthick) cycle
 
-       !Sum over final (FBZ blocks) electron wave vectors
-       do ikp = 1, el%nwv
-          !Grab IBZ vector index, ikp_ibz, corresponding to this FBZ vector
-          ikp_ibz = el%fbz2ibz_map(ikp)
+          !Read anisotropic lambda_istate from file
+          call chdir(trim(adjustl(num%scdir)))
+          write (filename, '(I9)') istate
+          filename = 'lambda.istate'//trim(adjustl(filename))
+          open(1, file = trim(filename), status = 'old', access = 'stream')
+          read(1) nprocs
+          if(allocated(lambda_istate)) deallocate(lambda_istate)
+          allocate(lambda_istate(nprocs, nummatsubara))
+          if(nprocs > 0) read(1) lambda_istate
+          close(1)
 
-          !Sum over final electron bands
-          do n = 1, wann%numwannbands
-             !Apply energy window to final electron
-             if(abs(el%ens(ikp, n) - el%enref) > el%fsthick) cycle
-             
-             !Mux primed state index
-             istatep_ibz = mux_state(wann%numwannbands, n, ikp_ibz)
+          !Sum over final (FBZ blocks) electron wave vectors
+          do ikp = 1, el%nwv
+             !Grab IBZ vector index, ikp_ibz, corresponding to this FBZ vector
+             ikp_ibz = el%fbz2ibz_map(ikp)
 
-             !Branch summed lambda
-             lambda = 0.0_r64
-             do s = 1, wann%numbranches
-                !Increment anisotropic lambda_istate processes counter
-                count = count + 1
-                lambda(:) = lambda(:) + lambda_istate(count, :)
-             end do 
+             !Sum over final electron bands
+             do n = 1, wann%numwannbands
+                !Apply energy window to final electron
+                if(abs(el%ens(ikp, n) - el%enref) > el%fsthick) cycle
 
-             !Run over Matsubara axis
-             do j = 1, nummatsubara
-                !Sum over Matsubara axis
-                aux = 0.0_r64
-                do jp = 1, nummatsubara
-                   aux = aux + el%Ws(ikp, n)* &
-                        (lambda(abs(j - jp) + 1) - mustar)*old_Delta(istatep_ibz, jp)/ &
-                        sqrt(fermi_matsubara_ens(jp)**2 + old_Delta(istatep_ibz, jp)**2)
+                !Mux primed state index
+                istatep_ibz = mux_state(wann%numwannbands, n, ikp_ibz)
+
+                !Branch summed lambda
+                lambda = 0.0_r64
+                do s = 1, wann%numbranches
+                   !Increment anisotropic lambda_istate processes counter
+                   count = count + 1
+                   lambda(:) = lambda(:) + lambda_istate(count, :)
                 end do
-                Delta(istate, j) = Delta(istate, j) + aux 
+
+                !Run over Matsubara axis
+                do j = 1, nummatsubara
+                   !Sum over Matsubara axis
+                   aux = 0.0_r64
+                   do jp = 1, nummatsubara
+                      aux = aux + el%Ws(ikp, n)* &
+                           (lambda(abs(j - jp) + 1) - mustar)*old_Delta(istatep_ibz, jp)/ &
+                           sqrt(fermi_matsubara_ens(jp)**2 + old_Delta(istatep_ibz, jp)**2)
+                   end do
+                   Delta(istate, j) = Delta(istate, j) + aux 
+                end do
              end do
           end do
        end do
-    end do
+    end if
 
     sync all
     call co_sum(Delta)
@@ -604,20 +610,23 @@ contains
     pikBT = pi*T*kB !eV
 
     call distribute_points(nummatsubara, chunk, start, end, num_active_images)
-    
+
     Z = 0.0_r64
-    
-    !Run over Matsubara energies
-    do j = start, end
-       !Sum over Matsubara energies
-       aux = 0.0_r64
-       do jp = 1, nummatsubara
-          aux = aux + iso_matsubara_lambda(abs(j - jp) + 1)* &
-               fermi_matsubara_ens(jp)/ &
-               sqrt(fermi_matsubara_ens(jp)**2 + Delta(jp)**2)
+
+    !Only work with the active images
+    if(this_image() <= num_active_images) then
+       !Run over Matsubara energies
+       do j = start, end
+          !Sum over Matsubara energies
+          aux = 0.0_r64
+          do jp = 1, nummatsubara
+             aux = aux + iso_matsubara_lambda(abs(j - jp) + 1)* &
+                  fermi_matsubara_ens(jp)/ &
+                  sqrt(fermi_matsubara_ens(jp)**2 + Delta(jp)**2)
+          end do
+          Z(j) = Z(j) + aux/fermi_matsubara_ens(j) 
        end do
-       Z(j) = Z(j) + aux/fermi_matsubara_ens(j) 
-    end do
+    end if
 
     !Reduce Z
     sync all
@@ -653,19 +662,22 @@ contains
     
     old_Delta = Delta
     Delta = 0.0_r64
-    
-    !Run over Matsubara energies
-    do j = start, end
-       !Sum over Matsubara energies
-       aux = 0.0_r64
-       do jp = 1, nummatsubara
-          lambda_aux = iso_matsubara_lambda(abs(j - jp) + 1)
 
-          aux = aux + (lambda_aux - mustar)*old_Delta(jp)/ &
-               sqrt(fermi_matsubara_ens(jp)**2 + old_Delta(jp)**2)
+    !Only work with the active images
+    if(this_image() <= num_active_images) then
+       !Run over Matsubara energies
+       do j = start, end
+          !Sum over Matsubara energies
+          aux = 0.0_r64
+          do jp = 1, nummatsubara
+             lambda_aux = iso_matsubara_lambda(abs(j - jp) + 1)
+
+             aux = aux + (lambda_aux - mustar)*old_Delta(jp)/ &
+                  sqrt(fermi_matsubara_ens(jp)**2 + old_Delta(jp)**2)
+          end do
+          Delta(j) = Delta(j) + aux
        end do
-       Delta(j) = Delta(j) + aux
-    end do
+    end if
 
     !Reduce Delta
     sync all

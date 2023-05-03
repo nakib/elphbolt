@@ -177,42 +177,45 @@ contains
     !Divide wave vectors among images
     call distribute_points(el%nwv_irred, chunk, start, end, num_active_images)
 
-    !Allocate small work variable chunk for each image
-    allocate(dos_chunk(chunk, el%numbands)[*])
-    
     !Allocate dos
     allocate(el%dos(el%nwv_irred, el%numbands))
 
-    !Initialize dos arrays
+    !Initialize dos array
     el%dos(:,:) = 0.0_r64
-    dos_chunk(:,:) = 0.0_r64
 
     counter = 0
-    do ik = start, end !Run over IBZ wave vectors
-       !Increase counter
-       counter = counter + 1
-       do ib = 1, el%numbands !Run over wave vectors   
-          !Grab sample energy from the IBZ
-          e = el%ens_irred(ik, ib) 
+    !Only work with the active images
+    if(this_image() <= num_active_images) then
+       !Allocate small work variable chunk for each image and initialize
+       allocate(dos_chunk(chunk, el%numbands)[*])
+       dos_chunk(:,:) = 0.0_r64
+       
+       do ik = start, end !Run over IBZ wave vectors
+          !Increase counter
+          counter = counter + 1
+          do ib = 1, el%numbands !Run over wave vectors   
+             !Grab sample energy from the IBZ
+             e = el%ens_irred(ik, ib) 
 
-          do ikp = 1, el%nwv !Sum over FBZ wave vectors
-             do ibp = 1, el%numbands !Sum over wave vectors
-                if(usetetra) then
-                   !Evaluate delta[E(iq,ib) - E(iq',ib')]
-                   delta = delta_fn_tetra(e, ikp, ibp, el%wvmesh, el%tetramap, &
-                        el%tetracount, el%tetra_evals)
-                else
-                   delta = delta_fn_triang(e, ikp, ibp, el%wvmesh, el%triangmap, &
-                        el%triangcount, el%triang_evals)
-                end if
-                !Sum over delta function
-                dos_chunk(counter, ib) = dos_chunk(counter, ib) + delta
+             do ikp = 1, el%nwv !Sum over FBZ wave vectors
+                do ibp = 1, el%numbands !Sum over wave vectors
+                   if(usetetra) then
+                      !Evaluate delta[E(iq,ib) - E(iq',ib')]
+                      delta = delta_fn_tetra(e, ikp, ibp, el%wvmesh, el%tetramap, &
+                           el%tetracount, el%tetra_evals)
+                   else
+                      delta = delta_fn_triang(e, ikp, ibp, el%wvmesh, el%triangmap, &
+                           el%triangcount, el%triang_evals)
+                   end if
+                   !Sum over delta function
+                   dos_chunk(counter, ib) = dos_chunk(counter, ib) + delta
+                end do
              end do
           end do
        end do
-    end do
-    !Multiply with spin degeneracy factor
-    dos_chunk(:,:) = el%spindeg*dos_chunk(:,:)
+       !Multiply with spin degeneracy factor
+       dos_chunk(:,:) = el%spindeg*dos_chunk(:,:)
+    end if
     
     !Gather from images and broadcast to all
     sync all
@@ -265,12 +268,7 @@ contains
     
     !Divide wave vectors among images
     call distribute_points(ph%nwv_irred, chunk, start, end, num_active_images)
-    
-    !Allocate small work variable chunk for each image
-    allocate(dos_chunk(chunk, ph%numbands)[*])
-    if(phiso) allocate(W_phiso_chunk(chunk, ph%numbands)[*])
-    if(phsubs) allocate(W_phsubs_chunk(chunk, ph%numbands)[*])
-    
+        
     !Allocate dos and W_phiso
     allocate(ph%dos(ph%nwv_irred, ph%numbands))
     allocate(W_phiso(ph%nwv_irred, ph%numbands))
@@ -278,59 +276,67 @@ contains
 
     !Initialize arrays and coarrays
     ph%dos(:,:) = 0.0_r64
-    dos_chunk(:,:) = 0.0_r64
     W_phiso(:,:) = 0.0_r64
     W_phsubs(:,:) = 0.0_r64
-    if(phiso) W_phiso_chunk(:,:) = 0.0_r64
-    if(phsubs) W_phsubs_chunk(:,:) = 0.0_r64
 
     counter = 0
-    do iq = start, end !Run over IBZ wave vectors
-       !Increase counter
-       counter = counter + 1
-       do ib = 1, ph%numbands !Run over wave vectors   
-          !Grab sample energy from the IBZ
-          e = ph%ens(ph%indexlist_irred(iq), ib) 
+    !Only work with the active images
+    if(this_image() <= num_active_images) then
+       !Allocate small work variable chunk for each image
+       allocate(dos_chunk(chunk, ph%numbands)[*])
+       if(phiso) allocate(W_phiso_chunk(chunk, ph%numbands)[*])
+       if(phsubs) allocate(W_phsubs_chunk(chunk, ph%numbands)[*])
+       dos_chunk(:,:) = 0.0_r64
+       if(phiso) W_phiso_chunk(:,:) = 0.0_r64
+       if(phsubs) W_phsubs_chunk(:,:) = 0.0_r64
+       
+       do iq = start, end !Run over IBZ wave vectors
+          !Increase counter
+          counter = counter + 1
+          do ib = 1, ph%numbands !Run over wave vectors   
+             !Grab sample energy from the IBZ
+             e = ph%ens(ph%indexlist_irred(iq), ib) 
 
-          do iqp = 1, ph%nwv !Sum over FBZ wave vectors
-             do ibp = 1, ph%numbands !Sum over wave vectors
-                !Evaluate delta[E(iq,ib) - E(iq',ib')]
-                if(usetetra) then
-                   delta = delta_fn_tetra(e, iqp, ibp, ph%wvmesh, ph%tetramap, &
-                        ph%tetracount, ph%tetra_evals)
-                else
-                   delta = delta_fn_triang(e, iqp, ibp, ph%wvmesh, ph%triangmap, &
-                        ph%triangcount, ph%triang_evals)
-                end if
-                !Sum over delta function
-                dos_chunk(counter, ib) = dos_chunk(counter, ib) + delta
+             do iqp = 1, ph%nwv !Sum over FBZ wave vectors
+                do ibp = 1, ph%numbands !Sum over wave vectors
+                   !Evaluate delta[E(iq,ib) - E(iq',ib')]
+                   if(usetetra) then
+                      delta = delta_fn_tetra(e, iqp, ibp, ph%wvmesh, ph%tetramap, &
+                           ph%tetracount, ph%tetra_evals)
+                   else
+                      delta = delta_fn_triang(e, iqp, ibp, ph%wvmesh, ph%triangmap, &
+                           ph%triangcount, ph%triang_evals)
+                   end if
+                   !Sum over delta function
+                   dos_chunk(counter, ib) = dos_chunk(counter, ib) + delta
 
-                if(phiso .or. phsubs) then
-                   do a = 1, numatoms
-                      pol = (a - 1)*3
-                      aux = (abs(dot_product(&
-                           ph%evecs(ph%indexlist_irred(iq), ib, pol + 1 : pol + 3), &
-                           ph%evecs(iqp, ibp, pol + 1 : pol + 3))))**2
-                      
-                      !Calculate phonon-isotope scattering in the Tamura model                   
-                      if(phiso) then
-                         W_phiso_chunk(counter, ib) = W_phiso_chunk(counter, ib) + &
-                              delta*aux*gfactors(atomtypes(a))*e**2
-                      end if
-                      
-                      !Calculate phonon-substitution scattering in the Tamura model
-                      if(phsubs) then
-                         W_phsubs_chunk(counter, ib) = W_phsubs_chunk(counter, ib) + &
-                              delta*aux*subs_gfactors(atomtypes(a))*e**2
-                      end if
-                   end do
-                end if
+                   if(phiso .or. phsubs) then
+                      do a = 1, numatoms
+                         pol = (a - 1)*3
+                         aux = (abs(dot_product(&
+                              ph%evecs(ph%indexlist_irred(iq), ib, pol + 1 : pol + 3), &
+                              ph%evecs(iqp, ibp, pol + 1 : pol + 3))))**2
+
+                         !Calculate phonon-isotope scattering in the Tamura model                   
+                         if(phiso) then
+                            W_phiso_chunk(counter, ib) = W_phiso_chunk(counter, ib) + &
+                                 delta*aux*gfactors(atomtypes(a))*e**2
+                         end if
+
+                         !Calculate phonon-substitution scattering in the Tamura model
+                         if(phsubs) then
+                            W_phsubs_chunk(counter, ib) = W_phsubs_chunk(counter, ib) + &
+                                 delta*aux*subs_gfactors(atomtypes(a))*e**2
+                         end if
+                      end do
+                   end if
+                end do
              end do
           end do
        end do
-    end do
-    if(phiso) W_phiso_chunk = W_phiso_chunk*0.5_r64*pi/hbar_eVps !THz
-    if(phsubs) W_phsubs_chunk = W_phsubs_chunk*0.5_r64*pi/hbar_eVps !THz
+       if(phiso) W_phiso_chunk = W_phiso_chunk*0.5_r64*pi/hbar_eVps !THz
+       if(phsubs) W_phsubs_chunk = W_phsubs_chunk*0.5_r64*pi/hbar_eVps !THz
+    end if
     
     !Gather from images and broadcast to all
     sync all
