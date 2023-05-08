@@ -193,6 +193,9 @@ contains
        call exit_with_message(&
             'Need to provide non-zero epsilon0 for e-ch. imp. interaction. Exiting.')
     end if
+    if(phbound .and. phthinfilm) then
+       call exit_with_message('ph-boundary and ph-thin-film scattering not allowed together. Exiting.')
+    end if
     self%qmesh = qmesh
     self%runlevel = runlevel
     !Runlevels:

@@ -17,7 +17,7 @@
 module misc
   !! Module containing miscellaneous math and numerics related functions and subroutines.
 
-  use params, only: r64, i64, kB
+  use params, only: r128, r64, i64, kB
   
   implicit none
   
@@ -756,6 +756,16 @@ contains
 
     Fermi = 1.0_r64/(exp((e - chempot)/kB/T) + 1.0_r64)
   end function Fermi
+
+  pure elemental real(r64) function expm1(x)
+    !! High accuracy evaluation of exp(x) - 1.
+    !! This is more accurate that real64 evaluation when x is "small".
+    !! Numpy equivalent: https://numpy.org/doc/stable/reference/generated/numpy.expm1.html
+    
+    real(r64), intent(in) :: x
+    
+    expm1 = exp(x + 0.0_r128) - 1.0_r128
+  end function expm1
 
   subroutine interpolate(coarsemesh, refinement, f, q, interpolation)
     !! Subroutine to perform BZ interpolation.
