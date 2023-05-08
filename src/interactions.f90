@@ -1603,7 +1603,7 @@ contains
 
     !Local variables
     integer(i64) :: ik, ib, nk_irred, nb, dir
-    real(r64), allocatable :: inv_Knudsen(:, :), inv_suppression_FS(:, :)
+    real(r64), allocatable :: Knudsen(:, :), suppression_FS(:, :)
 
     !Number of IBZ wave vectors and bands
     nk_irred = size(indexlist_irred(:))
@@ -1625,21 +1625,21 @@ contains
 
     !Check finiteness of crystal
     if(finite_crys) then
-       allocate(inv_Knudsen(nk_irred, nb), inv_suppression_FS(nk_irred, nb))
+       allocate(Knudsen(nk_irred, nb), suppression_FS(nk_irred, nb))
 
        !Inverse Knudsen number
        do ib = 1, nb
           do ik = 1, nk_irred
-             inv_Knudsen(ik, ib) = 1.e-6_r64*height*other_scatt_rates(ik, ib)/ &
-                  abs(vels_fbz(indexlist_irred(ik), ib, dir))
+             Knudsen(ik, ib) = abs(vels_fbz(indexlist_irred(ik), ib, dir)) &
+                  /other_scatt_rates(ik, ib)/height*1.e-6_r64 !THz
           end do
        end do
-       inv_Knudsen(1, 1:3) = 0.0_r64 !Deal with Gamma point acoustic phonons
+       Knudsen(1, 1:3) = 0.0_r64 !Deal with Gamma point acoustic phonons
 
        !Inverse Fuchs-Sondheimer supression function
-       inv_suppression_FS = 1.0_r64/(1.0_r64 + expm1(-inv_Knudsen)/inv_Knudsen)
+       suppression_FS = 1.0_r64 + expm1(-1.0_r64/Knudsen)*Knudsen
 
-       thin_film_scatt_rates = inv_suppression_FS*other_scatt_rates
+       thin_film_scatt_rates = other_scatt_rates/suppression_FS
        thin_film_scatt_rates(1, 1:3) = 0.0_r64 !Deal with Gamma point acoustic phonons
     end if
 
