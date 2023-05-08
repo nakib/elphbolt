@@ -1637,7 +1637,7 @@ contains
        inv_Knudsen(1, 1:3) = 0.0_r64 !Deal with Gamma point acoustic phonons
 
        !Inverse Fuchs-Sondheimer supression function
-       inv_suppression_FS = 1.0_r64 + expm1(-inv_Knudsen)/inv_Knudsen
+       inv_suppression_FS = (1.0_r64 + expm1(-inv_Knudsen))/inv_Knudsen
 
        thin_film_scatt_rates = inv_suppression_FS*other_scatt_rates
        thin_film_scatt_rates(1, 1:3) = 0.0_r64 !Deal with Gamma point acoustic phonons
