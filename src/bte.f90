@@ -167,9 +167,7 @@ contains
             self%ph_rta_rates_bound_ibz + self%ph_rta_rates_4ph_ibz
        
        ! phonon-thin-film
-!!$       call calculate_thinfilm_scatt_rates(ph%prefix, num%phthinfilm, crys%thinfilm_height, &
-!!$            crys%thinfilm_normal, ph%vels, ph%indexlist_irred, self%ph_rta_rates_thinfilm_ibz)
-       call calculate_thinfilm_scatt_rates(ph%prefix, num%phthinfilm, crys%thinfilm_height, &
+       call calculate_thinfilm_scatt_rates(ph%prefix, num%phthinfilm, num%phthinfilm_ballistic, crys%thinfilm_height, &
             crys%thinfilm_normal, ph%vels, ph%indexlist_irred, self%ph_rta_rates_ibz, self%ph_rta_rates_thinfilm_ibz)
        
        !Matthiessen's rule with thin-film

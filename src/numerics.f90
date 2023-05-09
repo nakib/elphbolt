@@ -81,6 +81,8 @@ module numerics_module
      !! Mesh refinement factor of phonon wavectors with respect to external 4-ph calculation 
      logical :: phthinfilm
      !! Use phonon-thin-film scattering?
+     logical :: phthinfilm_ballistic
+     !! Use ballistic limit of Fuchs-Sondheimer formula?
      logical :: phdef_Tmat
      !! Calculate phonon-defect scattering T-matrix?
      logical :: onlyphbte
@@ -135,13 +137,13 @@ contains
     character(len = 1024) :: datadumpdir, tag
     logical :: read_gq2, read_gk2, read_V, read_W, tetrahedra, phe, phiso, phsubs, &
          phbound, phdef_Tmat, onlyphbte, onlyebte, elchimp, elbound, drag, plot_along_path, &
-         phthinfilm, fourph
+         phthinfilm, phthinfilm_ballistic, fourph
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
          read_V, read_W, tetrahedra, phe, phiso, phsubs, onlyphbte, onlyebte, maxiter, &
          conv_thres, drag, elchimp, plot_along_path, runlevel, ph_en_min, ph_en_max, &
          ph_en_num, el_en_min, el_en_max, el_en_num, phbound, elbound, phdef_Tmat, &
-         ph_mfp_npts, phthinfilm , fourph, fourph_mesh_ref
+         ph_mfp_npts, phthinfilm, phthinfilm_ballistic, fourph, fourph_mesh_ref
 
     call subtitle("Reading numerics information...")
     
@@ -165,6 +167,7 @@ contains
     phbound = .false.
     fourph = .false.
     phthinfilm = .false.
+    phthinfilm_ballistic = .true.
     phdef_Tmat = .false.
     onlyphbte = .false.
     onlyebte = .false.
@@ -214,6 +217,7 @@ contains
        self%phbound = phbound
        self%fourph = fourph
        self%phthinfilm = phthinfilm
+       self%phthinfilm_ballistic = phthinfilm_ballistic
        self%phdef_Tmat = phdef_Tmat
        self%onlyphbte = onlyphbte
        self%onlyebte = onlyebte
@@ -333,6 +337,7 @@ contains
           write(*, "(A, L)") "Include ph-boundary interaction: ", self%phbound
           write(*, "(A, L)") "Include 4-ph interaction: ", self%fourph
           write(*, "(A, L)") "Include ph-thin-film interaction: ", self%phthinfilm
+          if(self%phthinfilm) write(*, "(A, L)") "    Use ballistic limit: ", self%phthinfilm_ballistic
           write(*, "(A, L)") "Include ph-defect interaction using the T-matrix: ", self%phdef_Tmat
           if(self%phbound) then
              write(*,"(A,(1E16.8,x),A)") 'Characteristic length for ph-boundary scattering =', &
