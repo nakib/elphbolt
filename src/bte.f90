@@ -1470,7 +1470,11 @@ contains
        sync all
        
        !  Calculate phonon mfp sampling grid [T-dependent quantity]
-       call linspace(ph_mfp_sampling_grid, 0.0_r64, maxval(ph_scalar_mfps), num%ph_mfp_npts)
+!!$       !   Using a linear grid.
+!!$       !call linspace(ph_mfp_sampling_grid, 0.0_r64, maxval(ph_scalar_mfps), num%ph_mfp_npts)
+       !   Using a log grid with a 50% increased maximum mfp value. 
+       call linspace(ph_mfp_sampling_grid, 1.0e-3_r64, 1.5_r64*maxval(ph_scalar_mfps), num%ph_mfp_npts)
+       ph_mfp_sampling_grid = 10.0_r64**log10(ph_mfp_sampling_grid)
 
        !  Write the sampling mfps to file
        call write2file_rank1_real("nodrag_iterated_ph_mfps_sampling", ph_mfp_sampling_grid)
