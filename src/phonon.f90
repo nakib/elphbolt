@@ -43,8 +43,6 @@ module phonon_module
      integer(i64) :: scell(3)
      !! q-mesh used in DFPT or, equivalently, supercell used in finite displencement
      !! method for calculating the 2nd order force constants.
-     real(r64), allocatable :: ifc2(:,:,:,:,:,:,:)
-     !! Second order force constants (ifc2) tensor.
      real(r64), allocatable :: ifc3(:,:,:,:)
      !! Third order force constants (ifc3) tensor.
      integer(i64) :: numtriplets
@@ -58,14 +56,18 @@ module phonon_module
      !! This is needed only for the phonon Green's function calculation.
 
      !Data read from ifc2 file. These will be used in the phonon calculation.
-     real(r64) :: rws(124, 0:3), cell_r(1:3, 0:3), cell_g(1:3, 0:3)
-     real(r64), allocatable :: mm(:,:), rr(:,:,:)
+     real(r64), private, allocatable :: ifc2(:,:,:,:,:,:,:)
+     !! Second order force constants (ifc2) tensor.
+     real(r64), private :: rws(124, 0:3), cell_r(1:3, 0:3), cell_g(1:3, 0:3)
+     real(r64), private, allocatable :: mm(:,:), rr(:,:,:)
+     integer(i64), private, allocatable :: ws_cell(:, :)
+     real(r64), private, allocatable :: ws_weight(:)
       
    contains
 
      procedure, public :: initialize, deallocate_phonon_quantities
      procedure, private :: calculate_phonons, read_ifc2, read_ifc3, &
-          phonon_espresso
+          phonon_espresso_precompute, phonon_espresso
      
   end type phonon
 
@@ -91,6 +93,9 @@ contains
 
     !Read ifc2 and related quantities
     call read_ifc2(self, crys)
+
+    !Precompute dynamical matrix related quantities
+    call phonon_espresso_precompute(self, crys)
     
     !Calculate harmonic properties
     call calculate_phonons(self, crys, sym, num)
@@ -114,6 +119,8 @@ contains
     if(allocated(self%Index_k)) deallocate(self%Index_k) 
     if(allocated(self%mm)) deallocate(self%mm) 
     if(allocated(self%rr)) deallocate(self%rr)
+    if(allocated(self%ws_weight)) deallocate(self%ws_weight)
+    if(allocated(self%ws_cell)) deallocate(self%ws_cell)
 
     sync all
   end subroutine deallocate_phonon_quantities
@@ -778,7 +785,89 @@ contains
        write(*, "(A, I10)") " Number triplets read in = ", self%numtriplets
   end subroutine read_ifc3
 
-  subroutine phonon_espresso(self, crys, nk, kpoints, omegas, eigenvect, velocities)
+  subroutine phonon_espresso_precompute(self, crys)
+    !! Subroutine to precompute q-indepent quantities related to the dynamical matrix
+
+    class(phonon), intent(inout) :: self
+    type(crystal), intent(in) :: crys
+
+    integer(i64) :: i, j, iat, jat, m1, m2, m3, &
+         num_ws_cells(3), counter, deg, ir
+    real(r64) :: distance, weight, r_ws(3), t(3)
+
+    call subtitle("Precomputing q-independent quantities related to dynamical matrix...")
+    
+    num_ws_cells(:) = 4*self%scell(:) + 1
+    
+    allocate(self%ws_weight(product(num_ws_cells)*crys%numatoms**2))
+    allocate(self%ws_cell(3, product(num_ws_cells)*crys%numatoms**2))
+
+    self%ws_weight = 0
+    self%ws_cell = 0.0_r64
+    counter = 0
+    
+    do iat = 1, crys%numatoms
+       do jat = 1, crys%numatoms
+          
+          do m1 = -2*self%scell(1), 2*self%scell(1)
+             do m2 = -2*self%scell(2), 2*self%scell(2)
+                do m3 = -2*self%scell(3), 2*self%scell(3)
+
+                   counter = counter + 1
+                   
+                   do i = 1, 3
+                      !Supercell image
+                      t(i) = m1*self%cell_r(1, i) + m2*self%cell_r(2, i) + m3*self%cell_r(3, i)
+
+                      !Position of basis atom in supercell image
+                      r_ws(i) = t(i) + self%rr(iat, jat, i)
+                   end do
+                   
+                   weight = 0.0_r64
+                   deg = 1
+                   j = 0
+                   do ir = 1, 124
+                      distance = dot_product(r_ws, self%rws(ir, 1:3)) - self%rws(ir, 0)
+                      if(distance > 1.0e-6_r64) then
+                         j = 1
+                         cycle
+                      end if
+
+                      if(abs(distance) < 1.0e-6_r64) then
+                         deg = deg + 1
+                      end if
+                   end do
+
+                   if(j == 0) then
+                      weight = 1.0_r64/dble(deg)
+                   end if
+
+                   if(weight > 0.0_r64) then
+                      self%ws_cell(1, counter) = mod(m1 + 1, self%scell(1))
+                      if(self%ws_cell(1, counter) <= 0) then
+                         self%ws_cell(1, counter) = self%ws_cell(1, counter) + self%scell(1)
+                      end if
+                      
+                      self%ws_cell(2, counter) = mod(m2 + 1,self%scell(2))
+                      if(self%ws_cell(2, counter) <= 0) then
+                         self%ws_cell(2, counter) = self%ws_cell(2, counter) + self%scell(2)
+                      end if
+                      
+                      self%ws_cell(3, counter) = mod(m3 + 1,self%scell(3))
+                      if(self%ws_cell(3, counter) <= 0) then
+                         self%ws_cell(3, counter) = self%ws_cell(3, counter) + self%scell(3)
+                      end if
+                      
+                   end if
+                   self%ws_weight(counter) = self%ws_weight(counter) + weight
+                end do
+             end do
+          end do
+       end do
+    end do
+  end subroutine phonon_espresso_precompute
+
+  subroutine phonon_espresso(self, crys, nq, qpoints, omegas, eigenvect, velocities)
     !! Subroutine to calculate phonons from the 2nd order force constants.
     !
     ! This is adapted from ShengBTE's subroutine of the same name.
@@ -786,26 +875,26 @@ contains
     
     class(phonon), intent(in) :: self
     type(crystal), intent(in) :: crys
-    integer(i64), intent(in) :: nk
-    real(r64), intent(in) :: kpoints(nk, 3)
-    real(r64), intent(out) :: omegas(nk, self%numbands)
-    real(r64), optional, intent(out) :: velocities(nk, self%numbands, 3)
-    complex(r64), optional, intent(out) :: eigenvect(nk, self%numbands, self%numbands)
+    integer(i64), intent(in) :: nq
+    real(r64), intent(in) :: qpoints(nq, 3)
+    real(r64), intent(out) :: omegas(nq, self%numbands)
+    real(r64), optional, intent(out) :: velocities(nq, self%numbands, 3)
+    complex(r64), optional, intent(out) :: eigenvect(nq, self%numbands, self%numbands)
 
     ! QE's 2nd-order files are in Ryd units.
     real(r64),parameter :: toTHz=20670.687_r64,&
          massfactor=1.8218779_r64*6.022e-4_r64
 
-    integer(i64) :: ir,nreq,ntype,nat,nbranches
-    integer(i64) :: i,j,ipol,jpol,iat,jat,idim,jdim,t1,t2,t3,m1,m2,m3,ik
+    integer(i64) :: counter, ntype,nat,nbranches
+    integer(i64) :: i,j,ipol,jpol,iat,jat,idim,jdim,t1,t2,t3,m1,m2,m3,iq
     integer(i64) :: ndim,nwork,ncell_g(3)
     integer(i64),allocatable :: tipo(:)
-    real(r64) :: weight,total_weight,exp_g,ck
+    real(r64) :: weight, total_weight, exp_g
     real(r64) :: r_ws(3)
-    real(r64) :: alpha,geg,gmax,kt,gr,volume_r,dnrm2
+    real(r64) :: alpha,geg,gmax,qt,gr,volume_r,dnrm2
     real(r64) :: zig(3),zjg(3),dgeg(3),t(0:3),g(0:3),g_old(0:3)
     real(r64), allocatable :: omega2(:),rwork(:)
-    real(r64),allocatable :: k(:,:),mass(:),eps(:,:)
+    real(r64),allocatable :: q(:,:),mass(:),eps(:,:)
     real(r64),allocatable :: eival(:,:),vels(:,:,:),zeff(:,:,:)
     complex(r64) :: auxi(3)
     complex(r64),allocatable :: cauxiliar(:),eigenvectors(:,:),work(:)
@@ -828,23 +917,23 @@ contains
     
     allocate(omega2(nbranches))
     allocate(work(nwork))
-    allocate(rwork(max(1,9*nat-2)))
-    allocate(k(nk,3))
+    allocate(rwork(max(1, 9*nat - 2)))
+    allocate(q(nq,3))
     allocate(mass(ntype))
     allocate(tipo(nat))
-    allocate(eps(3,3))
-    allocate(zeff(nat,3,3))    
-    allocate(dyn(ndim,ndim))
-    allocate(dyn_s(nk,ndim,ndim))
-    allocate(dyn_g(nk,ndim,ndim))
-    allocate(eival(ndim,nk))
-    allocate(eigenvectors(ndim,ndim))
+    allocate(eps(3, 3))
+    allocate(zeff(nat, 3, 3))    
+    allocate(dyn(ndim, ndim))
+    allocate(dyn_s(nq, ndim, ndim))
+    allocate(dyn_g(nq, ndim, ndim))
+    allocate(eival(ndim, nq))
+    allocate(eigenvectors(ndim, ndim))
     allocate(cauxiliar(ndim))
     if(present(velocities)) then
-       allocate(ddyn(ndim,ndim,3))
-       allocate(ddyn_s(nk,ndim,ndim,3))
-       allocate(ddyn_g(nk,ndim,ndim,3))
-       allocate(vels(ndim,nk,3))
+       allocate(ddyn(ndim, ndim, 3))
+       allocate(ddyn_s(nq, ndim, ndim, 3))
+       allocate(ddyn_g(nq, ndim, ndim, 3))
+       allocate(vels(ndim, nq, 3))
     end if
     
     mass = crys%masses/massfactor
@@ -855,80 +944,63 @@ contains
     end do
     
     ! Make sure operations are performed in consistent units.
-    do ik = 1, nk
-       k(ik, :) = matmul(crys%reclattvecs, kpoints(ik, :))
+    do iq = 1, nq
+       q(iq, :) = matmul(crys%reclattvecs, qpoints(iq, :))
     end do
-    k = k*bohr2nm
+    q = q*bohr2nm
     
     volume_r = crys%volume/bohr2nm**3
 
-    gmax=14.0_r64
-    alpha=(twopi*bohr2nm/dnrm2(3,crys%lattvecs(:,1),1))**2
-    geg=gmax*4.0_r64*alpha
-    ncell_g=int(sqrt(geg)/self%cell_g(:,0))+1
+    gmax = 14.0_r64
+    alpha = (twopi*bohr2nm/dnrm2(3, crys%lattvecs(:,1), 1))**2
+    geg = gmax*4.0_r64*alpha
+    ncell_g = int(sqrt(geg)/self%cell_g(:, 0)) + 1
     
     dyn_s = 0.0_r64
     if(present(velocities)) ddyn_s = 0.0_r64
+
+    counter = 0
     
-    do iat=1,nat
-       do jat=1,nat
-          total_weight=0.0_r64
-          do m1=-2*self%scell(1),2*self%scell(1)
-             do m2=-2*self%scell(2),2*self%scell(2)
-                do m3=-2*self%scell(3),2*self%scell(3)
-                   do i=1,3
-                      t(i)=m1*self%cell_r(1,i)+m2*self%cell_r(2,i)+m3*self%cell_r(3,i)
-                      r_ws(i)=t(i)+self%rr(iat,jat,i)
+    do iat = 1, nat
+       do jat = 1, nat
+          total_weight = 0.0_r64
+          do m1 = -2*self%scell(1), 2*self%scell(1)
+             do m2 = -2*self%scell(2), 2*self%scell(2)
+                do m3 = -2*self%scell(3), 2*self%scell(3)
+
+                   counter = counter + 1
+                   
+                   do i = 1, 3
+                      t(i) = m1*self%cell_r(1, i) + m2*self%cell_r(2, i) + m3*self%cell_r(3, i)
+                      r_ws(i) = t(i) + self%rr(iat, jat, i)
                    end do
-                   weight=0._r64
-                   nreq=1
-                   j=0
-                   Do ir=1,124
-                      ck=dot_product(r_ws,self%rws(ir,1:3))-self%rws(ir,0)
-                      if(ck.gt.1e-6_r64) then
-                         j=1
-                         cycle
-                      end if
-                      if(abs(ck).lt.1e-6_r64) then
-                         nreq=nreq+1
-                      end if
-                   end do
-                   if(j.eq.0) then
-                      weight=1._r64/dble(nreq)
-                   end if
-                   if(weight.gt.0._r64) then
-                      t1=mod(m1+1,self%scell(1))
-                      if(t1.le.0) then
-                         t1=t1+self%scell(1)
-                      end if
-                      t2=mod(m2+1,self%scell(2))
-                      if(t2.Le.0) then
-                         t2=t2+self%scell(2)
-                      end if
-                      t3=mod(m3+1,self%scell(3))
-                      if(t3.le.0) then
-                         t3=t3+self%scell(3)
-                      end if
-                      do ik=1,nk
-                         kt=dot_product(k(ik,1:3),t(1:3))
-                         do ipol=1,3
-                            idim = (iat-1)*3+ipol
-                            do jpol=1,3
-                               jdim = (jat-1)*3+jpol
-                               dyn_s(ik,idim,jdim)=dyn_s(ik,idim,jdim)+&
-                                    self%ifc2(ipol,jpol,iat,jat,t1,t2,t3)*&
-                                    expi(-kt)*weight
+                      
+                   t1 = self%ws_cell(1, counter)
+                   t2 = self%ws_cell(2, counter)
+                   t3 = self%ws_cell(3, counter)
+                   weight = self%ws_weight(counter)
+
+                   if(weight > 0.0_r64) then
+                      do iq = 1,nq
+                         qt = dot_product(q(iq, 1:3), t(1:3))
+                         do ipol = 1, 3
+                            idim = (iat - 1)*3 + ipol
+                            do jpol = 1, 3
+                               jdim = (jat - 1)*3 + jpol
+                               dyn_s(iq, idim, jdim) = dyn_s(iq, idim, jdim) + &
+                                    self%ifc2(ipol, jpol, iat, jat, t1, t2, t3)* &
+                                    expi(-qt)*weight
+                               
                                if(present(velocities)) then
-                                  ddyn_s(ik,idim,jdim,1:3)=ddyn_s(ik,idim,jdim,1:3)-&
+                                  ddyn_s(iq, idim, jdim, 1:3) = ddyn_s(iq, idim, jdim, 1:3) - &
                                        oneI*t(1:3)*&
-                                       self%ifc2(ipol,jpol,iat,jat,t1,t2,t3)*&
-                                       expi(-kt)*weight
+                                       self%ifc2(ipol, jpol, iat, jat, t1, t2, t3)*&
+                                       expi(-qt)*weight
                                end if
                             end do
                          end do
                       end do
                    end if
-                   total_weight=total_weight+weight
                 end do
              end do
           end do
@@ -959,15 +1031,16 @@ contains
                          idim=(iat-1)*3+ipol
                          do jpol=1,3
                             jdim=(iat-1)*3+jpol
-                            dyn_g(1:nk,idim,jdim)=dyn_g(1:nk,idim,jdim)-&
+                            dyn_g(1:nq,idim,jdim)=dyn_g(1:nq,idim,jdim)-&
                                  exp_g*zig(ipol)*auxi(jpol)
                          end do
                       end do
                    end do
                 end if
                 g_old(0:3)=g(0:3)
-                do ik=1,nk
-                   g(1:3)=g_old(1:3)+k(ik,1:3)
+                !q-dependent block
+                do iq=1,nq
+                   g(1:3) = g_old(1:3) + q(iq, 1:3)
                    geg=dot_product(g(1:3),matmul(eps,g(1:3)))
                    if (geg.gt.0.0_r64.and.geg/alpha/4.0_r64.lt.gmax) then
                       exp_g=exp(-geg/alpha/4.0_r64)/geg
@@ -981,11 +1054,11 @@ contains
                                idim=(iat-1)*3+ipol
                                do jpol=1,3
                                   jdim=(jat-1)*3+jpol
-                                  dyn_g(ik,idim,jdim)=dyn_g(ik,idim,jdim)+&
+                                  dyn_g(iq,idim,jdim)=dyn_g(iq,idim,jdim)+&
                                        exp_g*zig(ipol)*zjg(jpol)*expi(gr)
                                   if(present(velocities)) then
                                      do i=1,3
-                                        ddyn_g(ik,idim,jdim,i)=ddyn_g(ik,idim,jdim,i)+&
+                                        ddyn_g(iq,idim,jdim,i)=ddyn_g(iq,idim,jdim,i)+&
                                              exp_g*expi(gr)*&
                                              (zjg(jpol)*zeff(iat,i,ipol)+zig(ipol)*zeff(jat,i,jpol)+&
                                              zig(ipol)*zjg(jpol)*oneI*self%rr(iat,jat,i)-&
@@ -998,6 +1071,7 @@ contains
                       end do
                    end if
                 end do
+                !end of q-dependent block
              end do
           end do
        end do
@@ -1008,10 +1082,10 @@ contains
     ! Once the dynamical matrix has been built, the frequencies and
     ! group velocities are extracted exactly like in the previous
     ! subroutine.
-    do ik = 1, nk
-       dyn(:,:) = dyn_s(ik,:,:) + dyn_g(ik,:,:)
+    do iq = 1, nq
+       dyn(:,:) = dyn_s(iq,:,:) + dyn_g(iq,:,:)
        if(present(velocities)) then
-          ddyn(:,:,:) = ddyn_s(ik,:,:,:) + ddyn_g(ik,:,:,:)
+          ddyn(:,:,:) = ddyn_s(iq,:,:,:) + ddyn_g(iq,:,:,:)
        end if
 
        !Force Hermiticity
@@ -1046,25 +1120,25 @@ contains
        call zheev("V","U",nbranches,dyn(:,:),nbranches,omega2,work,nwork,rwork,i)
        
        if(present(eigenvect)) then
-          eigenvect(ik,:,:) = transpose(dyn(:,:))
+          eigenvect(iq,:,:) = transpose(dyn(:,:))
        end if
        
-       omegas(ik,:)=sign(sqrt(abs(omega2)),omega2)
+       omegas(iq,:)=sign(sqrt(abs(omega2)),omega2)
 
        if(present(velocities)) then
           do i=1,nbranches
              do j=1,3
-                velocities(ik,i,j)=real(dot_product(dyn(:,i),&
+                velocities(iq,i,j)=real(dot_product(dyn(:,i),&
                      matmul(ddyn(:,:,j),dyn(:,i))))
              end do
-             velocities(ik,i,:)=velocities(ik,i,:)/(2.0_r64*omegas(ik,i))
+             velocities(iq,i,:)=velocities(iq,i,:)/(2.0_r64*omegas(iq,i))
           end do
        end if
 
        !Take care of gamma point.
-       if(all(k(ik,1:3) == 0)) then
-          omegas(ik, 1:3) = 0.0_r64
-          if(present(velocities)) velocities(ik, :, :) = 0.0_r64
+       if(all(q(iq, 1:3) == 0)) then
+          omegas(iq, 1:3) = 0.0_r64
+          if(present(velocities)) velocities(iq, :, :) = 0.0_r64
        end if
     end do
 
