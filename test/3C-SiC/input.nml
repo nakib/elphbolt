@@ -55,5 +55,6 @@
 
 &wannier
  coarse_qmesh = 6 6 6
+ Wannier_engine_name = 'epw'
 /
 

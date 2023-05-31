@@ -44,7 +44,7 @@ module wannier_module
   type Wannier
      !! Standard form data related to Wannierization.
 
-     character(1028) :: Wannier_engine_name
+     character(1024) :: Wannier_engine_name
      !! Name of external Wannier calculator
      integer(i64) :: numwannbands
      !! Number of Wannier bands.
@@ -101,14 +101,33 @@ contains
     class(wannier), intent(out) :: self
     type(numerics), intent(in) :: num
 
-    !TODO Read Wannier engine name from input and set to self%Wannier_engine_name
-    self%Wannier_engine_name = 'epw'
+    !Local
+    integer(i64) :: coarse_qmesh(3)
+    character(1024) :: Wannier_engine_name
     
+    namelist /wannier/ coarse_qmesh, Wannier_engine_name
+
+    !Open input file
+    open(1, file = 'input.nml', status = 'old')
+
+    coarse_qmesh = [0, 0, 0]
+    read(1, nml = wannier)
+    if(any(coarse_qmesh <= 0)) then
+       call exit_with_message('Bad input(s) in wannier.')
+    end if
+    self%coarse_qmesh = coarse_qmesh
+    self%Wannier_engine_name = Wannier_engine_name
+
+    !Close input file
+    close(1)
+        
     !Read real space data
     select case(self%Wannier_engine_name)
     case("exciting")
+       if(this_image() == 1) write(*, '(A)') "Wannier data from EXCITING will be read."
        call self%read_exciting_Wannier(num)
     case("epw")
+       if(this_image() == 1) write(*, '(A)') "Wannier data from EPW will be read."
        call self%read_epw_Wannier(num)
     case default
        write(*, '(A, A)') "Error: Unknown Wannier engine for Wannier data: ", &
@@ -126,7 +145,6 @@ contains
     
     !Local variables
     integer(i64) :: iuc, ib, jb, image
-    integer(i64) :: coarse_qmesh(3)
     integer(i64) :: ignore_i
     real(r64) :: ignore_3r(3)
     complex(r64), allocatable :: gwann_aux(:, :, :, :, :)
@@ -137,23 +155,6 @@ contains
     character(len=*), parameter :: filename_phcells = "eph_ph_rvec.dat"
     character(len=*), parameter :: filename_Hwann = "eph_hr.dat"
     character(len=*), parameter :: filename_Dwann = "eph_dr.dat"
-
-    namelist /wannier/ coarse_qmesh
-
-    call subtitle("Reading EXCITING Wannier information...")
-
-    !Open input file
-    open(1, file = 'input.nml', status = 'old')
-
-    coarse_qmesh = [0, 0, 0]
-    read(1, nml = wannier)
-    if(any(coarse_qmesh <= 0)) then
-       call exit_with_message('Bad input(s) in wannier.')
-    end if
-    self%coarse_qmesh = coarse_qmesh
-
-    !Close input file
-    close(1)
     
     !Read real space hamiltonian
     call print_message("Reading Wannier rep. Hamiltonian...")
@@ -279,7 +280,6 @@ contains
     
     !Local variables
     integer(i64) :: iuc, ib, jb, image
-    integer(i64) :: coarse_qmesh(3)
     real(r64) :: ef
     real(r64), allocatable :: dummy(:)
     complex(r64), allocatable :: gwann_aux(:, :, :, :, :)
@@ -294,23 +294,6 @@ contains
     character(len=*), parameter :: filename_elwsdeg = "wsdeg_k"
     character(len=*), parameter :: filename_phwsdeg = "wsdeg_q"
     character(len=*), parameter :: filename_gwsdeg = "wsdeg_g"
-
-    namelist /wannier/ coarse_qmesh
-
-    call subtitle("Reading EPW Wannier information...")
-
-    !Open input file
-    open(1, file = 'input.nml', status = 'old')
-
-    coarse_qmesh = [0, 0, 0]
-    read(1, nml = wannier)
-    if(any(coarse_qmesh <= 0)) then
-       call exit_with_message('Bad input(s) in wannier.')
-    end if
-    self%coarse_qmesh = coarse_qmesh
-    
-    !Close input file
-    close(1)
     
     open(1,file=filename_epwdata,status='old')
     read(1,*) ef !Fermi energy. Read but ignored here.
