@@ -27,7 +27,7 @@ module wannier_module
   implicit none
 
   private
-  public epw_wannier
+  public Wannier
 
   !Captain's log. April 18, 2023.
   !I have pulled this out of the epw_wannier data type
@@ -41,9 +41,11 @@ module wannier_module
   
   !external chdir
   
-  type epw_wannier
-     !! Data and procedures related to Wannierization.
+  type Wannier
+     !! Standard form data related to Wannierization.
 
+     character(1028) :: Wannier_engine_name
+     !! Name of external Wannier calculator
      integer(i64) :: numwannbands
      !! Number of Wannier bands.
      integer(i64) :: numbranches
@@ -75,8 +77,6 @@ module wannier_module
      complex(r64), allocatable :: Dphwann(:, :, :)
      !! Dynamical matrix in Wannier representation.
      !complex(r64), allocatable :: gwann(:, :, :, :, :)
-     !complex(r64), allocatable :: gwann(:, :, :, :, :)[:]
-     !! e-ph vertex in Wannier representation.
 
      !FOR NOW...
      integer(i64) :: gwann_distrib_num_active_images
@@ -85,19 +85,196 @@ module wannier_module
 
    contains
 
-     procedure :: read=>read_EPW_Wannier, el_wann_epw, ph_wann_epw, &
-          gkRp_epw, gReq_epw, g2_epw, deallocate_wannier, plot_along_path, &
-          reshape_gwann_for_gkRp
+     procedure :: read, el_wann, ph_wann, gkRp, gReq, g2, &
+          plot_along_path, reshape_gwann_for_gkRp, deallocate_wannier
 
-  end type epw_wannier
+     !This is perhaps the only Wannier-engine dependent procedure.
+     procedure, private :: read_epw_Wannier, read_exciting_Wannier
+  end type Wannier
 
 contains
+  
+  subroutine read(self, num)
+    !! Read Wannier representation of the hamiltonian, dynamical matrix, and the
+    !! e-ph matrix elements.
+    
+    class(wannier), intent(out) :: self
+    type(numerics), intent(in) :: num
 
+    !TODO Read Wannier engine name from input and set to self%Wannier_engine_name
+    self%Wannier_engine_name = 'epw'
+    
+    !Read real space data
+    select case(self%Wannier_engine_name)
+    case("exciting")
+       call self%read_exciting_Wannier(num)
+    case("epw")
+       call self%read_epw_Wannier(num)
+    case default
+       write(*, '(A, A)') "Error: Unknown Wannier engine for Wannier data: ", &
+            self%Wannier_engine_name
+       call exit
+    end select
+  end subroutine read
+
+  subroutine read_exciting_Wannier(self, num)
+    !! Read Wannier representation of the hamiltonian, dynamical matrix, and the
+    !! e-ph matrix elements from exciting output.
+
+    class(wannier), intent(inout) :: self
+    type(numerics), intent(in) :: num
+    
+    !Local variables
+    integer(i64) :: iuc, ib, jb, image
+    integer(i64) :: coarse_qmesh(3)
+    integer(i64) :: ignore_i
+    real(r64) :: ignore_3r(3)
+    complex(r64), allocatable :: gwann_aux(:, :, :, :, :)
+    
+    ! EXCITING File names:
+    character(len=*), parameter :: filename_gwann = "ephgrr.bin"
+    character(len=*), parameter :: filename_elcells = "eph_el_rvec.dat"
+    character(len=*), parameter :: filename_phcells = "eph_ph_rvec.dat"
+    character(len=*), parameter :: filename_Hwann = "eph_hr.dat"
+    character(len=*), parameter :: filename_Dwann = "eph_dr.dat"
+
+    namelist /wannier/ coarse_qmesh
+
+    call subtitle("Reading EXCITING Wannier information...")
+
+    !Open input file
+    open(1, file = 'input.nml', status = 'old')
+
+    coarse_qmesh = [0, 0, 0]
+    read(1, nml = wannier)
+    if(any(coarse_qmesh <= 0)) then
+       call exit_with_message('Bad input(s) in wannier.')
+    end if
+    self%coarse_qmesh = coarse_qmesh
+
+    !Close input file
+    close(1)
+    
+    !Read real space hamiltonian
+    call print_message("Reading Wannier rep. Hamiltonian...")
+
+    open(1,file=filename_Hwann,status='old')
+    read(1, *) !header
+    read(1, *) self%numwannbands, self%numwannbands, self%nwsk
+
+    allocate(self%Hwann(self%nwsk,self%numwannbands,self%numwannbands))
+    do iuc = 1,self%nwsk !Number of real space electron cells
+       do ib = 1,self%numwannbands
+          read (1, *) self%Hwann(iuc, ib, :)
+       end do
+    end do
+
+    close(1)
+
+    !Read real space dynamical matrix (i.e. 2nd order force constants)
+    call print_message("Reading Wannier rep. dynamical matrix...")
+
+    open(1,file=filename_Dwann,status='old')
+    read(1, *) !header
+    read(1, *) self%numbranches, self%numbranches, self%nwsq
+
+    allocate(self%Dphwann(self%nwsq, self%numbranches, self%numbranches))
+    do iuc = 1,self%nwsq !Number of real space phonon cells
+       do ib = 1,self%numbranches
+          read (1, *) self%Dphwann(iuc, ib, :)
+       end do
+    end do
+
+    close(1)
+
+    !Divide wave vectors among images
+    allocate(self%gwann_distrib_start[*], self%gwann_distrib_end[*], self%gwann_distrib_chunk[*])
+    call distribute_points(self%nwsg, self%gwann_distrib_chunk, self%gwann_distrib_start, &
+         self%gwann_distrib_end, self%gwann_distrib_num_active_images)
+
+    if(.not. num%read_gk2 .or. .not. num%read_gq2 .or. &
+         num%plot_along_path) then
+
+       allocate(gwann(self%numwannbands, self%numwannbands, self%nwsk,&
+            self%numbranches, self%gwann_distrib_chunk[1])[*])
+       gwann = 0.0_r64
+
+       !Below, image 1 will read Wannierized g(Re,Rp) and distribute to all images.
+       if(this_image() == 1) then
+          call print_message("Reading Wannier rep. e-ph vertex and distributing...")
+
+          open(1, file = filename_gwann, status = 'old', access = 'stream')
+
+          !Note the dimensions of the tensor. This matches the output of exciting.
+          allocate(gwann_aux(self%numwannbands, self%numwannbands, self%numbranches,&
+               self%nwsk, self%gwann_distrib_chunk[1])) !chunk for the 1st image is the largest
+
+          do image = 1, self%gwann_distrib_num_active_images
+             read(1) gwann_aux(:, :, :, :, 1:self%gwann_distrib_chunk[image])
+
+             !Conform to the standard shape
+             gwann(:,:,:,:,:)[image] = reshape(gwann_aux, &
+                  shape = [self%numwannbands,self%numwannbands, &
+                  self%numbranches, self%nwsk, self%gwann_distrib_chunk[1]], &
+                  order = [1, 2, 4, 3, 5])
+          end do
+          
+          close(1)
+       end if
+
+       sync all
+
+       if(this_image() == 1) deallocate(gwann_aux)
+    end if
+    
+    
+!!$    !Exciting format
+!!$    write( un, '("# direct lattice vectors (in rows)")' )
+!!$    write( un, '(3'//fmt//')' ) this%avec
+!!$    write( un, '("# real space lattice vectors (lattice / Cartesian coordinates) and multiplicity")' )
+!!$    do ir = 1, this%nr
+!!$       write( un, '(i6,6x,3i6,6x,3'//fmt//',6x,i6)' ) ir, this%vrl(:, ir), this%vrc(:, ir), this%rmul(ir)
+!!$    end do
+
+    !Read cell maps of q, k, g meshes.
+    call print_message("Reading Wannier cells and multiplicities...")
+
+    allocate(self%rcells_k(self%nwsk, 3))
+    allocate(self%elwsdeg(self%nwsk))
+    open(1, file = filename_elcells, status = "old")
+    do iuc = 1,self%nwsk
+       read(1, *) ignore_i, self%rcells_k(iuc, :), ignore_3r(:), self%elwsdeg(iuc)
+    end do
+    close(1)
+
+    allocate(self%rcells_q(self%nwsq, 3))
+    allocate(self%phwsdeg(self%nwsq))
+    open(1, file = filename_phcells, status = "old")
+    do iuc = 1,self%nwsq
+       read(1, *) ignore_i, self%rcells_q(iuc, :), ignore_3r(:), self%phwsdeg(iuc)
+    end do
+    close(1)
+
+    !This bit is distrubuted
+    allocate(self%rcells_g(self%gwann_distrib_chunk[1], 3)[*])
+    allocate(self%gwsdeg(self%gwann_distrib_chunk[1])[*])
+    if(this_image() == 1) then
+       do image = 1, self%gwann_distrib_num_active_images
+          do iuc = 1, self%gwann_distrib_chunk[image]
+             self%rcells_g(iuc, :)[image] = self%rcells_q(iuc, :)
+             self%gwsdeg(iuc)[image] = self%phwsdeg(iuc)
+          end do
+       end do
+    end if
+
+    sync all
+  end subroutine read_exciting_Wannier
+    
   subroutine read_EPW_Wannier(self, num)
     !! Read Wannier representation of the hamiltonian, dynamical matrix, and the
     !! e-ph matrix elements from file epwdata.fmt.
 
-    class(epw_wannier), intent(out) :: self
+    class(wannier), intent(inout) :: self
     type(numerics), intent(in) :: num
     
     !Local variables
@@ -125,7 +302,7 @@ contains
     !Open input file
     open(1, file = 'input.nml', status = 'old')
 
-    coarse_qmesh = (/0, 0, 0/)
+    coarse_qmesh = [0, 0, 0]
     read(1, nml = wannier)
     if(any(coarse_qmesh <= 0)) then
        call exit_with_message('Bad input(s) in wannier.')
@@ -152,7 +329,7 @@ contains
        end do
     end do
 
-    !Read real space dynamical matrix
+    !Read real space dynamical matrix (i.e. 2nd order force constants)
     call print_message("Reading Wannier rep. dynamical matrix...")
     allocate(self%Dphwann(self%nwsq,self%numbranches,self%numbranches))
     do ib = 1,self%numbranches
@@ -254,11 +431,11 @@ contains
 
     sync all
   end subroutine read_EPW_Wannier
-
-  subroutine el_wann_epw(self, crys, nk, kvecs, energies, velocities, evecs, scissor)
+  
+  subroutine el_wann(self, crys, nk, kvecs, energies, velocities, evecs, scissor)
     !! Wannier interpolate electrons on list of arb. k-vecs
 
-    class(epw_wannier), intent(in) :: self
+    class(wannier), intent(in) :: self
     type(crystal), intent(in) :: crys
     integer(i64), intent(in) :: nk
     real(r64), intent(in) :: kvecs(nk,3) !Crystal coordinates
@@ -349,20 +526,19 @@ contains
           velocities(ik,:,:) = velocities(ik,:,:)*Ryd2radTHz !nmTHz = Km/s
        end if
     end do !ik
-  end subroutine el_wann_epw
-
-  subroutine ph_wann_epw(self, crys, nq, qvecs, energies, evecs)  
+  end subroutine el_wann
+  
+  subroutine ph_wann(self, crys, nq, qvecs, energies, evecs)  
     !! Wannier interpolate phonons on list of arb. q-vec
 
-    class(epw_wannier), intent(in) :: self
+    class(wannier), intent(in) :: self
     type(crystal), intent(in) :: crys
-
-    !Local variables
     integer(i64), intent(in) :: nq
     real(r64), intent(in) :: qvecs(nq, 3) !Crystal coordinates
     real(r64), intent(out) :: energies(nq, self%numbranches)
     complex(r64), intent(out), optional :: evecs(nq, self%numbranches, self%numbranches)
-    
+
+    !Local variables
     integer(i64) :: iuc, ib, jb, iq, na, nb, nwork, aux
     complex(r64) :: caux
     real(r64), allocatable :: rwork(:)
@@ -444,7 +620,7 @@ contains
           end if
        end do
     end do !iq
-  end subroutine ph_wann_epw
+  end subroutine ph_wann
 
   subroutine dyn_nonanalytic(self, crys, q, dyn)
     !! Calculate the long-range correction to the
@@ -456,7 +632,7 @@ contains
     ! This is adapted from ShengBTE's subroutine phonon_espresso.
     ! ShengBTE is distributed under GPL v3 or later.
 
-    class(epw_wannier), intent(in) :: self
+    class(wannier), intent(in) :: self
     type(crystal), intent(in) :: crys
     
     !Local variables
@@ -540,8 +716,8 @@ contains
     end do
     dyn = dyn + dyn_l*fac
   end subroutine dyn_nonanalytic
-
-  function g2_epw(self, crys, kvec, qvec, el_evec_k, el_evec_kp, ph_evec_q, ph_en, &
+  
+  real(r64) function g2(self, crys, kvec, qvec, el_evec_k, el_evec_kp, ph_evec_q, ph_en, &
        gmixed, wannspace)
     !! Function to calculate |g|^2.
     !! This works with EPW real space data
@@ -553,7 +729,7 @@ contains
     !! gmixed: e-ph matrix element in mixed Wannier-Bloch representation
     !! wannspace: the species that is in Wannier representation
 
-    class(epw_wannier), intent(in) :: self
+    class(wannier), intent(in) :: self
     type(crystal), intent(in) :: crys
     
     real(r64),intent(in) :: kvec(3), qvec(3), ph_en
@@ -568,7 +744,6 @@ contains
     complex(r64) :: caux, u(self%numbranches), gbloch, unm, &
          overlap(self%numwannbands,self%numwannbands), glprefac
     complex(r64), allocatable :: UkpgUkdag(:, :), UkpgUkdaguq(:)
-    real(r64) :: g2_epw
 
     if(wannspace /= 'el' .and. wannspace /= 'ph') then
        call exit_with_message(&
@@ -584,7 +759,7 @@ contains
     end do
 
     if(ph_en == 0) then !zero out matrix elements for zero energy phonons
-       g2_epw = 0
+       g2 = 0
     else
        if(wannspace == 'ph') then
           nws = self%nwsg
@@ -646,10 +821,10 @@ contains
           gbloch = gbloch + glprefac*unm
        end if
 
-       g2_epw = 0.5_r64*real(gbloch*conjg(gbloch))/ &
+       g2 = 0.5_r64*real(gbloch*conjg(gbloch))/ &
             ph_en*g2unitfactor !eV^2
     end if
-  end function g2_epw
+  end function g2
   
   subroutine long_range_prefac(self, crys, q, uqs, glprefac)
     !! Calculate the long-range correction prefactor of
@@ -662,7 +837,7 @@ contains
     ! adapted from ShengBTE's subroutine phonon_espresso.
     ! ShengBTE is distributed under GPL v3 or later.
 
-    class(epw_wannier), intent(in) :: self
+    class(wannier), intent(in) :: self
     type(crystal), intent(in) :: crys
     
     real(r64), intent(in) :: q(3) !Cartesian
@@ -710,15 +885,15 @@ contains
     end do
     glprefac = glprefac*fac
   end subroutine long_range_prefac
-
-  subroutine gkRp_epw(self, num, ik, kvec)
+  
+  subroutine gkRp(self, num, ik, kvec)
     !! Calculate the Bloch-Wannier mixed rep. e-ph matrix elements g(k,Rp),
     !! where k is an IBZ electron wave vector and Rp is a phonon unit cell.
     !! Note: this step *DOES NOT* perform the rotation over the Wannier bands space.
     !!
     !! The result will be saved to disk tagged with k-index.
 
-    class(epw_wannier), intent(in) :: self
+    class(wannier), intent(in) :: self
     type(numerics), intent(in) :: num
     integer(i64), intent(in) :: ik
     real(r64), intent(in) :: kvec(3)
@@ -772,16 +947,16 @@ contains
 
     !Change back to working directory
     call chdir(num%cwd)
-  end subroutine gkRp_epw
+  end subroutine gkRp
 
-  subroutine gReq_epw(self, num, iq, qvec)
+  subroutine gReq(self, num, iq, qvec)
     !! Calculate the Bloch-Wannier mixed rep. e-ph matrix elements g(Re,q),
     !! where q is an IBZ phonon wave vector and Re is a phonon unit cell.
     !! Note: this step *DOES NOT* perform the rotation over the Wannier bands space.
     !!
     !! The result will be saved to disk tagged with k-index.
 
-    class(epw_wannier), intent(in) :: self
+    class(wannier), intent(in) :: self
     type(numerics), intent(in) :: num
     integer(i64), intent(in) :: iq
     real(r64), intent(in) :: qvec(3)
@@ -830,12 +1005,12 @@ contains
 
     !Change back to working directory
     call chdir(num%cwd)
-  end subroutine gReq_epw
+  end subroutine gReq
 
   subroutine deallocate_wannier(self, num)
     !! Deallocates some Wannier quantities
 
-    class(epw_wannier), intent(inout) :: self
+    class(wannier), intent(inout) :: self
     type(numerics), intent(in) :: num
     
     deallocate(self%rcells_k, self%rcells_q, self%rcells_g, &
@@ -852,7 +1027,7 @@ contains
     !! Subroutine to plot bands, dispersions, e-ph matrix elements
     !! using the Wannier interpolation method with EPW inputs.
 
-    class(epw_wannier), intent(in) :: self
+    class(wannier), intent(in) :: self
     type(crystal), intent(in) :: crys
     type(numerics), intent(in) :: num
     real(r64), intent(in) :: scissor(self%numwannbands)
@@ -886,7 +1061,8 @@ contains
        !Calculate phonon dispersions
        allocate(ph_ens_path(nqpath, self%numbranches), &
             ph_evecs_path(nqpath, self%numbranches, self%numbranches))
-       call ph_wann_epw(self, crys, nqpath, qpathvecs, ph_ens_path, ph_evecs_path)
+!!$       call ph_wann_epw(self, crys, nqpath, qpathvecs, ph_ens_path, ph_evecs_path)
+       call ph_wann(self, crys, nqpath, qpathvecs, ph_ens_path, ph_evecs_path)
 
        !Output phonon dispersions
        write(saux, "(I0)") self%numbranches
@@ -898,8 +1074,9 @@ contains
 
        !Calculate electron bands
        allocate(el_ens_path(nqpath, self%numwannbands))
-       call el_wann_epw(self, crys, nqpath, qpathvecs, el_ens_path, scissor = scissor)
-
+!!$       call el_wann_epw(self, crys, nqpath, qpathvecs, el_ens_path, scissor = scissor)
+       call el_wann(self, crys, nqpath, qpathvecs, el_ens_path, scissor = scissor)
+       
        !Output electron dispersions
        write(saux,"(I0)") self%numwannbands
        open(1, file="el.ens_kpath",status="replace")
@@ -919,7 +1096,8 @@ contains
        read(1,*) k(1, :)
 
        !Calculate g(k, Rp)
-       call self%gkRp_epw(num, 0_i64, k(1,:))
+!!$       call self%gkRp_epw(num, 0_i64, k(1,:))
+       call self%gkRp(num, 0_i64, k(1,:))
 
        !Load gmixed from file
        !Change to data output directory
@@ -932,8 +1110,10 @@ contains
        !Change back to working directory
        call chdir(num%cwd)
 
-       call el_wann_epw(self, crys, 1_i64, k, el_ens_k, el_vels_k, el_evecs_k, &
-         scissor = scissor)
+!!$       call el_wann_epw(self, crys, 1_i64, k, el_ens_k, el_vels_k, el_evecs_k, &
+!!$            scissor = scissor)
+       call el_wann(self, crys, 1_i64, k, el_ens_k, el_vels_k, el_evecs_k, &
+            scissor = scissor)
 
        do i = 1, nqpath !Over phonon wave vectors path
           kp(1, :) = k(1, :) + qpathvecs(i, :)
@@ -942,14 +1122,17 @@ contains
           end do
 
           !Calculate electrons at this final wave vector
-          call el_wann_epw(self, crys, 1_i64, kp, el_ens_kp, el_vels_kp, el_evecs_kp, &
-            scissor = scissor)
+!!$          call el_wann_epw(self, crys, 1_i64, kp, el_ens_kp, el_vels_kp, el_evecs_kp, &
+!!$               scissor = scissor)
+          call el_wann(self, crys, 1_i64, kp, el_ens_kp, el_vels_kp, el_evecs_kp, &
+               scissor = scissor)
 
           do n = 1, self%numwannbands
              do m = 1, self%numwannbands
                 do s = 1, self%numbranches
                    !Calculate |g(k,k')|^2
-                   g2_qpath(i, s, m, n) = self%g2_epw(crys, k, qpathvecs(i, :), &
+!!$                   g2_qpath(i, s, m, n) = self%g2_epw(crys, k, qpathvecs(i, :), &
+                   g2_qpath(i, s, m, n) = self%g2(crys, k, qpathvecs(i, :), &
                         el_evecs_k(1, m, :), el_evecs_kp(1, n, :), ph_evecs_path(i, s, :), &
                         ph_ens_path(i, s), gmixed_k, 'ph')
                 end do
@@ -1038,9 +1221,9 @@ contains
 
   subroutine reshape_gwann_for_gkRp(self)
     !! Subroutine to reshape gwann to the best shape
-    !! for the calculations in the subroutine gkRp_epw_epw.
+    !! for the calculations in the subroutine gkRp.
 
-    class(epw_wannier), intent(in) :: self
+    class(wannier), intent(in) :: self
 
     if(this_image() == 1) print*, 'Current shape of gwann = ', shape(gwann)
 

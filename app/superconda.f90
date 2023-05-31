@@ -29,7 +29,7 @@ program superconda
   use symmetry_module, only: symmetry
   use electron_module, only: electron
   use phonon_module, only: phonon
-  use wannier_module, only: epw_wannier
+  use wannier_module, only: wannier
   use MigEl_sc_module, only: migel_sc
   use bz_sums, only: calculate_el_dos_fermi, calculate_el_Ws
   use interactions, only: calculate_gkRp, calculate_eph_interaction_ibzk 
@@ -40,7 +40,7 @@ program superconda
   type(numerics) :: num
   type(crystal) :: crys
   type(symmetry) :: sym
-  type(epw_wannier) :: wann
+  type(wannier) :: wann
   type(electron) :: el
   type(phonon) :: ph
   type(MigEl_sc) :: migel

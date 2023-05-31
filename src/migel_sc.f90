@@ -23,7 +23,7 @@ module MigEl_sc_module
        twonorm, distribute_points, Pade_continued, demux_state, mux_state
   use numerics_module, only: numerics
   use electron_module, only: electron
-  use wannier_module, only: epw_wannier
+  use wannier_module, only: wannier
   use eliashberg, only: calculate_iso_Matsubara_lambda, calculate_aniso_Matsubara_lambda
   
   implicit none
@@ -175,7 +175,7 @@ contains
 
     class(MigEl_sc), intent(inout) :: self
     type(electron), intent(in) :: el
-    type(epw_wannier), intent(in) :: wann
+    type(wannier), intent(in) :: wann
     type(numerics), intent(in) :: num
     real(r64), intent(in) :: max_ph_en
 
@@ -399,7 +399,7 @@ contains
     !! a given gap (Delta) at a given temperature (T) in K.
 
     type(electron), intent(in) :: el
-    type(epw_wannier), intent(in) :: wann
+    type(wannier), intent(in) :: wann
     type(numerics), intent(in) :: num
     real(r64), intent(in) :: Delta(:, :), fermi_matsubara_ens(:), T
     real(r64), intent(out) :: Z(:, :)
@@ -497,7 +497,7 @@ contains
     !! tau being the "time" in the iterator sense.
 
     type(electron), intent(in) :: el
-    type(epw_wannier), intent(in) :: wann
+    type(wannier), intent(in) :: wann
     type(numerics), intent(in) :: num
     real(r64), intent(in) :: Z(:, :), fermi_matsubara_ens(:), T, mustar
     real(r64), intent(inout) :: Delta(:, :)

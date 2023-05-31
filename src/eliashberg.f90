@@ -22,7 +22,7 @@ module eliashberg
   use misc, only: exit_with_message, print_message, distribute_points, &
        demux_state, mux_vector, write2file_rank1_real, write2file_rank2_real, &
        compsimps
-  use wannier_module, only: epw_wannier
+  use wannier_module, only: wannier
   use electron_module, only: electron
   use phonon_module, only: phonon
   use numerics_module, only: numerics
@@ -52,7 +52,7 @@ contains
     !band belonged within the energy window. Here the bands outside the energy
     !window will be skipped in the calculation as they are irrelevant for transport.
     
-    type(epw_wannier), intent(in) :: wann
+    type(wannier), intent(in) :: wann
     type(electron), intent(in) :: el
     type(phonon), intent(in) :: ph
     type(numerics), intent(in) :: num
@@ -315,7 +315,7 @@ contains
     !! Calculate the isotropic Matsubara electron-phonon coupling, lambda(l).
     !! Here l is the Bosonic Matsubara energy index. 
     
-    type(epw_wannier), intent(in) :: wann
+    type(wannier), intent(in) :: wann
     type(numerics), intent(in) :: num
     real(r64), intent(in) :: omegas(:), bose_matsubara_ens(:)
     real(r64), intent(out) :: iso_matsubara_lambda(:)
@@ -380,7 +380,7 @@ contains
     !band belonged within the energy window. Here the bands outside the energy
     !window will be skipped in the calculation as they are irrelevant for transport.
     
-    type(epw_wannier), intent(in) :: wann
+    type(wannier), intent(in) :: wann
     type(electron), intent(in) :: el
     type(numerics), intent(in) :: num
     real(r64), intent(in) :: omegas(:), bose_matsubara_ens(:)

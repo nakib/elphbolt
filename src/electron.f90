@@ -22,7 +22,7 @@ module electron_module
   use misc, only: exit_with_message, print_message, demux_state, sort, &
        binsearch, subtitle, Fermi, write2file_rank2_real, write2file_rank3_real 
   use numerics_module, only: numerics
-  use wannier_module, only: epw_wannier
+  use wannier_module, only: wannier
   use crystal_module, only: crystal, calculate_wavevectors_full
   use symmetry_module, only: symmetry, find_irred_wedge, create_fbz2ibz_map
   use delta, only: form_tetrahedra_3d, fill_tetrahedra_3d, form_triangles, &
@@ -117,7 +117,7 @@ contains
     !! Read input file and setup groundstate electronic system.
 
     class(electron), intent(out) :: self
-    type(epw_wannier), intent(in) :: wann
+    type(wannier), intent(in) :: wann
     type(crystal), intent(in) :: crys
     type(symmetry), intent(in) :: sym
     type(numerics), intent(in) :: num
@@ -330,7 +330,7 @@ contains
     !! and the electronic properties on them
 
     class(electron), intent(inout) :: self
-    type(epw_wannier), intent(in) :: wann
+    type(wannier), intent(in) :: wann
     type(crystal), intent(in) :: crys
     type(symmetry), intent(in) :: sym
     type(numerics), intent(in) :: num
@@ -368,7 +368,7 @@ contains
     allocate(self%ens_irred(self%nwv_irred, wann%numwannbands), &
          self%vels_irred(self%nwv_irred, wann%numwannbands, 3), &
          self%evecs_irred(self%nwv_irred, wann%numwannbands, wann%numwannbands))
-    call wann%el_wann_epw(crys, self%nwv_irred, self%wavevecs_irred, self%ens_irred, &
+    call wann%el_wann(crys, self%nwv_irred, self%wavevecs_irred, self%ens_irred, &
          self%vels_irred, self%evecs_irred,self%scissor)
     
     ! 4. Map out FBZ quantities from IBZ ones
@@ -449,7 +449,7 @@ contains
     !not getting these from IBZ quantities via symmetry rotations
     allocate(self%evecs(self%nwv, wann%numwannbands, wann%numwannbands))
     allocate(el_ens_tmp(self%nwv, wann%numwannbands), el_vels_tmp(self%nwv, wann%numwannbands, 3))
-    call wann%el_wann_epw(crys, self%nwv, self%wavevecs, el_ens_tmp, el_vels_tmp, &
+    call wann%el_wann(crys, self%nwv, self%wavevecs, el_ens_tmp, el_vels_tmp, &
       self%evecs,self%scissor)
     deallocate(el_ens_tmp, el_vels_tmp) !free up memory
     
@@ -492,7 +492,7 @@ contains
     allocate(self%ens_irred(self%nwv_irred, wann%numwannbands), &
          self%vels_irred(self%nwv_irred, wann%numwannbands, 3), &
          self%evecs_irred(self%nwv_irred, wann%numwannbands, wann%numwannbands))
-    call wann%el_wann_epw(crys, self%nwv_irred, self%wavevecs_irred, self%ens_irred, &
+    call wann%el_wann(crys, self%nwv_irred, self%wavevecs_irred, self%ens_irred, &
          self%vels_irred, self%evecs_irred,self%scissor)
     
     ! 10. Calculate the number of FBZ blocks electronic states

@@ -8,7 +8,7 @@ program bte_regression
   use symmetry_module, only: symmetry
   use electron_module, only: electron
   use phonon_module, only: phonon
-  use wannier_module, only: epw_wannier
+  use wannier_module, only: wannier
   use bte_module, only: bte
   use bz_sums, only: calculate_dos, calculate_qTF, calculate_el_dos_fermi, calculate_el_Ws
   use interactions, only: calculate_gReq, calculate_gkRp, calculate_3ph_interaction, &
@@ -24,7 +24,7 @@ program bte_regression
   type(numerics) :: num
   type(crystal) :: crys
   type(symmetry) :: sym
-  type(epw_wannier) :: wann
+  type(wannier) :: wann
   type(electron) :: el
   type(phonon) :: ph
   type(bte) :: bt

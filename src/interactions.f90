@@ -21,7 +21,7 @@ module interactions
   use misc, only: exit_with_message, print_message, distribute_points, &
        demux_state, mux_vector, mux_state, expi, Bose, binsearch, Fermi, &
        twonorm, write2file_rank2_real, demux_vector, interpolate, expm1
-  use wannier_module, only: epw_wannier
+  use wannier_module, only: wannier
   use crystal_module, only: crystal
   use electron_module, only: electron
   use phonon_module, only: phonon
@@ -452,7 +452,7 @@ contains
   subroutine calculate_gReq(wann, ph, num)
     !! Parallel driver of gReq_epw over IBZ phonon wave vectors.
 
-    type(epw_wannier), intent(in) :: wann
+    type(wannier), intent(in) :: wann
     type(phonon), intent(in) :: ph
     type(numerics), intent(in) :: num
 
@@ -471,7 +471,7 @@ contains
     !Only work with the active images
     if(this_image() <= num_active_images) then
        do iq = iqstart, iqend
-          call wann%gReq_epw(num, iq, ph%wavevecs_irred(iq, :))
+          call wann%gReq(num, iq, ph%wavevecs_irred(iq, :))
        end do
     end if
 
@@ -479,9 +479,9 @@ contains
   end subroutine calculate_gReq
   
   subroutine calculate_gkRp(wann, el, num)
-    !! Parallel driver of gkRp_epw over IBZ electron wave vectors.
+    !! Parallel driver of gkRp over IBZ electron wave vectors.
 
-    type(epw_wannier), intent(in) :: wann
+    type(wannier), intent(in) :: wann
     type(electron), intent(in) :: el
     type(numerics), intent(in) :: num
 
@@ -490,7 +490,7 @@ contains
 
     call print_message("Calculating g(Re,Rp) -> g(k,Rp) for all IBZ k...")
 
-    !Conform gwann to the best shape for the contraction in gkRp_epw.
+    !Conform gwann to the best shape for the contraction in gkRp.
     call wann%reshape_gwann_for_gkRp
     sync all
 
@@ -504,7 +504,7 @@ contains
     !Only work with the active images
     if(this_image() <= num_active_images) then
        do ik = ikstart, ikend
-          call wann%gkRp_epw(num, ik, el%wavevecs_irred(ik, :))
+          call wann%gkRp(num, ik, el%wavevecs_irred(ik, :))
        end do
     end if
 
@@ -525,7 +525,7 @@ contains
     !band belonged within the energy window. Here the bands outside the energy
     !window will be skipped in the calculation as they are irrelevant for transport.
 
-    type(epw_wannier), intent(in) :: wann
+    type(wannier), intent(in) :: wann
     type(crystal), intent(in) :: crys
     type(electron), intent(in) :: el
     type(phonon), intent(in) :: ph
@@ -690,7 +690,7 @@ contains
 
                    if(key == 'g') then
                       !Calculate |g_mns(k,<q>)|^2
-                      g2_istate(count) = wann%g2_epw(crys, k, q, el%evecs(ik, m, :), &
+                      g2_istate(count) = wann%g2(crys, k, q, el%evecs(ik, m, :), &
                            el%evecs(ikp_window, n, :), ph%evecs(iq_fbz, s, :), &
                            ph%ens(iq_fbz, s), gReq_iq, 'el')
                    end if
@@ -789,7 +789,7 @@ contains
     !band belonged within the energy window. Here the bands outside the energy
     !window will be skipped in the calculation as they are irrelevant for transport.
 
-    type(epw_wannier), intent(in) :: wann
+    type(wannier), intent(in) :: wann
     type(crystal), intent(in) :: crys
     type(electron), intent(in) :: el
     type(phonon), intent(in) :: ph
@@ -924,7 +924,7 @@ contains
 
                 !Calculate the fine mesh phonon.
                 qlist(1, :) = q
-                call wann%ph_wann_epw(crys, 1_i64, qlist, ph_ens_iq, ph_evecs_iq)
+                call wann%ph_wann(crys, 1_i64, qlist, ph_ens_iq, ph_evecs_iq)
              else !Original (coarser) mesh phonon
                 q_indvec = modulo(q_indvec/el%mesh_ref_array, ph%wvmesh) !0-based index vector
                 q = q_indvec/dble(ph%wvmesh) !crystal coords.
@@ -945,11 +945,11 @@ contains
                    if(key == 'g') then
                       !Calculate |g_mns(<k>,q)|^2
                       if(needfinephon) then
-                         g2_istate(count) = wann%g2_epw(crys, k, q, el%evecs_irred(ik, m, :), &
+                         g2_istate(count) = wann%g2(crys, k, q, el%evecs_irred(ik, m, :), &
                               el%evecs(ikp, n, :), ph_evecs_iq(1, s, :), &
                               ph_ens_iq(1, s), gkRp_ik, 'ph')
                       else
-                         g2_istate(count) = wann%g2_epw(crys, k, q, el%evecs_irred(ik, m, :), &
+                         g2_istate(count) = wann%g2(crys, k, q, el%evecs_irred(ik, m, :), &
                               el%evecs(ikp, n, :), ph%evecs(iq, s, :), &
                               ph%ens(iq, s), gkRp_ik, 'ph')
                       end if

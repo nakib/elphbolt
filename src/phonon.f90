@@ -24,7 +24,6 @@ module phonon_module
   use misc, only: print_message, subtitle, expi, distribute_points, &
        write2file_rank2_real, exit_with_message
   use numerics_module, only: numerics
-  use wannier_module, only: epw_wannier
   use crystal_module, only: crystal, calculate_wavevectors_full
   use symmetry_module, only: symmetry, find_irred_wedge, create_fbz2ibz_map
   use delta, only: form_tetrahedra_3d, fill_tetrahedra_3d, form_triangles, &
