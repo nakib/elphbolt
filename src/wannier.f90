@@ -111,6 +111,7 @@ contains
     open(1, file = 'input.nml', status = 'old')
 
     coarse_qmesh = [0, 0, 0]
+    Wannier_engine_name = 'epw'
     read(1, nml = wannier)
     if(any(coarse_qmesh <= 0)) then
        call exit_with_message('Bad input(s) in wannier.')
