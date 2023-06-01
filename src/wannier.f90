@@ -871,7 +871,7 @@ contains
   end subroutine long_range_prefac
   
   subroutine gkRp(self, num, ik, kvec)
-    !! Calculate the Bloch-Wannier mixed rep. e-ph matrix elements g(k,Rp),
+    !! Calculate the bloch-wannier mixed rep. e-ph matrix elements g(k,Rp),
     !! where k is an IBZ electron wave vector and Rp is a phonon unit cell.
     !! Note: this step *DOES NOT* perform the rotation over the Wannier bands space.
     !!
@@ -1028,6 +1028,9 @@ contains
     character(len=8) :: saux
 
     call print_message("Plotting bands, dispersions, and e-ph vertex along path...")
+
+    call self%reshape_gwann_for_gkRp
+    sync all
     
     if(this_image() == 1) then
 
@@ -1045,7 +1048,6 @@ contains
        !Calculate phonon dispersions
        allocate(ph_ens_path(nqpath, self%numbranches), &
             ph_evecs_path(nqpath, self%numbranches, self%numbranches))
-!!$       call ph_wann_epw(self, crys, nqpath, qpathvecs, ph_ens_path, ph_evecs_path)
        call ph_wann(self, crys, nqpath, qpathvecs, ph_ens_path, ph_evecs_path)
 
        !Output phonon dispersions
@@ -1058,7 +1060,6 @@ contains
 
        !Calculate electron bands
        allocate(el_ens_path(nqpath, self%numwannbands))
-!!$       call el_wann_epw(self, crys, nqpath, qpathvecs, el_ens_path, scissor = scissor)
        call el_wann(self, crys, nqpath, qpathvecs, el_ens_path, scissor = scissor)
        
        !Output electron dispersions
@@ -1080,7 +1081,6 @@ contains
        read(1,*) k(1, :)
 
        !Calculate g(k, Rp)
-!!$       call self%gkRp_epw(num, 0_i64, k(1,:))
        call self%gkRp(num, 0_i64, k(1,:))
 
        !Load gmixed from file
@@ -1094,8 +1094,6 @@ contains
        !Change back to working directory
        call chdir(num%cwd)
 
-!!$       call el_wann_epw(self, crys, 1_i64, k, el_ens_k, el_vels_k, el_evecs_k, &
-!!$            scissor = scissor)
        call el_wann(self, crys, 1_i64, k, el_ens_k, el_vels_k, el_evecs_k, &
             scissor = scissor)
 
@@ -1106,8 +1104,6 @@ contains
           end do
 
           !Calculate electrons at this final wave vector
-!!$          call el_wann_epw(self, crys, 1_i64, kp, el_ens_kp, el_vels_kp, el_evecs_kp, &
-!!$               scissor = scissor)
           call el_wann(self, crys, 1_i64, kp, el_ens_kp, el_vels_kp, el_evecs_kp, &
                scissor = scissor)
 
@@ -1115,7 +1111,6 @@ contains
              do m = 1, self%numwannbands
                 do s = 1, self%numbranches
                    !Calculate |g(k,k')|^2
-!!$                   g2_qpath(i, s, m, n) = self%g2_epw(crys, k, qpathvecs(i, :), &
                    g2_qpath(i, s, m, n) = self%g2(crys, k, qpathvecs(i, :), &
                         el_evecs_k(1, m, :), el_evecs_kp(1, n, :), ph_evecs_path(i, s, :), &
                         ph_ens_path(i, s), gmixed_k, 'ph')
@@ -1200,31 +1195,50 @@ contains
        end do   
        close(1)
     end if
+
+    call self%reshape_gwann_for_gkRp(revert = .true.)
     sync all
   end subroutine plot_along_path
 
-  subroutine reshape_gwann_for_gkRp(self)
+  subroutine reshape_gwann_for_gkRp(self, revert)
     !! Subroutine to reshape gwann to the best shape
-    !! for the calculations in the subroutine gkRp.
+    !! for the calculations in the subroutine gkRp. The
+    !! reshaping can be reverted.
+    !
+    ! Note: Use with caution! Always keep these sort of
+    ! operations local!
 
     class(wannier), intent(in) :: self
+    logical, optional, intent(in) :: revert
 
     if(this_image() == 1) print*, 'Current shape of gwann = ', shape(gwann)
 
-    !Do the old switcheroo between dimensions 3 and 4.
-    gwann = reshape(gwann, &
-         shape = [self%numwannbands,self%numwannbands, &
-         self%numbranches, self%nwsk, self%gwann_distrib_chunk[1]], &
-         order = [1, 2, 4, 3, 5])
+    if(present(revert) .and. revert) then
+       !Do the old switcheroo between dimensions 4 and 5.
+       gwann = reshape(gwann, &
+            shape = [self%numwannbands,self%numwannbands,&
+            self%numbranches, self%nwsk, self%gwann_distrib_chunk[1]], &
+            order = [1, 2, 3, 5, 4])
+       
+       !Do the old switcheroo between dimensions 3 and 4.
+       gwann = reshape(gwann, &
+            shape = [self%numwannbands,self%numwannbands, &
+            self%nwsk, self%numbranches, self%gwann_distrib_chunk[1]], &
+            order = [1, 2, 4, 3, 5])
+    else
+       !Do the old switcheroo between dimensions 3 and 4.
+       gwann = reshape(gwann, &
+            shape = [self%numwannbands,self%numwannbands, &
+            self%numbranches, self%nwsk, self%gwann_distrib_chunk[1]], &
+            order = [1, 2, 4, 3, 5])
 
-    !if(this_image() == 1) print*, 'Intermediate shape of gwann = ', shape(gwann)
-
-    !Do the old switcheroo between dimensions 4 and 5.
-    gwann = reshape(gwann, &
-         shape = [self%numwannbands,self%numwannbands,&
-         self%numbranches, self%gwann_distrib_chunk[1], self%nwsk], &
-         order = [1, 2, 3, 5, 4])
-
+       !Do the old switcheroo between dimensions 4 and 5.
+       gwann = reshape(gwann, &
+            shape = [self%numwannbands,self%numwannbands,&
+            self%numbranches, self%gwann_distrib_chunk[1], self%nwsk], &
+            order = [1, 2, 3, 5, 4])
+    end if
+    
     if(this_image() == 1) print*, 'New shape of gwann = ', shape(gwann)
   end subroutine reshape_gwann_for_gkRp
 end module wannier_module

@@ -480,7 +480,12 @@ contains
   
   subroutine calculate_gkRp(wann, el, num)
     !! Parallel driver of gkRp over IBZ electron wave vectors.
-
+    !
+    ! Captain's log. June 1, 2023. This procedure lives bit dangerously.
+    ! For the sake of efficiency, it reshapes wann%gwann. It does, however,
+    ! put that tensor back to its original shape. Is there a way to put a
+    ! lock on the use of gwann while this procedure is running?
+    
     type(wannier), intent(in) :: wann
     type(electron), intent(in) :: el
     type(numerics), intent(in) :: num
@@ -507,7 +512,10 @@ contains
           call wann%gkRp(num, ik, el%wavevecs_irred(ik, :))
        end do
     end if
+    sync all
 
+    !Put gwann back to original shape
+    call wann%reshape_gwann_for_gkRp(revert = .true.)
     sync all
   end subroutine calculate_gkRp
 

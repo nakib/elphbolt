@@ -794,7 +794,7 @@ contains
          num_ws_cells(3), counter, deg, ir
     real(r64) :: distance, weight, r_ws(3), t(3)
 
-    call subtitle("Precomputing q-independent quantities related to dynamical matrix...")
+    call print_message("Precomputing q-independent quantities related to dynamical matrix...")
     
     num_ws_cells(:) = 4*self%scell(:) + 1
     

@@ -144,7 +144,7 @@ program elphbolt
      if(num%onlyphbte .and. num%phe .or. num%drag) then
         if(.not. num%read_gq2) then
            call t_event%start_timer('IBZ q e-ph interactions')
-           
+
            !Calculate mixed Bloch-Wannier space e-ph vertex g(Re,q)
            call calculate_gReq(wann, ph, num)
            
