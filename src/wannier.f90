@@ -1196,7 +1196,9 @@ contains
        close(1)
     end if
 
+    sync all !This is essential for shape consistency of gwann above
     call self%reshape_gwann_for_gkRp(revert = .true.)
+
     sync all
   end subroutine plot_along_path
 
