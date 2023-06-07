@@ -372,7 +372,7 @@ contains
        allocate(widc(product(el%wvmesh),6), idc(product(el%wvmesh),9), &
                 ksint(product(el%wvmesh),3))
        do ik = 1, size(ksint,1)
-           call demux_vector(ik, ksint(ik,:), el%wvmesh, 0_k8)
+           call demux_vector(ik, ksint(ik,:), el%wvmesh, 0_i64)
        end do
        call precompute_interpolation_corners_and_weights(ph%wvmesh,  &
                                    el%mesh_ref_array, ksint, idc, widc)

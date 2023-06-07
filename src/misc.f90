@@ -785,7 +785,7 @@ contains
     real(r64),    allocatable :: weights_reduce(:,:)[:]
 
     integer(i64) :: iq, r0(3), r1(3), q(3), ipol, mode, chunk, num_active_images, count
-    integer(i64) :: i000, i100, i010, i110, i001, i101, i011, i111, equalpol, nq
+    integer(i64) :: equalpol, nq
     real(r64) :: x0, x1, y0, y1, z0, z1, x, y, z, v(2), v0(2), v1(2)
 
 
@@ -940,12 +940,12 @@ contains
     !! f The coarse mesh function to be interpolated.
     !! interpolation The result
 
-    integer(k8), intent(in) :: idc(:)
-    real(dp), intent(in) :: widc(:), f(:,:)
-    real(dp), intent(out) :: interpolation(:)
+    integer(i64), intent(in) :: idc(:)
+    real(r64), intent(in) :: widc(:), f(:,:)
+    real(r64), intent(out) :: interpolation(:)
 
 
-    real(dp) :: c00(size(f,2)), c01(size(f,2)), c10(size(f,2)), &
+    real(r64) :: c00(size(f,2)), c01(size(f,2)), c10(size(f,2)), &
                 c11(size(f,2)), c0(size(f,2)), c1(size(f,2))
 
     select case(idc(1))
@@ -969,7 +969,7 @@ contains
       interpolation = f(idc(2),:)
     case default
       call exit_with_message("Can't find point to interpolate on. Exiting.")
-    end case
+    end select
 
   end subroutine interpolate_using_precomputed
 
