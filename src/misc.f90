@@ -767,6 +767,213 @@ contains
     expm1 = exp(x + 0.0_r128) - 1.0_r128
   end function expm1
 
+  subroutine precompute_interpolation_corners_and_weights(coarsemesh, refinement, qs, idcorners, weights)
+    !! Subroutine to get corners and weights to perform BZ interpolation, using tri/bi/linear interpolator.
+    !!
+    !! coarsemesh The coarse mesh.
+    !! refinement The mesh refinement factor.
+    !! qs list of q points in the refined mesh given in integer indices along each reciprocal axis
+    !! idc corners in the coarse mesh for the refined mesh.
+    !! widc weights of the corners for interpolation of values in corse mesh to the refined one.
+
+    integer(i64), intent(in) :: coarsemesh(3), refinement(3), qs(:,:)
+    integer(i64), intent(inout)   :: idcorners(size(qs,1),9)
+    real(r64) :: weights(size(qs,1),6)
+
+    integer(i64), allocatable :: start[:], end[:]
+    integer(i64), allocatable :: idcorners_reduce(:,:)[:]
+    real(r64),    allocatable :: weights_reduce(:,:)[:]
+
+    integer(i64) :: iq, r0(3), r1(3), q(3), ipol, mode, chunk, num_active_images, count
+    integer(i64) :: i000, i100, i010, i110, i001, i101, i011, i111, equalpol, nq
+    real(r64) :: x0, x1, y0, y1, z0, z1, x, y, z, v(2), v0(2), v1(2)
+
+
+    allocate(start[*], end[*])
+    allocate(idcorners_reduce(size(qs,1),9)[*])
+    allocate(weights_reduce(size(qs,1),6)[*])
+
+    idcorners_reduce(:,:) = 0_i64
+    weights_reduce(:,:) = 0.0_r64
+
+    nq = size(qs,1)
+
+    !Divide electron points among images
+    call distribute_points(nq, chunk, start, end, num_active_images)
+
+    idcorners_reduce(:,:) = 0_i64
+    weights_reduce(:,:) = 0.0_r64
+
+
+    do iq = start, end
+       !compute q for each ik
+       q = qs(iq,:)
+
+       !Find on the coarse mesh the two diagonals.
+       r0 = modulo(floor(q/dble(refinement)), coarsemesh)
+       r1 = modulo(ceiling(q/dble(refinement)), coarsemesh)
+
+       mode = 0
+       do ipol = 1, 3
+          if(r1(ipol) == r0(ipol)) then
+             mode = mode + 1
+          end if
+       end do !ipol
+
+       idcorners_reduce(iq,1) = mode
+
+       !mode = 0: 3d interpolation
+       !mode = 1: 2d interpolation
+       !mode = 2: 1d interpolation
+       !mode = 3: no interpolation needed
+       select case(mode)
+       case(0) !3d
+
+          !Fine mesh point
+          x =  q(1)/dble(refinement(1)*coarsemesh(1))
+          y =  q(2)/dble(refinement(2)*coarsemesh(2))
+          z =  q(3)/dble(refinement(3)*coarsemesh(3))
+
+          !Coarse mesh walls
+          x0 = floor(q(1)/dble(refinement(1)))/dble(coarsemesh(1))
+          y0 = floor(q(2)/dble(refinement(2)))/dble(coarsemesh(2))
+          z0 = floor(q(3)/dble(refinement(3)))/dble(coarsemesh(3))
+          x1 = ceiling(q(1)/dble(refinement(1)))/dble(coarsemesh(1))
+          y1 = ceiling(q(2)/dble(refinement(2)))/dble(coarsemesh(2))
+          z1 = ceiling(q(3)/dble(refinement(3)))/dble(coarsemesh(3))
+
+          !Coarse mesh corners
+          idcorners_reduce(iq,2)  = (r0(3)*coarsemesh(2)+r0(2))*coarsemesh(1)+r0(1)+1
+          idcorners_reduce(iq,3)  = (r0(3)*coarsemesh(2)+r0(2))*coarsemesh(1)+r1(1)+1
+          idcorners_reduce(iq,4)  = (r0(3)*coarsemesh(2)+r1(2))*coarsemesh(1)+r0(1)+1
+          idcorners_reduce(iq,5)  = (r0(3)*coarsemesh(2)+r1(2))*coarsemesh(1)+r1(1)+1
+          idcorners_reduce(iq,6)  = (r1(3)*coarsemesh(2)+r0(2))*coarsemesh(1)+r0(1)+1
+          idcorners_reduce(iq,7)  = (r1(3)*coarsemesh(2)+r0(2))*coarsemesh(1)+r1(1)+1
+          idcorners_reduce(iq,8)  = (r1(3)*coarsemesh(2)+r1(2))*coarsemesh(1)+r0(1)+1
+          idcorners_reduce(iq,9)  = (r1(3)*coarsemesh(2)+r1(2))*coarsemesh(1)+r1(1)+1
+
+          !Get the weight of each point
+          weights_reduce(iq,1) = (x-x0)/(x1-x0)
+          weights_reduce(iq,2) = (y-y0)/(y1-y0)
+          weights_reduce(iq,3) = (z-z0)/(z1-z0)
+          weights_reduce(iq,4) = 1.0_r64 - weights_reduce(iq,1)
+          weights_reduce(iq,5) = 1.0_r64 - weights_reduce(iq,2)
+          weights_reduce(iq,6) = 1.0_r64 - weights_reduce(iq,3)
+
+       case(1) !2d
+
+          count = 1
+          do ipol = 1, 3
+             if(r1(ipol) .eq. r0(ipol)) then
+                equalpol = ipol
+             else
+             v(count) = q(ipol)/dble(refinement(ipol)*coarsemesh(ipol))
+                v0(count) = floor(q(ipol)/dble(refinement(ipol)))/dble(coarsemesh(ipol))
+                v1(count) = ceiling(q(ipol)/dble(refinement(ipol)))/dble(coarsemesh(ipol))
+                count = count+1
+             end if
+          end do
+
+          idcorners_reduce(iq,2) = (r0(3)*coarsemesh(2)+r0(2))*coarsemesh(1)+r0(1)+1
+          if(equalpol .eq. 1) then !1st 2 subindices of i are y,z
+             idcorners_reduce(iq,3) = (r1(3)*coarsemesh(2)+r0(2))*coarsemesh(1)+r0(1)+1
+             idcorners_reduce(iq,4) = (r0(3)*coarsemesh(2)+r1(2))*coarsemesh(1)+r0(1)+1
+             idcorners_reduce(iq,5) = (r1(3)*coarsemesh(2)+r1(2))*coarsemesh(1)+r0(1)+1
+          else if(equalpol .eq. 2) then !x,z
+             idcorners_reduce(iq,3) = (r1(3)*coarsemesh(2)+r0(2))*coarsemesh(1)+r0(1)+1
+             idcorners_reduce(iq,4) = (r0(3)*coarsemesh(2)+r0(2))*coarsemesh(1)+r1(1)+1
+             idcorners_reduce(iq,5) = (r1(3)*coarsemesh(2)+r0(2))*coarsemesh(1)+r1(1)+1
+          else !x,y
+             idcorners_reduce(iq,3) = (r0(3)*coarsemesh(2)+r1(2))*coarsemesh(1)+r0(1)+1
+             idcorners_reduce(iq,4) = (r0(3)*coarsemesh(2)+r0(2))*coarsemesh(1)+r1(1)+1
+             idcorners_reduce(iq,5) = (r0(3)*coarsemesh(2)+r1(2))*coarsemesh(1)+r1(1)+1
+          end if
+
+          weights_reduce(iq,1) = (v(1)-v0(1))/(v1(1)-v0(1))
+          weights_reduce(iq,2) = (v(2)-v0(2))/(v1(2)-v0(2))
+          weights_reduce(iq,3) = 1.0_r64 - weights_reduce(iq,1)
+          weights_reduce(iq,4) = 1.0_r64 - weights_reduce(iq,2)
+
+       case(2) !1d
+
+          do ipol = 1, 3
+             if(r1(ipol) /= r0(ipol)) then
+                x =  q(ipol)/dble(refinement(ipol)*coarsemesh(ipol))
+                x0 = floor(q(ipol)/dble(refinement(ipol)))/dble(coarsemesh(ipol))
+                x1 = ceiling(q(ipol)/dble(refinement(ipol)))/dble(coarsemesh(ipol))
+                idcorners_reduce(iq,2) = (r0(3)*coarsemesh(2)+r0(2))*coarsemesh(1)+r0(1)+1
+                if(ipol .eq. 1) then
+                   idcorners_reduce(iq,3) = (r0(3)*coarsemesh(2)+r0(2))*coarsemesh(1)+r1(1)+1
+                else if(ipol .eq. 2) then
+                   idcorners_reduce(iq,3) = (r0(3)*coarsemesh(2)+r1(2))*coarsemesh(1)+r0(1)+1
+                else
+                   idcorners_reduce(iq,3) = (r1(3)*coarsemesh(2)+r0(2))*coarsemesh(1)+r0(1)+1
+                end if
+                weights_reduce(iq,1) = (x-x0)/(x1-x0)
+                weights_reduce(iq,2) = 1.0_r64 - weights_reduce(iq,1)
+             end if
+          end do !ipol
+
+       case(3) !no interpolation needed
+          idcorners_reduce(iq,2) = (r0(3)*coarsemesh(2)+r0(2))*coarsemesh(1)+r0(1)+1
+       case default
+          call exit_with_message("Can't find point to interpolate on. Exiting.")
+       end select
+
+   end do !iq
+
+   !Reduce from all images
+   call co_sum(weights_reduce)
+   call co_sum(idcorners_reduce)
+   weights   = weights_reduce
+   idcorners = idcorners_reduce
+
+  end subroutine precompute_interpolation_corners_and_weights
+
+  subroutine interpolate_using_precomputed(idc, widc, f, interpolation)
+    !! Subroutine to perform BZ interpolation using precomputed weights and corners using
+    !! tri/bi/linear algorithm. We avoid the lapack calls as it require to perform
+    !! more operations
+    !!
+    !! idc corners in the coarse mesh for the refined mesh.
+    !! widc weights of the corners for interpolation of values in corse mesh to the refined one.
+    !! f The coarse mesh function to be interpolated.
+    !! interpolation The result
+
+    integer(k8), intent(in) :: idc(:)
+    real(dp), intent(in) :: widc(:), f(:,:)
+    real(dp), intent(out) :: interpolation(:)
+
+
+    real(dp) :: c00(size(f,2)), c01(size(f,2)), c10(size(f,2)), &
+                c11(size(f,2)), c0(size(f,2)), c1(size(f,2))
+
+    select case(idc(1))
+    case (0) !3d
+      !First we interpolate along first axis, then second, to finish with last one
+      c00 = f(idc(2),:) * widc(4) + f(idc(3),:) * widc(1)
+      c10 = f(idc(4),:) * widc(4) + f(idc(5),:) * widc(1)
+      c01 = f(idc(6),:) * widc(4) + f(idc(7),:) * widc(1)
+      c11 = f(idc(8),:) * widc(4) + f(idc(9),:) * widc(1)
+      c0  = c00 * widc(5) + c10 * widc(2)
+      c1  = c01 * widc(5) + c11 * widc(2)
+      interpolation = c0 * widc(6) + c1 * widc(3)
+    case (1) !2d
+      !First we interpolate along first axis, then second
+      c0 = f(idc(2),:) * widc(3) + f(idc(4),:) * widc(1)
+      c1 = f(idc(3),:) * widc(3) + f(idc(5),:) * widc(1)
+      interpolation = c0 * widc(4) + c1 * widc(2)
+    case (2) !1d
+      interpolation = f(idc(2),:) * widc(2) + f(idc(3),:) * widc(1)
+    case (3)!no iterpolation
+      interpolation = f(idc(2),:)
+    case default
+      call exit_with_message("Can't find point to interpolate on. Exiting.")
+    end case
+
+  end subroutine interpolate_using_precomputed
+
+
   subroutine interpolate(coarsemesh, refinement, f, q, interpolation)
     !! Subroutine to perform BZ interpolation.
     !!
