@@ -145,13 +145,15 @@ contains
     type(numerics), intent(in) :: num
     
     !Local variables
-    integer(i64) :: iuc, ib, jb, image
+    integer(i64) :: iuc, iuc_el, iuc_ph, ib, jb, image
     integer(i64) :: ignore_i
     real(r64) :: ignore_3r(3)
     complex(r64), allocatable :: gwann_aux(:, :, :, :, :)
+    integer(i64), allocatable :: rcells_g_aux(:, :)
+    integer(i64), allocatable :: gwsdeg_aux(:)
     
     ! EXCITING File names:
-    character(len=*), parameter :: filename_gwann = "ephgrr.bin"
+    character(len=*), parameter :: filename_gwann = "eph_grr.bin"
     character(len=*), parameter :: filename_elcells = "eph_el_rvec.dat"
     character(len=*), parameter :: filename_phcells = "eph_ph_rvec.dat"
     character(len=*), parameter :: filename_Hwann = "eph_hr.dat"
@@ -163,13 +165,16 @@ contains
     open(1,file=filename_Hwann,status='old')
     read(1, *) !header
     read(1, *) self%numwannbands, self%numwannbands, self%nwsk
-
-    allocate(self%Hwann(self%nwsk,self%numwannbands,self%numwannbands))
+    
+    allocate(self%Hwann(self%nwsk, self%numwannbands, self%numwannbands))
+    read(1, *) !header
     do iuc = 1,self%nwsk !Number of real space electron cells
        do ib = 1,self%numwannbands
-          read (1, *) self%Hwann(iuc, ib, :)
+          read(1, '(1000000(2g24.16,6x))') self%Hwann(iuc, :, ib)
        end do
+       read(1, *) !blank line
     end do
+    self%Hwann = 2.0_r64*self%Hwann !Hartree to Rydberg
 
     close(1)
 
@@ -181,14 +186,21 @@ contains
     read(1, *) self%numbranches, self%numbranches, self%nwsq
 
     allocate(self%Dphwann(self%nwsq, self%numbranches, self%numbranches))
+    read(1, *) !header
     do iuc = 1,self%nwsq !Number of real space phonon cells
        do ib = 1,self%numbranches
-          read (1, *) self%Dphwann(iuc, ib, :)
+          read(1, '(1000000(2g24.16,6x))') self%Dphwann(iuc, :, ib)
        end do
+       read(1, *) !blank line
     end do
+    self%Dphwann = 2.0_r64*self%Dphwann !Hartree to Rydberg
 
     close(1)
 
+    !Set number of cells for g. Unlike in EPW, in exciting this is the
+    !same as the number of R-vectors for phonons.
+    self%nwsg = self%nwsq
+    
     !Divide wave vectors among images
     allocate(self%gwann_distrib_start[*], self%gwann_distrib_end[*], self%gwann_distrib_chunk[*])
     call distribute_points(self%nwsg, self%gwann_distrib_chunk, self%gwann_distrib_start, &
@@ -200,7 +212,7 @@ contains
        allocate(gwann(self%numwannbands, self%numwannbands, self%nwsk,&
             self%numbranches, self%gwann_distrib_chunk[1])[*])
        gwann = 0.0_r64
-
+       
        !Below, image 1 will read Wannierized g(Re,Rp) and distribute to all images.
        if(this_image() == 1) then
           call print_message("Reading Wannier rep. e-ph vertex and distributing...")
@@ -210,33 +222,29 @@ contains
           !Note the dimensions of the tensor. This matches the output of exciting.
           allocate(gwann_aux(self%numwannbands, self%numwannbands, self%numbranches,&
                self%nwsk, self%gwann_distrib_chunk[1])) !chunk for the 1st image is the largest
-
+          gwann_aux = 0.0_r64
+          
           do image = 1, self%gwann_distrib_num_active_images
              read(1) gwann_aux(:, :, :, :, 1:self%gwann_distrib_chunk[image])
-
+             
              !Conform to the standard shape
              gwann(:,:,:,:,:)[image] = reshape(gwann_aux, &
                   shape = [self%numwannbands,self%numwannbands, &
-                  self%numbranches, self%nwsk, self%gwann_distrib_chunk[1]], &
+                  self%nwsk, self%numbranches, self%gwann_distrib_chunk[1]], &
                   order = [1, 2, 4, 3, 5])
           end do
           
           close(1)
        end if
-
+       sync all
+       
+       !From mass_amu**0.5xenergy_Hartree**1.5 to mass_Rydberg**0.5xenergy_Rydberg**1.5 
+       gwann = gwann*2.0_r64
+       
        sync all
 
        if(this_image() == 1) deallocate(gwann_aux)
     end if
-    
-    
-!!$    !Exciting format
-!!$    write( un, '("# direct lattice vectors (in rows)")' )
-!!$    write( un, '(3'//fmt//')' ) this%avec
-!!$    write( un, '("# real space lattice vectors (lattice / Cartesian coordinates) and multiplicity")' )
-!!$    do ir = 1, this%nr
-!!$       write( un, '(i6,6x,3i6,6x,3'//fmt//',6x,i6)' ) ir, this%vrl(:, ir), this%vrc(:, ir), this%rmul(ir)
-!!$    end do
 
     !Read cell maps of q, k, g meshes.
     call print_message("Reading Wannier cells and multiplicities...")
@@ -244,6 +252,9 @@ contains
     allocate(self%rcells_k(self%nwsk, 3))
     allocate(self%elwsdeg(self%nwsk))
     open(1, file = filename_elcells, status = "old")
+    do ignore_i = 1, 5
+       read(1, *) !headers and lattice vectors
+    end do
     do iuc = 1,self%nwsk
        read(1, *) ignore_i, self%rcells_k(iuc, :), ignore_3r(:), self%elwsdeg(iuc)
     end do
@@ -252,6 +263,9 @@ contains
     allocate(self%rcells_q(self%nwsq, 3))
     allocate(self%phwsdeg(self%nwsq))
     open(1, file = filename_phcells, status = "old")
+    do ignore_i = 1, 5
+       read(1, *) !headers and lattice vectors
+    end do
     do iuc = 1,self%nwsq
        read(1, *) ignore_i, self%rcells_q(iuc, :), ignore_3r(:), self%phwsdeg(iuc)
     end do
@@ -268,7 +282,7 @@ contains
           end do
        end do
     end if
-
+    
     sync all
   end subroutine read_exciting_Wannier
     
@@ -345,21 +359,17 @@ contains
 
           allocate(gwann_aux(self%numwannbands,self%numwannbands,self%nwsk,&
                self%numbranches,self%gwann_distrib_chunk[1])) !chunk for the 1st image is the largest
+          gwann_aux = 0.0_r64
           
           do image = 1, self%gwann_distrib_num_active_images
-!!$             print*, 'image, num_active_images ', image, self%gwann_distrib_num_active_images
-!!$             print*, 'start, end, chunk ', self%gwann_distrib_start[image], &
-!!$                  self%gwann_distrib_end[image], self%gwann_distrib_chunk[image]
-             
              read(1) gwann_aux(:, :, :, :, 1:self%gwann_distrib_chunk[image])
-!!$             print*, image, ' setting gwann'
+             
              gwann(:,:,:,:,:)[image] = gwann_aux(:,:,:,:,:)
-!!$             print*, image, ' done setting gwann'
           end do
 
           close(1)
        end if
-
+       
        sync all
 
        if(this_image() == 1) deallocate(gwann_aux)
@@ -391,6 +401,7 @@ contains
 
     allocate(self%rcells_g(self%gwann_distrib_chunk[1], 3)[*])
     allocate(self%gwsdeg(self%gwann_distrib_chunk[1])[*])
+    self%gwsdeg = 0
     
     if(this_image() == 1) then
        allocate(rcells_g_aux(self%gwann_distrib_chunk[1], 3)) !chunk for the 1st image is the largest 
@@ -904,8 +915,6 @@ contains
        image_order(i + 1) = modulo(i + this_image() - 1, self%gwann_distrib_num_active_images) + 1
     end do
 
-!!$    print*, this_image(), image_order
-
     do iuc = 1,self%nwsk
        caux = phase(iuc)
        
@@ -961,8 +970,6 @@ contains
     do i = 0, self%gwann_distrib_num_active_images - 1
        image_order(i + 1) = modulo(i + this_image() - 1, self%gwann_distrib_num_active_images) + 1
     end do
-    
-!!$    print*, this_image(), image_order
     
     do i = 1, self%gwann_distrib_num_active_images
        image = image_order(i)
@@ -1214,7 +1221,7 @@ contains
     logical, optional, intent(in) :: revert
 
     if(this_image() == 1) print*, 'Current shape of gwann = ', shape(gwann)
-
+    
     if(present(revert) .and. revert) then
        !Do the old switcheroo between dimensions 4 and 5.
        gwann = reshape(gwann, &
