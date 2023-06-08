@@ -20,10 +20,11 @@ module bte_module
 
   use params, only: r64, i64, qe, kB
   use misc, only: print_message, exit_with_message, write2file_rank2_real, &
-       distribute_points, demux_state, binsearch, interpolate, demux_vector, &
+       distribute_points, demux_state, binsearch, interpolate, demux_vector, mux_vector, &
        trace, subtitle, append2file_transport_tensor, write2file_response, &
        linspace, readfile_response, write2file_spectral_tensor, subtitle, timer, &
-       twonorm, write2file_rank1_real
+       twonorm, write2file_rank1_real, precompute_interpolation_corners_and_weights, &
+       interpolate_using_precomputed
   use numerics_module, only: numerics
   use crystal_module, only: crystal
   use symmetry_module, only: symmetry
@@ -114,9 +115,10 @@ contains
     !Local variables
     character(len = 1024) :: tag, Tdir, tableheader
     integer(i64) :: iq, ik, it_ph, it_el, icart
+    integer(i64), allocatable :: idc(:,:) , ksint(:,:)
     real(r64), allocatable :: I_diff(:,:,:), I_drag(:,:,:), ph_kappa(:,:,:), ph_alphabyT(:,:,:), &
          el_sigma(:,:,:), el_sigmaS(:,:,:), el_alphabyT(:,:,:), el_kappa0(:,:,:), &
-         dummy(:,:,:), ph_drag_term_T(:,:,:), ph_drag_term_E(:,:,:)
+         dummy(:,:,:), ph_drag_term_T(:,:,:), ph_drag_term_E(:,:,:), widc(:,:)
     real(r64) :: ph_kappa_scalar, ph_kappa_scalar_old, el_sigma_scalar, el_sigma_scalar_old, &
          el_sigmaS_scalar, el_sigmaS_scalar_old, el_kappa0_scalar, el_kappa0_scalar_old, &
          ph_alphabyT_scalar, ph_alphabyT_scalar_old, el_alphabyT_scalar, el_alphabyT_scalar_old, &
@@ -366,6 +368,15 @@ contains
     
     if(num%drag) then !Coupled BTEs
        call t%start_timer('Coupled e-ph BTEs')
+       call print_message("Building interpolator space for phonon drag")
+       allocate(widc(product(el%wvmesh),6), idc(product(el%wvmesh),9), &
+                ksint(product(el%wvmesh),3))
+       do ik = 1, size(ksint,1)
+           call demux_vector(ik, ksint(ik,:), el%wvmesh, 0_i64)
+       end do
+       call precompute_interpolation_corners_and_weights(ph%wvmesh,  &
+                                   el%mesh_ref_array, ksint, idc, widc)
+       call print_message("Building interpolator space for phonon drag: DONE")
        
        tot_alphabyT_scalar = el_alphabyT_scalar + ph_alphabyT_scalar
        KO_dev = 100.0_r64*abs(&
@@ -432,9 +443,9 @@ contains
           ph_alphabyT = ph_alphabyT/crys%T
 
           !Calculate phonon drag term for the current phBTE iteration.
-          call calculate_phonon_drag(num, el, ph, sym, self%el_rta_rates_ibz, &
+          call calculate_phonon_drag(num, el, ph, idc, widc, sym, self%el_rta_rates_ibz, &
                self%ph_response_E, ph_drag_term_E)
-          call calculate_phonon_drag(num, el, ph, sym, self%el_rta_rates_ibz, &
+          call calculate_phonon_drag(num, el, ph, idc, widc, sym, self%el_rta_rates_ibz, &
                self%ph_response_T, ph_drag_term_T)
           
           !Iterate electron response all the way
@@ -548,6 +559,7 @@ contains
 
        !Don't need these anymore
        deallocate(I_drag, I_diff, ph_drag_term_T, ph_drag_term_E)
+       deallocate(widc, idc, ksint)
 
        call t%end_timer('Coupled e-ph BTEs')
     end if !drag
@@ -1128,28 +1140,33 @@ contains
     end do
   end subroutine iterate_bte_el
 
-  subroutine calculate_phonon_drag(num, el, ph, sym, rta_rates_ibz, response_ph, ph_drag_term)
+  subroutine calculate_phonon_drag(num, el, ph, idc, widc, sym, rta_rates_ibz, response_ph, &
+                                   ph_drag_term)
     !! Subroutine to calculate the phonon drag term.
     !! 
     !! num Numerics object
     !! el Electron object
     !! ph Phonon object
+    !! idc corners in the coarse mesh for the refined mesh.
+    !! widc weights of the corners for interpolation of values in corse mesh to the refined one
     !! sym Symmetry
     !! rta_rates_ibz Electron RTA scattering rates
     !! response_ph Phonon response function
     !! ph_drag_term Phonon drag term
 
+
     type(electron), intent(in) :: el
     type(phonon), intent(in) :: ph
     type(numerics), intent(in) :: num
     type(symmetry), intent(in) :: sym
-    real(r64), intent(in) :: rta_rates_ibz(:,:), response_ph(:,:,:)
+    integer(i64), intent(in) :: idc(:,:)
+    real(r64), intent(in) :: rta_rates_ibz(:,:), response_ph(:,:,:), widc(:,:)
     real(r64), intent(out) :: ph_drag_term(:,:,:)
 
     !Local variables
     integer(i64) :: nstates_irred, nprocs, chunk, istate, numbands, numbranches, &
          ik_ibz, m, ieq, ik_sym, ik_fbz, iproc, iq, s, nk, num_active_images, &
-         ipol, fineq_indvec(3), start, end
+         ipol, fineq_indvec(3), start, end, iq2inter
     integer(i64), allocatable :: istate_el(:), istate_ph(:)
     real(r64) :: tau_ibz, ForG(3)
     real(r64), allocatable :: Xplus(:), Xminus(:), ph_drag_term_reduce(:,:,:)
@@ -1228,11 +1245,11 @@ contains
                    fineq_indvec = modulo( &
                         nint(matmul(sym%qrotations(:, :, ik_sym), fineq_indvec)), el%wvmesh)
 
-                   !Interpolate response function on this wave vector
-                   do ipol = 1, 3
-                      call interpolate(ph%wvmesh, el%mesh_ref_array, response_ph(:, s, ipol), &
-                           fineq_indvec, ForG(ipol))
-                   end do
+                   !Interpolate response function on this wave vector using precomputed tabulated weights
+                   !and points. I note that response_ph(:, s, :) is not contiguous in memory.
+                   iq2inter = mux_vector(fineq_indvec,el%wvmesh, 0_i64)
+                   call interpolate_using_precomputed(idc(iq2inter,:), widc(iq2inter,:),&
+                                                      response_ph(:, s, :), ForG(:))
                 else
                    !F(q) or G(q)
                    ForG(:) = response_ph(ph%equiv_map(ik_sym, iq), s, :)
