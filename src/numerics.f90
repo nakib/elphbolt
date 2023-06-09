@@ -95,6 +95,8 @@ module numerics_module
      !! Use electron-boundary scattering?
      logical :: drag
      !! Choose if the drag effect will be included.
+     logical :: use_Wannier_ifc2s
+     !! Choose if Wannier 2nd order ifcs will be used for usual phonon calculations.
      integer(i64) :: maxiter
      !! Maximum number of iterations in the BTE/Migdal-Eliashberg equations solver.
      real(r64) :: conv_thres
@@ -137,13 +139,13 @@ contains
     character(len = 1024) :: datadumpdir, tag
     logical :: read_gq2, read_gk2, read_V, read_W, tetrahedra, phe, phiso, phsubs, &
          phbound, phdef_Tmat, onlyphbte, onlyebte, elchimp, elbound, drag, plot_along_path, &
-         phthinfilm, phthinfilm_ballistic, fourph
+         phthinfilm, phthinfilm_ballistic, fourph, use_Wannier_ifc2s
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
          read_V, read_W, tetrahedra, phe, phiso, phsubs, onlyphbte, onlyebte, maxiter, &
          conv_thres, drag, elchimp, plot_along_path, runlevel, ph_en_min, ph_en_max, &
          ph_en_num, el_en_min, el_en_max, el_en_num, phbound, elbound, phdef_Tmat, &
-         ph_mfp_npts, phthinfilm, phthinfilm_ballistic, fourph, fourph_mesh_ref
+         ph_mfp_npts, phthinfilm, phthinfilm_ballistic, fourph, fourph_mesh_ref, use_Wannier_ifc2s
 
     call subtitle("Reading numerics information...")
     
@@ -174,6 +176,7 @@ contains
     elchimp = .false.
     elbound = .false.
     drag = .true.
+    use_Wannier_ifc2s = .false.
     plot_along_path = .false.
     maxiter = 50
     conv_thres = 1e-4_r64
@@ -224,6 +227,7 @@ contains
        self%elchimp = elchimp
        self%elbound = elbound
        self%drag = drag
+       self%use_Wannier_ifc2s = use_Wannier_ifc2s
     else
        self%mesh_ref = 1 !Enforce this for superconductivity mode
     end if
@@ -325,6 +329,7 @@ contains
        write(*, "(A, A)") "Data dump directory = ", trim(self%datadumpdir)
        write(*, "(A, A)") "T-dependent data dump directory = ", trim(self%datadumpdir_T)
        write(*, "(A, A)") "e-ph directory = ", trim(self%g2dir)
+       write(*, "(A, L)") "Use Wannier ifcs: ", self%use_Wannier_ifc2s
        if(self%runlevel /= 3) write(*, "(A, A)") "ph-ph directory = ", trim(self%Vdir)
        write(*, "(A, L)") "Reuse e-ph matrix elements: ", self%read_gk2
        if(self%runlevel /= 3) then

@@ -28,6 +28,7 @@ module phonon_module
   use symmetry_module, only: symmetry, find_irred_wedge, create_fbz2ibz_map
   use delta, only: form_tetrahedra_3d, fill_tetrahedra_3d, form_triangles, &
        fill_triangles
+  use wannier_module, only: wannier, dyn_nonanalytic_standalone
   
   implicit none
 
@@ -94,7 +95,8 @@ contains
     call read_ifc2(self, crys)
 
     !Precompute dynamical matrix related quantities
-    call phonon_espresso_precompute(self, crys)
+    if(.not. num%use_Wannier_ifc2s) &
+         call phonon_espresso_precompute(self, crys)
     
     !Calculate harmonic properties
     call calculate_phonons(self, crys, sym, num)
@@ -124,13 +126,14 @@ contains
     sync all
   end subroutine deallocate_phonon_quantities
   
-  subroutine calculate_phonons(self, crys, sym, num)
+  subroutine calculate_phonons(self, crys, sym, num, wann)
     !! Calculate phonon quantities on the FBZ and IBZ meshes.
 
     class(phonon), intent(inout) :: self
     type(crystal), intent(in) :: crys
     type(symmetry), intent(in) :: sym
     type(numerics), intent(in) :: num
+    type(wannier), optional, intent(in) :: wann
     
     !Local variables
     integer(i64) :: i, iq, ii, jj, kk, l, il, s, ib, im, chunk, &
@@ -172,8 +175,13 @@ contains
        allocate(evecs_chunk(chunk, self%numbands, self%numbands)[*])
 
        !Calculate FBZ phonon quantities
-       call phonon_espresso(self, crys, chunk, self%wavevecs(start:end, :), &
-            ens_chunk, evecs_chunk, vels_chunk)
+       if(num%use_Wannier_ifc2s) then
+!!$          call wann%ph_wann(crys, chunk, self%wavevecs(start:end, :), &
+!!$               ens_chunk, evecs_chunk, vels_chunk)
+       else
+          call phonon_espresso(self, crys, chunk, self%wavevecs(start:end, :), &
+               ens_chunk, evecs_chunk, vels_chunk)
+       end if
 
     end if
     !Gather the chunks from the images and broadcast to all
@@ -881,24 +889,22 @@ contains
     complex(r64), optional, intent(out) :: eigenvect(nq, self%numbands, self%numbands)
 
     ! QE's 2nd-order files are in Ryd units.
-    real(r64),parameter :: toTHz=20670.687_r64,&
-         massfactor=1.8218779_r64*6.022e-4_r64
+    real(r64), parameter :: toTHz = 20670.687_r64,&
+         massfactor = 1.8218779_r64*6.022e-4_r64
 
-    integer(i64) :: counter, ntype,nat,nbranches
-    integer(i64) :: i,j,ipol,jpol,iat,jat,idim,jdim,t1,t2,t3,m1,m2,m3,iq
-    integer(i64) :: ndim,nwork,ncell_g(3)
-    integer(i64),allocatable :: tipo(:)
-    real(r64) :: weight, total_weight, exp_g
+    integer(i64) :: counter, ntype, nat, nbranches
+    integer(i64) :: i, j, ipol, jpol, iat, jat, idim, jdim, t1, t2, t3, m1, m2, m3, iq
+    integer(i64) :: ndim, nwork, ncell_g(3)
+    real(r64) :: weight, total_weight
     real(r64) :: r_ws(3)
-    real(r64) :: alpha,geg,gmax,qt,gr,volume_r,dnrm2
-    real(r64) :: zig(3),zjg(3),dgeg(3),t(0:3),g(0:3),g_old(0:3)
-    real(r64), allocatable :: omega2(:),rwork(:)
-    real(r64),allocatable :: q(:,:),mass(:),eps(:,:)
-    real(r64),allocatable :: eival(:,:),vels(:,:,:),zeff(:,:,:)
-    complex(r64) :: auxi(3)
-    complex(r64),allocatable :: cauxiliar(:),eigenvectors(:,:),work(:)
-    complex(r64),allocatable :: dyn(:,:),dyn_s(:,:,:),dyn_g(:,:,:)
-    complex(r64),allocatable :: ddyn(:,:,:),ddyn_s(:,:,:,:),ddyn_g(:,:,:,:)
+    real(r64) :: alpha, geg, gmax, qt, volume_r, dnrm2
+    real(r64) :: t(0:3)
+    real(r64), allocatable :: omega2(:), rwork(:)
+    real(r64), allocatable :: q(:, :)
+    real(r64), allocatable :: vels(:, :, :)
+    complex(r64), allocatable :: eigenvectors(:, :), work(:)
+    complex(r64), allocatable :: dyn(:, :), dyn_s(:, :, :), dyn_full(:, :, :)
+    complex(r64), allocatable :: ddyn(:, :, :), ddyn_s(:, :, :, :), ddyn_full(:, :, :, :)
 
     !External procedures
     external :: zheev
@@ -917,30 +923,17 @@ contains
     allocate(omega2(nbranches))
     allocate(work(nwork))
     allocate(rwork(max(1, 9*nat - 2)))
-    allocate(q(nq,3))
-    allocate(mass(ntype))
-    allocate(tipo(nat))
-    allocate(eps(3, 3))
-    allocate(zeff(nat, 3, 3))    
+    allocate(q(nq, 3))
     allocate(dyn(ndim, ndim))
     allocate(dyn_s(nq, ndim, ndim))
-    allocate(dyn_g(nq, ndim, ndim))
-    allocate(eival(ndim, nq))
+    allocate(dyn_full(nq, ndim, ndim))
     allocate(eigenvectors(ndim, ndim))
-    allocate(cauxiliar(ndim))
     if(present(velocities)) then
        allocate(ddyn(ndim, ndim, 3))
        allocate(ddyn_s(nq, ndim, ndim, 3))
-       allocate(ddyn_g(nq, ndim, ndim, 3))
+       allocate(ddyn_full(nq, ndim, ndim, 3))
        allocate(vels(ndim, nq, 3))
     end if
-    
-    mass = crys%masses/massfactor
-    tipo = crys%atomtypes
-    eps = transpose(crys%epsilon)
-    do i = 1, nat
-       zeff(i, :, :) = transpose(crys%born(:, :, i))
-    end do
     
     ! Make sure operations are performed in consistent units.
     do iq = 1, nq
@@ -1006,86 +999,30 @@ contains
        end do
     end do
 
-    !The nonanalytic correction has two components in this approximation.
-    dyn_g = 0.0_r64
-    if(present(velocities)) ddyn_g = 0.0_r64
-    if(crys%polar) then
-       do m1=-ncell_g(1),ncell_g(1)
-          do m2=-ncell_g(2),ncell_g(2)
-             do m3=-ncell_g(3),ncell_g(3)
-                g(1:3)=m1*self%cell_g(1,1:3)+&
-                     m2*self%cell_g(2,1:3)+m3*self%cell_g(3,1:3)
-                geg=dot_product(g(1:3),matmul(eps,g(1:3)))
-                if(geg.gt.0.0_r64.and.geg/alpha/4.0_r64.lt.gmax) then
-                   exp_g=exp(-geg/alpha/4.0_r64)/geg
-                   do iat=1,nat
-                      zig(1:3)=matmul(g(1:3),zeff(iat,1:3,1:3))
-                      auxi(1:3)=0.
-                      do jat=1,nat
-                         gr=dot_product(g(1:3),self%rr(iat,jat,1:3))
-                         zjg(1:3)=matmul(g(1:3),zeff(jat,1:3,1:3))
-                         auxi(1:3)=auxi(1:3)+zjg(1:3)*expi(gr)
-                      end do
-                      do ipol=1,3
-                         idim=(iat-1)*3+ipol
-                         do jpol=1,3
-                            jdim=(iat-1)*3+jpol
-                            dyn_g(1:nq,idim,jdim)=dyn_g(1:nq,idim,jdim)-&
-                                 exp_g*zig(ipol)*auxi(jpol)
-                         end do
-                      end do
-                   end do
-                end if
-                g_old(0:3)=g(0:3)
-                !q-dependent block
-                do iq=1,nq
-                   g(1:3) = g_old(1:3) + q(iq, 1:3)
-                   geg=dot_product(g(1:3),matmul(eps,g(1:3)))
-                   if (geg.gt.0.0_r64.and.geg/alpha/4.0_r64.lt.gmax) then
-                      exp_g=exp(-geg/alpha/4.0_r64)/geg
-                      dgeg=matmul(eps+transpose(eps),g(1:3))
-                      do iat=1,nat
-                         zig(1:3)=matmul(g(1:3),zeff(iat,1:3,1:3))
-                         do jat=1,nat
-                            gr=dot_product(g(1:3),self%rr(iat,jat,1:3))
-                            zjg(1:3)=matmul(g(1:3),zeff(jat,1:3,1:3))
-                            do ipol=1,3
-                               idim=(iat-1)*3+ipol
-                               do jpol=1,3
-                                  jdim=(jat-1)*3+jpol
-                                  dyn_g(iq,idim,jdim)=dyn_g(iq,idim,jdim)+&
-                                       exp_g*zig(ipol)*zjg(jpol)*expi(gr)
-                                  if(present(velocities)) then
-                                     do i=1,3
-                                        ddyn_g(iq,idim,jdim,i)=ddyn_g(iq,idim,jdim,i)+&
-                                             exp_g*expi(gr)*&
-                                             (zjg(jpol)*zeff(iat,i,ipol)+zig(ipol)*zeff(jat,i,jpol)+&
-                                             zig(ipol)*zjg(jpol)*oneI*self%rr(iat,jat,i)-&
-                                             zig(ipol)*zjg(jpol)*(dgeg(i)/alpha/4.0+dgeg(i)/geg))
-                                     end do
-                                  end if
-                               end do
-                            end do
-                         end do
-                      end do
-                   end if
-                end do
-                !end of q-dependent block
-             end do
-          end do
-       end do
-       dyn_g = dyn_g*8.0_r64*pi/volume_r
-       if(present(velocities)) ddyn_g = ddyn_g*8.0_r64*pi/volume_r
-    end if
+    dyn_full = dyn_s
+    if(present(velocities)) ddyn_full = ddyn_s
     
+    !Add dipole correction to dynamical matrix
+    if(crys%polar) then
+       do iq = 1, nq
+          if(present(velocities)) then
+             call dyn_nonanalytic_standalone(crys, q(iq, :), ncell_g, &
+                  dyn_full(iq, :, :), ddyn_full(iq, :, :, :))
+          else
+             call dyn_nonanalytic_standalone(crys, q(iq, :), ncell_g, &
+                  dyn_full(iq, :, :))
+          end if
+       end do
+    end if
+
     ! Once the dynamical matrix has been built, the frequencies and
     ! group velocities are extracted exactly like in the previous
     ! subroutine.
     do iq = 1, nq
-       dyn(:,:) = dyn_s(iq,:,:) + dyn_g(iq,:,:)
-       if(present(velocities)) then
-          ddyn(:,:,:) = ddyn_s(iq,:,:,:) + ddyn_g(iq,:,:,:)
-       end if
+       dyn(:,:) = dyn_full(iq,:,:)
+       
+       if(present(velocities)) &
+            ddyn(:,:,:) = ddyn_full(iq, :, :, :)
 
        !Force Hermiticity
        do ipol = 1, nbranches

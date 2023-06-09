@@ -66,7 +66,7 @@ program elphbolt
   !Calculate crystal and BZ symmetries
   call sym%calculate_symmetries(crys, num%qmesh)
 
-  if(num%onlyebte .or. num%drag .or. num%phe &
+  if(num%use_Wannier_ifc2s .or. num%onlyebte .or. num%drag .or. num%phe &
        .or. num%plot_along_path .or. num%runlevel == 3) then
      !Read EPW Wannier data
      call wann%read(num)

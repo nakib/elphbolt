@@ -27,7 +27,7 @@ module wannier_module
   implicit none
 
   private
-  public Wannier
+  public Wannier, dyn_nonanalytic_standalone
 
   !Captain's log. April 18, 2023.
   !I have pulled this out of the epw_wannier data type
@@ -523,7 +523,7 @@ contains
     end do !ik
   end subroutine el_wann
   
-  subroutine ph_wann(self, crys, nq, qvecs, energies, evecs)  
+  subroutine ph_wann(self, crys, nq, qvecs, energies, evecs)!, velocities)  
     !! Wannier interpolate phonons on list of arb. q-vec
 
     class(wannier), intent(in) :: self
@@ -531,6 +531,7 @@ contains
     integer(i64), intent(in) :: nq
     real(r64), intent(in) :: qvecs(nq, 3) !Crystal coordinates
     real(r64), intent(out) :: energies(nq, self%numbranches)
+    !real(r64), optional, intent(out) :: velocities(nq, self%numbranches, 3)
     complex(r64), intent(out), optional :: evecs(nq, self%numbranches, self%numbranches)
 
     !Local variables
@@ -597,9 +598,23 @@ contains
           evecs(iq, :, :) = transpose(dynmat(:, :))
        end if
 
+!!$       if(present(velocities)) then
+!!$          !Calculate velocities using Feynman-Hellmann thm
+!!$          do ib = 1,self%numbranches
+!!$             do ipol = 1,3
+!!$                velocities(iq, ib, ipol)=real(dot_product(evecs(iq, ib,:), &
+!!$                     matmul(ddynmat(ipol, :, :), evecs(iq, ib, :))))
+!!$             end do
+!!$          end do
+!!$       end if
+
        !energies(iq, :) = energies(iq, :)*Rydberg2radTHz !2piTHz
        !energies(iq, :) = energies(iq, :)*Rydberg2eV*1.0e3_r64 !meV
        energies(iq, :) = energies(iq, :)*Ryd2eV !eV
+
+!!$       if(present(velocities)) then
+!!$          velocities(iq, :, :) = velocities(iq, :, :)*Ryd2radTHz !nmTHz = Km/s
+!!$       end if
        
        !Take care of gamma point.
        if(all(qvecs(iq,:) == 0)) then
@@ -711,6 +726,116 @@ contains
     end do
     dyn = dyn + dyn_l*fac
   end subroutine dyn_nonanalytic
+  
+  subroutine dyn_nonanalytic_standalone(crys, q, num_cells, dyn, ddyn)
+    !! Calculate the long-range correction to the
+    !! dynamical matrix and its derivative for a given phonon mode.
+    !!
+    !! q: the phonon wave vector in Cartesian coords., Bohr^-1
+    !! dyn: the dynamical matrix
+    !
+    ! This is adapted from ShengBTE's subroutine phonon_espresso.
+    ! ShengBTE is distributed under GPL v3 or later.
+
+    type(crystal), intent(in) :: crys
+    real(r64), intent(in) :: q(3) !Cartesian
+    integer(i64), intent(in) :: num_cells(3)
+    complex(r64), intent(inout) :: dyn(:, :)
+    complex(r64), optional, intent(inout) :: ddyn(:, :, :)
+
+    !Local variables
+    complex(r64) :: dyn_l(crys%numatoms*3, crys%numatoms*3), &
+         ddyn_l(crys%numatoms*3, crys%numatoms*3, 3), fnat(3)
+         
+    real(r64) :: qeq, arg, zig(3), zjg(3), g(3), gmax, alph, &
+         tpiba, dgeg(3), rr(crys%numatoms,crys%numatoms,3)
+    integer(i64) :: i, iat, jat, idim, jdim, ipol, jpol, &
+         m1, m2, m3, nq1, nq2, nq3
+    complex(r64) :: fac, facqd, facq
+    
+    tpiba = twopi/twonorm(crys%lattvecs(:,1))*bohr2nm
+
+    !Recall that the phonon supercell in elphbolt is the
+    !same as the EPW coarse phonon mesh.
+    nq1 = num_cells(1)
+    nq2 = num_cells(2)
+    nq3 = num_cells(3)
+
+    gmax= 14.0_r64 !dimensionless
+    alph= tpiba**2 !bohr^-2
+    !In Ry units, qe = sqrt(2.0)
+    fac = 8.0_r64*pi/(crys%volume/bohr2nm**3)
+
+    dyn_l = (0.0_r64, 0.0_r64)
+    if(present(ddyn)) ddyn_l = (0.0_r64, 0.0_r64)
+    do m1 = -nq1,nq1
+       do m2 = -nq2,nq2
+          do m3 = -nq3,nq3
+             g(:) = (m1*crys%reclattvecs(:,1)+m2*crys%reclattvecs(:,2)+m3*crys%reclattvecs(:,3))*bohr2nm
+             qeq = dot_product(g,matmul(crys%epsilon,g))
+
+             if (qeq > 0.0_r64 .and. qeq/alph/4.0_r64 < gmax ) then
+                facqd = exp(-qeq/alph/4.0_r64)/qeq
+
+                do iat = 1,crys%numatoms
+                   zig(:)=matmul(g,crys%born(:,:,iat))
+                   fnat(:)= (0.0_r64,0.0_r64)
+                   do jat = 1,crys%numatoms
+                      rr(iat,jat,:) = (crys%basis_cart(:,iat)-crys%basis_cart(:,jat))/bohr2nm
+                      arg = dot_product(g,rr(iat,jat,:))
+                      zjg(:) = matmul(g,crys%born(:,:,jat))
+                      fnat(:) = fnat(:) + zjg(:)*expi(arg)
+                   end do
+                   do ipol=1,3
+                      idim=(iat-1)*3+ipol
+                      do jpol=1,3
+                         jdim=(iat-1)*3+jpol
+                         dyn_l(idim,jdim) = dyn_l(idim,jdim) - &
+                              facqd*zig(ipol)*fnat(jpol)
+                      end do
+                   end do
+                end do
+             end if
+
+             g = g + q
+             qeq = dot_product(g,matmul(crys%epsilon,g))
+             if (qeq > 0.0_r64 .and. qeq/alph/4.0_r64 < gmax ) then
+                facqd = exp(-qeq/alph/4.0_r64)/qeq
+                dgeg=matmul(crys%epsilon+transpose(crys%epsilon),g)
+                do iat = 1,crys%numatoms
+                   zig(:)=matmul(g,crys%born(:,:,iat))                   
+                   do jat = 1,crys%numatoms
+                      rr(iat,jat,:) = (crys%basis_cart(:,iat)-crys%basis_cart(:,jat))/bohr2nm
+                      zjg(:)=matmul(g,crys%born(:,:,jat))
+                      arg = dot_product(g,rr(iat,jat,:))
+                      facq = facqd*expi(arg)
+                      do ipol=1,3
+                         idim=(iat-1)*3+ipol
+                         do jpol=1,3
+                            jdim=(jat-1)*3+jpol
+                            dyn_l(idim,jdim) = dyn_l(idim,jdim) + &
+                                 facq*zig(ipol)*zjg(jpol)
+
+                            if(present(ddyn)) then
+                               do i = 1, 3
+                                  ddyn_l(idim, jdim, i) = ddyn_l(idim, jdim, i) + &
+                                       facq*&
+                                       (zjg(jpol)*crys%born(i, ipol, iat) + zig(ipol)*crys%born(i, jpol, jat) + &
+                                       zig(ipol)*zjg(jpol)*oneI*rr(iat, jat, i) - &
+                                       zig(ipol)*zjg(jpol)*(dgeg(i)/alph/4.0 + dgeg(i)/qeq))
+                               end do
+                            end if
+                         end do
+                      end do
+                   end do
+                end do
+             end if
+          end do
+       end do
+    end do
+    dyn = dyn + dyn_l*fac
+    if(present(ddyn)) ddyn = ddyn + ddyn_l*fac
+  end subroutine dyn_nonanalytic_standalone
   
   real(r64) function g2(self, crys, kvec, qvec, el_evec_k, el_evec_kp, ph_evec_q, ph_en, &
        gmixed, wannspace)
