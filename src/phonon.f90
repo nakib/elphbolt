@@ -28,7 +28,7 @@ module phonon_module
   use symmetry_module, only: symmetry, find_irred_wedge, create_fbz2ibz_map
   use delta, only: form_tetrahedra_3d, fill_tetrahedra_3d, form_triangles, &
        fill_triangles
-  use wannier_module, only: wannier, dyn_nonanalytic_standalone
+  use wannier_module, only: Wannier, dyn_nonanalytic
   
   implicit none
 
@@ -73,7 +73,7 @@ module phonon_module
 
 contains
 
-  subroutine initialize(self, crys, sym, num)
+  subroutine initialize(self, crys, sym, num, wann)
     !! Initialize the phonon data type, calculate ground state phonon properties,
     !! and read 3rd order force constants data. 
 
@@ -81,6 +81,7 @@ contains
     type(crystal), intent(in) :: crys
     type(symmetry), intent(in) :: sym
     type(numerics), intent(in) :: num
+    type(wannier), intent(in), optional :: wann
 
     call subtitle("Setting up phonons...")
 
@@ -99,7 +100,7 @@ contains
          call phonon_espresso_precompute(self, crys)
     
     !Calculate harmonic properties
-    call calculate_phonons(self, crys, sym, num)
+    call calculate_phonons(self, crys, sym, num, wann)
 
     if(.not. num%onlyebte .and. num%runlevel /= 3) then
        !Read ifc3s and related quantities
@@ -133,7 +134,7 @@ contains
     type(crystal), intent(in) :: crys
     type(symmetry), intent(in) :: sym
     type(numerics), intent(in) :: num
-    type(wannier), optional, intent(in) :: wann
+    type(wannier), intent(in), optional :: wann
     
     !Local variables
     integer(i64) :: i, iq, ii, jj, kk, l, il, s, ib, im, chunk, &
@@ -176,8 +177,8 @@ contains
 
        !Calculate FBZ phonon quantities
        if(num%use_Wannier_ifc2s) then
-!!$          call wann%ph_wann(crys, chunk, self%wavevecs(start:end, :), &
-!!$               ens_chunk, evecs_chunk, vels_chunk)
+          call wann%ph_wann(crys, chunk, self%wavevecs(start:end, :), &
+               ens_chunk, evecs_chunk, vels_chunk)
        else
           call phonon_espresso(self, crys, chunk, self%wavevecs(start:end, :), &
                ens_chunk, evecs_chunk, vels_chunk)
@@ -889,8 +890,7 @@ contains
     complex(r64), optional, intent(out) :: eigenvect(nq, self%numbands, self%numbands)
 
     ! QE's 2nd-order files are in Ryd units.
-    real(r64), parameter :: toTHz = 20670.687_r64,&
-         massfactor = 1.8218779_r64*6.022e-4_r64
+    real(r64), parameter :: toTHz = 20670.687_r64
 
     integer(i64) :: counter, ntype, nat, nbranches
     integer(i64) :: i, j, ipol, jpol, iat, jat, idim, jdim, t1, t2, t3, m1, m2, m3, iq
@@ -1006,10 +1006,10 @@ contains
     if(crys%polar) then
        do iq = 1, nq
           if(present(velocities)) then
-             call dyn_nonanalytic_standalone(crys, q(iq, :), ncell_g, &
+             call dyn_nonanalytic(crys, q(iq, :), ncell_g, &
                   dyn_full(iq, :, :), ddyn_full(iq, :, :, :))
           else
-             call dyn_nonanalytic_standalone(crys, q(iq, :), ncell_g, &
+             call dyn_nonanalytic(crys, q(iq, :), ncell_g, &
                   dyn_full(iq, :, :))
           end if
        end do
@@ -1019,10 +1019,10 @@ contains
     ! group velocities are extracted exactly like in the previous
     ! subroutine.
     do iq = 1, nq
-       dyn(:,:) = dyn_full(iq,:,:)
+       dyn(:, :) = dyn_full(iq, :, :)
        
        if(present(velocities)) &
-            ddyn(:,:,:) = ddyn_full(iq, :, :, :)
+            ddyn(:, :, :) = ddyn_full(iq, :, :, :)
 
        !Force Hermiticity
        do ipol = 1, nbranches
