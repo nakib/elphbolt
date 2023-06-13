@@ -227,10 +227,10 @@ contains
        self%elchimp = elchimp
        self%elbound = elbound
        self%drag = drag
-       self%use_Wannier_ifc2s = use_Wannier_ifc2s
     else
        self%mesh_ref = 1 !Enforce this for superconductivity mode
     end if
+    self%use_Wannier_ifc2s = use_Wannier_ifc2s
     self%read_gk2 = read_gk2
     self%fsthick = fsthick
     self%datadumpdir = trim(datadumpdir)

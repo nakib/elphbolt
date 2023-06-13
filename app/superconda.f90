@@ -77,7 +77,11 @@ program superconda
   call t_event%start_timer('Phonons')
 
   !Calculate phonons
-  call ph%initialize(crys, sym, num)
+  if(num%use_Wannier_ifc2s) then
+     call ph%initialize(crys, sym, num, wann)
+  else
+     call ph%initialize(crys, sym, num)
+  end if
 
   call t_event%end_timer('Phonons')
 

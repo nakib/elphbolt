@@ -92,12 +92,13 @@ contains
     !Set number of phonon wave vectors
     self%nwv = product(self%wvmesh(:))
 
-    !Read ifc2 and related quantities
-    call read_ifc2(self, crys)
+    if(.not. num%use_Wannier_ifc2s) then
+       !Read ifc2 and related quantities
+       call read_ifc2(self, crys)
 
-    !Precompute dynamical matrix related quantities
-    if(.not. num%use_Wannier_ifc2s) &
-         call phonon_espresso_precompute(self, crys)
+       !Precompute dynamical matrix related quantities
+       call phonon_espresso_precompute(self, crys)
+    end if
     
     !Calculate harmonic properties
     call calculate_phonons(self, crys, sym, num, wann)
