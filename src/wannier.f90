@@ -535,14 +535,15 @@ contains
     complex(r64), intent(out), optional :: evecs(nq, self%numbranches, self%numbranches)
 
     !Local variables
-    integer(i64) :: iuc, ipol, ib, jb, iq, na, nb, nwork, aux
+    integer(i64) :: iuc, ipol, jpol, ib, jb, iq, na, nb, nwork, aux
     real(r64) :: rcart(3)
     complex(r64) :: caux
     real(r64), allocatable :: rwork(:)
     complex(r64), allocatable :: work(:)
     real(r64) :: omega2(self%numbranches), massnorm
-    complex(r64) :: dynmat(self%numbranches, self%numbranches)
-    complex(r64), allocatable :: ddynmat(:, :, :)
+    complex(r64) :: dynmat(self%numbranches, self%numbranches), &
+         dynmat_l(self%numbranches, self%numbranches)
+    complex(r64), allocatable :: ddynmat(:, :, :), ddynmat_l(:, :, :)
 
     !External procedures
     external :: zheev
@@ -555,7 +556,10 @@ contains
     allocate(work(nwork))
     allocate(rwork(max(1, 9*crys%numatoms-2)))
 
-    if(present(velocities)) allocate(ddynmat(self%numbranches, self%numbranches, 3))
+    if(present(velocities)) then
+       allocate(ddynmat(self%numbranches, self%numbranches, 3), &
+            ddynmat_l(self%numbranches, self%numbranches, 3))
+    end if
     
     do iq = 1, nq
        !Form dynamical matrix
@@ -569,6 +573,7 @@ contains
 
           if(present(velocities)) then
              rcart = matmul(crys%lattvecs, self%rcells_q(iuc, :))
+
              do ipol = 1, 3
                 ddynmat(:, :, ipol) = ddynmat(:, :, ipol) + &
                      oneI*rcart(ipol)*caux*self%Dphwann(iuc, :, :)
@@ -578,15 +583,21 @@ contains
        
        !Non-analytic correction
        if(crys%polar) then
-!!$          if(present(velocities)) then
-!!$             call dyn_nonanalytic(crys, matmul(crys%reclattvecs,qvecs(iq, :))*bohr2nm, &
-!!$                  self%coarse_qmesh, dynmat, ddynmat)
-!!$          else
-             call dyn_nonanalytic(crys, matmul(crys%reclattvecs, qvecs(iq, :))*bohr2nm, &
-                  self%coarse_qmesh, dynmat)
-!!$          end if
-       end if
+          if(present(velocities)) then
+             call dyn_nonanalytic(crys, matmul(crys%reclattvecs,qvecs(iq, :))*bohr2nm, &
+                  self%coarse_qmesh, dynmat_l, ddynmat_l)
 
+             !Add long range part to short range part.
+             !Recall that dyn_nonanalytic works returns in Bohr length units.
+             ddynmat = ddynmat + ddynmat_l*bohr2nm
+          else
+             call dyn_nonanalytic(crys, matmul(crys%reclattvecs, qvecs(iq, :))*bohr2nm, &
+                  self%coarse_qmesh, dynmat_l)
+          end if
+
+          dynmat = dynmat + dynmat_l
+       end if
+       
        !Force Hermiticity
        do ib = 1, self%numbranches
           do jb = ib + 1, self%numbranches
@@ -598,13 +609,15 @@ contains
        !Mass normalize
        do na = 1, crys%numatoms
           do nb = 1, crys%numatoms
-             massnorm = 1.d0/sqrt(crys%masses(crys%atomtypes(na))*&
+             massnorm = 1.0_r64/sqrt(crys%masses(crys%atomtypes(na))*&
                   crys%masses(crys%atomtypes(nb)))*Ryd2amu
-             dynmat(3*(na-1)+1:3*na, 3*(nb-1)+1:3*nb) = &
-                  dynmat(3*(na-1)+1:3*na, 3*(nb-1)+1:3*nb)*massnorm
+             
+             dynmat(3*(na - 1) + 1 : 3*na, 3*(nb - 1) + 1 : 3*nb) = &
+                  dynmat(3*(na - 1) + 1 : 3*na, 3*(nb - 1) + 1 : 3*nb)*massnorm
+
              if(present(velocities)) then
-                ddynmat(3*(na-1)+1:3*na, 3*(nb-1)+1:3*nb, 1:3) = &
-                     ddynmat(3*(na-1)+1:3*na, 3*(nb-1)+1:3*nb, 1:3)*massnorm
+                ddynmat(3*(na - 1) + 1 : 3*na, 3*(nb - 1) + 1 : 3*nb, 1:3) = &
+                     ddynmat(3*(na - 1) + 1 : 3*na, 3*(nb - 1) + 1 : 3*nb, 1:3)*massnorm
              end if
           end do
        end do
@@ -627,11 +640,12 @@ contains
 
        if(present(velocities)) then
           !Calculate velocities using Feynman-Hellmann thm
-          do ib = 1,self%numbranches
-             do ipol = 1,3
-                velocities(iq, ib, ipol)=real(dot_product(evecs(iq, ib, :), &
-                     matmul(ddynmat(:, :, ipol), evecs(iq, ib, :))))
+          do ib = 1, self%numbranches
+             do ipol = 1, 3
+                velocities(iq, ib, ipol) = real(dot_product(dynmat(:, ib), &
+                     matmul(ddynmat(:, :, ipol), dynmat(:, ib))))
              end do
+             
              velocities(iq, ib, :) = velocities(iq, ib, :)/(2.0_r64*energies(iq, ib))
           end do
        end if
@@ -652,21 +666,24 @@ contains
        
        !Handle negative energy phonons
        do ib = 1, self%numbranches
-          if(energies(iq,ib) < -0.005_r64) then
+          if(energies(iq, ib) < -0.005_r64) then
              call exit_with_message('Large negative phonon energy found! Stopping!')             
-          else if(energies(iq,ib) < 0 .and. energies(iq,ib) > -0.005_r64) then
-             energies(iq,ib) = 0.0_r64
+          else if(energies(iq, ib) < 0 .and. energies(iq, ib) > -0.005_r64) then
+             energies(iq, ib) = 0.0_r64
           end if
        end do
     end do !iq
   end subroutine ph_wann
   
-  subroutine dyn_nonanalytic(crys, q, num_cells, dyn, ddyn)
+  subroutine dyn_nonanalytic(crys, q, num_cells, dyn_l, ddyn_l)
     !! Calculate the long-range correction to the
     !! dynamical matrix and its derivative for a given phonon mode.
     !!
-    !! q: the phonon wave vector in Cartesian coords., Bohr^-1
-    !! dyn: the dynamical matrix
+    !! crys: crystal object
+    !! q: phonon wave vector in Cartesian coords., Bohr^-1
+    !! num_cells: dimensions of real space
+    !! dyn_l [output]: long-range part of dynamical matrix
+    !! ddyn_l [output]: long-range part of deriv. of dynamical matrix
     !
     ! This is adapted from ShengBTE's subroutine phonon_espresso.
     ! ShengBTE is distributed under GPL v3 or later.
@@ -674,18 +691,15 @@ contains
     type(crystal), intent(in) :: crys
     real(r64), intent(in) :: q(3) !Cartesian
     integer(i64), intent(in) :: num_cells(3)
-    complex(r64), intent(inout) :: dyn(:, :)
-    complex(r64), optional, intent(inout) :: ddyn(:, :, :)
+    complex(r64), intent(out) :: dyn_l(:, :)
+    complex(r64), optional, intent(out) :: ddyn_l(:, :, :)
 
     !Local variables
-    complex(r64) :: dyn_l(crys%numatoms*3, crys%numatoms*3), &
-         ddyn_l(crys%numatoms*3, crys%numatoms*3, 3), fnat(3)
-         
+    complex(r64) :: fnat(3),  facqd, facq
     real(r64) :: qeq, arg, zig(3), zjg(3), g(3), gmax, alph, &
-         tpiba, dgeg(3), rr(crys%numatoms,crys%numatoms,3)
-    integer(i64) :: i, iat, jat, idim, jdim, ipol, jpol, &
+         tpiba, dgeg(3), rr(crys%numatoms,crys%numatoms,3), fac
+    integer(i64) :: iat, jat, idim, jdim, ipol, jpol, &
          m1, m2, m3, nq1, nq2, nq3
-    complex(r64) :: fac, facqd, facq
     
     tpiba = twopi/twonorm(crys%lattvecs(:,1))*bohr2nm
 
@@ -701,32 +715,35 @@ contains
     fac = 8.0_r64*pi/(crys%volume/bohr2nm**3)
 
     dyn_l = (0.0_r64, 0.0_r64)
-    if(present(ddyn)) ddyn_l = (0.0_r64, 0.0_r64)
+    if(present(ddyn_l)) ddyn_l = (0.0_r64, 0.0_r64)
     do m1 = -nq1, nq1
        do m2 = -nq2, nq2
           do m3 = -nq3, nq3
              g(:) = (m1*crys%reclattvecs(:, 1) + &
                   m2*crys%reclattvecs(:, 2) + &
                   m3*crys%reclattvecs(:, 3))*bohr2nm
+             
              qeq = dot_product(g, matmul(crys%epsilon, g))
 
-             if (qeq > 0.0_r64 .and. qeq/alph/4.0_r64 < gmax ) then
+             if (qeq > 0.0_r64 .and. qeq/alph/4.0_r64 < gmax) then
                 facqd = exp(-qeq/alph/4.0_r64)/qeq
 
                 do iat = 1,crys%numatoms
-                   zig(:)=matmul(g,crys%born(:,:,iat))
-                   fnat(:)= (0.0_r64,0.0_r64)
+                   zig(:) = matmul(g, crys%born(:, :, iat))
+                   fnat(:)= (0.0_r64, 0.0_r64)
+
                    do jat = 1,crys%numatoms
-                      rr(iat,jat,:) = (crys%basis_cart(:,iat) - crys%basis_cart(:,jat))/bohr2nm
-                      arg = dot_product(g,rr(iat,jat,:))
-                      zjg(:) = matmul(g,crys%born(:,:,jat))
+                      rr(iat, jat, :) = (crys%basis_cart(:, iat) - crys%basis_cart(:, jat))/bohr2nm
+                      arg = dot_product(g, rr(iat, jat, :))
+                      zjg(:) = matmul(g, crys%born(:, :, jat))
                       fnat(:) = fnat(:) + zjg(:)*expi(arg)
                    end do
-                   do ipol=1,3
-                      idim=(iat-1)*3+ipol
-                      do jpol=1,3
-                         jdim=(iat-1)*3+jpol
-                         dyn_l(idim,jdim) = dyn_l(idim,jdim) - &
+
+                   do ipol = 1, 3
+                      idim = (iat - 1)*3 + ipol
+                      do jpol = 1, 3
+                         jdim = (iat - 1)*3 + jpol
+                         dyn_l(idim, jdim) = dyn_l(idim, jdim) - &
                               facqd*zig(ipol)*fnat(jpol)
                       end do
                    end do
@@ -735,16 +752,20 @@ contains
 
              g = g + q
              qeq = dot_product(g, matmul(crys%epsilon, g))
-             if (qeq > 0.0_r64 .and. qeq/alph/4.0_r64 < gmax ) then
+
+             if(qeq > 0.0_r64 .and. qeq/alph/4.0_r64 < gmax) then
                 facqd = exp(-qeq/alph/4.0_r64)/qeq
                 dgeg = matmul(crys%epsilon + transpose(crys%epsilon), g)
-                do iat = 1,crys%numatoms
-                   zig(:)=matmul(g, crys%born(:,:,iat))                   
+
+                do iat = 1, crys%numatoms
+                   zig(:) = matmul(g, crys%born(:, :, iat))
+
                    do jat = 1,crys%numatoms
                       rr(iat, jat,:) = (crys%basis_cart(:, iat) - crys%basis_cart(:, jat))/bohr2nm
                       zjg(:) = matmul(g, crys%born(:, :, jat))
                       arg = dot_product(g, rr(iat, jat, :))
                       facq = facqd*expi(arg)
+
                       do ipol = 1, 3
                          idim = (iat - 1)*3 + ipol
                          do jpol = 1, 3
@@ -752,14 +773,12 @@ contains
                             dyn_l(idim, jdim) = dyn_l(idim, jdim) + &
                                  facq*zig(ipol)*zjg(jpol)
 
-                            if(present(ddyn)) then
-                               do i = 1, 3
-                                  ddyn_l(idim, jdim, i) = ddyn_l(idim, jdim, i) + &
-                                       facq*&
-                                       (zjg(jpol)*crys%born(i, ipol, iat) + zig(ipol)*crys%born(i, jpol, jat) + &
-                                       zig(ipol)*zjg(jpol)*oneI*rr(iat, jat, i) - &
-                                       zig(ipol)*zjg(jpol)*(dgeg(i)/alph/4.0 + dgeg(i)/qeq))
-                               end do
+                            if(present(ddyn_l)) then
+                               ddyn_l(idim, jdim, :) = ddyn_l(idim, jdim, :) + &
+                                    facq*&
+                                    (zjg(jpol)*crys%born(:, ipol, iat) + zig(ipol)*crys%born(:, jpol, jat) + &
+                                    zig(ipol)*zjg(jpol)*(oneI*rr(iat, jat, :) - &
+                                    dgeg(:)*(0.25_r64/alph + 1.0_r64/qeq)))
                             end if
                          end do
                       end do
@@ -769,8 +788,9 @@ contains
           end do
        end do
     end do
-    dyn = dyn + dyn_l*fac
-    if(present(ddyn)) ddyn = ddyn + ddyn_l*fac
+
+    dyn_l = dyn_l*fac
+    if(present(ddyn_l)) ddyn_l = ddyn_l*fac
   end subroutine dyn_nonanalytic
   
   real(r64) function g2(self, crys, kvec, qvec, el_evec_k, el_evec_kp, ph_evec_q, ph_en, &

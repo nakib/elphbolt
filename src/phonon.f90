@@ -903,8 +903,8 @@ contains
     real(r64), allocatable :: q(:, :)
     real(r64), allocatable :: vels(:, :, :)
     complex(r64), allocatable :: eigenvectors(:, :), work(:)
-    complex(r64), allocatable :: dyn(:, :), dyn_s(:, :, :), dyn_full(:, :, :)
-    complex(r64), allocatable :: ddyn(:, :, :), ddyn_s(:, :, :, :), ddyn_full(:, :, :, :)
+    complex(r64), allocatable :: dyn(:, :), dyn_s(:, :, :), dyn_l(:, :, :)
+    complex(r64), allocatable :: ddyn(:, :, :), ddyn_s(:, :, :, :), ddyn_l(:, :, :, :)
 
     !External procedures
     external :: zheev
@@ -926,12 +926,12 @@ contains
     allocate(q(nq, 3))
     allocate(dyn(ndim, ndim))
     allocate(dyn_s(nq, ndim, ndim))
-    allocate(dyn_full(nq, ndim, ndim))
+    allocate(dyn_l(nq, ndim, ndim))
     allocate(eigenvectors(ndim, ndim))
     if(present(velocities)) then
        allocate(ddyn(ndim, ndim, 3))
        allocate(ddyn_s(nq, ndim, ndim, 3))
-       allocate(ddyn_full(nq, ndim, ndim, 3))
+       allocate(ddyn_l(nq, ndim, ndim, 3))
        allocate(vels(ndim, nq, 3))
     end if
     
@@ -998,31 +998,28 @@ contains
           end do
        end do
     end do
-
-    dyn_full = dyn_s
-    if(present(velocities)) ddyn_full = ddyn_s
     
     !Add dipole correction to dynamical matrix
     if(crys%polar) then
        do iq = 1, nq
           if(present(velocities)) then
              call dyn_nonanalytic(crys, q(iq, :), ncell_g, &
-                  dyn_full(iq, :, :), ddyn_full(iq, :, :, :))
+                  dyn_l(iq, :, :), ddyn_l(iq, :, :, :))
           else
              call dyn_nonanalytic(crys, q(iq, :), ncell_g, &
-                  dyn_full(iq, :, :))
+                  dyn_l(iq, :, :))
           end if
        end do
     end if
-
+    
     ! Once the dynamical matrix has been built, the frequencies and
     ! group velocities are extracted exactly like in the previous
     ! subroutine.
     do iq = 1, nq
-       dyn(:, :) = dyn_full(iq, :, :)
+       dyn(:, :) = dyn_s(iq, :, :) + dyn_l(iq, :, :)
        
        if(present(velocities)) &
-            ddyn(:, :, :) = ddyn_full(iq, :, :, :)
+            ddyn(:, :, :) = ddyn_s(iq, :, :, :) + ddyn_l(iq, :, :, :)
 
        !Force Hermiticity
        do ipol = 1, nbranches
