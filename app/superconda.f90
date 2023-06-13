@@ -71,9 +71,20 @@ program superconda
 
   !Calculate electrons
   call el%initialize(wann, crys, sym, num)
-
+  
   call t_event%end_timer('Initialization')
 
+  if(num%plot_along_path) then
+     call t_event%start_timer('Plots along path')
+
+     call subtitle("Plotting along high-symmetry path...")
+
+     !Plot electron bands, phonon dispersions, and g along path.
+     call wann%plot_along_path(crys, num, el%scissor)
+
+     call t_event%end_timer('Plots along path')
+  end if
+  
   call t_event%start_timer('Phonons')
 
   !Calculate phonons
