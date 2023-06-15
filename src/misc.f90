@@ -1220,7 +1220,7 @@ contains
     N = size(mat, 1)
 
     if(N /= size(mat, 2)) &
-         call exit_with_message("invert_complex_square called with non-zquare matrix. Exiting.")
+         call exit_with_message("invert_complex_square called with non-square matrix. Exiting.")
 
     !Set and allocate zgetr* variables             
     lwork = 32*N
