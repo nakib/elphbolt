@@ -49,6 +49,10 @@ module misc
   interface invert
      module procedure :: invert_complex_square
   end interface invert
+
+  interface interpolate_using_precomputed
+     module procedure :: interpolate_using_precomputed_3vector, interpolate_using_precomputed_scalar
+  end interface interpolate_using_precomputed
   
 contains
 
@@ -930,7 +934,7 @@ contains
 
   end subroutine precompute_interpolation_corners_and_weights
 
-  subroutine interpolate_using_precomputed(idc, widc, f, interpolation)
+  subroutine interpolate_using_precomputed_3vector(idc, widc, f, interpolation)
     !! Subroutine to perform BZ interpolation using precomputed weights and corners using
     !! tri/bi/linear algorithm. We avoid the lapack calls as it require to perform
     !! more operations
@@ -944,7 +948,7 @@ contains
     real(r64), intent(in) :: widc(:), f(:,:)
     real(r64), intent(out) :: interpolation(:)
 
-
+    !Locals
     real(r64) :: c00(size(f,2)), c01(size(f,2)), c10(size(f,2)), &
                 c11(size(f,2)), c0(size(f,2)), c1(size(f,2))
 
@@ -970,9 +974,48 @@ contains
     case default
       call exit_with_message("Can't find point to interpolate on. Exiting.")
     end select
+  end subroutine interpolate_using_precomputed_3vector
 
-  end subroutine interpolate_using_precomputed
+  subroutine interpolate_using_precomputed_scalar(idc, widc, f, interpolation)
+    !! Subroutine to perform BZ interpolation using precomputed weights and corners using
+    !! tri/bi/linear algorithm. We avoid the lapack calls as it require to perform
+    !! more operations
+    !!
+    !! idc corners in the coarse mesh for the refined mesh.
+    !! widc weights of the corners for interpolation of values in corse mesh to the refined one.
+    !! f The coarse mesh function to be interpolated.
+    !! interpolation The result
 
+    integer(i64), intent(in) :: idc(:)
+    real(r64), intent(in) :: widc(:), f(:)
+    real(r64), intent(out) :: interpolation
+
+    !Locals
+    real(r64) :: c00, c01, c10, c11, c0, c1
+
+    select case(idc(1))
+    case (0) !3d
+      !First we interpolate along first axis, then second, to finish with last one
+      c00 = f(idc(2)) * widc(4) + f(idc(3)) * widc(1)
+      c10 = f(idc(4)) * widc(4) + f(idc(5)) * widc(1)
+      c01 = f(idc(6)) * widc(4) + f(idc(7)) * widc(1)
+      c11 = f(idc(8)) * widc(4) + f(idc(9)) * widc(1)
+      c0  = c00 * widc(5) + c10 * widc(2)
+      c1  = c01 * widc(5) + c11 * widc(2)
+      interpolation = c0 * widc(6) + c1 * widc(3)
+    case (1) !2d
+      !First we interpolate along first axis, then second
+      c0 = f(idc(2)) * widc(3) + f(idc(4)) * widc(1)
+      c1 = f(idc(3)) * widc(3) + f(idc(5)) * widc(1)
+      interpolation = c0 * widc(4) + c1 * widc(2)
+    case (2) !1d
+      interpolation = f(idc(2)) * widc(2) + f(idc(3)) * widc(1)
+    case (3)!no iterpolation  
+      interpolation = f(idc(2))
+    case default
+      call exit_with_message("Can't find point to interpolate on. Exiting.")
+    end select
+  end subroutine interpolate_using_precomputed_scalar
 
   subroutine interpolate(coarsemesh, refinement, f, q, interpolation)
     !! Subroutine to perform BZ interpolation.

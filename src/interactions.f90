@@ -20,7 +20,8 @@ module interactions
   use params, only: i64, r64, pi, twopi, amu, qe, hbar_eVps, perm0
   use misc, only: exit_with_message, print_message, distribute_points, &
        demux_state, mux_vector, mux_state, expi, Bose, binsearch, Fermi, &
-       twonorm, write2file_rank2_real, demux_vector, interpolate, expm1
+       twonorm, write2file_rank2_real, demux_vector, interpolate, expm1, &
+       precompute_interpolation_corners_and_weights, interpolate_using_precomputed
   use wannier_module, only: wannier
   use crystal_module, only: crystal
   use electron_module, only: electron
@@ -1325,9 +1326,11 @@ contains
     !Local variables
     integer(i64) :: chunk, s, iq, coarse_numq_irred, coarse_numq_full, &
          num_active_images, start, end, fineq_indvec(3), mesh_ref_array(3), &
-         coarse_qmesh(3), fbz2ibz
+         coarse_qmesh(3), fbz2ibz, iq2inter
+    integer(i64), allocatable :: idc(:, :), qs_int(:, :)
     real(r64) :: ignore
-    real(r64), allocatable :: coarse_rta_rates_ibz(:, :), coarse_rta_rates_fbz(:, :)
+    real(r64), allocatable :: coarse_rta_rates_ibz(:, :), coarse_rta_rates_fbz(:, :), &
+         widc(:, :)
     character(len=1024) :: temp_tag, filename
 
     allocate(rta_rates(ph%nwv_irred, ph%numbands))
@@ -1402,19 +1405,46 @@ contains
 
        !If needed, parallely interpolate over fine q-mesh
        if(num%fourph_mesh_ref > 1) then
+          allocate(widc(product(ph%wvmesh), 6), idc(product(ph%wvmesh), 9), &
+               qs_int(product(ph%wvmesh), 3))
+
+          do iq = 1, size(qs_int, 1)
+             call demux_vector(iq, qs_int(iq, :), ph%wvmesh, 0_i64)
+          end do
+          
+          call precompute_interpolation_corners_and_weights(coarse_qmesh, &
+               mesh_ref_array, qs_int, idc, widc)
+
           !Only work with the active images
           if(this_image() <= num_active_images) then
              do iq = start, end             
                 !Calculate the fine mesh wave vector, 0-based index vector
                 call demux_vector(ph%indexlist_irred(iq), fineq_indvec, ph%wvmesh, 0_i64)
 
+                !q-point to interpolate on
+                iq2inter = mux_vector(fineq_indvec, ph%wvmesh, 0_i64)
+                
                 !Interpolate 4-ph scattering rates on this wave vector
                 do s = 1, ph%numbands
-                   call interpolate(coarse_qmesh, mesh_ref_array, coarse_rta_rates_fbz(:, s), &
-                        fineq_indvec, rta_rates(iq, s))
+                   call interpolate_using_precomputed(idc(iq2inter, :), widc(iq2inter, :), &
+                        coarse_rta_rates_fbz(:, s), rta_rates(iq, s))
                 end do
              end do
           end if
+          
+!!$          !Only work with the active images
+!!$          if(this_image() <= num_active_images) then
+!!$             do iq = start, end             
+!!$                !Calculate the fine mesh wave vector, 0-based index vector
+!!$                call demux_vector(ph%indexlist_irred(iq), fineq_indvec, ph%wvmesh, 0_i64)
+!!$
+!!$                !Interpolate 4-ph scattering rates on this wave vector
+!!$                do s = 1, ph%numbands
+!!$                   call interpolate(coarse_qmesh, mesh_ref_array, coarse_rta_rates_fbz(:, s), &
+!!$                        fineq_indvec, rta_rates(iq, s))
+!!$                end do
+!!$             end do
+!!$          end if
 
           sync all
           call co_sum(rta_rates)
