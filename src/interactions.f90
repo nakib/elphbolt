@@ -1405,6 +1405,7 @@ contains
 
        !If needed, parallely interpolate over fine q-mesh
        if(num%fourph_mesh_ref > 1) then
+          !Precompute the quantities needed for the fast interpolator
           allocate(widc(product(ph%wvmesh), 6), idc(product(ph%wvmesh), 9), &
                qs_int(product(ph%wvmesh), 3))
 
@@ -1431,20 +1432,6 @@ contains
                 end do
              end do
           end if
-          
-!!$          !Only work with the active images
-!!$          if(this_image() <= num_active_images) then
-!!$             do iq = start, end             
-!!$                !Calculate the fine mesh wave vector, 0-based index vector
-!!$                call demux_vector(ph%indexlist_irred(iq), fineq_indvec, ph%wvmesh, 0_i64)
-!!$
-!!$                !Interpolate 4-ph scattering rates on this wave vector
-!!$                do s = 1, ph%numbands
-!!$                   call interpolate(coarse_qmesh, mesh_ref_array, coarse_rta_rates_fbz(:, s), &
-!!$                        fineq_indvec, rta_rates(iq, s))
-!!$                end do
-!!$             end do
-!!$          end if
 
           sync all
           call co_sum(rta_rates)
