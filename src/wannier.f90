@@ -145,12 +145,10 @@ contains
     type(numerics), intent(in) :: num
     
     !Local variables
-    integer(i64) :: iuc, iuc_el, iuc_ph, ib, jb, image
+    integer(i64) :: iuc, ib, image
     integer(i64) :: ignore_i
     real(r64) :: ignore_3r(3)
     complex(r64), allocatable :: gwann_aux(:, :, :, :, :)
-    integer(i64), allocatable :: rcells_g_aux(:, :)
-    integer(i64), allocatable :: gwsdeg_aux(:)
     
     ! EXCITING File names:
     character(len=*), parameter :: filename_gwann = "eph_grr.bin"
@@ -535,7 +533,7 @@ contains
     complex(r64), intent(out), optional :: evecs(nq, self%numbranches, self%numbranches)
 
     !Local variables
-    integer(i64) :: iuc, ipol, jpol, ib, jb, iq, na, nb, nwork, aux
+    integer(i64) :: iuc, ipol, ib, jb, iq, na, nb, nwork, aux
     real(r64) :: rcart(3)
     complex(r64) :: caux
     real(r64), allocatable :: rwork(:)
@@ -695,9 +693,9 @@ contains
     complex(r64), optional, intent(out) :: ddyn_l(:, :, :)
 
     !Local variables
-    complex(r64) :: fnat(3),  facqd, facq
+    complex(r64) :: fnat(3),  facqd, facq, oneIrr(3)
     real(r64) :: qeq, arg, zig(3), zjg(3), g(3), gmax, alph, &
-         tpiba, dgeg(3), rr(crys%numatoms,crys%numatoms,3), fac
+         tpiba, dgeg(3), rr(crys%numatoms,crys%numatoms,3), fac, dgeg_coeff
     integer(i64) :: iat, jat, idim, jdim, ipol, jpol, &
          m1, m2, m3, nq1, nq2, nq3
     
@@ -756,12 +754,14 @@ contains
              if(qeq > 0.0_r64 .and. qeq/alph/4.0_r64 < gmax) then
                 facqd = exp(-qeq/alph/4.0_r64)/qeq
                 dgeg = matmul(crys%epsilon + transpose(crys%epsilon), g)
+                dgeg_coeff = 0.25_r64/alph + 1.0_r64/qeq
 
                 do iat = 1, crys%numatoms
                    zig(:) = matmul(g, crys%born(:, :, iat))
 
                    do jat = 1,crys%numatoms
-                      rr(iat, jat,:) = (crys%basis_cart(:, iat) - crys%basis_cart(:, jat))/bohr2nm
+                      rr(iat, jat, :) = (crys%basis_cart(:, iat) - crys%basis_cart(:, jat))/bohr2nm
+                      oneIrr(:) = oneI*rr(iat, jat, :)
                       zjg(:) = matmul(g, crys%born(:, :, jat))
                       arg = dot_product(g, rr(iat, jat, :))
                       facq = facqd*expi(arg)
@@ -777,8 +777,7 @@ contains
                                ddyn_l(idim, jdim, :) = ddyn_l(idim, jdim, :) + &
                                     facq*&
                                     (zjg(jpol)*crys%born(:, ipol, iat) + zig(ipol)*crys%born(:, jpol, jat) + &
-                                    zig(ipol)*zjg(jpol)*(oneI*rr(iat, jat, :) - &
-                                    dgeg(:)*(0.25_r64/alph + 1.0_r64/qeq)))
+                                    zig(ipol)*zjg(jpol)*(oneIrr(:) - dgeg_coeff*dgeg(:)))
                             end if
                          end do
                       end do
