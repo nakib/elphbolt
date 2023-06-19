@@ -586,7 +586,7 @@ contains
                   self%coarse_qmesh, dynmat_l, ddynmat_l)
 
              !Add long range part to short range part.
-             !Recall that dyn_nonanalytic works returns in Bohr length units.
+             !Recall that dyn_nonanalytic works & returns in Bohr length units.
              ddynmat = ddynmat + ddynmat_l*bohr2nm
           else
              call dyn_nonanalytic(crys, matmul(crys%reclattvecs, qvecs(iq, :))*bohr2nm, &
