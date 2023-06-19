@@ -15,14 +15,14 @@ Using /ab initio/ electron-phonon and a fully wave vector and electron band/phon
 - anisotropic and isotropic Eliashberg spectral function and
 - phonon-mediated superconducting transition temperature.
 
-To date (May 31, 2023), ~elphbolt~/~superconda~ has been used in the following works:
-| material(s) | physics probed                | publication                      |
-|-------------+-------------------------------+----------------------------------|
-| Si          | drag                          | [[https://www.nature.com/articles/s41524-022-00710-0][npj Comp. Mat. 8, 28]]             |
-| Diamond     | drag                          | [[https://doi.org/10.1016/j.mtphys.2022.100740][Mat. Tod. Phys 27, 100740]]        |
-| BAs         | drag                          | [[https://doi.org/10.1103/PhysRevB.107.L081202][Phys. Rev. B 107, L081202]]        |
-| GaN & AlN   | drag                          | https://arxiv.org/abs/2304.00165 |
-| MgB_{2}     | superconductivity enhancement | [[https://journals.aps.org/prb/abstract/10.1103/PhysRevB.107.184518][Phys. Rev. B 107, 184518]]         |
+To date (June 19, 2023), ~elphbolt~ / ~superconda~ has been used in the following works:
+| material(s) | physics probed                | publication               |
+|-------------+-------------------------------+---------------------------|
+| Si          | drag                          | [[https://www.nature.com/articles/s41524-022-00710-0][npj Comp. Mat. 8, 28]]      |
+| Diamond     | drag                          | [[https://doi.org/10.1016/j.mtphys.2022.100740][Mat. Tod. Phys 27, 100740]] |
+| BAs         | drag                          | [[https://doi.org/10.1103/PhysRevB.107.L081202][Phys. Rev. B 107, L081202]] |
+| MgB_{2}     | superconductivity enhancement | [[https://journals.aps.org/prb/abstract/10.1103/PhysRevB.107.184518][Phys. Rev. B 107, 184518]]  |
+| GaN & AlN   | drag                          | [[https://journals.aps.org/prb/abstract/10.1103/PhysRevB.107.245202][Phys. Rev. B 107, 245202]]  |
 
 Stylistically, ~elphbolt~ is designed to be simple, small, fast, and extensible. It uses an object-based procedural style, which allows fast development, while resulting in a rather compact source (~ 9000 lines of code, generated using David A. Wheeler's ~SLOCCount~). The symmetries of the crystal are fully exploited and the transport active Fermi window is used to allow the sampling of extremely fine wave vector meshes needed for accurate solutions of the BTEs and Eliashberg equations. Parallelism is achieved through modern Fortran's intrinsic ~coarrays~ feature that is fully supported by recent versions of both the ~gcc~ and ~intel~ compilers.
 
