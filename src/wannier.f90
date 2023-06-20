@@ -1329,5 +1329,5 @@ contains
     end if
     
     if(this_image() == 1) print*, 'New shape of gwann = ', shape(gwann)
-  end subroutine reshape_gwann_for_gkRp
+  end subroutine reshape_gwann_for_gkRp  
 end module wannier_module

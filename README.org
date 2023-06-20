@@ -34,7 +34,7 @@ Stylistically, ~elphbolt~ is designed to be simple, small, fast, and extensible.
 
 ** Documentation
 
-The source is heavily commented and auto-documented with ~FORD~ (https://github.com/cmacmackin/ford). For call graphs and detailed documentation, read ~documentation/index.html~ with your browser. 
+The source is heavily commented and can be auto-documented with ~FORD~ (https://github.com/cmacmackin/ford). For installation of ~FORD~, consult https://forddocs.readthedocs.io/en/latest/. To generate the documentation and the call graphs (you need `graphviz` for the latter), say `ford projectfile.md`. Then read ~./documentation/index.html~ with your browser.
 
 ** Installation on HPC systems with ~gcc~
 
