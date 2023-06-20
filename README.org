@@ -26,7 +26,7 @@ To date (June 19, 2023), ~elphbolt~ / ~superconda~ has been used in the followin
 
 Stylistically, ~elphbolt~ is designed to be simple, small, fast, and extensible. It uses an object-based procedural style, which allows fast development, while resulting in a rather compact source (~ 9000 lines of code, generated using David A. Wheeler's ~SLOCCount~). The symmetries of the crystal are fully exploited and the transport active Fermi window is used to allow the sampling of extremely fine wave vector meshes needed for accurate solutions of the BTEs and Eliashberg equations. Parallelism is achieved through modern Fortran's intrinsic ~coarrays~ feature that is fully supported by recent versions of both the ~gcc~ and ~intel~ compilers.
 
-~elphbolt~ currently works with the ~Quantum Espresso~ (https://www.quantum-espresso.org/) suite and its core module ~EPW~ (https://epw-code.org/) for the phonon quantities and the Wannier space information, respectively.
+~elphbolt~ currently works with the ~Quantum Espresso~ (https://www.quantum-espresso.org/) suite and its core module ~EPW~ (https://epw-code.org/) for the phonon quantities and the Wannier space information, respectively. An interface with all-electron ~exciting~ (https://exciting-code.org/) code is currently under construction.
 
 ~elphbolt~ is a "free as in freedom" code distributed under the GNU General Public License (GPL) version 3. You can read more about the philosophy of software freedom here: [[https://www.gnu.org/philosophy/free-sw.en.html]].
 
@@ -34,7 +34,7 @@ Stylistically, ~elphbolt~ is designed to be simple, small, fast, and extensible.
 
 ** Documentation
 
-The source is heavily commented and can be auto-documented with ~FORD~ (https://github.com/cmacmackin/ford). For installation of ~FORD~, consult https://forddocs.readthedocs.io/en/latest/. To generate the documentation and the call graphs (you need `graphviz` for the latter), say `ford projectfile.md`. Then read ~./documentation/index.html~ with your browser.
+The source is heavily commented and can be auto-documented with ~FORD~ (https://github.com/cmacmackin/ford). For installation of ~FORD~, consult https://forddocs.readthedocs.io/en/latest/. To generate the documentation and the call graphs (you need ~graphviz~ for the latter), say ~ford projectfile.md~. Then read ~./documentation/index.html~ with your browser.
 
 ** Installation on HPC systems with ~gcc~
 
