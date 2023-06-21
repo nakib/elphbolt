@@ -1044,6 +1044,11 @@ contains
           allocate(work(nwork))
        end if
        call zheev("V","U", nbranches,dyn(:, :), nbranches, omega2, work, nwork, rwork, i)
+
+       !Fix gauge
+       if(abs(dyn(1, 1)) /= 0.0_r64) then
+          dyn(:, :) = dyn(:, :)/(dyn(1, 1)/abs(dyn(1, 1)))
+       end if
        
        if(present(eigenvect)) then
           eigenvect(iq, :, :) = transpose(dyn(:, :))
