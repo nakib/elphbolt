@@ -18,6 +18,8 @@ module delta
   !! Module containing the procedures related to delta function evaulation.
 
   use params, only: r64, i64
+  use crystal_module, only: crystal
+  use wannier_module, only: wannier
   use misc, only: exit_with_message, print_message, demux_vector, mux_vector, &
        binsearch, sort
   
@@ -59,6 +61,7 @@ contains
     
     !Grab number of tetrahedra in which wave vector belongs
     num = tetracount(ik)
+    !num = 24 !DEBUG
     
     do itk = 1, num !Run over tetrahedra
        it = tetramap(1, ik, itk) !Grab tetrahedron
@@ -488,14 +491,14 @@ contains
     n3 = mesh(3)
 
     !Label of the vertices of the tetrahedra for a given subcell
-    tetra_vertices_labels = reshape((/ &
+    tetra_vertices_labels = reshape([ &
          1, 2, 3, 6, &
          1, 3, 5, 6, &
          3, 5, 6, 7, &
          3, 6, 7, 8, &
          3, 4, 6, 8, &
-         2, 3, 4, 6 /), &
-         shape(tetra_vertices_labels), order = (/2, 1/))
+         2, 3, 4, 6 ], &
+         shape(tetra_vertices_labels), order = [2, 1])
 
     !Allocate tetrahedra related variables
     allocate(tetra(6*nk, 4), tetracount(nk), tetramap(2, nk, 24))
@@ -535,7 +538,7 @@ contains
        end if
 
        !For each subcell save the vertices
-       scvol_vertices = reshape((/ &
+       scvol_vertices = reshape([ &
             i,   j,   k,   &
             ip1, j,   k,   &
             i,   jp1, k,   &
@@ -543,8 +546,8 @@ contains
             i,   j,   kp1, &
             ip1, j,   kp1, &
             i,   jp1, kp1, &
-            ip1, jp1, kp1 /), &
-            shape(scvol_vertices), order = (/2, 1/))
+            ip1, jp1, kp1 ], &
+            shape(scvol_vertices), order = [2, 1])
 
        do tk = 1, 6 !Run over 6 tetrahedra
           do tl = 1, 4 !Run over the labels of the vertices that
@@ -553,7 +556,7 @@ contains
              ii = scvol_vertices(aux,1)
              jj = scvol_vertices(aux,2)
              kk = scvol_vertices(aux,3)
-             aux = mux_vector((/ii, jj, kk/), mesh, 1_i64)
+             aux = mux_vector([ii, jj, kk], mesh, 1_i64)
              tmp = aux !Guaranteed to be > 0
              if(blocks) then
                 !Which point in indexlist does aux correspond to?
@@ -598,13 +601,17 @@ contains
     tetra_evals(:,:,:) = 0.0_r64
     
     do it = 1, numtetra !Run over tetrahedra
-       do ib = 1, numbands !Run over bands
-          do iv = 1, 4 !Run over vertices
-             aux = tetra(it, iv)
-             if(aux > 0) then !Only eigenvalues inside transport active region
-                tetra_evals(it, ib, iv) = evals(aux, ib)
-             end if
-          end do
+       !do ib = 1, numbands !Run over bands
+       do iv = 1, 4 !Run over vertices
+          aux = tetra(it, iv)
+          if(aux > 0) then !Only eigenvalues inside transport active region
+             tetra_evals(it, :, iv) = evals(aux, :)
+          end if
+       end do
+    end do
+    
+    do it = 1, numtetra
+       do ib = 1, numbands
           call sort(tetra_evals(it, ib, :))
        end do
     end do
@@ -638,10 +645,10 @@ contains
     n3 = mesh(3)
 
     !Label of the vertices of the triangles for a given subcell
-    triang_vertices_labels = reshape((/ &
-         1, 2, 3,&
-         1, 3, 4 /), &
-         shape(triang_vertices_labels), order = (/2, 1/))
+    triang_vertices_labels = reshape([ &
+         1, 2, 3, &
+         1, 3, 4 ], &
+         shape(triang_vertices_labels), order = [2, 1])
 
     !Allocate triangles related variables
     allocate(triang(2*nk, 3), triangcount(nk), triangmap(2, nk, 6))
@@ -675,12 +682,12 @@ contains
        end if
 
        !For each subcell save the vertices
-       scvol_vertices = reshape((/ &
+       scvol_vertices = reshape([ &
             i,   j,   k,    &
             ip1, j,   k,    &
             i,   jp1, k,    &
-            ip1, jp1, k /), &
-            shape(scvol_vertices), order = (/2, 1/))
+            ip1, jp1, k ], &
+            shape(scvol_vertices), order = [2, 1])
 
        !Run over the 2 triangles
        do tk = 1, 2
@@ -691,7 +698,7 @@ contains
              ii = scvol_vertices(aux, 1)
              jj = scvol_vertices(aux, 2)
              kk = scvol_vertices(aux, 3)
-             aux = mux_vector((/ii, jj, kk/), mesh, 1_i64)
+             aux = mux_vector([ii, jj, kk], mesh, 1_i64)
              tmp = aux !Guaranteed to be > 0
              if(blocks) then
                 !Which point in indexlist does aux correspond to?
@@ -737,13 +744,16 @@ contains
     triang_evals(:,:,:) = 0.0_r64
     
     do it = 1, numtriangs !Run over triangles
-       do ib = 1, numbands !Run over bands
-          do iv = 1, numvertices !Run over vertices
-             aux = triang(it, iv)
-             if(aux > 0) then !Only eigenvalues inside transport active region
-                triang_evals(it, ib, iv) = evals(aux, ib)
-             end if
-          end do
+       do iv = 1, numvertices !Run over vertices
+          aux = triang(it, iv)
+          if(aux > 0) then !Only eigenvalues inside transport active region
+             triang_evals(it, :, iv) = evals(aux, :)
+          end if
+       end do
+    end do
+
+    do it = 1, numtriangs
+       do ib = 1, numbands
           call sort(triang_evals(it, ib, :))
        end do
     end do
