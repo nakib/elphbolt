@@ -748,7 +748,7 @@ contains
 
     real(r64), intent(in) :: e, T
     
-    Bose = 1.0_r64/(exp(e/kB/T) - 1.0_r64)
+    Bose = 1.0_r64/expm1(e/kB/T)
   end function Bose
 
   pure real(r64) function Fermi(e, chempot, T)

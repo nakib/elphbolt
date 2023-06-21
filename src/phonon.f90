@@ -910,11 +910,6 @@ contains
     !External procedures
     external :: zheev
     
-    ! Quantum Espresso's 2nd-order format contains information about
-    ! lattice vectors, atomic positions, Born effective charges and so
-    ! forth in its header. The information is read but completely
-    ! ignored. It is the user's responsibility to ensure that
-    ! it is consistent with the CONTROL file.
     nwork = 1
     ntype = crys%numelements
     nat = crys%numatoms
@@ -987,7 +982,7 @@ contains
                                if(present(velocities)) then
                                   ddyn_s(iq, idim, jdim, 1:3) = ddyn_s(iq, idim, jdim, 1:3) - &
                                        oneI*t(1:3)*&
-                                       self%ifc2(ipol, jpol, iat, jat, t1, t2, t3)*&
+                                       self%ifc2(ipol, jpol, iat, jat, t1, t2, t3)* &
                                        expi(-qt)*weight
                                end if
                             end do
@@ -1013,9 +1008,6 @@ contains
        end do
     end if
     
-    ! Once the dynamical matrix has been built, the frequencies and
-    ! group velocities are extracted exactly like in the previous
-    ! subroutine.
     do iq = 1, nq
        dyn(:, :) = dyn_s(iq, :, :) + dyn_l(iq, :, :)
        
@@ -1030,42 +1022,42 @@ contains
           end do
        end do
        
-       do ipol=1,3
-          do jpol=1,3
-             do iat=1,nat
-                do jat=1,nat
-                   idim=(iat-1)*3+ipol
-                   jdim=(jat-1)*3+jpol
-                   dyn(idim,jdim)=dyn(idim,jdim)/self%mm(iat,jat)
+       do ipol = 1, 3
+          do jpol = 1, 3
+             do iat = 1, nat
+                do jat = 1, nat
+                   idim = (iat - 1)*3 + ipol
+                   jdim = (jat - 1)*3 + jpol
+                   dyn(idim, jdim) = dyn(idim, jdim)/self%mm(iat, jat)
                    if(present(velocities)) then
-                      ddyn(idim,jdim,1:3)=ddyn(idim,jdim,1:3)/self%mm(iat,jat)
+                      ddyn(idim, jdim, 1:3) = ddyn(idim, jdim, 1:3)/self%mm(iat, jat)
                    end if
                 end do
              end do
           end do
        end do
        
-       call zheev("V","U",nbranches,dyn(:,:),nbranches,omega2,work,-1_i64,rwork,i)
-       if(real(work(1)).gt.nwork) then
-          nwork=nint(2*real(work(1)))
+       call zheev("V", "U", nbranches, dyn(:, :), nbranches, omega2, work, -1_i64, rwork, i)
+       if(real(work(1)) > nwork) then
+          nwork = nint(2*real(work(1)))
           deallocate(work)
           allocate(work(nwork))
        end if
-       call zheev("V","U",nbranches,dyn(:,:),nbranches,omega2,work,nwork,rwork,i)
+       call zheev("V","U", nbranches,dyn(:, :), nbranches, omega2, work, nwork, rwork, i)
        
        if(present(eigenvect)) then
-          eigenvect(iq,:,:) = transpose(dyn(:,:))
+          eigenvect(iq, :, :) = transpose(dyn(:, :))
        end if
        
-       omegas(iq,:)=sign(sqrt(abs(omega2)),omega2)
+       omegas(iq,:) = sign(sqrt(abs(omega2)), omega2)
 
        if(present(velocities)) then
-          do i=1,nbranches
-             do j=1,3
-                velocities(iq,i,j)=real(dot_product(dyn(:,i),&
-                     matmul(ddyn(:,:,j),dyn(:,i))))
+          do i = 1, nbranches
+             do j = 1, 3
+                velocities(iq, i, j) = real(dot_product(dyn(:, i), &
+                     matmul(ddyn(:, :, j), dyn(:, i))))
              end do
-             velocities(iq,i,:)=velocities(iq,i,:)/(2.0_r64*omegas(iq,i))
+             velocities(iq, i, :) = velocities(iq, i, :)/(2.0_r64*omegas(iq, i))
           end do
        end if
 
@@ -1077,7 +1069,7 @@ contains
     end do
 
     !Units conversion
-    omegas=omegas*Ryd2eV !eV
-    if(present(velocities)) velocities=velocities*toTHz*bohr2nm !Km/s
+    omegas = omegas*Ryd2eV !eV
+    if(present(velocities)) velocities = velocities*toTHz*bohr2nm !Km/s
   end subroutine phonon_espresso
 end module phonon_module
