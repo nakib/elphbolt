@@ -51,8 +51,16 @@ contains
     select type(species)
     class is(phonon)
        !Imaginary part of resolvent
-       Im_resolvent = -pi*delta_fn_tetra(sampling_point, iwv, ib, species%wvmesh, species%tetramap, &
-            species%tetracount, species%tetra_squared_evals)
+       if(sampling_point < 1.0e-3) then !=>omega < 1e-3 eV^2
+          !For very small energies, use the tetrahedra filled with omega.
+          !This works better, numerically.
+          Im_resolvent = -pi*delta_fn_tetra(sqrt(sampling_point), iwv, ib, species%wvmesh, species%tetramap, &
+               species%tetracount, species%tetra_evals)/2.0_r64/sqrt(sampling_point)
+       else
+          !Otherwise, use the omega^2 tetrahedra
+          Im_resolvent = -pi*delta_fn_tetra(sampling_point, iwv, ib, species%wvmesh, species%tetramap, &
+               species%tetracount, species%tetra_squared_evals)
+       end if
 
        !Real part of resolvent
        Re_resolvent = real_tetra(sampling_point, iwv, ib, species%wvmesh, species%tetramap, &
@@ -98,7 +106,8 @@ contains
          istate1, s1, iq1_ibz, iq1, s2, iq2, i, j, num_dof_def, a, dof_counter, iq, &
          tau_sc, tau_uc, def_numatoms, def_numcells, atom, cell
     real(r64) :: en1_sq, q_cart(3)
-    complex(r64) :: d0_istate, phase, ev(ph%numbands, ph%numbands), dos(ph%nwv_irred, ph%numbands)
+    complex(r64) :: d0_istate, phase, ev(ph%numbands, ph%numbands), dos(ph%nwv_irred, ph%numbands), &
+         caux
     complex(r64), allocatable :: phi(:, :, :), phi_internal(:)
 
     !Total number of atoms in the defective block of the supercell

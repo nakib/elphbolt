@@ -280,8 +280,8 @@ contains
     !Local variables
     integer(i64) :: num_dof_def, numstates_irred, istate, &
          chunk, start, end, num_active_images, i, a, def_numatoms, &
-         dof_counter, iq, s, cell, atom
-    complex(r64), allocatable :: inv_one_minus_VD0(:, :), T(:, :, :), phi(:)
+         dof_counter, iq, s, cell, atom, j
+    complex(r64), allocatable :: inv_one_minus_VD0(:, :), T_onsite(:, :, :), phi(:)
     real(r64), allocatable :: V(:, :), identity(:, :)
     complex(r64) :: phase, ev(ph%numbands)
     real(r64) :: en_sq, val
@@ -295,9 +295,9 @@ contains
     !Number of irreducible phonon states
     numstates_irred = ph%nwv_irred*ph%numbands
     
-    allocate(T(num_dof_def, num_dof_def, numstates_irred))
+    allocate(T_onsite(num_dof_def, num_dof_def, numstates_irred))
     allocate(V(num_dof_def, num_dof_def))
-    T = 0.0_r64
+    T_onsite = 0.0_r64
     V = 0.0_r64
 
     allocate(identity(num_dof_def, num_dof_def))
@@ -335,7 +335,7 @@ contains
                 end do
              end do
           end do
-
+          
           select case(self%approx)
           case('lowest order')
              ! Lowest order:
@@ -346,7 +346,7 @@ contains
              !  V |                         
              !    |
              !                
-             T(:, :, istate) = V
+             T_onsite(:, :, istate) = V
           case('1st Born')
              ! 1st Born approximation:
              ! T = V + V.D0.V
@@ -357,7 +357,7 @@ contains
              !    |          /_____\
              !                 D0
              !
-             T(:, :, istate) = V + matmul(V, matmul(self%D0(:, :, istate), V))
+             T_onsite(:, :, istate) = V + matmul(V, matmul(self%D0(:, :, istate), V))
           case('full Born')
              ! Full Born approximation:
              ! T = V + V.D0.T = [I - VD0]^-1 . V
@@ -370,16 +370,16 @@ contains
              !
              inv_one_minus_VD0 = identity - matmul(V, self%D0(:, :, istate))
              call invert(inv_one_minus_VD0)
-             T(:, :, istate) = matmul(inv_one_minus_VD0, V)
+             T_onsite(:, :, istate) = matmul(inv_one_minus_VD0, V)
           case default
              call exit_with_message("T-matrix approximation not recognized.")
           end select
        end do
     end if
 
-    !Reduce T
+    !Reduce T_onsite
     sync all
-    call co_sum(T)
+    call co_sum(T_onsite)
     sync all
     
     !Release some memory
@@ -409,11 +409,19 @@ contains
           end do
 
           !<i|T|j> --> <sq|T|sq>
-          diagT(iq, s) = dot_product(phi, matmul(T(:, :, istate), phi))
+!!$          diagT(iq, s) = dot_product(phi, matmul(T_onsite(:, :, istate), phi))
+          !For on-site perturbation, i.e. diagonal V, can evaluate the sum over
+          !j in the expression above by hand. This yields the following. One can
+          !see that for the virtual crystal approximation for the atomic mass and the
+          !1st Born approximtion for the isotope scattering, the Tamura model is exactly
+          !reproduced.
+          do i = 1, num_dof_def
+             diagT(iq, s) = diagT(iq, s) + T_onsite(i, i, istate)*abs(phi(i))**2
+          end do
        end do
     end if
     
-    !Reduce T
+    !Reduce diagT
     sync all
     call co_sum(diagT)
     sync all
