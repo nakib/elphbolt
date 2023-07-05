@@ -92,7 +92,7 @@ program elphbolt
   if(num%phdef_Tmat) call ph_def%initialize(ph, crys)
   
   select case(num%runlevel)
-  case(1) !BTE workflow
+  case(1) !BTE workflow     
      call t_event%start_timer('Density of states and one-particle scattering rates')
 
      call subtitle("Calculating density of states...")
@@ -108,7 +108,7 @@ program elphbolt
      !and/or phonon-substitution scattering rates.
      call calculate_dos(ph, num%tetrahedra, crys%gfactors, crys%subs_gfactors, &
           crys%atomtypes, bt%ph_rta_rates_iso_ibz, bt%ph_rta_rates_subs_ibz, &
-          num%phiso, num%phsubs)
+          num%phiso, num%phsubs, num%phiso_Tmat)
 
      call t_event%end_timer('Density of states and one-particle scattering rates')
      
@@ -125,10 +125,6 @@ program elphbolt
      
      call subtitle("Calculating interactions...")
 
-     !Set chemical potential dependent directory
-     call num%create_chempot_dirs(el%chempot)
-
-     !
      if(num%phdef_Tmat) then
         !Calculate phonon-defect interactions
         call t_event%start_timer("Phonon-defect transition rates")
@@ -137,13 +133,17 @@ program elphbolt
         call calculate_retarded_phonon_D0(ph, crys, ph_def%cell_pos_intvec, ph_def%pcell_atom_label, ph_def%D0, &
              ph_def%dimp_cell_pos_intvec, ph_def%pcell_atom_dof)
 
-        call ph_def%calculate_phonon_Tmatrix(ph, crys)
-        
+        if(num%phiso_Tmat) then
+           call ph_def%calculate_phonon_Tmatrix(ph, crys, bt%ph_rta_rates_iso_ibz)
+        end if
+
         call t_event%end_timer("Phonon-defect transition rates")
-        
-        call exit_with_message('At the present phonon-defect scattering is not part of the BTE suite. Exiting.')
+
+!!$        call exit_with_message('At the present phonon-defect scattering is not part of the BTE suite. Exiting.')
      end if
-     !!
+     
+     !Set chemical potential dependent directory
+     call num%create_chempot_dirs(el%chempot)
      
      if(num%onlyphbte .and. num%phe .or. num%drag) then
         if(.not. num%read_gq2) then

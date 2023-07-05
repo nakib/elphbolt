@@ -235,7 +235,7 @@ contains
   end subroutine calculate_el_dos
 
   subroutine calculate_ph_dos_iso(ph, usetetra, gfactors, subs_gfactors, &
-       atomtypes, W_phiso, W_phsubs, phiso, phsubs)
+       atomtypes, W_phiso, W_phsubs, phiso, phsubs, phiso_Tmat)
     !! Calculate the phonon density of states (DOS) in units of 1/energy and,
     !! optionally, the phonon-isotope scattering rates.
     !!
@@ -245,7 +245,7 @@ contains
     !! usetetra Use the tetrahedron method for delta functions?
 
     type(phonon), intent(inout) :: ph
-    logical, intent(in) :: usetetra, phiso, phsubs
+    logical, intent(in) :: usetetra, phiso, phsubs, phiso_Tmat
     real(r64), intent(in) :: gfactors(:), subs_gfactors(:)
     integer(i64), intent(in) :: atomtypes(:)
     real(r64), intent(out), allocatable :: W_phiso(:,:), W_phsubs(:,:)
@@ -284,10 +284,10 @@ contains
     if(this_image() <= num_active_images) then
        !Allocate small work variable chunk for each image
        allocate(dos_chunk(chunk, ph%numbands)[*])
-       if(phiso) allocate(W_phiso_chunk(chunk, ph%numbands)[*])
+       if(phiso .and. .not. phiso_Tmat) allocate(W_phiso_chunk(chunk, ph%numbands)[*])
        if(phsubs) allocate(W_phsubs_chunk(chunk, ph%numbands)[*])
        dos_chunk(:,:) = 0.0_r64
-       if(phiso) W_phiso_chunk(:,:) = 0.0_r64
+       if(phiso .and. .not. phiso_Tmat) W_phiso_chunk(:,:) = 0.0_r64
        if(phsubs) W_phsubs_chunk(:,:) = 0.0_r64
        
        do iq = start, end !Run over IBZ wave vectors
@@ -310,7 +310,7 @@ contains
                    !Sum over delta function
                    dos_chunk(counter, ib) = dos_chunk(counter, ib) + delta
 
-                   if(phiso .or. phsubs) then
+                   if((phiso .and. .not. phiso_Tmat) .or. phsubs) then
                       do a = 1, numatoms
                          pol = (a - 1)*3
                          aux = (abs(dot_product(&
@@ -318,7 +318,7 @@ contains
                               ph%evecs(iqp, ibp, pol + 1 : pol + 3))))**2
 
                          !Calculate phonon-isotope scattering in the Tamura model                   
-                         if(phiso) then
+                         if(phiso .and. .not. phiso_Tmat) then
                             W_phiso_chunk(counter, ib) = W_phiso_chunk(counter, ib) + &
                                  delta*aux*gfactors(atomtypes(a))*e**2
                          end if
@@ -334,7 +334,8 @@ contains
              end do
           end do
        end do
-       if(phiso) W_phiso_chunk = W_phiso_chunk*0.5_r64*pi/hbar_eVps !THz
+       if(phiso .and. .not. phiso_Tmat) &
+            W_phiso_chunk = W_phiso_chunk*0.5_r64*pi/hbar_eVps !THz
        if(phsubs) W_phsubs_chunk = W_phsubs_chunk*0.5_r64*pi/hbar_eVps !THz
     end if
     
@@ -343,7 +344,8 @@ contains
     if(this_image() == 1) then
        do im = 1, num_active_images
           ph%dos(start[im]:end[im], :) = dos_chunk(:,:)[im]
-          if(phiso) W_phiso(start[im]:end[im], :) = W_phiso_chunk(:,:)[im]
+          if(phiso .and. .not. phiso_Tmat) &
+               W_phiso(start[im]:end[im], :) = W_phiso_chunk(:,:)[im]
           if(phsubs) W_phsubs(start[im]:end[im], :) = W_phsubs_chunk(:,:)[im]
        end do
     end if

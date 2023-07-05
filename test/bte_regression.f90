@@ -159,7 +159,7 @@ program bte_regression
   !and/or phonon-substitution scattering rates.
   call calculate_dos(ph, num%tetrahedra, crys%gfactors, crys%subs_gfactors, &
        crys%atomtypes, bt%ph_rta_rates_iso_ibz, bt%ph_rta_rates_subs_ibz, &
-       num%phiso, num%phsubs)
+       num%phiso, num%phsubs, num%phiso_Tmat)
   
   !Test phonon density of states
   if(this_image() == 1) then

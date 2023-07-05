@@ -71,6 +71,8 @@ module numerics_module
      !! Choose if ph-e interaction will be included.
      logical :: phiso
      !! Use phonon-isotope scattering?
+     logical :: phiso_Tmat
+     !! Calculate phonon-isotope scattering from ph-iso T-matrix?
      logical :: phsubs
      !! Use phonon-substitution scattering?
      logical :: phbound
@@ -139,13 +141,14 @@ contains
     character(len = 1024) :: datadumpdir, tag
     logical :: read_gq2, read_gk2, read_V, read_W, tetrahedra, phe, phiso, phsubs, &
          phbound, phdef_Tmat, onlyphbte, onlyebte, elchimp, elbound, drag, plot_along_path, &
-         phthinfilm, phthinfilm_ballistic, fourph, use_Wannier_ifc2s
+         phthinfilm, phthinfilm_ballistic, fourph, use_Wannier_ifc2s, phiso_Tmat
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
          read_V, read_W, tetrahedra, phe, phiso, phsubs, onlyphbte, onlyebte, maxiter, &
          conv_thres, drag, elchimp, plot_along_path, runlevel, ph_en_min, ph_en_max, &
          ph_en_num, el_en_min, el_en_max, el_en_num, phbound, elbound, phdef_Tmat, &
-         ph_mfp_npts, phthinfilm, phthinfilm_ballistic, fourph, fourph_mesh_ref, use_Wannier_ifc2s
+         ph_mfp_npts, phthinfilm, phthinfilm_ballistic, fourph, fourph_mesh_ref, use_Wannier_ifc2s, &
+         phiso_Tmat
 
     call subtitle("Reading numerics information...")
     
@@ -165,6 +168,7 @@ contains
     tetrahedra = .false.
     phe = .false.
     phiso = .false.
+    phiso_Tmat = .false.
     phsubs = .false.
     phbound = .false.
     fourph = .false.
@@ -216,6 +220,7 @@ contains
        self%read_W = read_W
        self%phe = phe
        self%phiso = phiso
+       self%phiso_Tmat = phiso_Tmat
        self%phsubs = phsubs
        self%phbound = phbound
        self%fourph = fourph
@@ -261,6 +266,7 @@ contains
     if(self%onlyebte) then
        self%onlyphbte = .false.
        self%phiso = .false.
+       self%phiso_Tmat = .false.
        self%phsubs = .false.
        self%drag = .false.
        self%phe = .false.
@@ -274,6 +280,10 @@ contains
     !Check if T-matrix and tetrahedron method consistency
     if(self%phdef_Tmat .and. .not. self%tetrahedra) then
        call exit_with_message("Currently T-matrix method is only supported with tetrahedron method. Exiting.")
+    end if
+
+    if(self%phiso_Tmat .and. .not. self%phdef_Tmat) then
+       call exit_with_message("For ph-iso scattering from T-matrix, need both phiso_Tmat and phdef_Tmat. Exiting.")
     end if
     
     !Create data dump directory
@@ -337,7 +347,8 @@ contains
           write(*, "(A, L)") "Reuse ph-ph matrix elements: ", self%read_V
           write(*, "(A, L)") "Reuse ph-ph transition probabilities: ", self%read_W
           write(*, "(A, L)") "Include ph-e interaction: ", self%phe
-          write(*, "(A, L)") "Include ph-isotope interaction: ", self%phiso       
+          write(*, "(A, L)") "Include ph-isotope interaction: ", self%phiso
+          write(*, "(A, L)") "Calculate ph-isotope interaction from T-matrix: ", self%phiso_Tmat
           write(*, "(A, L)") "Include ph-substitution interaction: ", self%phsubs
           write(*, "(A, L)") "Include ph-boundary interaction: ", self%phbound
           write(*, "(A, L)") "Include 4-ph interaction: ", self%fourph

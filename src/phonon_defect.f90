@@ -195,15 +195,17 @@ contains
     distance_from_origin = minval(distance_from_origins)
   end function distance_from_origin
   
-  subroutine calculate_phonon_Tmatrix(self, ph, crys)
+  subroutine calculate_phonon_Tmatrix(self, ph, crys, scatt_rates)
 
     class(phonon_defect), intent(inout) :: self
     type(phonon), intent(in) :: ph
     type(crystal), intent(in) :: crys
+    real(r64), allocatable, intent(out) :: scatt_rates(:, :)
   
     integer(i64) :: host, ik, i, j, dopant
     real(r64) :: def_frac
-    real(r64), allocatable :: scatt_rates(:, :), renorm_ens(:, :), lineshifts(:, :)
+    !real(r64), allocatable :: scatt_rates(:, :), renorm_ens(:, :), lineshifts(:, :)
+    real(r64), allocatable :: renorm_ens(:, :), lineshifts(:, :)
     complex(r64), allocatable :: irred_diagT(:, :, :)
 
     real(r64) :: V_mass_iso(crys%numelements)
