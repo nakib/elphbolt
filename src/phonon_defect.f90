@@ -210,7 +210,7 @@ contains
 
     real(r64) :: V_mass_iso(crys%numelements)
     integer(i64) :: num_atomtypes(crys%numelements)
-    
+
     num_atomtypes(:) = 0_i64
     do i = 1, crys%numelements
        do j = 1, crys%numatoms
@@ -222,10 +222,10 @@ contains
 
     allocate(scatt_rates(ph%nwv_irred, ph%numbands), &
          lineshifts(ph%nwv_irred, ph%numbands), renorm_ens(ph%nwv_irred, ph%numbands))
-    
+
     scatt_rates = 0.0_r64
     lineshifts = 0.0_r64
-    
+
     if(self%mass_defect) then
        do host = 1, crys%numelements
           do dopant = 1, crys%numdopants_types(host) !dopants of this host atom
@@ -254,9 +254,10 @@ contains
        renorm_ens(ik, :) = sqrt(ph%ens(ph%indexlist_irred(ik), :)**2 + &
             lineshifts(ik, :))
     end do
-    
+
     !Deal with Gamma point acoustic phonons
     scatt_rates(1, 1:3) = 0.0_r64
+    renorm_ens(1, 1:3) = 0.0_r64
 
     !Write to file
     call write2file_rank2_real(ph%prefix // '.W_rta_'//ph%prefix//'defect', scatt_rates)

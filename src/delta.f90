@@ -188,6 +188,8 @@ contains
           delta_fn_tetra = delta_fn_tetra + tmp
        end if ! .not. (e <= e1 .or. e >= e4)
     end do !itk
+
+    if(delta_fn_tetra < 1.0e-12_r64) delta_fn_tetra = 0.0_r64
     
     !Normalize with the total number of tetrahedra
     delta_fn_tetra = delta_fn_tetra/numtetra
@@ -840,6 +842,8 @@ contains
 
        delta_fn_triang = delta_fn_triang + tmp
     end do !itk
+
+    if(delta_fn_triang < 1.0e-12_r64) delta_fn_triang = 0.0_r64
         
     !Normalize with the total number of triangles
     delta_fn_triang = delta_fn_triang/numtriangs
