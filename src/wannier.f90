@@ -87,8 +87,6 @@ module wannier_module
 
      procedure :: read, el_wann, ph_wann, gkRp, gReq, g2, &
           plot_along_path, reshape_gwann_for_gkRp, deallocate_wannier
-
-     !This is perhaps the only Wannier-engine dependent procedure.
      procedure, private :: read_epw_Wannier, read_exciting_Wannier
   end type Wannier
 
@@ -107,6 +105,8 @@ contains
     
     namelist /wannier/ coarse_qmesh, Wannier_engine_name
 
+    call subtitle("Setting up Wannier...")
+    
     !Open input file
     open(1, file = 'input.nml', status = 'old')
 

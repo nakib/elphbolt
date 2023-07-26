@@ -66,16 +66,25 @@ program elphbolt
   !Calculate crystal and BZ symmetries
   call sym%calculate_symmetries(crys, num%qmesh)
 
+  sync all
+  call t_event%end_timer('Initialization')
+  
   if(num%use_Wannier_ifc2s .or. num%onlyebte .or. num%drag .or. num%phe &
        .or. num%plot_along_path .or. num%runlevel == 3) then
+     call t_event%start_timer('Wannier')
+     
      !Read EPW Wannier data
      call wann%read(num)
 
+     call t_event%end_timer('Wannier')
+
+     call t_event%start_timer('Electrons')
+
      !Calculate electrons
      call el%initialize(wann, crys, sym, num)
+
+     call t_event%end_timer('Electrons')
   end if
-  
-  call t_event%end_timer('Initialization')
   
   call t_event%start_timer('Phonons')
   

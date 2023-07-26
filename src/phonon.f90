@@ -101,7 +101,11 @@ contains
     end if
     
     !Calculate harmonic properties
-    call calculate_phonons(self, crys, sym, num, wann)
+    if(present(wann)) then
+       call calculate_phonons(self, crys, sym, num, wann)
+    else
+       call calculate_phonons(self, crys, sym, num)
+    end if
 
     if(.not. num%onlyebte .and. num%runlevel /= 3) then
        !Read ifc3s and related quantities
@@ -177,7 +181,7 @@ contains
        allocate(evecs_chunk(chunk, self%numbands, self%numbands)[*])
 
        !Calculate FBZ phonon quantities
-       if(num%use_Wannier_ifc2s) then
+       if(num%use_Wannier_ifc2s .and. present(wann)) then
           call wann%ph_wann(crys, chunk, self%wavevecs(start:end, :), &
                ens_chunk, evecs_chunk, vels_chunk)
        else
@@ -945,7 +949,11 @@ contains
     ncell_g = int(sqrt(geg)/self%cell_g(:, 0)) + 1
     
     dyn_s = 0.0_r64
-    if(present(velocities)) ddyn_s = 0.0_r64
+    dyn_l = 0.0_r64
+    if(present(velocities)) then
+       ddyn_s = 0.0_r64
+       ddyn_l = 0.0_r64
+    end if
 
     counter = 0
     
