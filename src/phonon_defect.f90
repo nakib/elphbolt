@@ -194,7 +194,7 @@ contains
     !Return the minimum distance
     distance_from_origin = minval(distance_from_origins)
   end function distance_from_origin
-  
+
   subroutine calculate_phonon_Tmatrix(self, ph, crys, scatt_rates)
 
     class(phonon_defect), intent(inout) :: self
@@ -208,7 +208,7 @@ contains
     real(r64), allocatable :: renorm_ens(:, :), lineshifts(:, :)
     complex(r64), allocatable :: irred_diagT(:, :, :)
 
-    real(r64) :: V_mass_iso(crys%numelements)
+    real(r64) :: V_mass_iso(crys%numatoms)
     integer(i64) :: num_atomtypes(crys%numelements)
 
     num_atomtypes(:) = 0_i64
@@ -227,22 +227,27 @@ contains
     lineshifts = 0.0_r64
 
     if(self%mass_defect) then
-       do host = 1, crys%numelements
-          do dopant = 1, crys%numdopants_types(host) !dopants of this host atom
+       do host = 1, crys%numatoms
+          do dopant = 1, crys%numdopants_types(crys%atomtypes(host))
+
              V_mass_iso = 0.0_r64
-             V_mass_iso(host) = 1.0_r64 - crys%dopant_masses(dopant, host)/crys%masses(host)
+             V_mass_iso(host) = &
+                  1.0_r64 - crys%dopant_masses(dopant, crys%atomtypes(host))/crys%masses(crys%atomtypes(host))
 
-             call self%calculate_phonon_Tmatrix_host(ph, crys, host, &
-                  irred_diagT(:, :, host), V_mass_iso)
+             call self%calculate_phonon_Tmatrix_host(ph, crys, &
+                  irred_diagT(:, :, crys%atomtypes(host)), V_mass_iso)
 
-             def_frac = crys%dopant_conc(dopant, host)*(1.0e-21_r64*crys%volume)/num_atomtypes(host)
+             def_frac = crys%dopant_conc(dopant, crys%atomtypes(host))*&
+                  (1.0e-21_r64*crys%volume)/num_atomtypes(crys%atomtypes(host))
 
+             print*, host, dopant, def_frac
+             
              do ik = 1, ph%nwv_irred
                 scatt_rates(ik, :) = scatt_rates(ik, :) + &
-                     def_frac*imag(irred_diagT(ik, :, host))/ph%ens(ph%indexlist_irred(ik), :)
+                     def_frac*imag(irred_diagT(ik, :, crys%atomtypes(host)))/ph%ens(ph%indexlist_irred(ik), :)
 
                 lineshifts(ik, :) = lineshifts(ik, :) + &
-                     def_frac*real(irred_diagT(ik, :, host))
+                     def_frac*real(irred_diagT(ik, :, crys%atomtypes(host)))
              end do
           end do
        end do
@@ -265,7 +270,8 @@ contains
     call write2file_rank2_real(ph%prefix // '.ens_renorm_ibz_'//ph%prefix//'defect', renorm_ens)
   end subroutine calculate_phonon_Tmatrix
   
-  subroutine calculate_phonon_Tmatrix_host(self, ph, crys, host_atom_type, diagT, V_mass)
+  !subroutine calculate_phonon_Tmatrix_host(self, ph, crys, host, diagT, V_mass)
+  subroutine calculate_phonon_Tmatrix_host(self, ph, crys, diagT, V_mass)
     !! Parallel calculator of the scattering T-matrix for phonons for a given approximation.
     !!
     !! D0 Retarded, bare Green's function in real space
@@ -277,16 +283,16 @@ contains
     type(phonon), intent(in) :: ph
     type(crystal), intent(in) :: crys
     complex(r64), intent(out) :: diagT(:, :)
-    real(r64), intent(in) :: V_mass(crys%numelements)
-    integer(i64), intent(in) :: host_atom_type
+    real(r64), intent(in) :: V_mass(crys%numatoms)
+    !integer(i64), intent(in) :: host
 
     !Local variables
     integer(i64) :: num_dof_def, numstates_irred, istate, &
          chunk, start, end, num_active_images, i, a, def_numatoms, &
-         dof_counter, iq, s, cell, atom, j
+         dof_counter, iq, s, cell, atom, j, atom2, b
     complex(r64), allocatable :: inv_one_minus_VD0(:, :), T_onsite(:, :, :), phi(:)
     real(r64), allocatable :: V(:, :), identity(:, :)
-    complex(r64) :: phase, ev(ph%numbands)
+    complex(r64) :: phase, ev(ph%numbands), caux
     real(r64) :: en_sq, val
 
     !Displacement degrees of freedom in the defective supercell 
@@ -327,7 +333,7 @@ contains
           dof_counter = 0
           do cell = 1, self%numcells
              do atom = 1, crys%numatoms !Number of atoms in the unit cell
-                val = en_sq*V_mass(crys%atomtypes(atom))
+                val = en_sq*V_mass(atom)
                 do a = 1, 3 !Cartesian directions
                    dof_counter = dof_counter + 1
                    !Since on-site mass perturbation is forced to be in the central unit cell,
@@ -338,7 +344,7 @@ contains
                 end do
              end do
           end do
-          
+         
           select case(self%approx)
           case('lowest order')
              ! Lowest order:
@@ -412,15 +418,7 @@ contains
           end do
 
           !<i|T|j> --> <sq|T|sq>
-!!$          diagT(iq, s) = dot_product(phi, matmul(T_onsite(:, :, istate), phi))
-          !For on-site perturbation, i.e. diagonal V, can evaluate the sum over
-          !j in the expression above by hand. This yields the following. One can
-          !see that for the virtual crystal approximation for the atomic mass and the
-          !1st Born approximtion for the isotope scattering, the Tamura model is exactly
-          !reproduced.
-          do i = 1, num_dof_def
-             diagT(iq, s) = diagT(iq, s) + T_onsite(i, i, istate)*abs(phi(i))**2
-          end do
+          diagT(iq, s) = dot_product(phi, matmul(T_onsite(:, :, istate), phi))
        end do
     end if
     
