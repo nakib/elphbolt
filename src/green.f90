@@ -103,11 +103,10 @@ contains
     
     !Local variables
     integer(i64) :: nstates_irred, chunk, start, end, num_active_images, &
-         istate1, s1, iq1_ibz, iq1, s2, iq2, i, j, num_dof_def, a, dof_counter, iq, &
-         tau_sc, tau_uc, def_numatoms, def_numcells, atom, cell
-    real(r64) :: en1_sq, q_cart(3)
-    complex(r64) :: d0_istate, phase, ev(ph%numbands, ph%numbands), dos(ph%nwv_irred, ph%numbands), &
-         caux
+         istate1, s1, iq1_ibz, iq1, s2, iq2, j, num_dof_def, dof_counter, iq, &
+         def_numatoms, def_numcells
+    real(r64) :: en1_sq
+    complex(r64) :: d0_istate, phase, ev(ph%numbands, ph%numbands)!, dos(ph%nwv_irred, ph%numbands)
     complex(r64), allocatable :: phi(:, :, :), phi_internal(:)
 
     !Total number of atoms in the defective block of the supercell

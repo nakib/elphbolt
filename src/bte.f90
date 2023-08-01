@@ -1166,7 +1166,7 @@ contains
     !Local variables
     integer(i64) :: nstates_irred, nprocs, chunk, istate, numbands, numbranches, &
          ik_ibz, m, ieq, ik_sym, ik_fbz, iproc, iq, s, nk, num_active_images, &
-         ipol, fineq_indvec(3), start, end, iq2inter
+         fineq_indvec(3), start, end, iq2inter
     integer(i64), allocatable :: istate_el(:), istate_ph(:)
     real(r64) :: tau_ibz, ForG(3)
     real(r64), allocatable :: Xplus(:), Xminus(:), ph_drag_term_reduce(:,:,:)

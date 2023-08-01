@@ -79,8 +79,6 @@ module crystal_module
      !! Concentration of the substitutional atoms in cm^-3 [D]
      real(r64), allocatable :: subs_gfactors(:)
      !! g-factors for the substitutional defects. [D]
-     integer(i64), allocatable :: defect_hosts(:)
-     !! Basis atom sites that can be a host for an impurity, one for each unique element.
      integer(i64), allocatable :: numdopants_types(:)
      !! Number of dopant types at each host atom site.
      real(r64), allocatable :: dopant_masses(:, :)
@@ -114,7 +112,7 @@ contains
 
     !Local variables
     integer(i64) :: i, j, k, numelements, numatoms
-    integer(i64), allocatable :: atomtypes(:), num_atomtypes(:), defect_hosts(:), numdopants_types(:)
+    integer(i64), allocatable :: atomtypes(:), num_atomtypes(:), numdopants_types(:)
     real(r64), allocatable :: masses(:), born(:,:,:), basis(:,:), &
          basis_cart(:,:), subs_perc(:), subs_masses(:), subs_conc(:), &
          dopant_masses(:, :), dopant_conc(:, :)
@@ -129,7 +127,7 @@ contains
     namelist /crystal_info/ name, elements, atomtypes, basis, lattvecs, &
          polar, born, epsilon, read_epsiloninf, epsilon0, epsiloninf, &
          masses, T, autoisotopes, twod, subs_masses, subs_conc, bound_length, &
-         defect_hosts, numdopants_types, dopant_masses, dopant_conc, thinfilm_height, &
+         numdopants_types, dopant_masses, dopant_conc, thinfilm_height, &
          thinfilm_normal
 
     call subtitle("Setting up crystal...")
@@ -153,12 +151,12 @@ contains
     allocate(elements(numelements), atomtypes(numatoms), born(3,3,numatoms), &
          basis(3,numatoms), masses(numelements), basis_cart(3,numatoms), &
          subs_masses(numelements), subs_conc(numelements), subs_perc(numelements), &
-         num_atomtypes(numelements), defect_hosts(numelements), &
+         num_atomtypes(numelements), &
          numdopants_types(numelements), dopant_masses(10, numelements), dopant_conc(10, numelements))
     allocate(self%elements(self%numelements), self%atomtypes(self%numatoms), self%born(3,3,self%numatoms), &
          self%masses(self%numatoms), self%gfactors(self%numelements), self%basis(3,self%numatoms), &
          self%basis_cart(3,self%numatoms), self%subs_masses(self%numelements), self%subs_conc(self%numelements), &
-         self%subs_gfactors(self%numelements), self%defect_hosts(self%numelements))
+         self%subs_gfactors(self%numelements))
     
     !Read crystal_info
     name = trim(adjustl('Crystal'))
@@ -178,7 +176,6 @@ contains
     twod = .false.
     subs_masses = 0.0_r64
     subs_conc = 0.0_r64
-    defect_hosts = -1_i64
     bound_length = 1.e12_r64 !mm, practically inifinity
     thinfilm_height = 1.e12_r64 !mm, practically inifinity
     thinfilm_normal = 'z'
@@ -225,7 +222,6 @@ contains
     self%bound_length = bound_length
     self%thinfilm_height = thinfilm_height
     self%thinfilm_normal = thinfilm_normal
-    self%defect_hosts = defect_hosts
     self%numdopants_types = numdopants_types
     
     if(product(numdopants_types) <= 0) then
@@ -308,13 +304,6 @@ contains
     !Print out crystal and reciprocal lattice information.
     if(this_image() == 1) then
        write(*, "(A, A)") 'Material: ', self%name
-
-       if(any(self%defect_hosts > 0)) then
-          write(*, "(A)") "Basis atom sites ready to host a substitution:"
-          do i = 1, self%numelements
-             write(*, '(A, A, A, I5)') " ", self%elements(i), " at site ", self%defect_hosts(i)
-          end do
-       end if
        
        if(self%autoisotopes) write(*,"(A)") 'Isotopic average of masses will be used.'
        do i = 1, self%numelements

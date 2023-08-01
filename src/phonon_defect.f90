@@ -204,7 +204,6 @@ contains
   
     integer(i64) :: host, ik, i, j, dopant
     real(r64) :: def_frac
-    !real(r64), allocatable :: scatt_rates(:, :), renorm_ens(:, :), lineshifts(:, :)
     real(r64), allocatable :: renorm_ens(:, :), lineshifts(:, :)
     complex(r64), allocatable :: irred_diagT(:, :, :)
 
@@ -229,7 +228,6 @@ contains
     if(self%mass_defect) then
        do host = 1, crys%numatoms
           do dopant = 1, crys%numdopants_types(crys%atomtypes(host))
-
              V_mass_iso = 0.0_r64
              V_mass_iso(host) = &
                   1.0_r64 - crys%dopant_masses(dopant, crys%atomtypes(host))/crys%masses(crys%atomtypes(host))
@@ -240,8 +238,6 @@ contains
              def_frac = crys%dopant_conc(dopant, crys%atomtypes(host))*&
                   (1.0e-21_r64*crys%volume)/num_atomtypes(crys%atomtypes(host))
 
-             print*, host, dopant, def_frac
-             
              do ik = 1, ph%nwv_irred
                 scatt_rates(ik, :) = scatt_rates(ik, :) + &
                      def_frac*imag(irred_diagT(ik, :, crys%atomtypes(host)))/ph%ens(ph%indexlist_irred(ik), :)
@@ -289,10 +285,10 @@ contains
     !Local variables
     integer(i64) :: num_dof_def, numstates_irred, istate, &
          chunk, start, end, num_active_images, i, a, def_numatoms, &
-         dof_counter, iq, s, cell, atom, j, atom2, b
+         dof_counter, iq, s, cell, atom
     complex(r64), allocatable :: inv_one_minus_VD0(:, :), T_onsite(:, :, :), phi(:)
     real(r64), allocatable :: V(:, :), identity(:, :)
-    complex(r64) :: phase, ev(ph%numbands), caux
+    complex(r64) :: phase, ev(ph%numbands)
     real(r64) :: en_sq, val
 
     !Displacement degrees of freedom in the defective supercell 
