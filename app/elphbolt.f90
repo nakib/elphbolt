@@ -115,10 +115,15 @@ program elphbolt
 
      !Calculate phonon density of states and, if needed, phonon-isotope
      !and/or phonon-substitution scattering rates.
-     call calculate_dos(ph, num%tetrahedra, crys%gfactors_VCA, crys%subs_gfactors, &
-          crys%atomtypes, bt%ph_rta_rates_iso_ibz, bt%ph_rta_rates_subs_ibz, &
-          num%phiso, num%phsubs, num%phiso_Tmat)
-
+     !
+     !Captain's log. August 11, 2023.
+     !I am not a fan of calculating any type of scattering using the density of
+     !states calculator. This is a one time calculation and by far not a bottleneck.
+     !I will move the phonon-isotope and phonon-isotope scattering stuff to where
+     !they belong -- interactions.f90 -- soon.
+     call calculate_dos(ph, crys, num%tetrahedra, bt%ph_rta_rates_iso_ibz, bt%ph_rta_rates_subs_ibz, &
+             num%phiso, num%phiso_1B_theory, num%phsubs, num%phiso_Tmat)
+     
      call t_event%end_timer('Density of states and one-particle scattering rates')
      
      if(num%plot_along_path) then

@@ -234,8 +234,8 @@ contains
     sync all
   end subroutine calculate_el_dos
 
-  subroutine calculate_ph_dos_iso(ph, usetetra, gfactors, subs_gfactors, &
-       atomtypes, W_phiso, W_phsubs, phiso, phsubs, phiso_Tmat)
+  subroutine calculate_ph_dos_iso(ph, crys, usetetra,  &
+       W_phiso, W_phsubs, phiso, phiso_1B_theory, phsubs, phiso_Tmat)
     !! Calculate the phonon density of states (DOS) in units of 1/energy and,
     !! optionally, the phonon-isotope scattering rates.
     !!
@@ -245,9 +245,11 @@ contains
     !! usetetra Use the tetrahedron method for delta functions?
 
     type(phonon), intent(inout) :: ph
+    type(crystal), intent(in) :: crys
     logical, intent(in) :: usetetra, phiso, phsubs, phiso_Tmat
-    real(r64), intent(in) :: gfactors(:), subs_gfactors(:)
-    integer(i64), intent(in) :: atomtypes(:)
+    !real(r64), intent(in) :: gfactors(:), subs_gfactors(:)
+    !integer(i64), intent(in) :: atomtypes(:)
+    character(len = 6), intent(in) :: phiso_1B_theory
     real(r64), intent(out), allocatable :: W_phiso(:,:), W_phsubs(:,:)
     
     !Local variables
@@ -261,7 +263,7 @@ contains
     call print_message("Calculating phonon density of states and (if needed) isotope/substitution scattering...")
 
     !Number of basis atoms
-    numatoms = size(atomtypes)
+    numatoms = size(crys%atomtypes)
     
     !Allocate start and end coarrays
     allocate(start[*], end[*])
@@ -319,14 +321,19 @@ contains
 
                          !Calculate phonon-isotope scattering in the Tamura model                   
                          if(phiso .and. .not. phiso_Tmat) then
-                            W_phiso_chunk(counter, ib) = W_phiso_chunk(counter, ib) + &
-                                 delta*aux*gfactors(atomtypes(a))*e**2
+                            if(phiso_1B_theory == 'DIB-1B') then !DIB 1st Born
+                               W_phiso_chunk(counter, ib) = W_phiso_chunk(counter, ib) + &
+                                    delta*aux*crys%gfactors_DIB(crys%atomtypes(a))*e**2
+                            else !Tamura (= VCA 1st Born)
+                               W_phiso_chunk(counter, ib) = W_phiso_chunk(counter, ib) + &
+                                    delta*aux*crys%gfactors_VCA(crys%atomtypes(a))*e**2
+                            end if
                          end if
 
                          !Calculate phonon-substitution scattering in the Tamura model
                          if(phsubs) then
                             W_phsubs_chunk(counter, ib) = W_phsubs_chunk(counter, ib) + &
-                                 delta*aux*subs_gfactors(atomtypes(a))*e**2
+                                 delta*aux*crys%subs_gfactors(crys%atomtypes(a))*e**2
                          end if
                       end do
                    end if
