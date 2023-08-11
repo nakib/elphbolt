@@ -32,7 +32,7 @@ module wannier_module
   !Captain's log. April 18, 2023.
   !I have pulled this out of the epw_wannier data type
   !and made it a module level, private variable. Doing this leads to
-  !much performance in the calculations involving contractions of gwann's indices.
+  !much performance (#dogememe) in the calculations involving contractions of gwann's indices.
   !I suspect that there is a bug in the compiler/OpenCoarrays library 
   !that causes memory access to be slow when gwann is a member of a data type.
   !I will move this back into the data type when the bug is fixed. --NHP

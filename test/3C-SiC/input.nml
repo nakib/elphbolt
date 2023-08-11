@@ -8,6 +8,7 @@
  elements ='Si' 'C'
  atomtypes = 1 2
  polar = .true.
+ VCA = .true.
  lattvecs(:,1) = -0.216954731 0.000000000 0.216954731
  lattvecs(:,2) =  0.000000000 0.216954731 0.216954731
  lattvecs(:,3) = -0.216954731 0.216954731 0.000000000
@@ -48,6 +49,7 @@
  read_V = .f.
  read_gk2 = .f.
  phiso = .t.
+ phiso_1B_theory = 'Tamura'
  elchimp = .t.
  tetrahedra = .true.
  drag = .t.

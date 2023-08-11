@@ -115,7 +115,7 @@ program elphbolt
 
      !Calculate phonon density of states and, if needed, phonon-isotope
      !and/or phonon-substitution scattering rates.
-     call calculate_dos(ph, num%tetrahedra, crys%gfactors, crys%subs_gfactors, &
+     call calculate_dos(ph, num%tetrahedra, crys%gfactors_VCA, crys%subs_gfactors, &
           crys%atomtypes, bt%ph_rta_rates_iso_ibz, bt%ph_rta_rates_subs_ibz, &
           num%phiso, num%phsubs, num%phiso_Tmat)
 

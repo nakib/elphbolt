@@ -71,8 +71,10 @@ module numerics_module
      !! Choose if ph-e interaction will be included.
      logical :: phiso
      !! Use phonon-isotope scattering?
+     character(len = 6) :: phiso_1B_theory
+     !! Choose phonon-isotope 1st Born scattering theory from "Tamura" or "DIB-1B".
      logical :: phiso_Tmat
-     !! Calculate phonon-isotope scattering from ph-iso T-matrix?
+     !! Calculate phonon-isotope scattering from general subsitutional defect T-matrix formalism?
      logical :: phsubs
      !! Use phonon-substitution scattering?
      logical :: phbound
@@ -139,6 +141,7 @@ contains
          ph_en_num, ph_mfp_npts, fourph_mesh_ref
     real(r64) :: fsthick, conv_thres, ph_en_min, ph_en_max, el_en_min, el_en_max
     character(len = 1024) :: datadumpdir, tag
+    character(len = 6) :: phiso_1B_theory
     logical :: read_gq2, read_gk2, read_V, read_W, tetrahedra, phe, phiso, phsubs, &
          phbound, phdef_Tmat, onlyphbte, onlyebte, elchimp, elbound, drag, plot_along_path, &
          phthinfilm, phthinfilm_ballistic, fourph, use_Wannier_ifc2s, phiso_Tmat
@@ -148,7 +151,7 @@ contains
          conv_thres, drag, elchimp, plot_along_path, runlevel, ph_en_min, ph_en_max, &
          ph_en_num, el_en_min, el_en_max, el_en_num, phbound, elbound, phdef_Tmat, &
          ph_mfp_npts, phthinfilm, phthinfilm_ballistic, fourph, fourph_mesh_ref, use_Wannier_ifc2s, &
-         phiso_Tmat
+         phiso_Tmat, phiso_1B_theory
 
     call subtitle("Reading numerics information...")
     
@@ -168,6 +171,7 @@ contains
     tetrahedra = .false.
     phe = .false.
     phiso = .false.
+    phiso_1B_theory = "DIB-1B"
     phiso_Tmat = .false.
     phsubs = .false.
     phbound = .false.
@@ -206,6 +210,14 @@ contains
     if(phbound .and. phthinfilm) then
        call exit_with_message('ph-boundary and ph-thin-film scattering not allowed together. Exiting.')
     end if
+    !print*, phiso_1B_theory
+    if((phiso_1B_theory /= "Tamura") .and. (phiso_1B_theory /= "DIB-1B")) then
+       call exit_with_message("phiso_1B_theory can be either 'Tamura' or 'DIB-1B'. Exiting.")
+    end if
+    if(phiso_1B_theory == "DIB-1B" .and. crys%VCA) then
+       call exit_with_message("phiso_1B_theory can't be 'DIB-1B' if 'VCA' is true. Exiting.")
+    end if
+    
     self%qmesh = qmesh
     self%runlevel = runlevel
     !Runlevels:
@@ -220,6 +232,7 @@ contains
        self%read_W = read_W
        self%phe = phe
        self%phiso = phiso
+       self%phiso_1B_theory = phiso_1B_theory
        self%phiso_Tmat = phiso_Tmat
        self%phsubs = phsubs
        self%phbound = phbound
@@ -348,6 +361,8 @@ contains
           write(*, "(A, L)") "Reuse ph-ph transition probabilities: ", self%read_W
           write(*, "(A, L)") "Include ph-e interaction: ", self%phe
           write(*, "(A, L)") "Include ph-isotope interaction: ", self%phiso
+          if(self%phiso) &
+               write(*, "(A, A)") "Selected ph-isotope 1st Born theory: ", self%phiso_1B_theory
           write(*, "(A, L)") "Calculate ph-isotope interaction from T-matrix: ", self%phiso_Tmat
           write(*, "(A, L)") "Include ph-substitution interaction: ", self%phsubs
           write(*, "(A, L)") "Include ph-boundary interaction: ", self%phbound
