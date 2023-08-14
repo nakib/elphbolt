@@ -166,7 +166,7 @@ contains
          num_atomtypes(numelements), numdopants_types(numelements), &
          dopant_masses(10, numelements), dopant_conc(10, numelements))
     allocate(self%elements(self%numelements), self%atomtypes(self%numatoms), &
-         self%born(3,3,self%numatoms), self%masses(self%numatoms), &
+         self%born(3,3,self%numatoms), self%masses(self%numelements), &
          self%gfactors_VCA(self%numelements), self%gfactors_DIB(self%numelements), &
          self%basis(3,self%numatoms), self%basis_cart(3,self%numatoms), &
          self%subs_masses(self%numelements), self%subs_conc(self%numelements), &
@@ -178,7 +178,7 @@ contains
     atomtypes = 0
     masses = -1.0_r64
     VCA = .false.
-    DIB = .true.
+    DIB = .false.
     lattvecs = 0.0_r64
     basis = 0.0_r64
     polar = .false.
@@ -198,12 +198,15 @@ contains
     dopant_masses = 0.0_r64
     dopant_conc = 0.0_r64
     read(1, nml = crystal_info)
-    if(any(atomtypes < 1) .or. T < 0.0_r64) then
-       call exit_with_message('Bad input(s) in crystal_info.')
-    end if
+    if(VCA .and. DIB) &
+         call exit_with_message("'VCA' and 'DIB' can't both be true.")
     if(VCA) DIB = .false.
-    if(.not. VCA .and. .not. DIB .and. any(masses < 0)) then
-       call exit_with_message('Bad input(s) in crystal_info.')
+    if(any(atomtypes < 1)) &
+         call exit_with_message("Atomtypes can't be negative.")
+    if(T < 0.0_r64) &
+         call exit_with_message("Negative temperatures not allowed here.")
+    if(.not. DIB .and. .not. VCA .and. any(masses < 0)) then
+       call exit_with_message("Provide valid basis atom masses for 'VCA' and 'DIB' false.")
     end if
     if(bound_length <= 0.0_r64) then
        call exit_with_message('Characteristic length for boundary scattering must be positive.')
@@ -279,7 +282,7 @@ contains
     if(self%VCA) &
          call calculate_mavg_and_g(self%elements, self%masses, self%gfactors_VCA)
     if(self%DIB) &
-         call calculate_g_DIB(self%elements, self%masses, self%gfactors_VCA)
+         call calculate_g_DIB(self%elements, self%masses, self%gfactors_DIB)
 
     !Calculate atomic basis in Cartesian coordinates
     self%basis_cart(:,:) = matmul(self%lattvecs,self%basis)

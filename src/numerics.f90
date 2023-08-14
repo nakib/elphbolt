@@ -217,6 +217,9 @@ contains
     if(phiso_1B_theory == "DIB-1B" .and. crys%VCA) then
        call exit_with_message("phiso_1B_theory can't be 'DIB-1B' if 'VCA' is true. Exiting.")
     end if
+    if(phiso_1B_theory == "Tamura" .and. crys%DIB) then
+       call exit_with_message("phiso_1B_theory can't be 'Tamura' if 'DIB' is true. Exiting.")
+    end if
     
     self%qmesh = qmesh
     self%runlevel = runlevel
