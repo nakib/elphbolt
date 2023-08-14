@@ -22,8 +22,8 @@ ln -s ../$inputdir/FORCE_CONSTANTS_3RD .
 ln -s ../$inputdir/espresso.ifc2 .
 
 #gcc+opencoarrays
-#Call elphbolt.x, for example, like this to run with 2 coarray images:
-~/OpenCoarrays/opencoarrays-install/bin/cafrun -n 2 ~/elphbolt/elphbolt.x
+#Call elphbolt, for example, like this to run with 2 coarray images:
+cafrun -n 2 ~/elphbolt/build/bin/elphbolt
 ##
 
 cd ..

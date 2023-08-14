@@ -8,4 +8,4 @@
 
  The file /output_gcc.txt/ gives the terminal print of the run.
 
- This calculation was done on 2 cpu cores of a Lenovo Thinkpad T440 machine running Ubuntu 20.04.2 LTS. The code was compiled with ~gcc v9.3.0 (Ubuntu 9.3.0-17ubuntu1~20.04)~ and ~OpenCoarrays v2.0.0~.
+ This calculation was done on 2 cpu cores on Dell Precision 3630 machine running Debian 4.19.289-1 (2023-07-24) x86_64 GNU/Linux. The code was compiled with ~gcc (Debian 8.3.0-6) 8.3.0~ and ~OpenCoarrays v2.9.2~.

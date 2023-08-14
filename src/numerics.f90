@@ -210,15 +210,17 @@ contains
     if(phbound .and. phthinfilm) then
        call exit_with_message('ph-boundary and ph-thin-film scattering not allowed together. Exiting.')
     end if
-    !print*, phiso_1B_theory
-    if((phiso_1B_theory /= "Tamura") .and. (phiso_1B_theory /= "DIB-1B")) then
-       call exit_with_message("phiso_1B_theory can be either 'Tamura' or 'DIB-1B'. Exiting.")
-    end if
-    if(phiso_1B_theory == "DIB-1B" .and. crys%VCA) then
-       call exit_with_message("phiso_1B_theory can't be 'DIB-1B' if 'VCA' is true. Exiting.")
-    end if
-    if(phiso_1B_theory == "Tamura" .and. crys%DIB) then
-       call exit_with_message("phiso_1B_theory can't be 'Tamura' if 'DIB' is true. Exiting.")
+
+    if(phiso) then
+       if((phiso_1B_theory /= "Tamura") .and. (phiso_1B_theory /= "DIB-1B")) then
+          call exit_with_message("phiso_1B_theory can be either 'Tamura' or 'DIB-1B'. Exiting.")
+       end if
+       if(phiso_1B_theory == "DIB-1B" .and. crys%VCA) then
+          call exit_with_message("phiso_1B_theory can't be 'DIB-1B' if 'VCA' is true. Exiting.")
+       end if
+       if(phiso_1B_theory == "Tamura" .and. crys%DIB) then
+          call exit_with_message("phiso_1B_theory can't be 'Tamura' if 'DIB' is true. Exiting.")
+       end if
     end if
     
     self%qmesh = qmesh
