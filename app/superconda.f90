@@ -31,7 +31,8 @@ program superconda
   use phonon_module, only: phonon
   use wannier_module, only: wannier
   use MigEl_sc_module, only: migel_sc
-  use bz_sums, only: calculate_el_dos_fermi, calculate_el_Ws
+  use bz_sums, only: calculate_el_dos_fermi, calculate_el_dos_fermi_Gaussian, &
+       calculate_el_Ws, calculate_el_Ws_Gaussian
   use interactions, only: calculate_gkRp, calculate_eph_interaction_ibzk 
   use eliashberg, only: calculate_a2F
   
@@ -108,10 +109,12 @@ program superconda
   call subtitle("Calculating density of states...")
 
   !Calculate electron density of states at the Fermi level
-  call calculate_el_dos_Fermi(el, num%tetrahedra)
+  !call calculate_el_dos_Fermi(el, num%tetrahedra)
+  call calculate_el_dos_Fermi_Gaussian(el, crys%reclattvecs)
 
   !Calculate the scaled electron delta functions
-  call calculate_el_Ws(el, num%tetrahedra)
+  !call calculate_el_Ws(el, num%tetrahedra)
+  call calculate_el_Ws_Gaussian(el, crys%reclattvecs)
 
   call t_event%end_timer('Density of states')
 

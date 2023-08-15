@@ -17,7 +17,7 @@
 module bz_sums
   !! Module containing the procedures to do Brillouin zone sums.
 
-  use params, only: r64, i64, kB, qe, pi, hbar_eVps, perm0
+  use params, only: r64, i64, kB, qe, pi, hbar_eVps, perm0, twopi
   use misc, only: exit_with_message, print_message, write2file_rank2_real, &
        distribute_points, Bose, Fermi, binsearch
   use phonon_module, only: phonon
@@ -29,7 +29,8 @@ module bz_sums
   implicit none
 
   public calculate_dos, calculate_transport_coeff, calculate_qTF, &
-       calculate_el_dos_fermi, calculate_el_Ws, calculate_mfp_cumulative_transport_coeff
+       calculate_el_dos_fermi, calculate_el_Ws, calculate_mfp_cumulative_transport_coeff, &
+       calculate_el_dos_fermi_gaussian, calculate_el_Ws_gaussian
   private calculate_el_dos, calculate_ph_dos_iso
 
   interface calculate_dos
@@ -71,6 +72,56 @@ contains
     end if
   end subroutine calculate_qTF
 
+  subroutine calculate_el_dos_Fermi_Gaussian(el, reclattvecs)
+    !! Calculate spin-normalized electron density of states at the Fermi level
+    !! using the adaptive Gaussian broadening method.
+    !! Ref: Eq. 18 of Computer Physics Communications 185 (2014) 1747–1758
+    !!
+    !! el Electron data type
+
+    type(electron), intent(inout) :: el
+    real(r64), intent(in) :: reclattvecs(3, 3)
+
+    integer(i64) :: ikp, ibp
+    integer :: dim
+    real(r64) :: sigma, delta, onebyroot2pi, onebyroot12, aux, Qs(3, 3)
+
+    onebyroot2pi = 1.0_r64/sqrt(twopi)
+    onebyroot12 = 1.0_r64/sqrt(12.0_r64)
+
+    do dim = 1, 3
+       Qs(dim, :) = reclattvecs(dim, :)/el%wvmesh(dim)
+    end do
+    
+    call print_message("Calculating spin-normalized electronic density of states at Fermi level...")
+
+    el%spinnormed_dos_fermi = 0.0_r64
+    do ikp = 1, el%nwv !over FBZ blocks
+       do ibp = 1, el%numbands
+          !Calculate adaptive smearing
+          aux = 0.0_r64
+          do dim = 1, 3
+             aux = aux + &
+                  dot_product(el%vels(ikp, ibp, :), Qs(dim, :))**2
+          end do
+          sigma = hbar_eVps*onebyroot12*sqrt(aux)
+          
+          !Evaluate delta[E(iq',ib') - E_Fermi]
+          delta = max(onebyroot2pi/sigma*&
+               exp(-0.5_r64*((el%chempot - el%ens(ikp, ibp))/sigma)**2), 1.0e-4_r64)
+
+          el%spinnormed_dos_fermi = el%spinnormed_dos_fermi + delta
+       end do
+    end do
+    el%spinnormed_dos_fermi = el%spinnormed_dos_fermi/product(el%wvmesh)
+
+    if(this_image() == 1) then
+       write(*, "(A, 1E16.8, A)") ' Spin-normalized DOS(Ef) = ', el%spinnormed_dos_fermi, ' 1/eV/spin'
+    end if
+
+    sync all
+  end subroutine calculate_el_dos_Fermi_Gaussian
+  
   subroutine calculate_el_dos_Fermi(el, usetetra)
     !! Calculate spin-normalized electron density of states at the Fermi level
     !!
@@ -108,6 +159,63 @@ contains
     sync all
   end subroutine calculate_el_dos_Fermi
 
+  subroutine calculate_el_Ws_Gaussian(el, reclattvecs)
+    !! Calculate all electron delta functions scaled by spin-normalized DOS(Ef)
+    !! W_mk = delta[E_mk - Ef]/DOS(Ef)
+    !
+    !Note that here the delta function weights are already supercell normalized. 
+
+    type(electron), intent(inout) :: el
+    real(r64), intent(in) :: reclattvecs(3, 3)    
+    
+    !Local variables
+    integer(i64) :: ik_ibz, ik_fbz, ieq, ib
+    integer :: dim
+    real(r64) :: sigma, delta, onebyroot2pi, onebyroot12, aux, Qs(3, 3)
+    
+    onebyroot2pi = 1.0_r64/sqrt(twopi)
+    onebyroot12 = 1.0_r64/sqrt(12.0_r64)
+
+    do dim = 1, 3
+       Qs(dim, :) = reclattvecs(dim, :)/el%wvmesh(dim)
+    end do
+    
+    call print_message("Calculating DOS(Ef) normalized electron delta functions...")
+
+    allocate(el%Ws(el%nwv, el%numbands))
+    allocate(el%Ws_irred(el%nwv_irred, el%numbands))
+
+    el%Ws_irred = 0.0_r64
+    do ik_ibz = 1, el%nwv_irred
+       do ieq = 1, el%nequiv(ik_ibz)
+          call binsearch(el%indexlist, el%ibz2fbz_map(ieq, ik_ibz, 2), ik_fbz)
+          do ib =1, el%numbands
+             !Calculate adaptive smearing
+             aux = 0.0_r64
+             do dim = 1, 3
+                aux = aux + &
+                     dot_product(el%vels(ik_fbz, ib, :), Qs(dim, :))**2
+             end do
+             sigma = hbar_eVps*onebyroot12*sqrt(aux)
+
+             !Evaluate delta[E(iq',ib') - E_Fermi]
+             delta = max(onebyroot2pi/sigma*&
+                  exp(-0.5_r64*((el%chempot - el%ens(ik_fbz, ib))/sigma)**2), 1.0e-4_r64)
+
+             el%Ws(ik_fbz, ib) = delta
+          end do
+          el%Ws_irred(ik_ibz, :) = el%Ws_irred(ik_ibz, :) + &
+               el%Ws(ik_fbz, :)
+       end do
+       !Get the irreducible quantities as an average over all FBZ images
+       el%Ws_irred(ik_ibz, :) = el%Ws_irred(ik_ibz, :)/el%nequiv(ik_ibz)
+    end do
+    el%Ws = el%Ws/el%spinnormed_dos_fermi/product(el%wvmesh)
+    el%Ws_irred = el%Ws_irred/el%spinnormed_dos_fermi/product(el%wvmesh)
+    
+    sync all
+  end subroutine calculate_el_Ws_Gaussian
+  
   subroutine calculate_el_Ws(el, usetetra)
     !! Calculate all electron delta functions scaled by spin-normalized DOS(Ef)
     !! W_mk = delta[E_mk - Ef]/DOS(Ef)
