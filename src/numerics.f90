@@ -35,6 +35,10 @@ module numerics_module
      !! Phonon wave vector mesh.
      integer(i64) :: mesh_ref
      !! Electron mesh refinement factor compared to the phonon mesh.
+     logical :: eco_mode
+     !! Use coarse grained matrix elements?
+     integer(i64) :: econess
+     !! How much coarse graining for the matrix elements?
      real(r64) :: fsthick
      !! Fermi surface thickness in eV.
      character(len = 1024) :: cwd
@@ -222,6 +226,11 @@ contains
           call exit_with_message("phiso_1B_theory can't be 'Tamura' if 'DIB' is true. Exiting.")
        end if
     end if
+
+    !eco mode DBG
+    self%eco_mode = .true.
+    self%econess = 2
+    !!
     
     self%qmesh = qmesh
     self%runlevel = runlevel

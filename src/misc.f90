@@ -650,11 +650,30 @@ contains
        s = s + 0.5_r64*(f(n) + f(n - 1))*h
     end if
   end subroutine compsimps
+
+  integer(i64) function coarse_grained(iwv_fine, coarsening_factor, mesh)
+    !! Given a 1-based muxed wave vector on the fine mesh,
+    !! calculates a 1-based muxed coarse-grained wave vector on the
+    !! same mesh.
+    !! iwv_fine is the 1-based 1-based muxed wave vector
+    !! coarsening_factor is the coarsening factor
+    !! mesh is the number of wave vectors along the three reciprocal lattice vectors.
+
+    integer(i64), intent(in) :: iwv_fine, coarsening_factor, mesh(3)
+
+    !Locals
+    integer(i64) :: wv_fine(3)
+    
+    call demux_vector(iwv_fine, wv_fine, mesh, 0_i64)
+    coarse_grained = mux_vector(&
+         modulo(nint((dble(wv_fine)/coarsening_factor), kind = i64), mesh), &
+         mesh, 0_i64)
+  end function coarse_grained
   
   function mux_vector(v, mesh, base)
     !! Multiplex index of a single wave vector.
+    !! Output is always 1-based.
     !! v is the demultiplexed triplet of a wave vector.
-    !! i is the multiplexed index of a wave vector (always 1-based).
     !! mesh is the number of wave vectors along the three reciprocal lattice vectors.
     !! base states whether v has 0- or 1-based indexing.
 
