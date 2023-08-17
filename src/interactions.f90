@@ -128,6 +128,22 @@ contains
 
     Vm2_3ph = abs(aux1)**2
   end function Vm2_3ph
+
+!!$  subroutine calculate_coarse_grained_3ph_vertex(ph, crys, num)
+!!$    !! TODO
+!!$    
+!!$    type(phonon), intent(in) :: ph
+!!$    type(crystal), intent(in) :: crys
+!!$    type(numerics), intent(in) :: num
+!!$
+!!$    !Total number of IBZ blocks states
+!!$    nstates_irred = ph%nwv_irred*ph%numbands
+!!$
+!!$    !Maximum total number of 3-phonon processes for a given initial phonon state
+!!$    nprocs = ph%nwv*ph%numbands**2
+!!$
+!!$    
+!!$  end subroutine calculate_coarse_grained_3ph_vertex
   
   subroutine calculate_3ph_interaction(ph, crys, num, key)
     !! Parallel driver of the 3-ph vertex calculator for all IBZ phonon wave vectors.
@@ -140,7 +156,7 @@ contains
     type(crystal), intent(in) :: crys
     type(numerics), intent(in) :: num
     character(len = 1), intent(in) :: key
-    
+
     !Local variables
     integer(i64) :: start, end, chunk, istate1, nstates_irred, &
          nprocs, s1, s2, s3, iq1_ibz, iq1, iq2, iq3_minus, it, &
@@ -162,7 +178,7 @@ contains
     else
        call print_message("Calculating 3-ph transition probabilities for all IBZ phonons...")
     end if
-   
+
     !Conversion factor in transition probability expression
     const = pi/4.0_r64*hbar_eVps**5*(qe/amu)**3*1.0d-12
 
@@ -171,7 +187,7 @@ contains
 
     !Maximum total number of 3-phonon processes for a given initial phonon state
     nprocs = ph%nwv*ph%numbands**2
-    
+
     !Allocate |V^-|^2
     if(key == 'V') allocate(Vm2_1(nprocs), Vm2_2(nprocs))
     ! Above, we split the |V-|^2 vertices into two parts:

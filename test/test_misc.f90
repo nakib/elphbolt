@@ -4,12 +4,13 @@ program test_misc
   use testify_m, only : testify
   use params, only: pi
   use misc, only: int_div, expi, trace, kronecker, sort, cross_product, &
-       twonorm, binsearch, mux_vector, demux_vector, interpolate, coarse_grained
+       twonorm, binsearch, mux_vector, demux_vector, interpolate, coarse_grained, &
+       unique
   
   implicit none
 
   integer :: itest
-  integer, parameter :: num_tests = 14
+  integer, parameter :: num_tests = 15
   type(testify) :: test_array(num_tests), tests_all
   integer(i64) :: index, quotient, remainder, int_array(5), v1(3), v2(3), v1_muxed, v2_muxed
   real(r64) :: pauli1(2, 2), ipauli2(2, 2), pauli3(2, 2), &
@@ -150,6 +151,16 @@ program test_misc
         coarse_grained(10_i64, 1_i64*[5, 5, 5], 1_i64*[10, 10, 10])], &
        1_i64*[1, 3, 3, 1, 1, 1, 6, 6, 6, 6, 1, 1]) 
 
+  !unique
+  itest = itest + 1
+  test_array(itest) = testify("unique")
+  call test_array(itest)%assert(&
+       [unique(1_i64*[4, 5, 1, 3, 3, 1, 4]), &
+        unique(1_i64*[0, 0, 0]), &
+        unique(1_i64*[5, 5, 4, 3, 2, 1, 1, 0, 0, -1]), &
+        unique(1_i64*[1, 2, 2, 4, 4, 5, 5])], &
+       1_i64*[[4, 5, 1, 3], [0], [5, 4, 3, 2, 1, 0, -1], [1, 2, 4, 5]])
+  
   !Bose
 
   !Fermi

@@ -651,24 +651,43 @@ contains
     end if
   end subroutine compsimps
 
-  integer(i64) function coarse_grained(iwv_fine, coarsening_factor, mesh)
+  pure function unique(A)
+    !! Returns an array of unique elements of A.
+    !! In other words, creates and returns a set from A.
+
+    integer(i64), intent(in) :: A(:)
+    integer(i64), allocatable :: unique(:)
+
+    !Locals
+    logical :: is_unique(size(A))
+    integer(i64) :: i
+
+    is_unique = .true.
+    do i = size(A), 1, -1
+       is_unique(i) = .not. any(A(1 : i - 1) == A(i))
+    end do
+    
+    allocate(unique(count(is_unique)))
+    unique = pack(A, mask = is_unique)
+  end function unique
+  
+  integer(i64) function coarse_grained(iwv_fine, coarsening_factor, mesh_fine)
     !! Given a 1-based muxed wave vector on the fine mesh,
     !! calculates a 1-based muxed coarse-grained wave vector on the
     !! same mesh.
-    !! iwv_fine is the 1-based 1-based muxed wave vector
+    !! iwv_fine is the 1-based muxed wave vector
     !! coarsening_factor is the coarsening factor
-    !! mesh is the number of wave vectors along the three reciprocal lattice vectors.
+    !! mesh_fine is the number of wave vectors along the three reciprocal lattice vectors.
 
-    integer(i64), intent(in) :: iwv_fine, coarsening_factor(3), mesh(3)
+    integer(i64), intent(in) :: iwv_fine, coarsening_factor(3), mesh_fine(3)
 
     !Locals
     integer(i64) :: wv_fine(3)
     
-    call demux_vector(iwv_fine, wv_fine, mesh, 0_i64)
+    call demux_vector(iwv_fine, wv_fine, mesh_fine, 0_i64)
     coarse_grained = mux_vector(&
          modulo(nint((dble(wv_fine)/coarsening_factor), kind = i64)*&
-         coarsening_factor, mesh), mesh, 0_i64)
-    print*, iwv_fine, coarse_grained
+         coarsening_factor, mesh_fine), mesh_fine, 0_i64)
   end function coarse_grained
   
   function mux_vector(v, mesh, base)

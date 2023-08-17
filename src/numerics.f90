@@ -37,7 +37,7 @@ module numerics_module
      !! Electron mesh refinement factor compared to the phonon mesh.
      logical :: eco_mode
      !! Use coarse grained matrix elements?
-     integer(i64) :: econess
+     integer(i64) :: econess(3)
      !! How much coarse graining for the matrix elements?
      real(r64) :: fsthick
      !! Fermi surface thickness in eV.
@@ -227,9 +227,13 @@ contains
        end if
     end if
 
+    !TODO
+    !! [ ] Read eco mode info from input
+    !! [ ] Check for valid choice of econess
+    
     !eco mode DBG
     self%eco_mode = .true.
-    self%econess = 2
+    self%econess = [2, 2, 2]
     !!
     
     self%qmesh = qmesh
