@@ -4,12 +4,12 @@ program test_misc
   use testify_m, only : testify
   use params, only: pi
   use misc, only: int_div, expi, trace, kronecker, sort, cross_product, &
-       twonorm, binsearch, mux_vector, demux_vector, interpolate
+       twonorm, binsearch, mux_vector, demux_vector, interpolate, coarse_grained
   
   implicit none
 
   integer :: itest
-  integer, parameter :: num_tests = 13
+  integer, parameter :: num_tests = 14
   type(testify) :: test_array(num_tests), tests_all
   integer(i64) :: index, quotient, remainder, int_array(5), v1(3), v2(3), v1_muxed, v2_muxed
   real(r64) :: pauli1(2, 2), ipauli2(2, 2), pauli3(2, 2), &
@@ -131,6 +131,24 @@ program test_misc
   !mux_state
 
   !demux_state
+
+  !coarse_grained
+  itest = itest + 1
+  test_array(itest) = testify("coarse_grained")
+  call test_array(itest)%assert(&
+       [coarse_grained(1_i64, 1_i64*[2, 2, 2], 1_i64*[4, 2, 2]), &
+        coarse_grained(2_i64, 1_i64*[2, 2, 2], 1_i64*[4, 3, 4]), &
+        coarse_grained(3_i64, 1_i64*[2, 2, 2], 1_i64*[4, 3, 4]), &
+        coarse_grained(4_i64, 1_i64*[2, 2, 2], 1_i64*[4, 1, 1]), &
+        coarse_grained(1_i64, 1_i64*[5, 5, 5], 1_i64*[10, 10, 10]), &
+        coarse_grained(2_i64, 1_i64*[5, 5, 5], 1_i64*[10, 10, 10]), &
+        coarse_grained(4_i64, 1_i64*[5, 5, 5], 1_i64*[10, 10, 10]), &
+        coarse_grained(5_i64, 1_i64*[5, 5, 5], 1_i64*[10, 10, 10]), &
+        coarse_grained(6_i64, 1_i64*[5, 5, 5], 1_i64*[10, 10, 10]), &
+        coarse_grained(7_i64, 1_i64*[5, 5, 5], 1_i64*[10, 10, 10]), &
+        coarse_grained(9_i64, 1_i64*[5, 5, 5], 1_i64*[10, 10, 10]), &
+        coarse_grained(10_i64, 1_i64*[5, 5, 5], 1_i64*[10, 10, 10])], &
+       1_i64*[1, 3, 3, 1, 1, 1, 6, 6, 6, 6, 1, 1]) 
 
   !Bose
 

@@ -659,15 +659,16 @@ contains
     !! coarsening_factor is the coarsening factor
     !! mesh is the number of wave vectors along the three reciprocal lattice vectors.
 
-    integer(i64), intent(in) :: iwv_fine, coarsening_factor, mesh(3)
+    integer(i64), intent(in) :: iwv_fine, coarsening_factor(3), mesh(3)
 
     !Locals
     integer(i64) :: wv_fine(3)
     
     call demux_vector(iwv_fine, wv_fine, mesh, 0_i64)
     coarse_grained = mux_vector(&
-         modulo(nint((dble(wv_fine)/coarsening_factor), kind = i64), mesh), &
-         mesh, 0_i64)
+         modulo(nint((dble(wv_fine)/coarsening_factor), kind = i64)*&
+         coarsening_factor, mesh), mesh, 0_i64)
+    print*, iwv_fine, coarse_grained
   end function coarse_grained
   
   function mux_vector(v, mesh, base)
