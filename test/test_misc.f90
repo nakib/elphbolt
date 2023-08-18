@@ -5,16 +5,17 @@ program test_misc
   use params, only: pi
   use misc, only: int_div, expi, trace, kronecker, sort, cross_product, &
        twonorm, binsearch, mux_vector, demux_vector, interpolate, coarse_grained, &
-       unique
+       unique, linspace, compsimps
   
   implicit none
 
   integer :: itest
-  integer, parameter :: num_tests = 15
+  integer, parameter :: num_tests = 16
   type(testify) :: test_array(num_tests), tests_all
   integer(i64) :: index, quotient, remainder, int_array(5), v1(3), v2(3), v1_muxed, v2_muxed
   real(r64) :: pauli1(2, 2), ipauli2(2, 2), pauli3(2, 2), &
-       real_array(5)
+       real_array(5), result
+  real(r64), allocatable :: integrand(:)
 
   !Some data to be used in the tests below
   pauli1 = reshape([0.0_r64, 1.0_r64, 1.0_r64, 0.0_r64], [2, 2])
@@ -108,6 +109,14 @@ program test_misc
   !TODO
   
   !compsimps
+  itest = itest + 1
+  allocate(integrand(200))
+  call linspace(integrand, 0.0_r64, 10.0_r64, 200_i64)
+  call compsimps(integrand, integrand(2) - integrand(1), result)
+  print*, result
+  call test_array(itest)%assert(&
+       [result], &
+       [50.0_r64], tol = 1.0e-6_r64)
 
   !mux_vector
   itest = itest + 1
@@ -149,7 +158,7 @@ program test_misc
         coarse_grained(7_i64, 1_i64*[5, 5, 5], 1_i64*[10, 10, 10]), &
         coarse_grained(9_i64, 1_i64*[5, 5, 5], 1_i64*[10, 10, 10]), &
         coarse_grained(10_i64, 1_i64*[5, 5, 5], 1_i64*[10, 10, 10])], &
-       1_i64*[1, 3, 3, 1, 1, 1, 6, 6, 6, 6, 1, 1]) 
+        1_i64*[1, 3, 3, 1, 1, 1, 6, 6, 6, 6, 1, 1])
 
   !unique
   itest = itest + 1

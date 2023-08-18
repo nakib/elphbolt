@@ -650,7 +650,7 @@ contains
        s = s + 0.5_r64*(f(n) + f(n - 1))*h
     end if
   end subroutine compsimps
-
+  
   pure function unique(A)
     !! Returns an array of unique elements of A.
     !! In other words, creates and returns a set from A.
@@ -662,7 +662,6 @@ contains
     logical :: is_unique(size(A))
     integer(i64) :: i
 
-    is_unique = .true.
     do i = size(A), 1, -1
        is_unique(i) = .not. any(A(1 : i - 1) == A(i))
     end do
@@ -670,6 +669,24 @@ contains
     allocate(unique(count(is_unique)))
     unique = pack(A, mask = is_unique)
   end function unique
+
+  subroutine create_set(A, uniqueA)
+    !! Subroutine version of the pure function unique.
+    
+    integer(i64), intent(in) :: A(:)
+    integer(i64), allocatable, intent(out) :: uniqueA(:)
+
+    !Locals
+    logical :: is_unique(size(A))
+    integer(i64) :: i
+
+    do i = size(A), 1, -1
+       is_unique(i) = .not. any(A(1 : i - 1) == A(i))
+    end do
+
+    allocate(uniqueA(count(is_unique)))
+    uniqueA = pack(A, mask = is_unique)
+  end subroutine create_set
   
   integer(i64) function coarse_grained(iwv_fine, coarsening_factor, mesh_fine)
     !! Given a 1-based muxed wave vector on the fine mesh,
@@ -683,12 +700,26 @@ contains
 
     !Locals
     integer(i64) :: wv_fine(3)
-    
+
     call demux_vector(iwv_fine, wv_fine, mesh_fine, 0_i64)
     coarse_grained = mux_vector(&
          modulo(nint((dble(wv_fine)/coarsening_factor), kind = i64)*&
          coarsening_factor, mesh_fine), mesh_fine, 0_i64)
   end function coarse_grained
+
+  subroutine coarse_grain(iwv_fine_list, coarsening_factor, mesh_fine, iwv_coarse_list)
+    integer(i64), intent(in) :: iwv_fine_list(:), coarsening_factor(3), mesh_fine(3)
+    integer(i64), allocatable, intent(out) :: iwv_coarse_list(:)
+
+    !Locals
+    integer(i64) :: i
+
+    allocate(iwv_coarse_list(size(iwv_fine_list)))
+    
+    do i = 1, size(iwv_fine_list)
+       iwv_coarse_list(i) = coarse_grained(iwv_fine_list(i), coarsening_factor, mesh_fine)
+    end do
+  end subroutine coarse_grain
   
   function mux_vector(v, mesh, base)
     !! Multiplex index of a single wave vector.

@@ -21,7 +21,8 @@ module interactions
   use misc, only: exit_with_message, print_message, distribute_points, &
        demux_state, mux_vector, mux_state, expi, Bose, binsearch, Fermi, &
        twonorm, write2file_rank2_real, demux_vector, interpolate, expm1, &
-       precompute_interpolation_corners_and_weights, interpolate_using_precomputed
+       precompute_interpolation_corners_and_weights, interpolate_using_precomputed, &
+       create_set, coarse_grain
   use wannier_module, only: wannier
   use crystal_module, only: crystal
   use electron_module, only: electron
@@ -136,13 +137,140 @@ contains
 !!$    type(crystal), intent(in) :: crys
 !!$    type(numerics), intent(in) :: num
 !!$
+!!$    !TODO The following should be moved to the ph initialization precedure
+!!$    call coarse_grain(ph%indexlist_irred, ph%cg_indexlist_irred)
+!!$    call coarse_grain(ph%indexlist, ph%cg_indexlist)
+!!$    
+!!$    !Create coarse_grained IBZ mesh
+!!$    call create_set(ph%cg_indexlist_irred, ph%cgset_indexlist_irred)
+!!$
+!!$    !Create coarse_grained FBZ mesh
+!!$    call create_set(ph%cg_indexlist, ph%cgset_indexlist)
+!!$    !!
+!!$    
 !!$    !Total number of IBZ blocks states
-!!$    nstates_irred = ph%nwv_irred*ph%numbands
+!!$    nstates_irred = size(ph%cgset_indexlist_irred)*ph%numbands
 !!$
 !!$    !Maximum total number of 3-phonon processes for a given initial phonon state
-!!$    nprocs = ph%nwv*ph%numbands**2
+!!$    nprocs = size(ph%cgset_indexlist)*ph%numbands**2
 !!$
-!!$    
+!!$    !Run over first phonon IBZ states
+!!$    do istate1 = start, end
+!!$       !Demux state index into branch (s) and wave vector (iq) indices
+!!$       call demux_state(istate1, ph%numbands, s1, iq1_ibz)
+!!$
+!!$       !Muxed index of wave vector from the IBZ index list.
+!!$       !This will be used to access IBZ information from the FBZ quantities.
+!!$       iq1 = ph%indexlist_irred(iq1_ibz)
+!!$
+!!$       !Energy of phonon 1
+!!$       en1 = ph%ens(iq1, s1)
+!!$
+!!$       !Initial (IBZ blocks) wave vector (crystal coords.)
+!!$       q1 = ph%wavevecs(iq1, :)
+!!$
+!!$       !Convert from crystal to 0-based index vector
+!!$       q1_indvec = nint(q1*ph%wvmesh)
+!!$
+!!$       !Run over second (FBZ) phonon wave vectors
+!!$       do iq2 = 1, ph%nwv
+!!$          !Initial (IBZ blocks) wave vector (crystal coords.)
+!!$          q2 = ph%wavevecs(iq2, :)
+!!$
+!!$          !Convert from crystal to 0-based index vector
+!!$          q2_indvec = nint(q2*ph%wvmesh)
+!!$
+!!$          !Folded final phonon wave vector
+!!$          q3_minus_indvec = modulo(q1_indvec - q2_indvec, ph%wvmesh) !0-based index vector
+!!$          q3_minus = q3_minus_indvec/dble(ph%wvmesh) !crystal coords.
+!!$
+!!$          !Muxed index of q3_minus
+!!$          iq3_minus = mux_vector(q3_minus_indvec, ph%wvmesh, 0_i64)
+!!$
+!!$          if(en1 /= 0.0_r64) then
+!!$             !Calculate the numtriplet number of mass-normalized phases for this (q2,q3) pair
+!!$             do it = 1, ph%numtriplets
+!!$                massfac = 1.0_r64/sqrt(&
+!!$                     crys%masses(crys%atomtypes(ph%Index_i(it)))*&
+!!$                     crys%masses(crys%atomtypes(ph%Index_j(it)))*&
+!!$                     crys%masses(crys%atomtypes(ph%Index_k(it))))
+!!$                q2_cart = matmul(crys%reclattvecs, q2)
+!!$                q3_minus_cart = matmul(crys%reclattvecs, q3_minus)
+!!$                phases_q2q3(it) = massfac*&
+!!$                     expi(-dot_product(q2_cart, ph%R_j(:,it)) -&
+!!$                     dot_product(q3_minus_cart, ph%R_k(:,it)))
+!!$             end do
+!!$          end if
+!!$
+!!$          !Run over branches of second phonon
+!!$          do s2 = 1, ph%numbands
+!!$             !Energy of phonon 2
+!!$             en2 = ph%ens(iq2, s2)
+!!$
+!!$             !Get index of -q2
+!!$             neg_q2_indvec = modulo(-q2_indvec, ph%wvmesh)
+!!$             neg_iq2 = mux_vector(neg_q2_indvec, ph%wvmesh, 0_i64)
+!!$
+!!$             if(key == 'W') then
+!!$                !Bose factor for phonon 2
+!!$                bose2 = Bose(en2, crys%T)
+!!$             end if
+!!$
+!!$             !Run over branches of third phonon
+!!$             do s3 = 1, ph%numbands                
+!!$                !Minus process index
+!!$                index_minus = ((iq2 - 1)*ph%numbands + (s2 - 1))*ph%numbands + s3
+!!$
+!!$                !Energy of phonon 3
+!!$                en3 = ph%ens(iq3_minus, s3)
+!!$
+!!$                !Evaluate delta functions
+!!$                if(num%tetrahedra) then
+!!$                   delta_minus = delta_fn_tetra(en1 - en3, iq2, s2, ph%wvmesh, ph%tetramap, &
+!!$                        ph%tetracount, ph%tetra_evals) !minus process
+!!$
+!!$                   delta_plus = delta_fn_tetra(en3 - en1, neg_iq2, s2, ph%wvmesh, ph%tetramap, &
+!!$                        ph%tetracount, ph%tetra_evals) !plus process
+!!$                else
+!!$                   delta_minus = delta_fn_triang(en1 - en3, iq2, s2, ph%wvmesh, ph%triangmap, &
+!!$                        ph%triangcount, ph%triang_evals) !minus process
+!!$
+!!$                   delta_plus = delta_fn_triang(en3 - en1, neg_iq2, s2, ph%wvmesh, ph%triangmap, &
+!!$                        ph%triangcount, ph%triang_evals) !plus process
+!!$                end if
+!!$
+!!$                if(key == 'V') then
+!!$                   if(en1*en2*en3 == 0.0_r64) cycle
+!!$
+!!$                   if(delta_minus > 0.0_r64) then
+!!$                      !Increase counter for energetically available minus process
+!!$                      minus_count = minus_count + 1
+!!$
+!!$                      !Save the index of this process
+!!$                      !V1_indexlist(minus_count) = index_minus
+!!$
+!!$                      !Calculate and save the minus process vertex
+!!$                      Vm2_1(minus_count) = Vm2_3ph(ph%evecs(iq1, s1, :), &
+!!$                           conjg(ph%evecs(iq2, s2, :)), conjg(ph%evecs(iq3_minus, s3, :)), &
+!!$                           ph%Index_i(:), ph%Index_j(:), ph%Index_k(:), ph%ifc3(:,:,:,:), &
+!!$                           phases_q2q3, ph%numtriplets, ph%numbands)
+!!$                   end if
+!!$
+!!$                   if(delta_plus > 0.0_r64) then
+!!$                      !Increase counter for energetically available plus process
+!!$                      plus_count = plus_count + 1
+!!$
+!!$                      !Calculate and save the minus process vertex
+!!$                      Vm2_2(plus_count) = Vm2_3ph(ph%evecs(iq1, s1, :), &
+!!$                           conjg(ph%evecs(iq2, s2, :)), conjg(ph%evecs(iq3_minus, s3, :)), &
+!!$                           ph%Index_i(:), ph%Index_j(:), ph%Index_k(:), ph%ifc3(:,:,:,:), &
+!!$                           phases_q2q3, ph%numtriplets, ph%numbands)
+!!$                   end if
+!!$                end if
+!!$             end do !s3
+!!$          end do !s2
+!!$       end do !iq2
+!!$    end do !istate1
 !!$  end subroutine calculate_coarse_grained_3ph_vertex
   
   subroutine calculate_3ph_interaction(ph, crys, num, key)
