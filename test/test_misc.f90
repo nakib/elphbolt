@@ -15,7 +15,7 @@ program test_misc
   integer(i64) :: index, quotient, remainder, int_array(5), v1(3), v2(3), v1_muxed, v2_muxed
   real(r64) :: pauli1(2, 2), ipauli2(2, 2), pauli3(2, 2), &
        real_array(5), result
-  real(r64), allocatable :: integrand(:)
+  real(r64), allocatable :: integrand(:), domain(:)
 
   !Some data to be used in the tests below
   pauli1 = reshape([0.0_r64, 1.0_r64, 1.0_r64, 0.0_r64], [2, 2])
@@ -110,13 +110,14 @@ program test_misc
   
   !compsimps
   itest = itest + 1
-  allocate(integrand(200))
-  call linspace(integrand, 0.0_r64, 10.0_r64, 200_i64)
-  call compsimps(integrand, integrand(2) - integrand(1), result)
-  print*, result
+  test_array(itest) = testify("compsims gaussian")
+  allocate(domain(300), integrand(300))
+  call linspace(domain, 0.0_r64, 1.0_r64, 300_i64)
+  integrand = 2.0_r64/sqrt(pi)*exp(-domain**2)
+  call compsimps(integrand, domain(2) - domain(1), result)
   call test_array(itest)%assert(&
        [result], &
-       [50.0_r64], tol = 1.0e-6_r64)
+       [erf(1.0_r64)], tol = 1.0e-8_r64)
 
   !mux_vector
   itest = itest + 1
