@@ -715,7 +715,7 @@ contains
     integer(i64) :: i
 
     allocate(iwv_coarse_list(size(iwv_fine_list)))
-    
+
     do i = 1, size(iwv_fine_list)
        iwv_coarse_list(i) = coarse_grained(iwv_fine_list(i), coarsening_factor, mesh_fine)
     end do

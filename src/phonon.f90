@@ -22,7 +22,7 @@ module phonon_module
   use params, only: r64, i64, bohr2nm, pi, twopi, Ryd2eV, oneI
   use particle_module, only: particle
   use misc, only: print_message, subtitle, expi, distribute_points, &
-       write2file_rank2_real, exit_with_message
+       write2file_rank2_real, exit_with_message, create_set, coarse_grain
   use numerics_module, only: numerics
   use crystal_module, only: crystal, calculate_wavevectors_full
   use symmetry_module, only: symmetry, find_irred_wedge, create_fbz2ibz_map
@@ -54,6 +54,11 @@ module phonon_module
      real(r64), allocatable :: tetra_squared_evals(:,:,:)
      !! Tetrahedra vertices filled with squared eigenvalues.
      !! This is needed only for the phonon Green's function calculation.
+
+     integer(i64), allocatable :: cg_indexlist_irred(:)
+     integer(i64), allocatable :: cg_indexlist(:)
+     integer(i64), allocatable :: cgset_indexlist_irred(:)
+     integer(i64), allocatable :: cgset_indexlist(:)
 
      !Data read from ifc2 file. These will be used in the phonon calculation.
      real(r64), private, allocatable :: ifc2(:,:,:,:,:,:,:)
@@ -307,6 +312,20 @@ contains
             self%triangmap, .false.)
        call fill_triangles(self%triang, self%ens, self%triang_evals)
     end if
+
+    !DBG Coarse graining stuff
+    call coarse_grain(self%indexlist_irred, 2_i64*[1, 1, 1], self%wvmesh, self%cg_indexlist_irred)
+    
+    allocate(self%indexlist(self%nwv))
+    self%indexlist = [(i, i = 1, self%nwv)]
+    call coarse_grain(self%indexlist, 2_i64*[1, 1, 1], self%wvmesh, self%cg_indexlist)
+
+    !Create coarse_grained IBZ mesh
+    call create_set(self%cg_indexlist_irred, self%cgset_indexlist_irred)
+
+    !Create coarse_grained FBZ mesh
+    call create_set(self%cg_indexlist, self%cgset_indexlist)
+    !!
   end subroutine calculate_phonons
   
   subroutine read_ifc2(self, crys)
