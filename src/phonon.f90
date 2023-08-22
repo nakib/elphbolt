@@ -313,19 +313,19 @@ contains
        call fill_triangles(self%triang, self%ens, self%triang_evals)
     end if
 
-    !DBG Coarse graining stuff
-    call coarse_grain(self%indexlist_irred, 2_i64*[1, 1, 1], self%wvmesh, self%cg_indexlist_irred)
-    
-    allocate(self%indexlist(self%nwv))
-    self%indexlist = [(i, i = 1, self%nwv)]
-    call coarse_grain(self%indexlist, 2_i64*[1, 1, 1], self%wvmesh, self%cg_indexlist)
-
-    !Create coarse_grained IBZ mesh
-    call create_set(self%cg_indexlist_irred, self%cgset_indexlist_irred)
-
-    !Create coarse_grained FBZ mesh
-    call create_set(self%cg_indexlist, self%cgset_indexlist)
-    !!
+!!$    !DBG Coarse graining stuff
+!!$    call coarse_grain(self%indexlist_irred, 2_i64*[1, 1, 1], self%wvmesh, self%cg_indexlist_irred)
+!!$    
+!!$    allocate(self%indexlist(self%nwv))
+!!$    self%indexlist = [(i, i = 1, self%nwv)]
+!!$    call coarse_grain(self%indexlist, 2_i64*[1, 1, 1], self%wvmesh, self%cg_indexlist)
+!!$
+!!$    !Create coarse_grained IBZ mesh
+!!$    call create_set(self%cg_indexlist_irred, self%cgset_indexlist_irred)
+!!$
+!!$    !Create coarse_grained FBZ mesh
+!!$    call create_set(self%cg_indexlist, self%cgset_indexlist)
+!!$    !!
   end subroutine calculate_phonons
   
   subroutine read_ifc2(self, crys)
