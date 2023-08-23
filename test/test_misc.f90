@@ -2,17 +2,20 @@ program test_misc
 
   use iso_fortran_env, only : r64 => real64, i64 => int64
   use testify_m, only : testify
-  use params, only: pi
+  use params, only: pi, kB
   use misc, only: int_div, expi, trace, kronecker, sort, cross_product, &
        twonorm, binsearch, mux_vector, demux_vector, interpolate, coarse_grained, &
-       unique, linspace, compsimps
+       unique, linspace, compsimps, mux_state, demux_state, demux_mesh, expm1, &
+       Fermi, Bose
   
   implicit none
 
   integer :: itest
-  integer, parameter :: num_tests = 16
+  integer, parameter :: num_tests = 22
   type(testify) :: test_array(num_tests), tests_all
-  integer(i64) :: index, quotient, remainder, int_array(5), v1(3), v2(3), v1_muxed, v2_muxed
+  integer(i64) :: index, quotient, remainder, int_array(5), v1(3), v2(3), &
+       v1_muxed, v2_muxed, ik1, ik2, ik3, ib1, ib2, ib3
+  integer(i64), allocatable :: index_mesh_0(:, :), index_mesh_1(:, :)
   real(r64) :: pauli1(2, 2), ipauli2(2, 2), pauli3(2, 2), &
        real_array(5), result
   real(r64), allocatable :: integrand(:), domain(:)
@@ -100,13 +103,11 @@ program test_misc
   
   !binsearch
   itest = itest + 1
-  test_array(itest) = testify("sort_real")
+  test_array(itest) = testify("binsearch")
   int_array = [-105_i64, 105_i64, 105_i64, 105_i64, 0_i64]
   call sort(int_array)
   call binsearch(int_array, 105_i64, index)
   call test_array(itest)%assert(index, 3_i64)
-
-  !TODO
   
   !compsimps
   itest = itest + 1
@@ -138,10 +139,48 @@ program test_misc
        [v1, v2], 1_i64*[1, 2, 3, 1, 2, 3])
   
   !demux_mesh
+  itest = itest + 1
+  test_array(itest) = testify("demux_mesh base 0, base 1")
+  allocate(index_mesh_0(3, 8), index_mesh_1(3, 8))
+  call demux_mesh(index_mesh_0, 1_i64*[2, 2, 2], 0_i64)
+  call demux_mesh(index_mesh_1, 1_i64*[2, 2, 2], 1_i64)
+  call test_array(itest)%assert(&
+       [index_mesh_0, index_mesh_1], &
+       1_i64*[ 0, 0, 0, &
+               1, 0, 0, &
+               0, 1, 0, &
+               1, 1, 0, &
+               0, 0, 1, &
+               1, 0, 1, &
+               0, 1, 1, &
+               1, 1, 1, &
+               1, 1, 1, &
+               2, 1, 1, &
+               1, 2, 1, &
+               2, 2, 1, &
+               1, 1, 2, &
+               2, 1, 2, &
+               1, 2, 2, &
+               2, 2, 2  ])
 
   !mux_state
+  itest = itest + 1
+  test_array(itest) = testify("mux_state")
+  call test_array(itest)%assert(&
+       [mux_state(12_i64, 1_i64, 1_i64), &
+        mux_state(12_i64, 12_i64, 1_i64), &
+        mux_state(6_i64, 3_i64, 6_i64)], &
+       1_i64*[1, 12, 33])
 
   !demux_state
+  itest = itest + 1
+  test_array(itest) = testify("demux_state")
+  call demux_state(1_i64, 12_i64, ib1, ik1)
+  call demux_state(12_i64, 12_i64, ib2, ik2)
+  call demux_state(33_i64, 6_i64, ib3, ik3)
+  call test_array(itest)%assert(&
+       [ib1, ik1, ib2, ik2, ib3, ik3], &
+       1_i64*[1, 1, 12, 1, 3, 6])
 
   !coarse_grained
   itest = itest + 1
@@ -170,10 +209,32 @@ program test_misc
         unique(1_i64*[5, 5, 4, 3, 2, 1, 1, 0, 0, -1]), &
         unique(1_i64*[1, 2, 2, 4, 4, 5, 5])], &
        1_i64*[[4, 5, 1, 3], [0], [5, 4, 3, 2, 1, 0, -1], [1, 2, 4, 5]])
-  
-  !Bose
 
+  !expm1
+  itest = itest + 1
+  test_array(itest) = testify("expm1 (numpy precision equivalence)")
+  call test_array(itest)%assert(&
+       [expm1(pi), expm1(1.0e-8_r64), expm1(1.0e-10_r64)], &
+       [22.140692632779267_r64, 1.0000000050000001e-08_r64, 1.0000000050000000e-08_r64], &
+       tol = 1.0e-8_r64)
+
+  !Bose
+  itest = itest + 1
+  test_array(itest) = testify("Bose")
+  call test_array(itest)%assert(&
+       [1.0e-10*Bose(1.0e-6_r64, 1.0e8_r64), &
+        Bose(1.0_r64, 1.0e-2_r64)], &
+       [1.0e-10*kB*1.0e8_r64/1.0e-6_r64, 0.0_r64], &
+       tol = 1.0e-10_r64)
+  
   !Fermi
+  itest = itest + 1
+  test_array(itest) = testify("Fermi")
+  call test_array(itest)%assert(&
+       [Fermi(1.0_r64, 1.0_r64, 300.0_r64), &
+        Fermi(1.0_r64, 1.0_r64, 1.0e-2_r64)], &
+       [0.5_r64, 0.5_r64], &
+       tol = 1.0e-8_r64)
 
   !Interpolate
 
@@ -184,5 +245,5 @@ program test_misc
   tests_all = testify(test_array)
   call tests_all%report
   
-  if (tests_all%get_status() .eqv. .false.) error stop -1
+  if(tests_all%get_status() .eqv. .false.) error stop -1
 end program test_misc

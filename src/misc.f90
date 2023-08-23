@@ -753,28 +753,25 @@ contains
     integer(i64), intent(out) :: v(3)
     integer(i64) :: aux
 
-    if(base < 0 .or. base > 1) then
-       call exit_with_message("Base has to be either 0 or 1 in misc.f90:demux_vector")
-    end if
+    if(base < 0 .or. base > 1) &
+         call exit_with_message("Base has to be either 0 or 1 in misc.f90:demux_vector")
 
     call int_div(i - 1, mesh(1), aux, v(1))
     call int_div(aux, mesh(2), v(3), v(2))
-    if(base == 1) then
-       v(1) = v(1) + 1
-       v(2) = v(2) + 1
-       v(3) = v(3) + 1 
-    end if
+    if(base == 1) v = v + 1
   end subroutine demux_vector
   
-  subroutine demux_mesh(index_mesh, nmesh, mesh, base, indexlist)
+  subroutine demux_mesh(index_mesh, mesh, base, indexlist)
     !! Demultiplex all wave vector indices 
     !! (optionally, from a list of indices).
     !! Internally uses demux_vector.
 
-    integer(i64), intent(in) :: nmesh, mesh(3), base
-    integer(i64), optional, intent(in) :: indexlist(nmesh)
-    integer(i64), intent(out) :: index_mesh(3, nmesh)
-    integer(i64) :: i
+    integer(i64), intent(in) :: mesh(3), base
+    integer(i64), optional, intent(in) :: indexlist(:)
+    integer(i64), intent(out) :: index_mesh(:, :)
+    integer(i64) :: i, nmesh
+
+    nmesh = size(index_mesh, dim = 2)
 
     do i = 1, nmesh !over total number of wave vectors
        if(present(indexlist)) then

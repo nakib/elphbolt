@@ -228,9 +228,9 @@ contains
     !Create mesh of demuxed 0-based indices.
     base = 0
     if(present(indexlist)) then
-       call demux_mesh(index_mesh,nmesh,mesh,base,indexlist)
+       call demux_mesh(index_mesh, mesh, base, indexlist)
     else
-       call demux_mesh(index_mesh,nmesh,mesh,base)
+       call demux_mesh(index_mesh, mesh, base)
     end if
 
     !Allocate start and end coarrays
