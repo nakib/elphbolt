@@ -55,10 +55,12 @@ On the Sirius cluster of Boston College, I was able to build version 2.9.2 by fi
 Above, you can change the build path with the additional argument ~--install-prefix <path to build directory>~ to ~install.sh~.
 
 *** 3. Build
-**** Using cmake
-Issue the following commands to build and run tests: ~mkdir build; cd build; cmake ..; make; ctest~. If all goes well, the exectuable will be available as ~build/bin/{elphbolt, superconda}~.
-**** Using fpm (https://fpm.fortran-lang.org/en/index.html) [stay tuned...]
+**** Using ~cmake~
+Issue the following command to build and run tests: ~mkdir build; cd build; cmake ..; make; ctest~. If all goes well, the exectuable will be available as ~build/bin/{elphbolt, superconda}~.
+**** Using ~fpm~ (https://fpm.fortran-lang.org/en/index.html)
+     To build with Fortran Package Manager (~fpm~), simply say ~fpm build --compiler caf --flag -g -O2 -fPIC -fbounds-check -Wunused -Wconversion -Wunderflow -Wdo-subscript"~. Replace ~build~ with ~test~ in the last command to build and run tests. The ~elphbolt~ and ~superconda~ apps will be available in the ~build/caf_*/app/~ directory.
 
+     Modify the fpm manifest file, ~fpm.toml~, to suit your system. I'd appreciate any feedback.
 ** Container solutions
 
 An example ~Dockerfile~ is provided. I have not yet tested this on any HPC system.
