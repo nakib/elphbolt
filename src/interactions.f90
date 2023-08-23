@@ -1549,9 +1549,8 @@ contains
                         el%triangcount, el%triang_evals)
                 end if
 
-                !Save Xchimp
-                Xchimp_istate(count) = g2*transfac(matmul(crys%reclattvecs,k), &
-                     matmul(crys%reclattvecs,kp))*delta
+                !Save Xchimp (with factor suppressing forward scattering)
+                Xchimp_istate(count) = g2 * delta
 
                 !Save final electron state
                 istate_el(count) = mux_state(el%numbands, n, ikp)
@@ -1809,8 +1808,10 @@ contains
     
     !Local variables
     integer(i64) :: nstates_irred, istate, nprocs_eph, &
-         iproc, chunk, m, ik, num_active_images, start, end
+         iproc, chunk, m, ik, mp, ikp, num_active_images, start, end
+    integer(i64), allocatable :: istate_el_echimp(:)
     real(r64), allocatable :: X(:)
+    real(r64) :: k(3), kp(3)
     character(len = 1024) :: filepath_Xp, filepath_Xm, tag
 
     !Set output directory of transition probilities
@@ -1868,11 +1869,22 @@ contains
 
              !Read Xchimp from file
              if(allocated(X)) deallocate(X)
-             call read_transition_probs_e(trim(adjustl(filepath_Xm)), nprocs_eph, X)
+             call read_transition_probs_e(trim(adjustl(filepath_Xm)), nprocs_eph, X, istate_el_echimp)
 
-             do iproc = 1, nprocs_eph
-                rta_rates_echimp(ik, m) = rta_rates_echimp(ik, m) + X(iproc) 
-             end do
+             if (num%inchimpexact) then
+               do iproc = 1, nprocs_eph
+                  rta_rates_echimp(ik, m) = rta_rates_echimp(ik, m) + X(iproc) 
+               end do
+             else
+               k = el%wavevecs_irred(ik, :) 
+               do iproc = 1, nprocs_eph
+                  !Demux final state index into band (m) and wave vector (ik) indices
+                  call demux_state(istate_el_echimp(iproc), el%numbands, mp, ikp)
+                  kp = el%wavevecs(ikp, :)
+                  rta_rates_echimp(ik, m) = rta_rates_echimp(ik, m) + X(iproc) * &
+                     transfac(matmul(crys%reclattvecs,k), matmul(crys%reclattvecs,kp)) 
+               end do
+             end if
           end if
        end do
     end if

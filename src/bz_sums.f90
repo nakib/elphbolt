@@ -364,7 +364,7 @@ contains
     integer(i64) :: iq, ib, iqp, ibp, im, chunk, counter, num_active_images, &
          pol, a, numatoms
     integer(i64), allocatable :: start[:], end[:]
-    real(r64) :: e, delta, aux
+    real(r64) :: e, delta, aux, matel_iso, matel_subs
     real(r64), allocatable :: dos_chunk(:,:)[:], W_phiso_chunk(:,:)[:], &
          W_phsubs_chunk(:,:)[:]
     
@@ -388,6 +388,14 @@ contains
     ph%dos(:,:) = 0.0_r64
     W_phiso(:,:) = 0.0_r64
     W_phsubs(:,:) = 0.0_r64
+
+    !!Initialize the matrix elements storage
+    if (phiso .and. .not. phiso_Tmat) then 
+      call ph%xiso%allocate_xmassvar(ph, usetetra, phiso_Tmat)
+    end if 
+    if (phsubs) then
+      call ph%xsubs%allocate_xmassvar(ph, usetetra, phiso_Tmat)
+    end if
 
     counter = 0
     !Only work with the active images
@@ -417,9 +425,17 @@ contains
                       delta = delta_fn_triang(e, iqp, ibp, ph%wvmesh, ph%triangmap, &
                            ph%triangcount, ph%triang_evals)
                    end if
+
+                   ! If not energy conserving ignore
+                   if (delta .le. 0.0_r64 ) then
+                     cycle
+                   end if
+
                    !Sum over delta function
                    dos_chunk(counter, ib) = dos_chunk(counter, ib) + delta
 
+                   matel_iso = 0.0_r64
+                   matel_subs = 0.0_r64
                    if((phiso .and. .not. phiso_Tmat) .or. phsubs) then
                       do a = 1, numatoms
                          pol = (a - 1)*3
@@ -430,28 +446,36 @@ contains
                          !Calculate phonon-isotope scattering in the Tamura model                   
                          if(phiso .and. .not. phiso_Tmat) then
                             if(phiso_1B_theory == 'DIB-1B') then !DIB 1st Born
-                               W_phiso_chunk(counter, ib) = W_phiso_chunk(counter, ib) + &
+                               matel_iso = matel_iso + &
                                     delta*aux*crys%gfactors_DIB(crys%atomtypes(a))*e**2
                             else !Tamura (= VCA 1st Born)
-                               W_phiso_chunk(counter, ib) = W_phiso_chunk(counter, ib) + &
+                               matel_iso = matel_iso + &
                                     delta*aux*crys%gfactors_VCA(crys%atomtypes(a))*e**2
                             end if
                          end if
 
                          !Calculate phonon-substitution scattering in the Tamura model
                          if(phsubs) then
-                            W_phsubs_chunk(counter, ib) = W_phsubs_chunk(counter, ib) + &
+                            matel_subs = matel_subs + &
                                  delta*aux*crys%subs_gfactors(crys%atomtypes(a))*e**2
                          end if
                       end do
                    end if
+                   ! Save here
+                   if (phiso .and. .not. phiso_Tmat) then
+                     W_phiso_chunk(counter, ib) = W_phiso_chunk(counter, ib) +  & 
+                              matel_iso * 0.5_r64 * pi / hbar_eVps
+                     call ph%xiso%save_xmassvar(ph%numbands, iq, iqp, ib, ibp, matel_iso)
+                   end if
+                   if (phsubs) then
+                     W_phsubs_chunk(counter, ib) = W_phsubs_chunk(counter, ib) +  & 
+                              matel_subs * 0.5_r64 * pi / hbar_eVps
+                     call ph%xsubs%save_xmassvar(ph%numbands, iq, iqp, ib, ibp, matel_subs)
+                   end if  
                 end do
              end do
           end do
        end do
-       if(phiso .and. .not. phiso_Tmat) &
-            W_phiso_chunk = W_phiso_chunk*0.5_r64*pi/hbar_eVps !THz
-       if(phsubs) W_phsubs_chunk = W_phsubs_chunk*0.5_r64*pi/hbar_eVps !THz
     end if
     
     !Gather from images and broadcast to all
