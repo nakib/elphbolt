@@ -58,7 +58,7 @@ Above, you can change the build path with the additional argument ~--install-pre
 **** Using ~cmake~
 Issue the following command to build and run tests: ~mkdir build; cd build; cmake ..; make; ctest~. If all goes well, the exectuable will be available as ~build/bin/{elphbolt, superconda}~.
 **** Using ~fpm~
-     To build with Fortran Package Manager ((https://fpm.fortran-lang.org/en/index.html)), simply say
+     To build with Fortran Package Manager (https://fpm.fortran-lang.org/), simply say
      
       #+BEGIN_SRC bash
       fpm build --compiler caf --flag "-g -O2 -fPIC -fbounds-check -Wunused -Wconversion -Wunderflow -Wdo-subscript" 
