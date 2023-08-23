@@ -50,15 +50,16 @@ set(SRC
   src/eliashberg.f90
   src/bte.f90)
 
+#Add shared library
+add_library(elphboltlib SHARED ${SRC})
+
 #Set elphbolt driver program
-add_executable(elphbolt app/elphbolt.f90 ${SRC})
+add_executable(elphbolt app/elphbolt.f90)
+target_link_libraries(elphbolt elphboltlib ${LINKS})
 
 #Set superconda driver program
-add_executable(superconda app/superconda.f90 ${SRC})
-
-#Link libraries
-target_link_libraries(elphbolt ${LINKS})
-target_link_libraries(superconda ${LINKS})
+add_executable(superconda app/superconda.f90)
+target_link_libraries(superconda elphboltlib ${LINKS})
 
 #Set test library
 add_library(testify thirdparty/testify/src/testify.f90)
@@ -68,10 +69,8 @@ enable_testing()
 #Unit tests
 foreach(component misc)
   #Set test program
-  add_executable(test_${component} test/test_${component}.f90 ${SRC})
-
-  #Link libraries
-  target_link_libraries(test_${component} testify ${LINKS})
+  add_executable(test_${component} test/test_${component}.f90)
+  target_link_libraries(test_${component} testify elphboltlib ${LINKS})
 
   #Add to test battery
   add_test(test_${component} bin/test_${component})
@@ -79,10 +78,9 @@ endforeach()
 
 #BTE regression test
 #Set test program
-add_executable(test_bte_regression test/bte_regression.f90 ${SRC})
-
-#Link libraries
-target_link_libraries(test_bte_regression testify ${LINKS})
+#add_executable(test_bte_regression test/bte_regression.f90 ${SRC})
+add_executable(test_bte_regression test/bte_regression.f90)
+target_link_libraries(test_bte_regression testify elphboltlib ${LINKS})
 
 find_program (bash /bin/bash)
 if(bash)
