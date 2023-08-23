@@ -1,0 +1,42 @@
+name = "elphbolt"
+license = "GPLv3+"
+author = "Nakib Haider Protik"
+maintainer = "nakib.haider.protik@gmail.com"
+copyright = "2023 Contributors of the elphbolt project."
+
+[library]
+source-dir="src"
+
+[dependencies]
+testify = { git = "git@github.com:nakib/testify.git" }
+
+[build]
+link = ["blas", "lapack", "symspg"]
+auto-tests = false
+
+[install]
+library = true
+
+[[executable]]
+name="elphbolt"
+source-dir="app"
+main="elphbolt.f90"
+
+[[executable]]
+name="superconda"
+source-dir="app"
+main="superconda.f90"
+
+[[test]]
+name = "test_misc"
+source-dir="test"
+main = "test_misc.f90"
+
+#TODO
+#Figure out how to call the regression test calculation
+#setup shell script before running the test binary.
+#[[test]]
+#name = "bte_regression"
+#source-dir="test"
+#main = "bte_regression.f90"
+
