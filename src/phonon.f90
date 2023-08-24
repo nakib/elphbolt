@@ -22,18 +22,32 @@ module phonon_module
   use params, only: r64, i64, bohr2nm, pi, twopi, Ryd2eV, oneI
   use particle_module, only: particle
   use misc, only: print_message, subtitle, expi, distribute_points, &
-       write2file_rank2_real, exit_with_message, create_set, coarse_grain
+       write2file_rank2_real, exit_with_message, create_set, coarse_grain, &
+       mux_state
   use numerics_module, only: numerics
   use crystal_module, only: crystal, calculate_wavevectors_full
   use symmetry_module, only: symmetry, find_irred_wedge, create_fbz2ibz_map
   use delta, only: form_tetrahedra_3d, fill_tetrahedra_3d, form_triangles, &
-       fill_triangles
+       fill_triangles, delta_fn_tetra, delta_fn_triang
   use wannier_module, only: Wannier, dyn_nonanalytic
   
   implicit none
 
   private
   public phonon
+
+  
+  type Xmassvar
+     !! Type to contain the phonon mass var scattering matrix elements
+     !! number of matrix elements
+     integer(i64) :: nels = 0_i64
+     !! Indexes of the phonon states (IBZ,FBZ)
+     integer(i64), allocatable :: indexes(:,:)
+     !! Matrix element (squared)
+     real(r64), allocatable :: matel(:)
+  contains
+     procedure, public :: allocate_xmassvar, clean_xmassvar, save_xmassvar
+  end type Xmassvar
   
   type, extends(particle) :: phonon
      !! Data and procedures related to phonons.
@@ -67,6 +81,9 @@ module phonon_module
      real(r64), private, allocatable :: mm(:,:), rr(:,:,:)
      integer(i64), private, allocatable :: ws_cell(:, :)
      real(r64), private, allocatable :: ws_weight(:)
+
+     !!! Ph mass variance matrix elements for isotopic and substitutional
+     type(Xmassvar) :: xiso, xsubs
       
    contains
 
@@ -1104,4 +1121,98 @@ contains
     omegas = omegas*Ryd2eV !eV
     if(present(velocities)) velocities = velocities*toTHz*bohr2nm !Km/s
   end subroutine phonon_espresso
+
+  subroutine allocate_xmassvar(self, ph, usetetra, Tmat)
+   !! Intializes the xmass var matrix elements size (for that image)
+   !! self - Xmassvar object
+   !! ph   - phonon object
+   !! usetetra - use tetrahedron method 
+   !! Tmat - are we using Green functions to compute the maatrix elements 
+   
+   class(Xmassvar), intent(inout) :: self
+   type(phonon), intent(in)       :: ph
+   logical, intent(in)            :: usetetra
+   logical, intent(in)            :: Tmat 
+
+   !Locals
+   integer(i64) :: iq, ib, iqp, ibp, chunk, num_active_images
+   integer(i64), allocatable :: start[:], end[:]
+   real(r64) ::  e, delta
+
+   !Allocate start and end coarrays
+   allocate(start[*], end[*])
+
+   !Divide wave vectors among images
+   call distribute_points(ph%nwv_irred, chunk, start, end, num_active_images)
+
+   if (.not. Tmat) then
+     if(this_image() <= num_active_images) then
+        do iq = start, end !Run over IBZ wave vectors
+           do ib = 1, ph%numbands !Run over wave vectors   
+              !Grab sample energy from the IBZ
+              e = ph%ens(ph%indexlist_irred(iq), ib)
+              do iqp = 1, ph%nwv !Sum over FBZ wave vectors
+                 do ibp = 1, ph%numbands !Sum over wave vectors
+                    !Evaluate delta[E(iq,ib) - E(iq',ib')]
+                    if(usetetra) then
+                       delta = delta_fn_tetra(e, iqp, ibp, ph%wvmesh, ph%tetramap, &
+                            ph%tetracount, ph%tetra_evals)
+                    else
+                       delta = delta_fn_triang(e, iqp, ibp, ph%wvmesh, ph%triangmap, &
+                            ph%triangcount, ph%triang_evals)
+                    end if
+                 if (delta .gt. 0.0_r64) self%nels = self%nels + 1_i64
+                 end do !ibp
+              end do !iqp
+           end do !ib
+        end do !iq
+     end if
+   else
+     call print_message("WARNING: In-scattering correction due to mass variance"//&
+                            " for Tmatrix currently not implemented")
+   end if
+
+   ! Allocate arrays
+   allocate(self%matel(self%nels))
+   allocate(self%indexes(self%nels,2))
+
+ end subroutine allocate_xmassvar
+ 
+ subroutine clean_xmassvar(self)
+   !! Cleans stuff
+   !! self - Xmassvar object
+   
+   class(Xmassvar), intent(inout) :: self
+   
+   if(allocated(self%matel)) deallocate(self%matel)
+   if(allocated(self%indexes)) deallocate(self%indexes)
+
+ end subroutine clean_xmassvar
+
+ subroutine save_xmassvar(self, nb, iq1, iq2, ib1, ib2, matel)
+   !! Cleans stuff
+   !! self - Xmassvar object
+   !! nb - number of bands
+   !! iq1 - iq of first phonon
+   !! iq2 - iq of second phonon
+   !! ib1 - band idx of first phonon
+   !! ib2 - band idx of second phonon
+   !! matel - matrix elements
+   
+   class(Xmassvar), intent(inout) :: self
+   integer(i64), intent(in) :: nb, iq1, iq2, ib1, ib2
+   real(r64), intent(in) :: matel
+
+   
+
+   self%matel(self%nels) = matel
+   self%indexes(self%nels,:) = (/mux_state(nb,ib1,iq1), &
+                                 mux_state(nb,ib2,iq2)/)
+
+   self%nels = self%nels - 1_i64
+   if (self%nels .eq. 0_i64) self%nels = size(self%matel)
+
+ end subroutine save_xmassvar
+
+
 end module phonon_module

@@ -899,6 +899,39 @@ contains
 
     !Only work with the active images
     if(this_image() <= num_active_images) then
+
+! First we add self interactions comming from isotopic and
+    ! substitution
+       if (ph%xiso%nels .ne. 0) then
+          do iproc = 1, ph%xiso%nels
+               ! Get states information
+               call demux_state(ph%xiso%indexes(iproc,1), numbranches, s1, iq1_ibz)
+               call demux_state(ph%xiso%indexes(iproc,2), numbranches, s2, iq2)
+               !Now iterate over the images
+               do ieq = 1, ph%nequiv(iq1_ibz)
+                   iq1_sym = ph%ibz2fbz_map(ieq, iq1_ibz, 1) !symmetry
+                   iq1_fbz = ph%ibz2fbz_map(ieq, iq1_ibz, 2) !image due to symmetry
+                   response_ph_reduce(iq1_fbz, s1, :) = response_ph_reduce(iq1_fbz, s1, :) + &
+                       ph%xiso%matel(iproc) * response_ph(ph%equiv_map(iq1_sym, iq2), s2, :)
+               end do
+          end do ! iproc
+       end if
+       
+       ! Now subs (same as isotopic)
+       if (ph%xsubs%nels .ne. 0) then
+          do iproc = 1, ph%xsubs%nels
+               ! Get states information
+               call demux_state(ph%xsubs%indexes(iproc,1), numbranches, s1, iq1_ibz)
+               call demux_state(ph%xsubs%indexes(iproc,2), numbranches, s2, iq2)
+               !Now iterate over the images
+               do ieq = 1, ph%nequiv(iq1_ibz)
+                   iq1_sym = ph%ibz2fbz_map(ieq, iq1_ibz, 1) !symmetry
+                   iq1_fbz = ph%ibz2fbz_map(ieq, iq1_ibz, 2) !image due to symmetry
+                   response_ph_reduce(iq1_fbz, s1, :) = response_ph_reduce(iq1_fbz, s1, :) + &
+                       ph%xsubs%matel(iproc) * response_ph(ph%equiv_map(iq1_sym, iq2), s2, :)
+               end do
+          end do ! iproc
+       end if
        !Run over first phonon IBZ states
        do istate1 = start, end
           !Demux state index into branch (s) and wave vector (iq1_ibz) indices
@@ -1031,11 +1064,11 @@ contains
     !Local variables
     integer(i64) :: nstates_irred, nprocs, chunk, istate, numbands, numbranches, &
          ik_ibz, m, ieq, ik_sym, ik_fbz, iproc, ikp, n, nk, num_active_images, aux, &
-         start, end
-    integer(i64), allocatable :: istate_el(:), istate_ph(:)
+         start, end, nprocs_echimp
+    integer(i64), allocatable :: istate_el(:), istate_ph(:), istate_el_echimp(:)
     real(r64) :: tau_ibz
-    real(r64), allocatable :: Xplus(:), Xminus(:), response_el_reduce(:,:,:)
-    character(1024) :: filepath_Xminus, filepath_Xplus, tag
+    real(r64), allocatable :: Xplus(:), Xminus(:),  Xchimp(:), response_el_reduce(:,:,:)
+    character(1024) :: filepath_Xminus, filepath_Xplus, filepath_Xechimp, tag
 
     !Set output directory of transition probilities
     write(tag, "(E9.3)") T
@@ -1096,6 +1129,16 @@ contains
           !Read X- from file
           call read_transition_probs_e(trim(adjustl(filepath_Xminus)), nprocs, Xminus)
 
+          !Read Xchimp from file
+          if(num%elchimp .and. num%inchimpexact) then
+               !Set Xchimp filename
+               write(tag, '(I9)') istate
+               filepath_Xechimp = trim(adjustl(num%Xdir))//'/Xchimp.istate'//trim(adjustl(tag))
+               call read_transition_probs_e(trim(adjustl(filepath_Xechimp)), nprocs_echimp, Xchimp, &
+                    istate_el_echimp)
+          end if
+
+
           !Sum over the number of equivalent k-points of the IBZ point
           do ieq = 1, el%nequiv(ik_ibz)
              ik_sym = el%ibz2fbz_map(ieq, ik_ibz, 1) !symmetry
@@ -1114,6 +1157,22 @@ contains
                 response_el_reduce(ik_fbz, m, :) = response_el_reduce(ik_fbz, m, :) + &
                      response_el(aux, n, :)*(Xplus(iproc) + Xminus(iproc))
              end do
+
+             !Add charged impurity contribution to the self consistent term
+             if(num%elchimp .and. num%inchimpexact) then
+                 do iproc = 1, nprocs_echimp
+                   !Grab the final electron and, if needed, the interacting phonon
+                   call demux_state(istate_el_echimp(iproc), numbands, n, ikp)
+  
+                   !Self contribution:
+                   !Find image of final electron wave vector due to the current symmetry
+                   call binsearch(el%indexlist, el%equiv_map(ik_sym, ikp), aux)
+  
+                   response_el_reduce(ik_fbz, m, :) = response_el_reduce(ik_fbz, m, :) + &
+                        response_el(aux, n, :) * Xchimp(iproc) 
+                 end do
+             end if
+
 
              !Iterate BTE
              response_el_reduce(ik_fbz, m, :) = field_term(ik_fbz, m, :) + &

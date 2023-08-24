@@ -99,6 +99,8 @@ module numerics_module
      !! Choose if electron BTE will be solved.
      logical :: elchimp
      !! Use electron-charged impurity scattering?
+     logical :: inchimpexact
+     !! Introduce in-scattering correction due to echimp in an exact way
      logical :: elbound
      !! Use electron-boundary scattering?
      logical :: drag
@@ -148,14 +150,14 @@ contains
     character(len = 6) :: phiso_1B_theory
     logical :: read_gq2, read_gk2, read_V, read_W, tetrahedra, phe, phiso, phsubs, &
          phbound, phdef_Tmat, onlyphbte, onlyebte, elchimp, elbound, drag, plot_along_path, &
-         phthinfilm, phthinfilm_ballistic, fourph, use_Wannier_ifc2s, phiso_Tmat
+         phthinfilm, phthinfilm_ballistic, fourph, use_Wannier_ifc2s, phiso_Tmat, inchimpexact
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
          read_V, read_W, tetrahedra, phe, phiso, phsubs, onlyphbte, onlyebte, maxiter, &
          conv_thres, drag, elchimp, plot_along_path, runlevel, ph_en_min, ph_en_max, &
          ph_en_num, el_en_min, el_en_max, el_en_num, phbound, elbound, phdef_Tmat, &
          ph_mfp_npts, phthinfilm, phthinfilm_ballistic, fourph, fourph_mesh_ref, use_Wannier_ifc2s, &
-         phiso_Tmat, phiso_1B_theory
+         phiso_Tmat, phiso_1B_theory, inchimpexact
 
     call subtitle("Reading numerics information...")
     
@@ -186,6 +188,7 @@ contains
     onlyphbte = .false.
     onlyebte = .false.
     elchimp = .false.
+    inchimpexact = .false.
     elbound = .false.
     drag = .true.
     use_Wannier_ifc2s = .false.
@@ -260,6 +263,7 @@ contains
        self%phdef_Tmat = phdef_Tmat
        self%onlyphbte = onlyphbte
        self%onlyebte = onlyebte
+       self%inchimpexact = inchimpexact
        self%elchimp = elchimp
        self%elbound = elbound
        self%drag = drag
