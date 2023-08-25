@@ -6,4 +6,5 @@
 
 - Martí Raya-Moreno
   - [PR #83](https://github.com/nakib/elphbolt/pull/83): Scissor shift of the conduction bands.
-  - [PR #96](https://github.com/nakib/elphbolt/pull/96): Fast trilinear interpolation to speed up BTE iteration cycles. 
+  - [PR #96](https://github.com/nakib/elphbolt/pull/96): Fast trilinear interpolation to speed up BTE iteration cycles.
+  - [PR #104](https://github.com/nakib/elphbolt/pull/104): Exact in-scattering correction to the BTE for electron-charged impurity and phonon-point defect scattering.
