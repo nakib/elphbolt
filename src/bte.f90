@@ -900,8 +900,8 @@ contains
     !Only work with the active images
     if(this_image() <= num_active_images) then
 
-! First we add self interactions comming from isotopic and
-    ! substitution
+       ! First we add self interactions comming from isotopic and
+       ! substitution
        if (ph%xiso%nels .ne. 0) then
           do iproc = 1, ph%xiso%nels
                ! Get states information

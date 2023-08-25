@@ -401,6 +401,7 @@ contains
                   crys%thinfilm_height, 'mm along the ', crys%thinfilm_normal, ' direction'
           end if
           write(*, "(A, L)") "Include el-charged impurity interaction: ", self%elchimp
+          write(*, "(A, L)") "Include el-charged impurity exact in-scattering: ", self%inchimpexact
           write(*, "(A, L)") "Include el-boundary interaction: ", self%elbound
           if(self%elbound) then
              write(*,"(A,(1E16.8,x),A)") 'Characteristic length for el-boundary scattering =', &

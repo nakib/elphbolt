@@ -1807,12 +1807,12 @@ contains
     type(electron), intent(in) :: el
     
     !Local variables
-    integer(i64) :: nstates_irred, istate, nprocs_eph, &
+    integer(i64) :: nstates_irred, istate, nprocs_eph, nprocs_echimp, &
          iproc, chunk, m, ik, mp, ikp, num_active_images, start, end
     integer(i64), allocatable :: istate_el_echimp(:)
     real(r64), allocatable :: X(:)
     real(r64) :: k(3), kp(3)
-    character(len = 1024) :: filepath_Xp, filepath_Xm, tag
+    character(len = 1024) :: filepath_Xp, filepath_Xm, filepath_Xchimp, tag
 
     !Set output directory of transition probilities
     write(tag, "(E9.3)") crys%T
@@ -1865,19 +1865,20 @@ contains
           if(num%elchimp) then
              !Set Xchimp filename
              write(tag, '(I9)') istate
-             filepath_Xm = trim(adjustl(num%Xdir))//'/Xchimp.istate'//trim(adjustl(tag))
+             filepath_Xchimp = trim(adjustl(num%Xdir))//'/Xchimp.istate'//trim(adjustl(tag))
 
              !Read Xchimp from file
              if(allocated(X)) deallocate(X)
-             call read_transition_probs_e(trim(adjustl(filepath_Xm)), nprocs_eph, X, istate_el_echimp)
+             call read_transition_probs_e(trim(adjustl(filepath_Xchimp)), &
+                  nprocs_echimp, X, istate_el_echimp)
 
              if (num%inchimpexact) then
-               do iproc = 1, nprocs_eph
+               do iproc = 1, nprocs_echimp
                   rta_rates_echimp(ik, m) = rta_rates_echimp(ik, m) + X(iproc) 
                end do
              else
                k = el%wavevecs_irred(ik, :) 
-               do iproc = 1, nprocs_eph
+               do iproc = 1, nprocs_echimp
                   !Demux final state index into band (m) and wave vector (ik) indices
                   call demux_state(istate_el_echimp(iproc), el%numbands, mp, ikp)
                   kp = el%wavevecs(ikp, :)
