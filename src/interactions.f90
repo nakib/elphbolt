@@ -17,7 +17,7 @@
 module interactions
   !! Module containing the procedures related to the computation of interactions.
 
-  use params, only: i64, r64, pi, twopi, amu, qe, hbar_eVps, perm0
+  use params, only: i64, r64, pi, twopi, amu, qe, hbar_eVps, perm0, oneI
   use misc, only: exit_with_message, print_message, distribute_points, &
        demux_state, mux_vector, mux_state, expi, Bose, binsearch, Fermi, &
        twonorm, write2file_rank2_real, demux_vector, interpolate, expm1, &
@@ -30,7 +30,7 @@ module interactions
   use phonon_module, only: phonon
   use numerics_module, only: numerics
   use delta, only: delta_fn_tetra, delta_fn_triang
-
+  
   implicit none
 
   private
@@ -502,10 +502,11 @@ contains
          q1_indvec(3), q2_indvec(3), q3_minus_indvec(3), index_minus, index_plus, &
          neg_iq2, neg_q2_indvec(3), num_active_images, plus_count, minus_count
     real(r64) :: en1, en2, en3, massfac, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
-         occup_fac, const, bose2, bose3, delta_minus, delta_plus
+         occup_fac, const, bose2, bose3, delta_minus, delta_plus, local_wavevecs(ph%nwv, 3)
     real(r64), allocatable :: Vm2_1(:), Vm2_2(:), Wm(:), Wp(:)
     integer(i64), allocatable :: istate2_plus(:), istate3_plus(:), istate2_minus(:), istate3_minus(:)
-    complex(r64) :: phases_q2q3(ph%numtriplets)
+!!$    complex(r64) :: phases_q2q3(ph%numtriplets)
+    complex(r64) :: phases_q1(ph%numtriplets, ph%nwv)
     character(len = 1024) :: filename, filename_Wm, filename_Wp
 
     if(key /= 'V' .and. key /= 'W') then
@@ -526,7 +527,7 @@ contains
 
     !Maximum total number of 3-phonon processes for a given initial phonon state
     nprocs = ph%nwv*ph%numbands**2
-
+    
     !Allocate |V^-|^2
     if(key == 'V') allocate(Vm2_1(nprocs), Vm2_2(nprocs))
     ! Above, we split the |V-|^2 vertices into two parts:
@@ -547,7 +548,7 @@ contains
        write(*, "(A, I10)") " #states = ", nstates_irred
        write(*, "(A, I10)") " #states/image <= ", chunk
     end if
-
+    
     !Only work with the active images
     if(this_image() <= num_active_images) then
        !Run over first phonon IBZ states
@@ -605,6 +606,12 @@ contains
           !Convert from crystal to 0-based index vector
           q1_indvec = nint(q1*ph%wvmesh)
 
+          !TODO Precalculate phases phases_q1(iq2, it) here
+          if(key == 'V') then
+             call calculate_phases(ph%numtriplets, ph%nwv, phases_q1)
+          end if
+          !!
+
           !Run over second (FBZ) phonon wave vectors
           do iq2 = 1, ph%nwv
              !Initial (IBZ blocks) wave vector (crystal coords.)
@@ -620,22 +627,22 @@ contains
              !Muxed index of q3_minus
              iq3_minus = mux_vector(q3_minus_indvec, ph%wvmesh, 0_i64)
 
-             if(key == 'V') then
-                if(en1 /= 0.0_r64) then
-                   !Calculate the numtriplet number of mass-normalized phases for this (q2,q3) pair
-                   do it = 1, ph%numtriplets
-                      massfac = 1.0_r64/sqrt(&
-                           crys%masses(crys%atomtypes(ph%Index_i(it)))*&
-                           crys%masses(crys%atomtypes(ph%Index_j(it)))*&
-                           crys%masses(crys%atomtypes(ph%Index_k(it))))
-                      q2_cart = matmul(crys%reclattvecs, q2)
-                      q3_minus_cart = matmul(crys%reclattvecs, q3_minus)
-                      phases_q2q3(it) = massfac*&
-                           expi(-dot_product(q2_cart, ph%R_j(:,it)) -&
-                           dot_product(q3_minus_cart, ph%R_k(:,it)))
-                   end do
-                end if
-             end if
+!!$             if(key == 'V') then
+!!$                if(en1 /= 0.0_r64) then
+!!$                   !Calculate the numtriplet number of mass-normalized phases for this (q2,q3) pair
+!!$                   do it = 1, ph%numtriplets
+!!$                      massfac = 1.0_r64/sqrt(&
+!!$                           crys%masses(crys%atomtypes(ph%Index_i(it)))*&
+!!$                           crys%masses(crys%atomtypes(ph%Index_j(it)))*&
+!!$                           crys%masses(crys%atomtypes(ph%Index_k(it))))
+!!$                      q2_cart = matmul(crys%reclattvecs, q2)
+!!$                      q3_minus_cart = matmul(crys%reclattvecs, q3_minus)
+!!$                      phases_q2q3(it) = massfac*&
+!!$                           expi(-dot_product(q2_cart, ph%R_j(:,it)) -&
+!!$                           dot_product(q3_minus_cart, ph%R_k(:,it)))
+!!$                   end do
+!!$                end if
+!!$             end if
 
              !Run over branches of second phonon
              do s2 = 1, ph%numbands
@@ -685,10 +692,14 @@ contains
                          !V1_indexlist(minus_count) = index_minus
 
                          !Calculate and save the minus process vertex
+!!$                         Vm2_1(minus_count) = Vm2_3ph(ph%evecs(iq1, s1, :), &
+!!$                              conjg(ph%evecs(iq2, s2, :)), conjg(ph%evecs(iq3_minus, s3, :)), &
+!!$                              ph%Index_i(:), ph%Index_j(:), ph%Index_k(:), ph%ifc3(:,:,:,:), &
+!!$                              phases_q2q3, ph%numtriplets, ph%numbands)
                          Vm2_1(minus_count) = Vm2_3ph(ph%evecs(iq1, s1, :), &
                               conjg(ph%evecs(iq2, s2, :)), conjg(ph%evecs(iq3_minus, s3, :)), &
                               ph%Index_i(:), ph%Index_j(:), ph%Index_k(:), ph%ifc3(:,:,:,:), &
-                              phases_q2q3, ph%numtriplets, ph%numbands)
+                              phases_q1(:, iq2), ph%numtriplets, ph%numbands)
                       end if
 
                       if(delta_plus > 0.0_r64) then
@@ -696,10 +707,14 @@ contains
                          plus_count = plus_count + 1
 
                          !Calculate and save the minus process vertex
+!!$                         Vm2_2(plus_count) = Vm2_3ph(ph%evecs(iq1, s1, :), &
+!!$                              conjg(ph%evecs(iq2, s2, :)), conjg(ph%evecs(iq3_minus, s3, :)), &
+!!$                              ph%Index_i(:), ph%Index_j(:), ph%Index_k(:), ph%ifc3(:,:,:,:), &
+!!$                              phases_q2q3, ph%numtriplets, ph%numbands)
                          Vm2_2(plus_count) = Vm2_3ph(ph%evecs(iq1, s1, :), &
                               conjg(ph%evecs(iq2, s2, :)), conjg(ph%evecs(iq3_minus, s3, :)), &
                               ph%Index_i(:), ph%Index_j(:), ph%Index_k(:), ph%ifc3(:,:,:,:), &
-                              phases_q2q3, ph%numtriplets, ph%numbands)
+                              phases_q1(:, iq2), ph%numtriplets, ph%numbands)
                       end if
                    end if
 
@@ -803,6 +818,55 @@ contains
        end do !istate1
     end if
     sync all
+    
+  contains
+    
+    subroutine calculate_phases(ntrips, nwv, phases)
+      integer(i64), intent(in) :: ntrips, nwv
+      complex(r64), intent(out) :: phases(ntrips, nwv)
+
+      associate(Index_i => ph%Index_i, Index_j => ph%Index_j, Index_k => ph%Index_k, &
+           wvmesh => ph%wvmesh, wavevecs => ph%wavevecs, &
+           R_j => ph%R_j, R_k => ph%R_k, &
+           reclattvecs => crys%reclattvecs, masses => crys%masses, &
+           atomtypes => crys%atomtypes)
+        !$acc data copyin(nwv, wavevecs, wvmesh, reclattvecs, ntrips, masses, atomtypes, &
+        !$acc             Index_i, Index_j, Index_k) copyout(phases)
+
+        !$acc parallel loop
+        do iq2 = 1, nwv
+           !Initial (IBZ blocks) wave vector (crystal coords.)
+           q2 = wavevecs(iq2, :)
+
+           !Convert from crystal to 0-based index vector
+           q2_indvec = nint(q2*wvmesh)
+
+           !Folded final phonon wave vector
+           q3_minus_indvec = modulo(q1_indvec - q2_indvec, wvmesh) !0-based index vector
+           q3_minus = q3_minus_indvec/dble(wvmesh) !crystal coords.
+
+           q2_cart = matmul(reclattvecs, q2)
+           q3_minus_cart = matmul(reclattvecs, q3_minus)
+           !TODO calculate the above two lines without matmul
+
+           !Calculate the numtriplet number of mass-normalized phases for this (q2,q3) pair
+           do it = 1, ntrips
+              massfac = 1.0_r64/sqrt(&
+                   masses(atomtypes(Index_i(it)))*&
+                   masses(atomtypes(Index_j(it)))*&
+                   masses(atomtypes(Index_k(it))))
+
+              !expi won't work on the accelerator
+              phases(it, iq2) = massfac*&
+                   exp(oneI*(-dot_product(q2_cart, R_j(:,it)) -&
+                   dot_product(q3_minus_cart, R_k(:,it))))
+           end do
+        end do
+        !$acc end parallel loop
+        !$acc end data
+
+      end associate
+    end subroutine calculate_phases
   end subroutine calculate_3ph_interaction
 
   subroutine calculate_gReq(wann, ph, num)
