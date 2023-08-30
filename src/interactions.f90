@@ -501,7 +501,7 @@ contains
          nprocs, s1, s2, s3, iq1_ibz, iq1, iq2, iq3_minus, it, &
          q1_indvec(3), q2_indvec(3), q3_minus_indvec(3), index_minus, index_plus, &
          neg_iq2, neg_q2_indvec(3), num_active_images, plus_count, minus_count, &
-         ntrips_gpu, nwv_gpu
+         idim, jdim, nwv_gpu, ntrips_gpu
     real(r64) :: en1, en2, en3, massfac, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
          occup_fac, const, bose2, bose3, delta_minus, delta_plus
     real(r64), allocatable :: Vm2_1(:), Vm2_2(:), Wm(:), Wp(:)
@@ -530,18 +530,19 @@ contains
 
     ntrips_gpu = ph%numtriplets
     nwv_gpu = ph%nwv
-    
+
     associate(wavevecs => ph%wavevecs, wvmesh => ph%wvmesh, &
-         reclattvecs => crys%reclattvecs, &
+         reclattvecs => crys%reclattvecs, numtriplets => ph%numtriplets, &
          masses => crys%masses, atomtypes => crys%atomtypes, &
          R_j => ph%R_j, R_k => ph%R_k, &
          Index_i => ph%Index_i, Index_j => ph%Index_j, Index_k => ph%Index_k)
 
       !Send some data to the gpu
-      !$acc data copyin(nwv_gpu, wavevecs, wvmesh, reclattvecs, ntrips_gpu, &
+      !$acc data copyin(nwv_gpu, ntrips_gpu, wavevecs, wvmesh, reclattvecs, &
       !$acc             masses, atomtypes, &
       !$acc             R_j, R_k, &
-      !$acc             Index_i, Index_j, Index_k)
+      !$acc             Index_i, Index_j, Index_k)!, &
+      !!$acc      create(q2_cart, q3_minus_cart)
 
       print*, 'Done copying data to gpu'
 
@@ -625,8 +626,10 @@ contains
 
             !TODO Precalculate phases phases_q1(iq2, it) here
             if(key == 'V') then
-               !$acc data copyout(phases_q1)
-               !$acc parallel loop
+               !$acc data copyin(q1_indvec) copyout(phases_q1)
+               !$acc parallel loop &
+               !$acc          private(iq2, it, q2, q2_indvec, q3_minus_indvec, &
+               !$acc          q3_minus, q2_cart, q3_minus_cart, massfac)
                do iq2 = 1, nwv_gpu
                   !Initial (IBZ blocks) wave vector (crystal coords.)
                   q2 = wavevecs(iq2, :)
@@ -636,11 +639,10 @@ contains
 
                   !Folded final phonon wave vector
                   q3_minus_indvec = modulo(q1_indvec - q2_indvec, wvmesh) !0-based index vector
+                  
                   q3_minus = q3_minus_indvec/dble(wvmesh) !crystal coords.
-
                   q2_cart = matmul(reclattvecs, q2)
                   q3_minus_cart = matmul(reclattvecs, q3_minus)
-                  !TODO calculate the above two lines without matmul
 
                   !Calculate the numtriplet number of mass-normalized phases for this (q2,q3) pair
                   do it = 1, ntrips_gpu
@@ -648,10 +650,10 @@ contains
                           masses(atomtypes(Index_i(it)))*&
                           masses(atomtypes(Index_j(it)))*&
                           masses(atomtypes(Index_k(it))))
-
-                     !expi won't work on the accelerator
-                     phases_q1(it, iq2) = massfac*&
-                          exp(oneI*(-dot_product(q2_cart, R_j(:,it)) -&
+                     
+                     !Note: expi won't work on the accelerator
+                     phases_q1(it, iq2) = massfac*exp((0.0_r64, -1.0_r64)*&
+                          (dot_product(q2_cart, R_j(:,it)) + &
                           dot_product(q3_minus_cart, R_k(:,it))))
                   end do
                end do
@@ -868,6 +870,7 @@ contains
       sync all
 
       !$acc end data
+      !!$acc end data
     end associate
   end subroutine calculate_3ph_interaction
 
