@@ -42,6 +42,8 @@ contains
     !! tetracount Number of tetrahedra in which a wave vector belongs
     !! tetra_evals Tetrahedra populated with the eigenvalues
 
+    !$acc routine seq
+    
     real(r64), intent(in) :: e
     integer(i64), intent(in) :: ik, ib
     integer(i64), intent(in) :: mesh(3), tetramap(:,:,:), tetracount(:)
@@ -770,6 +772,8 @@ contains
     !! triangcount Number of triangles in which a wave vector belongs
     !! triang_evals Triangles populated with the eigenvalues
 
+    !$acc routine seq
+    
     real(r64), intent(in) :: e
     integer(i64), intent(in) :: ik, ib
     integer(i64), intent(in) :: mesh(3), triangmap(:,:,:), triangcount(:)

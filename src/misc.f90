@@ -721,19 +721,21 @@ contains
     end do
   end subroutine coarse_grain
   
-  function mux_vector(v, mesh, base)
+  pure function mux_vector(v, mesh, base)
     !! Multiplex index of a single wave vector.
     !! Output is always 1-based.
     !! v is the demultiplexed triplet of a wave vector.
     !! mesh is the number of wave vectors along the three reciprocal lattice vectors.
     !! base states whether v has 0- or 1-based indexing.
 
+    !$acc routine seq
+    
     integer(i64), intent(in) :: v(3), mesh(3), base
     integer(i64) :: mux_vector
 
-    if(base < 0 .or. base > 1) then
-       call exit_with_message("Base has to be either 0 or 1 in misc.f90:mux_vector")
-    end if
+!!$    if(base < 0 .or. base > 1) then
+!!$       call exit_with_message("Base has to be either 0 or 1 in misc.f90:mux_vector")
+!!$    end if
 
     if(base == 0) then
        mux_vector = (v(3)*mesh(2) + v(2))*mesh(1) + v(1) + 1
