@@ -18,8 +18,8 @@ endif()
 
 #Set flags for caf
 if(CMAKE_Fortran_COMPILER MATCHES "caf")
-  set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -O2 -cpp -fPIC -fbounds-check -Wunused -Wconversion -Wunderflow -Wdo-subscript")
-  #set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -O2 -cpp -fopenacc -DOPENACC=1 -foffload=-lm -fopt-info-omp -fPIC -Wunused -Wconversion -Wunderflow -Wdo-subscript")
+  #set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -O2 -cpp -fPIC -fbounds-check -Wunused -Wconversion -Wunderflow -Wdo-subscript")
+  set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} -g -O2 -cpp -fopenacc -DOPENACC=1 -foffload=-lm -fopt-info-omp -fPIC -Wunused -Wconversion -Wunderflow -Wdo-subscript")
 endif()
 
 #Set spg library
