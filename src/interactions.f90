@@ -514,7 +514,6 @@ contains
 
     if(key == 'V') then
        allocate(minus_mask(nprocs), plus_mask(nprocs))
-       !minus_mask = .false.
     end if
     
     ntrips_gpu = ph%numtriplets
@@ -624,20 +623,19 @@ contains
 
             !Precalculate phases phases_q1(iq2, it) here
             if(key == 'V') then
+               minus_mask = .false.
+               plus_mask = .false.
+               
                !$acc data copyin(s1, iq1, q1_indvec, en1) &
-               !$acc      copyout(phases_q1, Vm2_1, Vm2_2, minus_mask, plus_mask) !&
-               !!$acc      copy(plus_count, minus_count)
+               !$acc      copyout(phases_q1, Vm2_1, Vm2_2), &
+               !$acc      copy(minus_mask, plus_mask)
 
                !$acc parallel loop &
                !$acc          private(iq2, it, q2, q2_indvec, q3_minus_indvec, &
                !$acc          q3_minus, q2_cart, q3_minus_cart, iq3_minus, massfac, &
                !$acc          neg_q2_indvec, neg_iq2, aux, proc_index, &
-               !$acc          delta_plus, delta_minus, s2s3, s2, s3, en2, en3) !&
-               !!$acc          reduction(+: minus_count, plus_count)
+               !$acc          delta_plus, delta_minus, s2s3, s2, s3, en2, en3)
                do iq2 = 1, nwv_gpu
-                  minus_mask = .false.
-                  plus_mask = .false.
-                  
                   !Initial (IBZ blocks) wave vector (crystal coords.)
                   q2 = wavevecs(iq2, :)
 
@@ -735,9 +733,13 @@ contains
                filename = 'Vm2.istate'//trim(adjustl(filename))
                open(1, file = trim(filename), status = 'replace', access = 'stream')
                write(1) count(minus_mask, kind = i64)
-               write(1) pack(Vm2_1, mask = minus_mask)
+               do proc_index = 1, nprocs
+                  if(minus_mask(proc_index)) write(1) Vm2_1(proc_index)
+               end do
                write(1) count(plus_mask, kind = i64)
-               write(1) pack(Vm2_2, mask = plus_mask)
+               do proc_index = 1, nprocs
+                  if(plus_mask(proc_index)) write(1) Vm2_2(proc_index)
+               end do
                close(1)
             end if
             !!
@@ -758,8 +760,11 @@ contains
                   !Muxed index of q3_minus
                   iq3_minus = mux_vector(q3_minus_indvec, ph%wvmesh, 0_i64)
 
-                  !Run over branches of second phonon
-                  do s2 = 1, ph%numbands
+                  !Combined loop over the 2nd and 3rd phonon bands
+                  do s2s3 = 1, ph%numbands**2
+                     s2 = int((s2s3 - 1)/ph%numbands) + 1 !changes slow
+                     s3 = modulo(s2s3 - 1, ph%numbands) + 1 !changes fast
+
                      !Energy of phonon 2
                      en2 = ph%ens(iq2, s2)
 
@@ -770,77 +775,72 @@ contains
                      !Bose factor for phonon 2
                      bose2 = Bose(en2, crys%T)
 
-                     !Run over branches of third phonon
-                     do s3 = 1, ph%numbands                
-                        !Minus process index
-                        index_minus = ((iq2 - 1)*ph%numbands + (s2 - 1))*ph%numbands + s3
+                     !Minus process index
+                     index_minus = ((iq2 - 1)*ph%numbands + (s2 - 1))*ph%numbands + s3
 
-                        !Energy of phonon 3
-                        en3 = ph%ens(iq3_minus, s3)
+                     !Energy of phonon 3
+                     en3 = ph%ens(iq3_minus, s3)
 
-                        !Evaluate delta functions
-                        if(num%tetrahedra) then
-                           delta_minus = delta_fn_tetra(en1 - en3, iq2, s2, ph%wvmesh, ph%tetramap, &
-                                ph%tetracount, ph%tetra_evals) !minus process
+                     !Evaluate delta functions
+                     if(num%tetrahedra) then
+                        delta_minus = delta_fn_tetra(en1 - en3, iq2, s2, ph%wvmesh, ph%tetramap, &
+                             ph%tetracount, ph%tetra_evals) !minus process
 
-                           delta_plus = delta_fn_tetra(en3 - en1, neg_iq2, s2, ph%wvmesh, ph%tetramap, &
-                                ph%tetracount, ph%tetra_evals) !plus process
-                        else
-                           delta_minus = delta_fn_triang(en1 - en3, iq2, s2, ph%wvmesh, ph%triangmap, &
-                                ph%triangcount, ph%triang_evals) !minus process
+                        delta_plus = delta_fn_tetra(en3 - en1, neg_iq2, s2, ph%wvmesh, ph%tetramap, &
+                             ph%tetracount, ph%tetra_evals) !plus process
+                     else
+                        delta_minus = delta_fn_triang(en1 - en3, iq2, s2, ph%wvmesh, ph%triangmap, &
+                             ph%triangcount, ph%triang_evals) !minus process
 
-                           delta_plus = delta_fn_triang(en3 - en1, neg_iq2, s2, ph%wvmesh, ph%triangmap, &
-                                ph%triangcount, ph%triang_evals) !plus process
-                        end if                        
-                        
-                        if(en1*en2*en3 == 0.0_r64) cycle
+                        delta_plus = delta_fn_triang(en3 - en1, neg_iq2, s2, ph%wvmesh, ph%triangmap, &
+                             ph%triangcount, ph%triang_evals) !plus process
+                     end if
 
-                        !Bose factor for phonon 3
-                        bose3 = Bose(en3, crys%T)
+                     if(en1*en2*en3 == 0.0_r64) cycle
 
-                        !Calculate W-:
+                     !Bose factor for phonon 3
+                     bose3 = Bose(en3, crys%T)
 
-                        !Temperature dependent occupation factor
-                        !(bose1 + 1)*bose2*bose3/(bose1*(bose1 + 1))
-                        ! = (bose2 + bose3 + 1)
-                        occup_fac = (bose2 + bose3 + 1.0_r64)
+                     !Calculate W-:
 
-                        if(delta_minus > 0.0_r64) then
-                           !Non-zero process counter
-                           minus_count = minus_count + 1
+                     !Temperature dependent occupation factor
+                     !(bose1 + 1)*bose2*bose3/(bose1*(bose1 + 1))
+                     ! = (bose2 + bose3 + 1)
+                     occup_fac = (bose2 + bose3 + 1.0_r64)
 
-                           !Save W-
-                           Wm(minus_count) = Vm2_1(minus_count)*occup_fac*delta_minus/en1/en2/en3
-                           istate2_minus(minus_count) = mux_state(ph%numbands, s2, iq2)
-                           istate3_minus(minus_count) = mux_state(ph%numbands, s3, iq3_minus)
-                        end if
+                     if(delta_minus > 0.0_r64) then
+                        !Non-zero process counter
+                        minus_count = minus_count + 1
 
-                        !Calculate W+:
+                        !Save W-
+                        Wm(minus_count) = Vm2_1(minus_count)*occup_fac*delta_minus/en1/en2/en3
+                        istate2_minus(minus_count) = mux_state(ph%numbands, s2, iq2)
+                        istate3_minus(minus_count) = mux_state(ph%numbands, s3, iq3_minus)
+                     end if
 
-                        !Grab index of corresponding plus process using
-                        !V-(s1q1|s2q2,s3q3) = V+(s1q1|s2-q2,s3q3)
-                        index_plus = ((neg_iq2 - 1)*ph%numbands + (s2 - 1))*ph%numbands + s3
+                     !Calculate W+:
 
-                        !Temperature dependent occupation factor
-                        !(bose1 + 1)*(bose2 + 1)*bose3/(bose1*(bose1 + 1))
-                        ! = bose2 - bose3.
-                        occup_fac = (bose2 - bose3)
+                     !Grab index of corresponding plus process using
+                     !V-(s1q1|s2q2,s3q3) = V+(s1q1|s2-q2,s3q3)
+                     index_plus = ((neg_iq2 - 1)*ph%numbands + (s2 - 1))*ph%numbands + s3
 
-                        if(delta_plus > 0.0_r64) then
-                           !Non-zero process counter
-                           plus_count = plus_count + 1
+                     !Temperature dependent occupation factor
+                     !(bose1 + 1)*(bose2 + 1)*bose3/(bose1*(bose1 + 1))
+                     ! = bose2 - bose3.
+                     occup_fac = (bose2 - bose3)
 
-                           !Save W+
-                           Wp(plus_count) = Vm2_2(plus_count)*occup_fac*delta_plus/en1/en2/en3
-                           istate2_plus(plus_count) = mux_state(ph%numbands, s2, neg_iq2)
-                           istate3_plus(plus_count) = mux_state(ph%numbands, s3, iq3_minus)
-                        end if                        
-                     end do !s3
-                  end do !s2
+                     if(delta_plus > 0.0_r64) then
+                        !Non-zero process counter
+                        plus_count = plus_count + 1
+
+                        !Save W+
+                        Wp(plus_count) = Vm2_2(plus_count)*occup_fac*delta_plus/en1/en2/en3
+                        istate2_plus(plus_count) = mux_state(ph%numbands, s2, neg_iq2)
+                        istate3_plus(plus_count) = mux_state(ph%numbands, s3, iq3_minus)
+                     end if
+                  end do !s2s3
                end do !iq2
-            end if
-
-            if(key == 'W') then
+               
                !Multiply constant factor, unit factor, etc.
                Wm(:) = const*Wm(:) !THz
                Wp(:) = const*Wp(:) !THz
@@ -873,11 +873,10 @@ contains
             !Change back to working directory
             call chdir(num%cwd)       
          end do !istate1
-      end if
+      end if !num_images
       sync all
 
       !$acc end data
-      !!$acc end data
     end associate
   end subroutine calculate_3ph_interaction
 
