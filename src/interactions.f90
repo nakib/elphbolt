@@ -17,6 +17,10 @@
 module interactions
   !! Module containing the procedures related to the computation of interactions.
 
+#ifdef _OPENACC
+  use openacc
+#endif
+  
   use params, only: i64, r64, pi, twopi, amu, qe, hbar_eVps, perm0, oneI
   use misc, only: exit_with_message, print_message, distribute_points, &
        demux_state, mux_vector, mux_state, expi, Bose, binsearch, Fermi, &
@@ -499,10 +503,13 @@ contains
 
     if(key == 'V') then
        call print_message("Calculating 3-ph vertices for all IBZ phonons...")
+#ifdef _OPENACC
+       print*, " Offloading has been enabled."
+#endif
     else
        call print_message("Calculating 3-ph transition probabilities for all IBZ phonons...")
     end if
-
+    
     !Conversion factor in transition probability expression
     const = pi/4.0_r64*hbar_eVps**5*(qe/amu)**3*1.0d-12
 
@@ -532,17 +539,18 @@ contains
          evecs => ph%evecs, ifc3 => ph%ifc3, &
          Index_i => ph%Index_i, Index_j => ph%Index_j, Index_k => ph%Index_k)
 
+#ifdef _OPENACC
       !Send some data to the gpu
       !$acc data copyin(nwv_gpu, ntrips_gpu, nprocs, wavevecs, wvmesh, reclattvecs, &
       !$acc             masses, atomtypes, &
       !$acc             R_j, R_k, numbands, ens, evecs, ifc3, &
       !$acc             tetrahedra_gpu, tetramap, tetracount, tetra_evals, &
       !$acc             triangmap, triangcount, triang_evals, &
-      !$acc             Index_i, Index_j, Index_k, nbands_gpu)!, &
-      !!$acc      create(q2_cart, q3_minus_cart)
-
-      print*, 'Done copying data to gpu'
-
+      !$acc             Index_i, Index_j, Index_k, nbands_gpu)
+      
+      print*, 'Done copying state-independent data to accelerator.'
+#endif
+      
       !Allocate |V^-|^2
       if(key == 'V') allocate(Vm2_1(nprocs), Vm2_2(nprocs))
       ! Above, we split the |V-|^2 vertices into two parts:
@@ -625,7 +633,8 @@ contains
             if(key == 'V') then
                minus_mask = .false.
                plus_mask = .false.
-               
+
+#ifdef _OPENACC
                !$acc data copyin(s1, iq1, q1_indvec, en1) &
                !$acc      copyout(phases_q1, Vm2_1, Vm2_2), &
                !$acc      copy(minus_mask, plus_mask)
@@ -635,6 +644,7 @@ contains
                !$acc          q3_minus, q2_cart, q3_minus_cart, iq3_minus, massfac, &
                !$acc          neg_q2_indvec, neg_iq2, aux, proc_index, &
                !$acc          delta_plus, delta_minus, s2s3, s2, s3, en2, en3)
+#endif
                do iq2 = 1, nwv_gpu
                   !Initial (IBZ blocks) wave vector (crystal coords.)
                   q2 = wavevecs(iq2, :)
@@ -719,10 +729,10 @@ contains
                      end if
                   end do !s2s3
                end do !iq2
+#ifdef _OPENACC
                !$acc end parallel loop
                !$acc end data
-
-               !!$acc wait
+#endif
                
                !Change to data output directory
                call chdir(trim(adjustl(num%Vdir)))
@@ -876,7 +886,9 @@ contains
       end if !num_images
       sync all
 
+#ifdef _OPENACC
       !$acc end data
+#endif
     end associate
   end subroutine calculate_3ph_interaction
 
