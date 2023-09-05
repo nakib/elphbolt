@@ -426,7 +426,7 @@ contains
          num_active_cpu_images
 
     !Number of active images
-    num_active_cpu_images = min(cpu_load + cpu_load, num_images())
+    num_active_images = min(gpu_load + cpu_load, num_images())
     
     !Load distribution among gpu image. For now take this to be image 1.
     !

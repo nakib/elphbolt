@@ -566,7 +566,7 @@ contains
          call distribute_points_cpu_gpu(gpu_load, cpu_load, &
               chunk, start, end, num_active_images)
 
-         !print*, this_image(), gpu_load, cpu_load, chunk
+         !print*, this_image(), gpu_load, cpu_load, chunk, num_active_images
 
          if(this_image() == 1) then
             write(*, "(A, I10)") " #states/gpu = ", chunk

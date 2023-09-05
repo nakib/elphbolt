@@ -7,11 +7,15 @@ copyright = "2023 Contributors of the elphbolt project."
 [library]
 source-dir="src"
 
+[preprocess]
+[preprocess.cpp]
+
 [dependencies]
 testify = { git = "git@github.com:nakib/testify.git" }
 
 [build]
 link = ["blas", "lapack", "symspg"]
+external-modules = "openacc"
 auto-tests = false
 
 [install]
