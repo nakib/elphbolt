@@ -32,6 +32,7 @@ set(LINKS "-lblas -llapack ${SPG_LIB}")
 
 #Set source
 set(SRC
+  src/resource.f90
   src/params.f90
   src/misc.f90
   src/spglib_wrapper.f90

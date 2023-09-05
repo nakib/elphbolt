@@ -4,6 +4,7 @@ module resource_module
 #ifdef _OPENACC
   use openacc
 #endif
+  use misc, only: create_set
   
   implicit none
   
@@ -33,7 +34,9 @@ contains
 
     integer :: igpus, im, iset
     integer :: devicenum
+#ifdef _OPENACC
     integer(acc_device_property):: property
+#endif
 
     character*(100) :: string
     character(len=10), allocatable :: hostname(:)[:]
