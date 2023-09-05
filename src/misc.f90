@@ -53,6 +53,10 @@ module misc
   interface interpolate_using_precomputed
      module procedure :: interpolate_using_precomputed_3vector, interpolate_using_precomputed_scalar
   end interface interpolate_using_precomputed
+
+  interface create_set
+     module procedure :: create_set_int, create_set_char
+  end interface create_set
   
 contains
 
@@ -721,7 +725,7 @@ contains
     unique = pack(A, mask = is_unique)
   end function unique
 
-  subroutine create_set(A, uniqueA)
+  subroutine create_set_int(A, uniqueA)
     !! Subroutine version of the pure function unique.
     
     integer(i64), intent(in) :: A(:)
@@ -737,7 +741,28 @@ contains
 
     allocate(uniqueA(count(is_unique)))
     uniqueA = pack(A, mask = is_unique)
-  end subroutine create_set
+  end subroutine create_set_int
+
+  subroutine create_set_char(A, uniqueA)
+    !! Subroutine version of the pure function unique.
+    !
+    ! Captain's lamentation: This is when I miss not having templates
+    ! in this language...
+
+    character(len=10), intent(in) :: A(:)
+    character(len=10), allocatable, intent(out) :: uniqueA(:)
+
+    !Locals
+    logical :: is_unique(size(A))
+    integer :: i
+
+    do i = size(A), 1, -1
+       is_unique(i) = .not. any(A(1 : i - 1) == A(i))
+    end do
+
+    allocate(uniqueA(count(is_unique)))
+    uniqueA = pack(A, mask = is_unique)
+  end subroutine create_set_char
   
   integer(i64) function coarse_grained(iwv_fine, coarsening_factor, mesh_fine)
     !! Given a 1-based muxed wave vector on the fine mesh,
