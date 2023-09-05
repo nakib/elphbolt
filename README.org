@@ -57,17 +57,30 @@ Above, you can change the build path with the additional argument ~--install-pre
 *** 3. Build
     Use one of the following two methods:
 **** Using ~fpm~ (requires internet connection)
-     To build and test with Fortran Package Manager (https://fpm.fortran-lang.org/), simply say
+     For a cpu-only build and test with Fortran Package Manager (https://fpm.fortran-lang.org/), say
      
       #+BEGIN_SRC bash
-      . fpm_config_caf.sh
-      fpm build
-      fpm test
+      . fpm_config_caf.sh; yes | fpm clean; fpm build; fpm test
       #+END_SRC
 
      The ~elphbolt~ and ~superconda~ apps will be available in the ~build/caf_*/app/~ directory.
 
      Modify the fpm manifest file, ~fpm.toml~, to suit your system. I'd appreciate any feedback.
+
+***** Experimental
+      For a cpu+gpu build with OpenACC (https://www.openacc.org/), say
+      
+     #+BEGIN_SRC bash
+      . fpm_config_caf_openacc.sh; yes | fpm clean; fpm build
+     #+END_SRC
+     
+     For this build, you will need a *recent* version of ~gcc~ build with ~nvptx~. You can have it on your HPC system using, for example, spack (https://spack.io/):
+     
+     #+BEGIN_SRC bash
+     spack install gcc@12.3.0+nvptx
+     #+END_SRC
+     
+     and adding the relevant ~<path to spack build of gcc>/bin~ directory to your ~PATH~.
 **** Using ~cmake~ (works offline)
 Issue the following command to build and run tests: ~mkdir build; cd build; cmake ..; make; ctest~. If all goes well, the exectuable will be available as ~build/bin/{elphbolt, superconda}~.
 ** Container solutions
