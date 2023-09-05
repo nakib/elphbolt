@@ -146,7 +146,7 @@ contains
 
     Vm2_3ph = abs(aux1)**2
   end function Vm2_3ph
-
+  
 !!$  subroutine calculate_coarse_grained_3ph_vertex(ph, crys, num)
 !!$    !! TODO
 !!$    
@@ -524,16 +524,16 @@ contains
 
     if(key == 'V') then
 
+       !Deep copies for the gpu
        ntrips_gpu = ph%numtriplets
        nwv_gpu = ph%nwv
        nbands_gpu = ph%numbands
        tetrahedra_gpu = num%tetrahedra
 
        associate(wavevecs => ph%wavevecs, wvmesh => ph%wvmesh, &
-            reclattvecs => crys%reclattvecs, numtriplets => ph%numtriplets, &
+            reclattvecs => crys%reclattvecs, &
             masses => crys%masses, atomtypes => crys%atomtypes, &
-            R_j => ph%R_j, R_k => ph%R_k, numbands => ph%numbands, &
-            ens => ph%ens, &
+            R_j => ph%R_j, R_k => ph%R_k, ens => ph%ens, &
             tetramap => ph%tetramap, triangmap => ph%triangmap, &
             tetracount => ph%tetracount, tetra_evals => ph%tetra_evals, &
             triangcount => ph%triangcount, triang_evals => ph%triang_evals, &
@@ -579,9 +579,8 @@ contains
 
 #ifdef _OPENACC
          !Send some data to the gpu
-         !$acc data if(offload) copyin(nwv_gpu, ntrips_gpu, nprocs, wavevecs, wvmesh, reclattvecs, &
-         !$acc             masses, atomtypes, &
-         !$acc             R_j, R_k, numbands, ens, evecs, ifc3, &
+         !$acc data if(offload) copyin(nwv_gpu, ntrips_gpu, wavevecs, wvmesh, reclattvecs, &
+         !$acc             masses, atomtypes, R_j, R_k, ens, evecs, ifc3, &
          !$acc             tetrahedra_gpu, tetramap, tetracount, tetra_evals, &
          !$acc             triangmap, triangcount, triang_evals, &
          !$acc             Index_i, Index_j, Index_k, nbands_gpu)
