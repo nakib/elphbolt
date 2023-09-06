@@ -498,9 +498,7 @@ contains
     character(len = 1024) :: filename, filename_Wm, filename_Wp
     logical :: tetrahedra_gpu
     logical, allocatable :: minus_mask(:), plus_mask(:)
-#ifdef _OPENACC
     type(resource) :: compute_resource
-#endif
 
     if(key /= 'V' .and. key /= 'W') then
        call exit_with_message("Invalid value of key in call to calculate_3ph_interaction. Exiting.")
@@ -508,14 +506,16 @@ contains
 
     if(key == 'V') then
        call print_message("Calculating 3-ph vertices for all IBZ phonons...")
-#ifdef _OPENACC
+
        call compute_resource%initialize
 
        call compute_resource%report
-       
+
+#ifdef _OPENACC
        if(compute_resource%gpu_manager) &
             print*, " Offloading has been enabled from image", this_image()
 #endif
+       
     else
        call print_message("Calculating 3-ph transition probabilities for all IBZ phonons...")
     end if
