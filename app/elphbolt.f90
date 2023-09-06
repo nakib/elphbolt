@@ -38,7 +38,6 @@ program elphbolt
        !calculate_W_fromcgV2
   use phonon_defect_module, only: phonon_defect
   use Green_function, only: calculate_retarded_phonon_D0
-  use resource_module, only: resource
   
   implicit none
   

@@ -26,7 +26,8 @@ module interactions
        demux_state, mux_vector, mux_state, expi, Bose, binsearch, Fermi, &
        twonorm, write2file_rank2_real, demux_vector, interpolate, expm1, &
        precompute_interpolation_corners_and_weights, interpolate_using_precomputed, &
-       create_set, coarse_grain, distribute_points_cpu_gpu
+       create_set, coarse_grain
+  use resource_module, only: resource
   
   use wannier_module, only: wannier
   use crystal_module, only: crystal
@@ -483,31 +484,37 @@ contains
     character(len = 1), intent(in) :: key
 
     !Local variables
-    integer(i64) :: start, end, chunk, istate1, nstates_irred, &
+    integer(i64) :: istate1, nstates_irred, &
          nprocs, s1, s2, s3, iq1_ibz, iq1, iq2, iq3_minus, it, &
          q1_indvec(3), q2_indvec(3), q3_minus_indvec(3), index_minus, index_plus, &
          neg_iq2, neg_q2_indvec(3), num_active_images, plus_count, minus_count, &
-         idim, jdim, nwv_gpu, ntrips_gpu, s2s3, nbands_gpu, proc_index, cpu_load, gpu_load
+         idim, jdim, nwv_gpu, ntrips_gpu, s2s3, nbands_gpu, proc_index
     real(r64) :: en1, en2, en3, massfac, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
-         occup_fac, const, bose2, bose3, delta_minus, delta_plus, aux
+         occup_fac, const, bose2, bose3, delta_minus, delta_plus, aux, load_split
     real(r64), allocatable :: Vm2_1(:), Vm2_2(:), Wm(:), Wp(:)
     integer(i64), allocatable :: istate2_plus(:), istate3_plus(:), istate2_minus(:), istate3_minus(:)
+    integer(i64), allocatable :: chunk[:], start[:], end[:]
     complex(r64) :: phases_q1(ph%numtriplets, ph%nwv)
     character(len = 1024) :: filename, filename_Wm, filename_Wp
-    logical :: tetrahedra_gpu, offload
+    logical :: tetrahedra_gpu
     logical, allocatable :: minus_mask(:), plus_mask(:)
+#ifdef _OPENACC
+    type(resource) :: compute_resource
+#endif
 
     if(key /= 'V' .and. key /= 'W') then
        call exit_with_message("Invalid value of key in call to calculate_3ph_interaction. Exiting.")
     end if
 
-    offload = .false.
-
     if(key == 'V') then
        call print_message("Calculating 3-ph vertices for all IBZ phonons...")
 #ifdef _OPENACC
-       offload = this_image() == 1
-       if(offload) print*, " Offloading from image 1 has been enabled."
+       call compute_resource%initialize
+
+       call compute_resource%report
+       
+       if(compute_resource%gpu_manager) &
+            print*, " Offloading has been enabled from image", this_image()
 #endif
     else
        call print_message("Calculating 3-ph transition probabilities for all IBZ phonons...")
@@ -522,6 +529,8 @@ contains
     !Maximum total number of 3-phonon processes for a given initial phonon state
     nprocs = ph%nwv*ph%numbands**2
 
+    allocate(chunk[*], start[*], end[*])
+    
     if(key == 'V') then
 
        !Deep copies for the gpu
@@ -530,6 +539,7 @@ contains
        nbands_gpu = ph%numbands
        tetrahedra_gpu = num%tetrahedra
 
+       !Associations will work with openacc
        associate(wavevecs => ph%wavevecs, wvmesh => ph%wvmesh, &
             reclattvecs => crys%reclattvecs, &
             masses => crys%masses, atomtypes => crys%atomtypes, &
@@ -548,44 +558,38 @@ contains
          ! 1. that are non-zero when the minus-type processes are energetically allowed
          ! 2. that are non-zero when the symmetry-related plus-type processes are energetically allowed
 
-         !Divide irred phonon states among images/gpu
+         !Split load among cpus and gpus
          ! Defaults (no gpu): 
-         gpu_load = 0
-         cpu_load = nstates_irred
+         load_split = 0.0
 #ifdef _OPENACC
          !TODO: Run a test cpu and gpu calculation to balance
          !the gpu/cpu load on the fly.
-
-         !Test:
-         !Fixed 40-60 split. Will make the split dynamic later.
-         gpu_load = nint(0.4*nstates_irred)
-         cpu_load = nstates_irred - gpu_load
+         load_split = 0.4
 #endif
 
-#ifdef _OPENACC
-         call distribute_points_cpu_gpu(gpu_load, cpu_load, &
+         call compute_resource%balance_load(load_split, nstates_irred, &
               chunk, start, end, num_active_images)
 
-         !print*, this_image(), gpu_load, cpu_load, chunk, num_active_images
-
-         if(this_image() == 1) then
+         !
+         write(*, "(A, I10)") " Message from node ", compute_resource%this_node
+         print*, 'num_active_images, image number: ', num_active_images, this_image()
+         if(compute_resource%gpu_manager) then
             write(*, "(A, I10)") " #states/gpu = ", chunk
-         else if(this_image() == 2) then
-            write(*, "(A, I10)") " #states/cpu image = ", chunk
+         else
+            write(*, "(A, I10)") " #states/cpu = ", chunk
          end if
-#else
-         call distribute_points(cpu_load, chunk, start, end, num_active_images)
-#endif
+         !
 
 #ifdef _OPENACC
          !Send some data to the gpu
-         !$acc data if(offload) copyin(nwv_gpu, ntrips_gpu, wavevecs, wvmesh, reclattvecs, &
+         !$acc data if(compute_resource%gpu_manager) copyin(nwv_gpu, ntrips_gpu, &
+         !$acc             wavevecs, wvmesh, reclattvecs, &
          !$acc             masses, atomtypes, R_j, R_k, ens, evecs, ifc3, &
          !$acc             tetrahedra_gpu, tetramap, tetracount, tetra_evals, &
          !$acc             triangmap, triangcount, triang_evals, &
          !$acc             Index_i, Index_j, Index_k, nbands_gpu)
          
-         if(offload) print*, " Done copying state-independent data to accelerator."
+         if(compute_resource%gpu_manager) print*, " Done copying state-independent data to accelerator."
 #endif
 
          !Only work with the active images
@@ -613,11 +617,11 @@ contains
                plus_mask = .false.
 
 #ifdef _OPENACC
-               !$acc data if(offload) copyin(s1, iq1, q1_indvec, en1), &
+               !$acc data if(compute_resource%gpu_manager) copyin(s1, iq1, q1_indvec, en1), &
                !$acc      copyout(phases_q1, Vm2_1, Vm2_2), &
                !$acc      copy(minus_mask, plus_mask)
 
-               !$acc parallel loop if(offload) &
+               !$acc parallel loop if(compute_resource%gpu_manager) &
                !$acc          private(iq2, it, q2, q2_indvec, q3_minus_indvec, &
                !$acc          q3_minus, q2_cart, q3_minus_cart, iq3_minus, massfac, &
                !$acc          neg_q2_indvec, neg_iq2, aux, proc_index, &
