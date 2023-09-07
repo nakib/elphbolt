@@ -26,7 +26,7 @@ module interactions
        demux_state, mux_vector, mux_state, expi, Bose, binsearch, Fermi, &
        twonorm, write2file_rank2_real, demux_vector, interpolate, expm1, &
        precompute_interpolation_corners_and_weights, interpolate_using_precomputed, &
-       create_set, coarse_grain
+       create_set, coarse_grain, timer
   use resource_module, only: resource
   
   use wannier_module, only: wannier
@@ -531,8 +531,16 @@ contains
 
     allocate(chunk[*], start[*], end[*])
     
-    if(key == 'V') then
+    if(key == 'V') then       
+       !Split load among cpus and gpus
+       ! Defaults (no gpu): 
+       load_split = 0.0
+#ifdef _OPENACC
+       call calculate_load_split_3ph_interactions(ph, crys, num, load_split)
 
+       if(this_image() == 1) print*, 'Projected optimal gpu/cpu load split = ', load_split
+#endif
+       
        !Deep copies for the gpu
        ntrips_gpu = ph%numtriplets
        nwv_gpu = ph%nwv
@@ -557,15 +565,6 @@ contains
          ! Above, we split the |V-|^2 vertices into two parts:
          ! 1. that are non-zero when the minus-type processes are energetically allowed
          ! 2. that are non-zero when the symmetry-related plus-type processes are energetically allowed
-
-         !Split load among cpus and gpus
-         ! Defaults (no gpu): 
-         load_split = 0.0
-#ifdef _OPENACC
-         !TODO: Run a test cpu and gpu calculation to balance
-         !the gpu/cpu load on the fly.
-         load_split = 0.5
-#endif
 
          call compute_resource%balance_load(load_split, nstates_irred, &
               chunk, start, end, num_active_images)
@@ -948,6 +947,372 @@ contains
 
     sync all
   end subroutine calculate_3ph_interaction
+
+  subroutine calculate_load_split_3ph_interactions(ph, crys, num, load_split)
+    type(phonon), intent(in) :: ph
+    type(crystal), intent(in) :: crys
+    type(numerics), intent(in) :: num
+    real(r64), intent(out) :: load_split
+
+    !Local variables
+    integer(i64) :: istate1, nstates_irred, &
+         nprocs, s1, s2, s3, iq1_ibz, iq1, iq2, iq3_minus, it, &
+         q1_indvec(3), q2_indvec(3), q3_minus_indvec(3), index_minus, index_plus, &
+         neg_iq2, neg_q2_indvec(3), num_active_images, plus_count, minus_count, &
+         idim, jdim, nwv_gpu, ntrips_gpu, s2s3, nbands_gpu, proc_index, t_start, t_end, t_rate
+    real(r64) :: en1, en2, en3, massfac, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
+         delta_minus, delta_plus, aux, gpu_time, cpu_time
+    real(r64), allocatable :: Vm2_1(:), Vm2_2(:), Wm(:), Wp(:)
+    integer(i64), allocatable :: istate2_plus(:), istate3_plus(:), istate2_minus(:), istate3_minus(:)
+    complex(r64) :: phases_q1(ph%numtriplets, ph%nwv)
+    character(len = 1024) :: filename, filename_Wm, filename_Wp
+    logical :: tetrahedra_gpu
+    logical, allocatable :: minus_mask(:), plus_mask(:)
+
+    
+    if(this_image() == 1) then
+       !Total number of IBZ blocks states
+       nstates_irred = ph%nwv_irred*ph%numbands
+
+       !Maximum total number of 3-phonon processes for a given initial phonon state
+       nprocs = ph%nwv*ph%numbands**2
+
+       !Deep copies for the gpu
+       ntrips_gpu = ph%numtriplets
+       nwv_gpu = ph%nwv
+       nbands_gpu = ph%numbands
+       tetrahedra_gpu = num%tetrahedra
+
+       !Associations will work with openacc
+       associate(wavevecs => ph%wavevecs, wvmesh => ph%wvmesh, &
+            reclattvecs => crys%reclattvecs, &
+            masses => crys%masses, atomtypes => crys%atomtypes, &
+            R_j => ph%R_j, R_k => ph%R_k, ens => ph%ens, &
+            tetramap => ph%tetramap, triangmap => ph%triangmap, &
+            tetracount => ph%tetracount, tetra_evals => ph%tetra_evals, &
+            triangcount => ph%triangcount, triang_evals => ph%triang_evals, &
+            evecs => ph%evecs, ifc3 => ph%ifc3, &
+            Index_i => ph%Index_i, Index_j => ph%Index_j, Index_k => ph%Index_k)
+
+         allocate(minus_mask(nprocs), plus_mask(nprocs))
+
+         !Allocate |V^-|^2
+         allocate(Vm2_1(nprocs), Vm2_2(nprocs))
+         ! Above, we split the |V-|^2 vertices into two parts:
+         ! 1. that are non-zero when the minus-type processes are energetically allowed
+         ! 2. that are non-zero when the symmetry-related plus-type processes are energetically allowed
+
+         !The cpu run
+
+         !Set the clock rate
+         call system_clock(count_rate = t_rate)
+
+         !Clock in
+         call system_clock(count = t_start)         
+
+         !Pick a test first phonon IBZ state
+         istate1 = nstates_irred
+
+         !Demux state index into branch (s) and wave vector (iq) indices
+         call demux_state(istate1, ph%numbands, s1, iq1_ibz)
+
+         !Muxed index of wave vector from the IBZ index list.
+         !This will be used to access IBZ information from the FBZ quantities.
+         iq1 = ph%indexlist_irred(iq1_ibz)
+
+         !Energy of phonon 1
+         en1 = ph%ens(iq1, s1)
+
+         !Initial (IBZ blocks) wave vector (crystal coords.)
+         q1 = ph%wavevecs(iq1, :)
+
+         !Convert from crystal to 0-based index vector
+         q1_indvec = nint(q1*ph%wvmesh)
+
+         !Precalculate phases phases_q1(iq2, it) here
+         minus_mask = .false.
+         plus_mask = .false.
+
+         do iq2 = 1, nwv_gpu
+            !Initial (IBZ blocks) wave vector (crystal coords.)
+            q2 = wavevecs(iq2, :)
+
+            !Convert from crystal to 0-based index vector
+            q2_indvec = nint(q2*wvmesh)
+
+            !Folded final phonon wave vector
+            q3_minus_indvec = modulo(q1_indvec - q2_indvec, wvmesh) !0-based index vector
+            q3_minus = q3_minus_indvec/dble(wvmesh) !crystal coords.
+
+            q2_cart = matmul(reclattvecs, q2)
+            q3_minus_cart = matmul(reclattvecs, q3_minus)
+
+            !Calculate the numtriplet number of mass-normalized phases for this (q2,q3) pair
+            do it = 1, ntrips_gpu
+               massfac = 1.0_r64/sqrt(&
+                    masses(atomtypes(Index_i(it)))*&
+                    masses(atomtypes(Index_j(it)))*&
+                    masses(atomtypes(Index_k(it))))
+
+               !Note: expi won't work on the accelerator
+               phases_q1(it, iq2) = massfac*exp((0.0_r64, -1.0_r64)*&
+                    (dot_product(q2_cart, R_j(:,it)) + &
+                    dot_product(q3_minus_cart, R_k(:,it))))
+            end do
+
+            !Muxed index of q3_minus
+            iq3_minus = mux_vector(q3_minus_indvec, wvmesh, 0_i64)
+
+            !Combined loop over the 2nd and 3rd phonon bands
+            do s2s3 = 1, nbands_gpu**2
+               s2 = int((s2s3 - 1)/nbands_gpu) + 1 !changes slow
+               s3 = modulo(s2s3 - 1, nbands_gpu) + 1 !changes fast
+
+               proc_index = (iq2 - 1)*nbands_gpu**2 + s2s3
+
+               !Energy of phonon 2
+               en2 = ens(iq2, s2)
+
+               !Get index of -q2
+               neg_q2_indvec = modulo(-q2_indvec, wvmesh)
+               neg_iq2 = mux_vector(neg_q2_indvec, wvmesh, 0_i64)
+
+               !Energy of phonon 3
+               en3 = ens(iq3_minus, s3)
+
+               !TODO: This iffer can possibly be handled early on in the program.
+               !Evaluate delta functions
+               if(tetrahedra_gpu) then
+                  delta_minus = delta_fn_tetra(en1 - en3, iq2, s2, wvmesh, tetramap, &
+                       tetracount, tetra_evals) !minus process
+
+                  delta_plus = delta_fn_tetra(en3 - en1, neg_iq2, s2, wvmesh, tetramap, &
+                       tetracount, tetra_evals) !plus process
+               else
+                  delta_minus = delta_fn_triang(en1 - en3, iq2, s2, wvmesh, triangmap, &
+                       triangcount, triang_evals) !minus process
+
+                  delta_plus = delta_fn_triang(en3 - en1, neg_iq2, s2, wvmesh, triangmap, &
+                       triangcount, triang_evals) !plus process
+               end if
+
+               if(en1*en2*en3 == 0.0_r64) cycle
+
+               if(delta_minus > 0.0_r64 .or. delta_plus > 0.0_r64) &
+                    aux = Vm2_3ph(evecs(iq1, s1, :), &
+                    evecs(iq2, s2, :), evecs(iq3_minus, s3, :), &
+                    Index_i(:), Index_j(:), Index_k(:), ifc3(:,:,:,:), &
+                    phases_q1(:, iq2), ntrips_gpu, nbands_gpu)
+
+               if(delta_minus > 0.0_r64) then
+                  !Record energetically available minus process
+                  minus_mask(proc_index) = .true.
+                  Vm2_1(proc_index) = aux
+               end if
+
+               if(delta_plus > 0.0_r64) then
+                  !Record energetically available plus process
+                  plus_mask(proc_index) = .true.
+                  Vm2_2(proc_index) = aux
+               end if
+            end do !s2s3
+         end do !iq2
+
+         !Change to data output directory
+         call chdir(trim(adjustl(num%Vdir)))
+
+         !Write data in binary format
+         !Note: this will overwrite existing data!
+         write (filename, '(I9)') istate1
+         filename = 'Vm2.istate'//trim(adjustl(filename))
+         open(1, file = trim(filename), status = 'replace', access = 'stream')
+         write(1) count(minus_mask, kind = i64)
+         do proc_index = 1, nprocs
+            if(minus_mask(proc_index)) write(1) Vm2_1(proc_index)
+         end do
+         write(1) count(plus_mask, kind = i64)
+         do proc_index = 1, nprocs
+            if(plus_mask(proc_index)) write(1) Vm2_2(proc_index)
+         end do
+         close(1)
+
+       !Clock out
+       call system_clock(count = t_end)
+
+       cpu_time = dble(t_end - t_start)/t_rate
+
+       !gpu run:
+
+       !Clock in
+       call system_clock(count = t_start)
+
+#ifdef _OPENACC
+       !Send some data to the gpu
+       !$acc data copyin(nwv_gpu, ntrips_gpu, &
+       !$acc             wavevecs, wvmesh, reclattvecs, &
+       !$acc             masses, atomtypes, R_j, R_k, ens, evecs, ifc3, &
+       !$acc             tetrahedra_gpu, tetramap, tetracount, tetra_evals, &
+       !$acc             triangmap, triangcount, triang_evals, &
+       !$acc             Index_i, Index_j, Index_k, nbands_gpu)
+#endif
+
+       !Pick a test first phonon IBZ state
+       istate1 = nstates_irred
+
+       !Demux state index into branch (s) and wave vector (iq) indices
+       call demux_state(istate1, ph%numbands, s1, iq1_ibz)
+
+       !Muxed index of wave vector from the IBZ index list.
+       !This will be used to access IBZ information from the FBZ quantities.
+       iq1 = ph%indexlist_irred(iq1_ibz)
+
+       !Energy of phonon 1
+       en1 = ph%ens(iq1, s1)
+
+       !Initial (IBZ blocks) wave vector (crystal coords.)
+       q1 = ph%wavevecs(iq1, :)
+
+       !Convert from crystal to 0-based index vector
+       q1_indvec = nint(q1*ph%wvmesh)
+
+       !Precalculate phases phases_q1(iq2, it) here
+       minus_mask = .false.
+       plus_mask = .false.
+
+#ifdef _OPENACC
+       !$acc data copyin(s1, iq1, q1_indvec, en1), &
+       !$acc      copyout(phases_q1, Vm2_1, Vm2_2), &
+       !$acc      copy(minus_mask, plus_mask)
+
+       !$acc parallel loop &
+       !$acc          private(iq2, it, q2, q2_indvec, q3_minus_indvec, &
+       !$acc          q3_minus, q2_cart, q3_minus_cart, iq3_minus, massfac, &
+       !$acc          neg_q2_indvec, neg_iq2, aux, proc_index, &
+       !$acc          delta_plus, delta_minus, s2s3, s2, s3, en2, en3)
+#endif
+       do iq2 = 1, nwv_gpu
+          !Initial (IBZ blocks) wave vector (crystal coords.)
+          q2 = wavevecs(iq2, :)
+
+          !Convert from crystal to 0-based index vector
+          q2_indvec = nint(q2*wvmesh)
+
+          !Folded final phonon wave vector
+          q3_minus_indvec = modulo(q1_indvec - q2_indvec, wvmesh) !0-based index vector
+          q3_minus = q3_minus_indvec/dble(wvmesh) !crystal coords.
+
+          q2_cart = matmul(reclattvecs, q2)
+          q3_minus_cart = matmul(reclattvecs, q3_minus)
+
+          !Calculate the numtriplet number of mass-normalized phases for this (q2,q3) pair
+          do it = 1, ntrips_gpu
+             massfac = 1.0_r64/sqrt(&
+                  masses(atomtypes(Index_i(it)))*&
+                  masses(atomtypes(Index_j(it)))*&
+                  masses(atomtypes(Index_k(it))))
+
+             !Note: expi won't work on the accelerator
+             phases_q1(it, iq2) = massfac*exp((0.0_r64, -1.0_r64)*&
+                  (dot_product(q2_cart, R_j(:,it)) + &
+                  dot_product(q3_minus_cart, R_k(:,it))))
+          end do
+
+          !Muxed index of q3_minus
+          iq3_minus = mux_vector(q3_minus_indvec, wvmesh, 0_i64)
+
+          !Combined loop over the 2nd and 3rd phonon bands
+          do s2s3 = 1, nbands_gpu**2
+             s2 = int((s2s3 - 1)/nbands_gpu) + 1 !changes slow
+             s3 = modulo(s2s3 - 1, nbands_gpu) + 1 !changes fast
+
+             proc_index = (iq2 - 1)*nbands_gpu**2 + s2s3
+
+             !Energy of phonon 2
+             en2 = ens(iq2, s2)
+
+             !Get index of -q2
+             neg_q2_indvec = modulo(-q2_indvec, wvmesh)
+             neg_iq2 = mux_vector(neg_q2_indvec, wvmesh, 0_i64)
+
+             !Energy of phonon 3
+             en3 = ens(iq3_minus, s3)
+
+             !TODO: This iffer can possibly be handled early on in the program.
+             !Evaluate delta functions
+             if(tetrahedra_gpu) then
+                delta_minus = delta_fn_tetra(en1 - en3, iq2, s2, wvmesh, tetramap, &
+                     tetracount, tetra_evals) !minus process
+
+                delta_plus = delta_fn_tetra(en3 - en1, neg_iq2, s2, wvmesh, tetramap, &
+                     tetracount, tetra_evals) !plus process
+             else
+                delta_minus = delta_fn_triang(en1 - en3, iq2, s2, wvmesh, triangmap, &
+                     triangcount, triang_evals) !minus process
+
+                delta_plus = delta_fn_triang(en3 - en1, neg_iq2, s2, wvmesh, triangmap, &
+                     triangcount, triang_evals) !plus process
+             end if
+
+             if(en1*en2*en3 == 0.0_r64) cycle
+
+             if(delta_minus > 0.0_r64 .or. delta_plus > 0.0_r64) &
+                  aux = Vm2_3ph(evecs(iq1, s1, :), &
+                  evecs(iq2, s2, :), evecs(iq3_minus, s3, :), &
+                  Index_i(:), Index_j(:), Index_k(:), ifc3(:,:,:,:), &
+                  phases_q1(:, iq2), ntrips_gpu, nbands_gpu)
+
+             if(delta_minus > 0.0_r64) then
+                !Record energetically available minus process
+                minus_mask(proc_index) = .true.
+                Vm2_1(proc_index) = aux
+             end if
+
+             if(delta_plus > 0.0_r64) then
+                !Record energetically available plus process
+                plus_mask(proc_index) = .true.
+                Vm2_2(proc_index) = aux
+             end if
+          end do !s2s3
+       end do !iq2
+#ifdef _OPENACC
+       !$acc end parallel loop
+       !$acc end data
+       !$acc end data
+#endif
+
+       !Change to data output directory
+       call chdir(trim(adjustl(num%Vdir)))
+
+       !Write data in binary format
+       !Note: this will overwrite existing data!
+       write (filename, '(I9)') istate1
+       filename = 'Vm2.istate'//trim(adjustl(filename))
+       open(1, file = trim(filename), status = 'replace', access = 'stream')
+       write(1) count(minus_mask, kind = i64)
+       do proc_index = 1, nprocs
+          if(minus_mask(proc_index)) write(1) Vm2_1(proc_index)
+       end do
+       write(1) count(plus_mask, kind = i64)
+       do proc_index = 1, nprocs
+          if(plus_mask(proc_index)) write(1) Vm2_2(proc_index)
+       end do
+       close(1)
+       
+       !Clock out
+       call system_clock(count = t_end)
+
+       gpu_time = dble(t_end - t_start)/t_rate
+
+       !Split load among cpus and gpus
+       load_split = 1.0 - gpu_time/cpu_time
+
+     end associate
+    end if !image 1 check
+
+    sync all
+    call co_broadcast(load_split, 1)
+    sync all
+  end subroutine calculate_load_split_3ph_interactions
 
 !!$    subroutine calculate_3ph_interaction(ph, crys, num, key)
 !!$    !! Parallel driver of the 3-ph vertex calculator for all IBZ phonon wave vectors.
