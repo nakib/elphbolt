@@ -564,21 +564,21 @@ contains
 #ifdef _OPENACC
          !TODO: Run a test cpu and gpu calculation to balance
          !the gpu/cpu load on the fly.
-         load_split = 0.4
+         load_split = 0.5
 #endif
 
          call compute_resource%balance_load(load_split, nstates_irred, &
               chunk, start, end, num_active_images)
 
-         !
-         write(*, "(A, I10)") " Message from node ", compute_resource%this_node
-         print*, 'num_active_images, image number: ', num_active_images, this_image()
-         if(compute_resource%gpu_manager) then
-            write(*, "(A, I10)") " #states/gpu = ", chunk
-         else
-            write(*, "(A, I10)") " #states/cpu = ", chunk
-         end if
-         !
+!!$         !
+!!$         write(*, "(A, I10)") " Message from node ", compute_resource%this_node
+!!$         print*, 'num_active_images, image number: ', num_active_images, this_image()
+!!$         if(compute_resource%gpu_manager) then
+!!$            write(*, "(A, I10)") " #states/gpu = ", chunk
+!!$         else
+!!$            write(*, "(A, I10)") " #states/cpu = ", chunk
+!!$         end if
+!!$         !
 
 #ifdef _OPENACC
          !Send some data to the gpu
@@ -589,7 +589,9 @@ contains
          !$acc             triangmap, triangcount, triang_evals, &
          !$acc             Index_i, Index_j, Index_k, nbands_gpu)
          
-         if(compute_resource%gpu_manager) print*, " Done copying state-independent data to accelerator."
+         if(compute_resource%gpu_manager) &
+              print*, 'image ', this_image(), &
+              ": Done copying state-independent data to accelerator."
 #endif
 
          !Only work with the active images
