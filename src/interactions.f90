@@ -536,9 +536,18 @@ contains
        ! Defaults (no gpu): 
        load_split = 0.0
 #ifdef _OPENACC
-       call calculate_load_split_3ph_interactions(ph, crys, num, load_split)
+       
+       !print*, speedup_3ph_interactions(ph, crys, num)
+       load_split = 1.0/(1.0 + 1.0/ &
+            (1.0*compute_resource%num_gpus/compute_resource%num_cpus*&
+            speedup_3ph_interactions(ph, crys, num)))
 
-       if(this_image() == 1) print*, 'Projected optimal gpu/cpu load split = ', load_split
+       if(load_split > 1.0) then
+          load_split = 0.0
+          if(this_image() == 1) print*, 'No speed-up can be achieved for this problem.'
+       else
+          if(this_image() == 1) print*, 'Projected optimal gpu/cpu load split = ', load_split
+       end if
 #endif
        
        !Deep copies for the gpu
@@ -948,11 +957,13 @@ contains
     sync all
   end subroutine calculate_3ph_interaction
 
-  subroutine calculate_load_split_3ph_interactions(ph, crys, num, load_split)
+  real(r64) function speedup_3ph_interactions(ph, crys, num)
+    !! Returns the speedup due to gpu acceleration compared
+    !! to a single cpu run.
+    
     type(phonon), intent(in) :: ph
     type(crystal), intent(in) :: crys
     type(numerics), intent(in) :: num
-    real(r64), intent(out) :: load_split
 
     !Local variables
     integer(i64) :: istate1, nstates_irred, &
@@ -1303,16 +1314,16 @@ contains
 
        gpu_time = dble(t_end - t_start)/t_rate
 
-       !Split load among cpus and gpus
-       load_split = 1.0 - gpu_time/cpu_time
+       !Speedup
+       speedup_3ph_interactions = cpu_time/gpu_time
 
      end associate
     end if !image 1 check
 
     sync all
-    call co_broadcast(load_split, 1)
+    call co_broadcast(speedup_3ph_interactions, 1)
     sync all
-  end subroutine calculate_load_split_3ph_interactions
+  end function speedup_3ph_interactions
 
 !!$    subroutine calculate_3ph_interaction(ph, crys, num, key)
 !!$    !! Parallel driver of the 3-ph vertex calculator for all IBZ phonon wave vectors.
