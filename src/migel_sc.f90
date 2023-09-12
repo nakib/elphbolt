@@ -66,17 +66,17 @@ module MigEl_sc_module
      !! Temperature sweep: start, end, difference
      real(r64) :: mustar
      !! Dimensionless Coulomb pseudopotential parameter
-     real(r64) :: MAD_Tc
-     !! Superconducting transition temperature in the McMillan-Allen-Dynes (MAD) theory
+     real(r64) :: MD_Tc
+     !! Superconducting transition temperature in the McMillan-Dynes (MD) theory
      real(r64) :: BCS_delta
-     !! Superconducting gap from the BCS theory using the MAD Tc
+     !! Superconducting gap from the BCS theory using the MD Tc
      logical :: isotropic
      !! Use isotropic approximation?
      logical :: use_external_eps
      !! Use user generated |epsilon|^2 to screen a2F?
 
    contains
-     procedure, public :: initialize, calculate_MAD_theory, calculate_MigEl_theory
+     procedure, public :: initialize, calculate_MD_theory, calculate_MigEl_theory
      procedure, private :: generate_real_ens_meshes, generate_matsubara_meshes
   end type MigEl_sc
 
@@ -148,27 +148,27 @@ contains
     sync all
   end subroutine initialize
 
-  subroutine calculate_MAD_theory(self)
+  subroutine calculate_MD_theory(self)
     !! Calculate the supercondting gap and transition temperature
-    !! using the McMillan-Allen-Dynes (MAD) theory.
+    !! using the McMillan-Dynes (MD) theory.
     !! P. B. Allen and R. C. Dynes Phys. Rev. B 12, 905 (1975).
 
     class(MigEl_sc), intent(inout) :: self
     
-    !McMillan-Allen-Dynes Tc
-    self%MAD_Tc = self%omegalog/1.2_r64*exp( -1.04_r64*(1.0_r64 + self%iso_lambda0)/ &
+    !McMillan-Dynes Tc
+    self%MD_Tc = self%omegalog/1.2_r64*exp( -1.04_r64*(1.0_r64 + self%iso_lambda0)/ &
          (self%iso_lambda0 - self%mustar*(1.0_r64 + 0.62_r64*self%iso_lambda0)))/kB
 
-    !BCS gap in the weak-coupling limit from the MAD Tc
-    self%BCS_Delta = 1.72_r64*kB*self%MAD_Tc
+    !BCS gap in the weak-coupling limit from the MD Tc
+    self%BCS_Delta = 1.72_r64*kB*self%MD_Tc
 
     if(this_image() == 1) then
-       write(*,"(A, (1E16.8, x), A)") 'McMillan-Allen-Dynes Tc =', &
-            self%MAD_Tc, ' K'
+       write(*,"(A, (1E16.8, x), A)") 'McMillan-Dynes Tc =', &
+            self%MD_Tc, ' K'
        write(*,"(A, (1E16.8, x), A)") 'BCS gap =', &
             self%BCS_delta*1.0e3_r64, ' meV'
     end if
-  end subroutine calculate_MAD_theory
+  end subroutine calculate_MD_theory
 
   subroutine calculate_MigEl_theory(self, el, wann, num, max_ph_en)
     !! Solve the Migdal-Eliashberg equations.

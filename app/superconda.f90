@@ -155,8 +155,8 @@ program superconda
 
      call subtitle("Solving Migdal-Eliashberg equations...")
 
-     !Calculate McMillan-Allen-Dynes theory
-     call migel%calculate_MAD_theory
+     !Calculate McMillan-Dynes theory
+     call migel%calculate_MD_theory
 
      !Calculate Migdal-Eliashberg theory
      call migel%calculate_MigEl_theory(el, wann, num, maxval(ph%ens(:,:)))
