@@ -381,11 +381,11 @@ contains
           write(*, "(A, L)") "Reuse ph-e matrix elements: ", self%read_gq2
           write(*, "(A, L)") "Reuse ph-ph matrix elements: ", self%read_V
           write(*, "(A, L)") "Reuse ph-ph transition probabilities: ", self%read_W
-          write(*, "(A, L)") "Include ph-e interaction: ", self%phe
-          write(*, "(A, L)") "Include ph-isotope interaction: ", self%phiso
+          write(*, "(A, L)") "Calculate ph-e interaction: ", self%phe
+          write(*, "(A, L)") "Calculate 1st Born ph-isotope interaction: ", self%phiso
           if(self%phiso) &
                write(*, "(A, A)") "Selected ph-isotope 1st Born theory: ", self%phiso_1B_theory
-          write(*, "(A, L)") "Calculate ph-isotope interaction from T-matrix: ", self%phiso_Tmat
+          write(*, "(A, L)") "Calculate ph-isotope interaction via T-matrix: ", self%phiso_Tmat
           write(*, "(A, L)") "Include ph-substitution interaction: ", self%phsubs
           write(*, "(A, L)") "Include ph-boundary interaction: ", self%phbound
           write(*, "(A, L)") "Include 4-ph interaction: ", self%fourph

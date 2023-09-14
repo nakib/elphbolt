@@ -261,9 +261,11 @@ contains
     renorm_ens(1, 1:3) = 0.0_r64
 
     !Write to file
-    call write2file_rank2_real(ph%prefix // '.W_rta_'//ph%prefix//'defect', scatt_rates)
+    !call write2file_rank2_real(ph%prefix // '.W_rta_'//ph%prefix//'defect', scatt_rates)
+    call write2file_rank2_real(ph%prefix // '.W_rta_'//ph%prefix//'iso', scatt_rates)
     !call write2file_rank2_real(ph%prefix // '.lineshifts_ibz_'//ph%prefix//'defect', lineshifts)
-    call write2file_rank2_real(ph%prefix // '.ens_renorm_ibz_'//ph%prefix//'defect', renorm_ens)
+    !call write2file_rank2_real(ph%prefix // '.ens_renorm_ibz_'//ph%prefix//'defect', renorm_ens)
+    call write2file_rank2_real(ph%prefix // '.ens_renorm_ibz_'//ph%prefix//'iso', renorm_ens)
   end subroutine calculate_phonon_Tmatrix
   
   !subroutine calculate_phonon_Tmatrix_host(self, ph, crys, host, diagT, V_mass)
