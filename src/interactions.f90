@@ -108,7 +108,7 @@ contains
     real(r64), intent(in) :: q
 
     gchimp2 = 1.0e-3_r64/crys%volume/((perm0*crys%epsilon0)*(q**2 + crys%qTF**2))**2*&
-         (el%chimp_conc_n*(qe*el%Zn**2)**2 + el%chimp_conc_p*(qe*el%Zp**2)**2) !ev^2
+         (el%chimp_conc_n*(qe*el%Zn)**2 + el%chimp_conc_p*(qe*el%Zp)**2) !ev^2
   end function gchimp2
   
   pure real(r64) function Vm2_3ph(ev1_s1, ev2_s2, ev3_s3, &
