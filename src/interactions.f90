@@ -2435,7 +2435,7 @@ contains
                         el%triangcount, el%triang_evals)
                 end if
 
-                !Save Xchimp (with factor suppressing forward scattering)
+                !Save Xchimp (without forward scattering suppression)
                 Xchimp_istate(count) = g2 * delta
 
                 !Save final electron state
