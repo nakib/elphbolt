@@ -26,7 +26,7 @@ module interactions
        demux_state, mux_vector, mux_state, expi, Bose, binsearch, Fermi, &
        twonorm, write2file_rank2_real, demux_vector, interpolate, expm1, &
        precompute_interpolation_corners_and_weights, interpolate_using_precomputed, &
-       create_set, coarse_grain, timer
+       create_set, coarse_grain, timer, eye
   use resource_module, only: resource
   
   use wannier_module, only: wannier
@@ -97,18 +97,72 @@ contains
     qdist = minval(distfromcorners)
   end function qdist
   
-  pure real(r64) function gchimp2(el, crys, q)
+!!$  pure real(r64) function gchimp2(el, crys, q)
+!!$    !! Function to calculate the squared electron-charged impurity vertex.
+!!$    !!
+!!$    !! This is the Fourier transform of the Yukawa potential, c.f. Eq. 33
+!!$    !! of RevModPhys.53.745 (1981).
+!!$
+!!$    type(crystal), intent(in) :: crys
+!!$    type(electron), intent(in) :: el
+!!$    real(r64), intent(in) :: q
+!!$
+!!$    gchimp2 = 1.0e-3_r64/crys%volume/((perm0*crys%epsilon0)*(q**2 + crys%qTF**2))**2*&
+!!$         (el%chimp_conc_n*(qe*el%Zn)**2 + el%chimp_conc_p*(qe*el%Zp)**2) !ev^2
+!!$  end function gchimp2
+  
+  real(r64) function gchimp2(el, crys, qcrys, evec_k, evec_kp)
     !! Function to calculate the squared electron-charged impurity vertex.
     !!
-    !! This is the Fourier transform of the Yukawa potential, c.f. Eq. 33
-    !! of RevModPhys.53.745 (1981).
+    !! The expression implemented here was derived by Leveillee et al.
+    !! in PRB 107, 125207 (2023).
 
     type(crystal), intent(in) :: crys
     type(electron), intent(in) :: el
-    real(r64), intent(in) :: q
+    real(r64), intent(in) :: qcrys(3)
+    complex(r64),intent(in) :: evec_k(:), evec_kp(:)
 
-    gchimp2 = 1.0e-3_r64/crys%volume/((perm0*crys%epsilon0)*(q**2 + crys%qTF**2))**2*&
-         (el%chimp_conc_n*(qe*el%Zn)**2 + el%chimp_conc_p*(qe*el%Zp)**2) !ev^2
+    real(r64) :: qcart(3), qmag, prefac, overlap, denom, Gsum, &
+         G(3), Gplusq(3), eps_3x3(3, 3)
+    integer :: ik1, ik2, ik3
+    
+    qcart = matmul(crys%reclattvecs, qcrys)
+    qmag = twonorm(qcart)
+
+    !if(qmag == 0.0_r64) then
+    !   eps_3x3 = crys%epsilon0*eye(3_i64)
+    !else
+    eps_3x3 = (crys%epsilon0 + (crys%qTF/qmag)**2)*eye(3_i64)
+    !end if
+    
+    prefac = 1.0e-3_r64/crys%volume/perm0**2*&
+         (el%chimp_conc_n*(qe*el%Zn)**2 + el%chimp_conc_p*(qe*el%Zp)**2)
+    
+    !This is [U(k')U^\dagger(k)]_nm
+    !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
+    overlap = (abs(dot_product(evec_kp, evec_k)))**2
+    
+    Gsum = 0.0_r64
+    do ik1 = -3, 3
+       do ik2 = -3, 3
+          do ik3 = -3, 3
+             G = (  ik1*crys%reclattvecs(:, 1) &
+                  + ik2*crys%reclattvecs(:, 2) &
+                  + ik3*crys%reclattvecs(:, 3)  )
+
+             Gplusq = G + qcart
+
+             denom = abs(dot_product(Gplusq, matmul(eps_3x3, Gplusq)))**2
+
+             !Only want G /= -q in the sum over G
+             if(denom > 0.0_r64) &
+             !if(all(G + qcart /= 0.0_r64)) &
+                  Gsum = Gsum + 1.0_r64/denom
+          end do
+       end do
+    end do
+    
+    gchimp2 = prefac*overlap*Gsum !ev^2
   end function gchimp2
   
   pure real(r64) function Vm2_3ph(ev1_s1, ev2_s2, ev3_s3, &
@@ -2416,15 +2470,19 @@ contains
              q_mag = qdist(q_indvec/dble(el%wvmesh), crys%reclattvecs)
 
              !Calculate matrix element
-             g2 = gchimp2(el, crys, q_mag)
-
+             !g2 = gchimp2(el, crys, q_mag)
+             
              !Run over final electron bands
              do n = 1, el%numbands
                 !Apply energy window to final electron
                 if(abs(el%ens(ikp, n) - el%enref) > el%fsthick) cycle
-
+                
                 !Increment g2 processes counter
                 count = count + 1
+
+                !Calculate matrix element
+                g2 = gchimp2(el, crys, q_indvec/dble(el%wvmesh), &
+                     el%evecs_irred(ik, m, :), el%evecs(ikp, n, :))  
 
                 !Evaulate delta function
                 if(num%tetrahedra) then

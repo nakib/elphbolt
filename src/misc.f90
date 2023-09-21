@@ -107,6 +107,19 @@ contains
        write(*, "(A)") ".............."
     end if
   end subroutine end_timer
+
+  pure function eye(N)
+    !! Returns an NxN identity matrix.
+
+    integer(i64), intent(in) :: N
+    integer(i64) :: eye(N, N)
+    integer(i64) :: i
+
+    eye = 0
+    do i = 1, N
+       eye(i, i) = 1
+    end do
+  end function eye
   
   subroutine linspace(grid, min, max, num)
     !! Create equidistant grid.
