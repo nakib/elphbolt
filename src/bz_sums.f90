@@ -62,14 +62,15 @@ contains
           end do
        end do
 
-!!$       !Free-electron gas Thomas-Fermi model
-!!$       ! qTF**2 = spindeg*e^2*beta/nptq/vol_pcell/perm0/epsilon0*Sum_{BZ}f0_{k}(1-f0_{k})
-!!$       crys%qTF = sqrt(1.0e9_r64*crys%qTF*el%spindeg*beta*qe**2/product(el%wvmesh)&
-!!$            /crys%volume/perm0/crys%epsilon0) !nm^-1
-
-       !Eq. 22 of PRB 107, 125207 (2023) with the typo in the power of left hand side fixed
+       !Free-electron gas Thomas-Fermi model
+       ! qTF**2 = spindeg*e^2*beta/nptq/vol_pcell/perm0/epsilon0*Sum_{BZ}f0_{k}(1-f0_{k})
        crys%qTF = sqrt(1.0e9_r64*crys%qTF*el%spindeg*beta*qe**2/product(el%wvmesh)&
-            /crys%volume/perm0) !nm^-1
+            /crys%volume/perm0/crys%epsilon0) !nm^-1
+
+       !Compare the above to Eq. 22 of PRB 107, 125207 (2023) with the typo
+       !in the power of left hand side fixed.
+       !crys%qTF = sqrt(1.0e9_r64*crys%qTF*el%spindeg*beta*qe**2/product(el%wvmesh)&
+       !     /crys%volume/perm0) !nm^-1
 
        if(this_image() == 1) then
           write(*, "(A, 1E16.8, A)") ' Thomas-Fermi screening wave vector = ', crys%qTF, ' 1/nm'

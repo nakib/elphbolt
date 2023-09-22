@@ -129,11 +129,11 @@ contains
     qcart = matmul(crys%reclattvecs, qcrys)
     qmag = twonorm(qcart)
 
-    !if(qmag == 0.0_r64) then
-    !   eps_3x3 = crys%epsilon0*eye(3_i64)
-    !else
-    eps_3x3 = (crys%epsilon0 + (crys%qTF/qmag)**2)*eye(3_i64)
-    !end if
+    !Note the difference compared to Eq. 23 of PRB 107, 125207 (2023).
+    !This is because in my expression for qTF^2 (module bz_sums > calculate_qTF),
+    !the denominator contains a factor of epsilon0.
+    !As such, (q_TF_effective)^2 in the above paper = epsilon0 x my qTF^2.
+    eps_3x3 = crys%epsilon0*(1.0_r64 + (crys%qTF/qmag)**2)*eye(3_i64)
     
     prefac = 1.0e-3_r64/crys%volume/perm0**2*&
          (el%chimp_conc_n*(qe*el%Zn)**2 + el%chimp_conc_p*(qe*el%Zp)**2)
@@ -146,17 +146,14 @@ contains
     do ik1 = -3, 3
        do ik2 = -3, 3
           do ik3 = -3, 3
-             G = (  ik1*crys%reclattvecs(:, 1) &
-                  + ik2*crys%reclattvecs(:, 2) &
-                  + ik3*crys%reclattvecs(:, 3)  )
-
-             Gplusq = G + qcart
+             Gplusq = (  ik1*crys%reclattvecs(:, 1) &
+                       + ik2*crys%reclattvecs(:, 2) &
+                       + ik3*crys%reclattvecs(:, 3)  ) + qcart
 
              denom = abs(dot_product(Gplusq, matmul(eps_3x3, Gplusq)))**2
 
              !Only want G /= -q in the sum over G
              if(denom > 0.0_r64) &
-             !if(all(G + qcart /= 0.0_r64)) &
                   Gsum = Gsum + 1.0_r64/denom
           end do
        end do
@@ -2482,7 +2479,7 @@ contains
 
                 !Calculate matrix element
                 g2 = gchimp2(el, crys, q_indvec/dble(el%wvmesh), &
-                     el%evecs_irred(ik, m, :), el%evecs(ikp, n, :))  
+                     el%evecs_irred(ik, m, :), el%evecs(ikp, n, :))
 
                 !Evaulate delta function
                 if(num%tetrahedra) then
