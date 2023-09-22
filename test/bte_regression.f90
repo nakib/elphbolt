@@ -273,11 +273,12 @@ program bte_regression
      call t_event%end_timer('IBZ e-ph transition probabilities')
   end if
 
-  if(num%onlyebte .or. num%drag .or. num%phe) then
-     !After this point the electron eigenvectors are not needed
-     call el%deallocate_eigenvecs
+  if(num%onlyebte .or. num%drag .or. num%phe .or. num%drag &
+       .or. num%plot_along_path) then
+     !Deallocate Wannier quantities
+     call wann%deallocate_wannier(num)
   end if
-
+  
   if(num%onlyebte .or. num%drag) then
      if(num%elchimp) then
         call t_event%start_timer('e-ch. imp. interactions')
@@ -289,10 +290,9 @@ program bte_regression
      end if
   end if
 
-  if(num%onlyebte .or. num%drag .or. num%phe .or. num%drag &
-       .or. num%plot_along_path) then
-     !Deallocate Wannier quantities
-     call wann%deallocate_wannier(num)
+  if(num%onlyebte .or. num%drag .or. num%phe) then
+     !After this point the electron eigenvectors are not needed
+     call el%deallocate_eigenvecs
   end if
 
   if(num%onlyphbte .or. num%drag) then
