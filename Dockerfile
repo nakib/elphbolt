@@ -58,3 +58,5 @@ RUN rm -rf elphbolt # Remove previous builds if any.
 RUN git clone https://github.com/nakib/elphbolt; cd elphbolt && \
     mkdir build; cd build; cmake ..; make && \
     ctest -R test_misc
+# Note that above the regression test was not included.
+# Will revist this later [TODO].
