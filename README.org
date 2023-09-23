@@ -83,9 +83,13 @@ Above, you can change the build path with the additional argument ~--install-pre
      and adding the relevant ~<path to spack build of gcc>/bin~ directory to your ~PATH~.
 **** Using ~cmake~ (works offline)
 Issue the following command to build and run tests: ~mkdir build; cd build; cmake ..; make; ctest~. If all goes well, the exectuable will be available as ~build/bin/{elphbolt, superconda}~.
-** Container solutions
+**** Using ~docker~ (requires internet connection)
+To build a docker image, say
 
-An example ~Dockerfile~ is provided. I have not yet tested this on any HPC system.
+      #+BEGIN_SRC bash
+      docker build - < Dockerfile
+      #+END_SRC
+The docker build uses ~cmake~ internally.
 
 ** Examples
 
