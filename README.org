@@ -26,7 +26,7 @@ To date (July 03, 2023), ~elphbolt~ / ~superconda~ has been used in the followin
 | Si          | drag                                                              | [[https://www.nature.com/articles/s41524-022-00710-0][npj Comp. Mat. 8, 28]]      |
 
 
-Stylistically, ~elphbolt~ is designed to be simple, small, fast, and extensible. It uses an object-based procedural style, which allows fast development, while resulting in a rather compact source (~ 9000 lines of code, generated using David A. Wheeler's ~SLOCCount~). The symmetries of the crystal are fully exploited and the transport active Fermi window is used to allow the sampling of extremely fine wave vector meshes needed for accurate solutions of the BTEs and Eliashberg equations. Parallelism is achieved through modern Fortran's intrinsic ~coarrays~ feature that is fully supported by recent versions of both the ~gcc~ and ~intel~ compilers.
+Stylistically, ~elphbolt~ is designed to be simple, small, fast, and extensible. It uses an object-based procedural style, which allows fast development, while resulting in a rather compact source (~ 10k lines of code, generated using David A. Wheeler's ~SLOCCount~). The symmetries of the crystal are fully exploited and the transport active Fermi window is used to allow the sampling of extremely fine wave vector meshes needed for accurate solutions of the BTEs and Eliashberg equations. Parallelism is achieved through modern Fortran's intrinsic ~coarrays~ feature that is fully supported by recent versions of both the ~gcc~ and ~intel~ compilers.
 
 ~elphbolt~ currently works with the ~Quantum Espresso~ (https://www.quantum-espresso.org/) suite and its core module ~EPW~ (https://epw-code.org/) for the phonon quantities and the Wannier space information, respectively. An interface with all-electron ~exciting~ (https://exciting-code.org/) code is currently under construction.
 
@@ -46,13 +46,7 @@ The source is heavily commented and can be auto-documented with ~FORD~ (https://
 
 *** 2. Get ~OpenCoarrays~
 
-~OpenCoarrays~ ([[http://www.opencoarrays.org]]) is an implementation of the ~coarrays~ functionalities. Some HPC systems include it (for example, MareNostrum4 (BSC) and LaPalma (IAC)). In that case, load it. If not, you can build it from source. Below are a couple of concrete examples:
-
-I was able to build version 2.0.0 on the LaPalma system of IAC by first loading ~gcc~, ~openmpi~, and ~cmake~, then going into the ~OpenCoarrays-2.0.0~ directory and saying ~./install.sh~. The executables ~caf~ and ~cafrun~ were then installed in ~/OpenCoarrays-2.0.0/prerequisites/installations/bin/~. I added the above directory to my ~$PATH~ in my ~bashrc~.
-
-On the Sirius cluster of Boston College, I was able to build version 2.9.2 by first loading ~gnu_gcc/9.2.0~, ~openmpi/4.0.5gcc9.2.0~, and ~cmake/3.18.4~, then going into the ~OpenCoarrays-2.9.2~ directory and saying ~./install.sh --with-fortran /usr/public/gnu_gcc/9.2.0/bin/gfortran --with-cxx /usr/public/gnu_gcc/9.2.0/bin/g++ --with-c /usr/public/gnu_gcc/9.2.0/bin/gcc --with-mpi /usr/public/openmpi/4.0.5gcc.9.2.0/ --with-cmake /usr/public/cmake/3.18.4/bin/cmake~. The executables ~caf~ and ~cafrun~ were then installed in ~/OpenCoarrays-2.9.2/prerequisites/installations/opencoarrays/2.9.2/bin/~. I added the above directory to my ~$PATH~ in my ~bashrc~. 
-
-Above, you can change the build path with the additional argument ~--install-prefix <path to build directory>~ to ~install.sh~.
+~OpenCoarrays~ ([[http://www.opencoarrays.org]]) is an implementation of the ~coarrays~ functionalities. Some HPC systems include it (for example, MareNostrum4 (BSC) and LaPalma (IAC)). In that case, load it. If not, you can build it from source.
 
 *** 3. Build
     Use one of the following two methods:
@@ -83,7 +77,7 @@ Above, you can change the build path with the additional argument ~--install-pre
      and adding the relevant ~<path to spack build of gcc>/bin~ directory to your ~PATH~.
 **** Using ~cmake~ (works offline)
 Issue the following command to build and run tests: ~mkdir build; cd build; cmake ..; make; ctest~. If all goes well, the exectuable will be available as ~build/bin/{elphbolt, superconda}~.
-**** Using ~docker~ (requires internet connection)
+** Docker (requires internet connection)
 To build a docker image, say
 
       #+BEGIN_SRC bash
