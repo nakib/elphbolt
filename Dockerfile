@@ -1,4 +1,4 @@
-FROM debian:buster
+FROM ubuntu:jammy
 
 # User name
 ENV USERNAME=elf
@@ -39,24 +39,22 @@ WORKDIR /home/$USERNAME
 
 # Install some other packages from Debian repo
 RUN sudo apt-get install -yq git nano make cmake gfortran mpich  \
-    liblapack-dev libsymspg-dev && \
+    liblapack-dev libsymspg-dev curl unzip && \
     sudo apt-get clean -q
 
-# Install OpenCoarrays 2.8.0
+# Install OpenCoarrays 2.10.1
 RUN rm -rf OpenCoarrays # Remove previous build, if it exists.
 RUN git clone https://github.com/sourceryinstitute/OpenCoarrays && \
     mkdir OpenCoarrays/opencoarrays-install  && \
     cd OpenCoarrays/opencoarrays-install && \
-    git checkout tags/2.8.0 && \
+    git checkout tags/2.10.1 && \
     FC="$(command -v gfortran)" CC="$(command -v gcc)" cmake .. && \
     sudo make install && \
     caf --version && \
     cafrun --version
 
 # Install elphbolt (develop-latest)
-RUN rm -rf elphbolt # Remove previous builds if it exists.
+RUN rm -rf elphbolt # Remove previous builds if any.
 RUN git clone https://github.com/nakib/elphbolt; cd elphbolt && \
-    cp Makefiles/thinkpad_gcc.make src/ && \
-    cp Makefiles/Makefile src/ &&\
-    cd src/ && \
-    make clean; make
+    mkdir build; cd build; cmake ..; make && \
+    ctest -R test_misc
