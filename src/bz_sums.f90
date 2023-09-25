@@ -609,7 +609,7 @@ contains
     ! W/m/K for thermal conductivity
     ! 1/Omega/m for charge conductivity
     ! V/K for thermopower
-    ! A/m/K for alpha/T
+    ! A/m for alpha
     trans_coeff_hc = A_hc*trans_coeff_hc
     if(A_cc /= 0.0_r64) trans_coeff_cc = A_cc*trans_coeff_cc
 
@@ -762,10 +762,10 @@ contains
        end do !ib
     end do !ik
     !Units:
-    ! W/m/K/eV for thermal conductivity
-    ! 1/Omega/m/eV for charge conductivity
-    ! V/K/eV for thermopower
-    ! A/m/K/eV for alpha/T
+    ! W/m/K/eV for spectral thermal conductivity
+    ! 1/Omega/m/eV for spectral charge conductivity
+    ! V/K/eV for spectral thermopower
+    ! A/m/eV for spectral alpha
     trans_coeff_hc = A_hc*trans_coeff_hc
     if(A_cc /= 0.0_r64) trans_coeff_cc = A_cc*trans_coeff_cc
 

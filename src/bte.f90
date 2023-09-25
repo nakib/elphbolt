@@ -1450,6 +1450,7 @@ contains
        call calculate_spectral_transport_coeff(el, 'E', crys%T, el%spindeg, el%chempot, el%ens, &
             el%vels, crys%volume, self%el_response_E, el_en_grid, num%tetrahedra, sym, &
             el_alphabyT, el_sigma)
+       el_alphabyT = el_alphabyT/crys%T
 
        !  Write spectral electron alpha/T
        call write2file_spectral_tensor('RTA_el_alphabyT_spectral_', el_alphabyT, el%bandlist)
@@ -1468,6 +1469,7 @@ contains
        call calculate_spectral_transport_coeff(el, 'E', crys%T, el%spindeg, el%chempot, el%ens, &
             el%vels, crys%volume, self%el_response_E, el_en_grid, num%tetrahedra, sym, &
             el_alphabyT, el_sigma)
+       el_alphabyT = el_alphabyT/crys%T
 
        !  Write spectral electron alpha/T
        call write2file_spectral_tensor('nodrag_iterated_el_alphabyT_spectral_', el_alphabyT, el%bandlist)
@@ -1621,11 +1623,13 @@ contains
        !  Allocate spectral transport coefficients
        allocate(el_sigma(el%numbands, 3, 3, num%el_en_num), &
             el_alphabyT(el%numbands, 3, 3, num%el_en_num))
+       el_alphabyT = el_alphabyT/crys%T
 
        !  Calculate spectral function
        call calculate_spectral_transport_coeff(el, 'E', crys%T, el%spindeg, el%chempot, el%ens, &
             el%vels, crys%volume, self%el_response_E, el_en_grid, num%tetrahedra, sym, &
             el_alphabyT, el_sigma)
+       el_alphabyT = el_alphabyT/crys%T
 
        !  Write spectral electron alpha/T
        call write2file_spectral_tensor('partdcpl_iterated_el_alphabyT_spectral_', el_alphabyT, el%bandlist)
@@ -1688,11 +1692,13 @@ contains
        !  Allocate spectral transport coefficients
        allocate(el_sigma(el%numbands, 3, 3, num%el_en_num), &
             el_alphabyT(el%numbands, 3, 3, num%el_en_num))
+       el_alphabyT = el_alphabyT/crys%T
 
        !  Calculate spectral function
        call calculate_spectral_transport_coeff(el, 'E', crys%T, el%spindeg, el%chempot, el%ens, &
             el%vels, crys%volume, self%el_response_E, el_en_grid, num%tetrahedra, sym, &
             el_alphabyT, el_sigma)
+       el_alphabyT = el_alphabyT/crys%T
 
        !  Write spectral electron alpha/T
        call write2file_spectral_tensor('drag_iterated_el_alphabyT_spectral_', el_alphabyT, el%bandlist)
@@ -1753,6 +1759,7 @@ contains
        !  Calculate spectral function
        call calculate_spectral_transport_coeff(ph, 'E', crys%T, 1_i64, 0.0_r64, ph%ens, ph%vels, &
             crys%volume, self%ph_response_E, ph_en_grid, num%tetrahedra, sym, ph_alphabyT, dummy)
+       ph_alphabyT = ph_alphabyT/crys%T
 
        !  Write spectral phonon kappa
        call write2file_spectral_tensor('drag_iterated_ph_alphabyT_spectral_', ph_alphabyT)
