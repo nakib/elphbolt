@@ -167,6 +167,7 @@ contains
     integer(i64) :: i, iq, ii, jj, kk, l, il, s, ib, im, chunk, &
          num_active_images
     integer(i64), allocatable :: start[:], end[:]
+    integer(i64) , allocatable :: fbz2ibz_map(:)
     real(r64), allocatable :: ens_chunk(:,:)[:], vels_chunk(:,:,:)[:], &
          symmetrizers_chunk(:,:,:)[:]
     complex(r64), allocatable :: evecs_chunk(:,:,:)[:]
@@ -273,6 +274,17 @@ contains
     sync all
     
     if(this_image() <= num_active_images) deallocate(symmetrizers_chunk)
+
+    !Create fbz2ibz_map
+    allocate(fbz2ibz_map(self%nwv))
+    fbz2ibz_map = -1
+    do iq = 1, self%nwv
+       do i = 1, self%nwv_irred !an irreducible point
+          do l = 1, self%nequiv(i) !number of equivalent points of i
+             if(self%ibz2fbz_map(l, i, 2) == iq) fbz2ibz_map(iq) = i
+          end do
+       end do
+    end do
     
     !Symmetrize phonon energies and velocities.
     do i = 1, self%nwv_irred !an irreducible point
@@ -309,6 +321,31 @@ contains
        do iq = 1, self%nwv_irred
           write(1, "(" // trim(adjustl(numcols)) // "E20.10)") &
                self%vels(self%indexlist_irred(iq), :, :)
+       end do
+       close(1)
+    end if
+
+    !Print out full BZ phonon energies and velocities
+    if(this_image() == 1) then
+       write(numcols, "(I0)") self%numbands
+       open(1, file = "ph.ens_fbz", status = "replace")
+       do iq = 1, self%nwv
+          write(1, "(" // trim(adjustl(numcols)) // "E20.10)") &
+               self%ens(iq, :)
+       end do
+       close(1)
+
+       write(numcols, "(I0)") 3*self%numbands
+       open(1, file = "ph.vels_fbz", status = "replace")
+       do iq = 1, self%nwv
+          write(1, "(" // trim(adjustl(numcols)) // "E20.10)") &
+               self%vels(iq, :, :)
+       end do
+       close(1)
+
+       open(1, file = "ph.fbz2ibz_map", status = "replace")
+       do iq = 1, self%nwv
+          write(1, "(I10)") fbz2ibz_map(iq)
        end do
        close(1)
     end if
