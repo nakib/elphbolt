@@ -1,0 +1,20 @@
+* Post-processing tools
+** ~dos.jl~
+*** Get dependencies
+    First load the following packages in your Julia system. To do this, press ~]~ in your Julia repl and say the following:
+
+    #+BEGIN_SRC bash
+    package add DelimitedFiles LinearAlgebra Plots LaTeXStrings ThreadsX ArgParse
+    #+END_SRC
+
+    Once done, escape by saying ~Ctrl+c~.
+    
+    This has to be done just once.
+*** Run 
+    To run ~dos.jl~ on ~<N>~ threads, say
+    
+    #+BEGIN_SRC bash
+    julia --threads <N> dos.jl --rundir "<path to completed elphbolt or superconda run>/"
+    #+END_SRC
+
+    The results will be written in a subdirectory there called ~postproc_results~.
