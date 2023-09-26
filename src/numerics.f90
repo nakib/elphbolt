@@ -145,9 +145,11 @@ contains
     !Local variables
     integer(i64) :: mesh_ref, qmesh(3), maxiter, runlevel, el_en_num, &
          ph_en_num, ph_mfp_npts, fourph_mesh_ref
+    integer :: i
     real(r64) :: fsthick, conv_thres, ph_en_min, ph_en_max, el_en_min, el_en_max
     character(len = 1024) :: datadumpdir, tag
     character(len = 6) :: phiso_1B_theory
+    character(len = 1) :: numcols
     logical :: read_gq2, read_gk2, read_V, read_W, tetrahedra, phe, phiso, phsubs, &
          phbound, phdef_Tmat, onlyphbte, onlyebte, elchimp, elbound, drag, plot_along_path, &
          phthinfilm, phthinfilm_ballistic, fourph, use_Wannier_ifc2s, phiso_Tmat, inchimpexact
@@ -352,6 +354,15 @@ contains
 
     !Print out information.
     if(this_image() == 1) then
+       write(numcols, "(I0)") 3
+       open(1, file = "ph.reclattvecs", status = "replace")
+       do i = 1, 3
+          write(1, "(" // trim(adjustl(numcols)) // "E20.10)") &
+               crys%reclattvecs(:, i)
+       end do
+       write(1, *) self%qmesh
+       close(1)
+       
        write(*, "(A, (3I5,x))") "q-mesh = ", self%qmesh
        if(crys%twod) then
           write(*, "(A, (3I5,x))") "k-mesh = ", self%mesh_ref*self%qmesh(1), self%mesh_ref*self%qmesh(2), 1

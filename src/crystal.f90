@@ -357,7 +357,7 @@ contains
        write(*,"(3(1E16.8,x))") self%reclattvecs(:,1)
        write(*,"(3(1E16.8,x))") self%reclattvecs(:,2)
        write(*,"(3(1E16.8,x))") self%reclattvecs(:,3)
-       write(*,"(A,(1E16.8,x),A)") 'Brillouin zone volume =', self%volume_bz, '1/nm^3'
+       write(*,"(A,(1E16.8,x),A)") 'Brillouin zone volume =', self%volume_bz, '1/nm^3'       
        if(self%twod) write(*,"(A)") 'System is 2d.'
        
        if(self%polar) then
