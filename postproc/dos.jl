@@ -2,6 +2,8 @@ using DelimitedFiles
 using LinearAlgebra
 using Plots
 using LaTeXStrings
+using ThreadsX
+#using Distributed
 
 qe = 1.602176634e-19 #C
 hbar = 1.05457172647e-22 #J.ps
@@ -14,13 +16,11 @@ function δ_gaussian(ω, ε, σ)
     return exp(-((ω - ε)/σ)^2/2)/σ/√(2π)
 end
 
-function dos(ωs, εs, vs, Bs, wvmesh)
+function dos(ω, εs, vs, Bs, wvmesh)
     #Returns the density of states (DOS) calculated
-    #on a uniform mesh.
+    #on a uniform mesh at a given energy.
     #
     #The adaptive gaussian smearing method is used here.
-
-    N = length(ωs)
 
     #Number of wave vectors and bands
     nq, nb = size(εs)
@@ -28,28 +28,30 @@ function dos(ωs, εs, vs, Bs, wvmesh)
     #Hard-code a minimum smearing value.
     σ_min = 1.0e-6 # 1 μeV
     
-    Qs = zeros(3, 3)
+    Qs = zeros(Float64, 3, 3)
     for dim ∈ 1:3
         Qs[dim, :] = Bs[dim, :]/wvmesh[dim]
     end
-    
-    dos = zeros(N)
-    for i ∈ 1:N
-        for iqp ∈ 2:nq #skip the Γ-point
-            for ibp ∈ 1:nb
-                σ = 0.0
-                v_ibp = vs[iqp, ibp, :]
-                for dim ∈ 1:3
-                    σ += (v_ibp[:]⋅Qs[dim, :])^2
-                end                    
-                σ = max(hbar_eVps*√(σ/12), 1.0e-4)
-                
-                dos[i] += δ_gaussian(ωs[i], εs[iqp, ibp], σ)
+
+    dos = 0.0
+    for iq′ ∈ 1:nq
+        for ib′ ∈ 1:nb
+            #Calculate the adaptive smearing parameter
+            σ = 0.0
+            v_ib′ = vs[iq′, ib′, :]
+            for dim ∈ 1:3
+                σ += (v_ib′[:]⋅Qs[dim, :])^2
+                #σ += dot(v_ib′[:], Qs[dim, :])^2
             end
+            σ = max(hbar_eVps*√(σ/12), σ_min)
+            
+            dos += δ_gaussian(ω, εs[iq′, ib′], σ)
         end
     end
     return dos/nq
 end
+
+println(Threads.nthreads())
 
 #Test on MgB2
 #
@@ -71,13 +73,14 @@ Bs = [0.20380103E+02   0.11766458E+02  -0.00000000E+00;
 wvmesh = [25 25 25]
 
 #Number of equdistant energy sampling points
-N = 200
+N = 400
 
 #Sampling energies
 ωs = collect(LinRange(0, 1.05*maximum(εs), N)) #eV
 
 #Phonon DOS
-ph_dos = dos(ωs, εs, vs, Bs, wvmesh)
+ph_dos = ThreadsX.map(ω -> dos(ω, εs, vs, Bs, wvmesh), ωs)
+ph_dos[1] = 0.0 #Take care of the Γ-point
 
 #Plot in meV-meV^-1 units
 dos_plot = plot(1.0e3*ωs, 1.0e-3*ph_dos, legend = false)
