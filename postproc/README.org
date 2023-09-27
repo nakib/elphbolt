@@ -14,7 +14,7 @@
     To run ~dos.jl~ on ~N~ threads, say
     
     #+BEGIN_SRC bash
-    julia --threads <N> dos.jl --rundir "<path to completed elphbolt or superconda run>/" --dosof "<species name>" --chempot <chemical potential in eV>
+    julia --threads N dos.jl --rundir "<path to completed elphbolt or superconda run>/" --dosof "<species name>" --chempot <chemical potential in eV>
     #+END_SRC
 
     Above you may choose ~"ph"~ or ~"el"~ for phonons or electrons, respectively. For the latter, you may pass the chemical potential value.
