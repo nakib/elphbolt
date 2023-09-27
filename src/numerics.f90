@@ -362,6 +362,19 @@ contains
        end do
        write(1, *) self%qmesh
        close(1)
+
+       open(1, file = "el.reclattvecs", status = "replace")
+       do i = 1, 3
+          write(1, "(" // trim(adjustl(numcols)) // "E20.10)") &
+               crys%reclattvecs(:, i)
+       end do
+       if(crys%twod) then
+          write(1, *) self%mesh_ref*self%qmesh(1), self%mesh_ref*self%qmesh(2), 1
+       else
+          write(1, *) self%mesh_ref*self%qmesh(1), self%mesh_ref*self%qmesh(2), &
+               self%mesh_ref*self%qmesh(3)
+       end if
+       close(1)
        
        write(*, "(A, (3I5,x))") "q-mesh = ", self%qmesh
        if(crys%twod) then

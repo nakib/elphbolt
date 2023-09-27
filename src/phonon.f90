@@ -23,7 +23,7 @@ module phonon_module
   use particle_module, only: particle
   use misc, only: print_message, subtitle, expi, distribute_points, &
        write2file_rank2_real, exit_with_message, create_set, coarse_grain, &
-       mux_state
+       mux_state, write2file_rank3_real
   use numerics_module, only: numerics
   use crystal_module, only: crystal, calculate_wavevectors_full
   use symmetry_module, only: symmetry, find_irred_wedge, create_fbz2ibz_map
@@ -326,23 +326,9 @@ contains
     end if
 
     !Print out full BZ phonon energies and velocities
+    call write2file_rank2_real("ph.ens_fbz", self%ens)
+    call write2file_rank3_real("ph.vels_fbz", self%vels)
     if(this_image() == 1) then
-       write(numcols, "(I0)") self%numbands
-       open(1, file = "ph.ens_fbz", status = "replace")
-       do iq = 1, self%nwv
-          write(1, "(" // trim(adjustl(numcols)) // "E20.10)") &
-               self%ens(iq, :)
-       end do
-       close(1)
-
-       write(numcols, "(I0)") 3*self%numbands
-       open(1, file = "ph.vels_fbz", status = "replace")
-       do iq = 1, self%nwv
-          write(1, "(" // trim(adjustl(numcols)) // "E20.10)") &
-               self%vels(iq, :, :)
-       end do
-       close(1)
-
        open(1, file = "ph.fbz2ibz_map", status = "replace")
        do iq = 1, self%nwv
           write(1, "(I10)") fbz2ibz_map(iq)

@@ -281,7 +281,7 @@ contains
        if (scissor .ne. 0.0_r64) then
           write(*, "(A, 1E16.8, A)") "Scissor operator = ", &
             self%scissor(self%indlowconduction) , " eV"
-       end if     
+       end if
     end if
     
     !Calculate electrons
@@ -573,6 +573,10 @@ contains
     !Print out irreducible electron energies and velocities
     call write2file_rank2_real("el.ens_ibz", self%ens_irred)
     call write2file_rank3_real("el.vels_ibz", self%vels_irred)
+
+    !Print out full BZ electron energies and velocities
+    call write2file_rank2_real("el.ens_fbz", self%ens)
+    call write2file_rank3_real("el.vels_fbz", self%vels)
     
     !Calculate electron tetrahedra
     if(num%tetrahedra) then
