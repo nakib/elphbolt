@@ -125,41 +125,45 @@ contains
     real(r64) :: qcart(3), qmag, prefac, overlap, denom, Gsum, &
          G(3), Gplusq(3), eps_3x3(3, 3)
     integer :: ik1, ik2, ik3
-    
+        
     qcart = matmul(crys%reclattvecs, qcrys)
     qmag = twonorm(qcart)
 
-    !Note the difference compared to Eq. 23 of PRB 107, 125207 (2023).
-    !This is because in my expression for qTF^2 (module bz_sums > calculate_qTF),
-    !the denominator contains a factor of epsilon0.
-    !As such, (q_TF_effective)^2 in the above paper = epsilon0 x my qTF^2.
-    eps_3x3 = crys%epsilon0*(1.0_r64 + (crys%qTF/qmag)**2)*eye(3_i64)
-    
-    prefac = 1.0e-3_r64/crys%volume/perm0**2*&
+    gchimp2 = 0.0
+    if(qmag > 0) then
+       !Note the difference compared to Eq. 23 of PRB 107, 125207 (2023).
+       !This is because in my expression for qTF^2 (module bz_sums > calculate_qTF),
+       !the denominator contains a factor of epsilon0.
+       !As such, (q_TF_effective)^2 in the above paper = epsilon0 x my qTF^2.
+       eps_3x3 = crys%epsilon0*(1.0_r64 + (crys%qTF/qmag)**2)*eye(3_i64)
+
+       !This is [U(k')U^\dagger(k)]_nm
+       !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
+       overlap = (abs(dot_product(evec_kp, evec_k)))**2
+
+       prefac = 1.0e-3_r64/crys%volume/perm0**2*&
          (el%chimp_conc_n*(qe*el%Zn)**2 + el%chimp_conc_p*(qe*el%Zp)**2)
-    
-    !This is [U(k')U^\dagger(k)]_nm
-    !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
-    overlap = (abs(dot_product(evec_kp, evec_k)))**2
-    
-    Gsum = 0.0_r64
-    do ik1 = -3, 3
-       do ik2 = -3, 3
-          do ik3 = -3, 3
-             Gplusq = (  ik1*crys%reclattvecs(:, 1) &
-                       + ik2*crys%reclattvecs(:, 2) &
-                       + ik3*crys%reclattvecs(:, 3)  ) + qcart
+       
+       Gsum = 0.0_r64
+       !Use a safe range for the G vector sums
+       do ik1 = -3, 3
+          do ik2 = -3, 3
+             do ik3 = -3, 3
+                Gplusq = (  ik1*crys%reclattvecs(:, 1) &
+                     + ik2*crys%reclattvecs(:, 2) &
+                     + ik3*crys%reclattvecs(:, 3)  ) + qcart
 
-             denom = abs(dot_product(Gplusq, matmul(eps_3x3, Gplusq)))**2
+                denom = abs(dot_product(Gplusq, matmul(eps_3x3, Gplusq)))**2
 
-             !Only want G /= -q in the sum over G
-             if(denom > 0.0_r64) &
-                  Gsum = Gsum + 1.0_r64/denom
+                !Only want G /= -q in the sum over G
+                if(all(Gplusq /= 0)) &
+                     Gsum = Gsum + 1.0_r64/denom
+             end do
           end do
        end do
-    end do
-    
-    gchimp2 = prefac*overlap*Gsum !ev^2
+
+       gchimp2 = prefac*overlap*Gsum !ev^2
+    end if
   end function gchimp2
   
   pure real(r64) function Vm2_3ph(ev1_s1, ev2_s2, ev3_s3, &
@@ -2404,7 +2408,7 @@ contains
     integer(i64) :: nstates_irred, istate, m, ik, n, ikp, &
          start, end, chunk, k_indvec(3), kp_indvec(3), &
          q_indvec(3), count, nprocs, num_active_images
-    real(r64) :: k(3), kp(3), q_mag, const, en_el, delta, g2
+    real(r64) :: k(3), kp(3), q_crys(3), q_mag, const, en_el, delta, g2
     real(r64), allocatable :: Xchimp_istate(:)
     integer(i64), allocatable :: istate_el(:)
     character(len = 1024) :: filename
@@ -2463,8 +2467,11 @@ contains
              !Note that q, k, and k' are all on the same mesh
              q_indvec = kp_indvec - k_indvec !0-based index vector
 
+             !Above, but in crystal coordinates
+             q_crys = q_indvec/dble(el%wvmesh)
+             
              !Calculate length of the wave vector
-             q_mag = qdist(q_indvec/dble(el%wvmesh), crys%reclattvecs)
+             !q_mag = qdist(q_indvec/dble(el%wvmesh), crys%reclattvecs)
 
              !Calculate matrix element
              !g2 = gchimp2(el, crys, q_mag)
@@ -2478,7 +2485,7 @@ contains
                 count = count + 1
 
                 !Calculate matrix element
-                g2 = gchimp2(el, crys, q_indvec/dble(el%wvmesh), &
+                g2 = gchimp2(el, crys, q_crys, &
                      el%evecs_irred(ik, m, :), el%evecs(ikp, n, :))
 
                 !Evaulate delta function
@@ -2490,7 +2497,7 @@ contains
                         el%triangcount, el%triang_evals)
                 end if
 
-                !Save Xchimp (without forward scattering suppression)
+                !Save Xchimp (just the out-scattering part)
                 Xchimp_istate(count) = g2 * delta
 
                 !Save final electron state
@@ -2815,7 +2822,7 @@ contains
 
              if (num%inchimpexact) then
                do iproc = 1, nprocs_echimp
-                  rta_rates_echimp(ik, m) = rta_rates_echimp(ik, m) + X(iproc) 
+                  rta_rates_echimp(ik, m) = rta_rates_echimp(ik, m) + X(iproc)
                end do
              else
                k = el%wavevecs_irred(ik, :) 

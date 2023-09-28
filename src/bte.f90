@@ -1169,7 +1169,7 @@ contains
                    call binsearch(el%indexlist, el%equiv_map(ik_sym, ikp), aux)
   
                    response_el_reduce(ik_fbz, m, :) = response_el_reduce(ik_fbz, m, :) + &
-                        response_el(aux, n, :) * Xchimp(iproc) 
+                        response_el(aux, n, :) * Xchimp(iproc)
                  end do
              end if
 
