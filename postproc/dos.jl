@@ -25,11 +25,9 @@ function dos(ω, εs, vs, Bs, wvmesh)
     
     #Hard-code a minimum smearing value.
     σ_min = 1.0e-6 # 1 μeV
-    
-    Qs = zeros(Float64, 3, 3)
-    for dim ∈ 1:3
-        Qs[dim, :] = Bs[dim, :]/wvmesh[dim]
-    end
+
+    #Discretized reciprocal lattice vectors
+    Qs = Bs[1:3, :]./wvmesh[:]
     
     dos = 0.0
     for iq′ ∈ 1:nq
@@ -39,7 +37,7 @@ function dos(ω, εs, vs, Bs, wvmesh)
             for dim ∈ 1:3
                 σ += (vs[iq′, ib′, :]⋅Qs[dim, :])^2
             end
-            σ = max(hbar_eVps*√(σ/12), σ_min)
+            σ = max(hbar_eVps*√(σ/12), σ_min) #eV
             
             dos += δ_gaussian(ω, εs[iq′, ib′], σ)
         end
