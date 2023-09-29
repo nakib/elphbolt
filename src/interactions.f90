@@ -129,6 +129,12 @@ contains
     qcart = matmul(crys%reclattvecs, qcrys)
     qmag = twonorm(qcart)
 
+    !Captains log. Sept. 29. 2023.
+    !(1) Calculating a non-zero coupling for the zero momentum
+    !transfer case will lead to a large number of iterations in the
+    !electron BTE.
+    !(2) In the theory implemented here, the coupling for this
+    !term vanishes since for q = 0, G = 0 is trivially omitted from the G sum.
     gchimp2 = 0.0
     if(qmag > 0) then
        !Note the difference compared to Eq. 23 of PRB 107, 125207 (2023).
@@ -136,7 +142,7 @@ contains
        !the denominator contains a factor of epsilon0.
        !As such, (q_TF_effective)^2 in the above paper = epsilon0 x my qTF^2.
        eps_3x3 = crys%epsilon0*(1.0_r64 + (crys%qTF/qmag)**2)*eye(3_i64)
-
+       
        !This is [U(k')U^\dagger(k)]_nm
        !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
        overlap = (abs(dot_product(evec_kp, evec_k)))**2
@@ -155,7 +161,7 @@ contains
                 
                 !Only want G /= -q in the sum over G
                 if(all(Gplusq /= 0)) Gsum = Gsum + &
-                     1.0_r64/abs(dot_product(Gplusq, matmul(eps_3x3, Gplusq)))**2
+                     1.0_r64/(dot_product(Gplusq, matmul(eps_3x3, Gplusq)))**2
              end do
           end do
        end do
