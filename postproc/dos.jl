@@ -120,7 +120,7 @@ function parse_commandline()
         arg_type = String
         default = "./"
 
-        "--dosof"
+        "--particle"
         help = "(ph)onon or (el)ectron density of states"
         arg_type = String
         default = "ph"
@@ -134,7 +134,7 @@ function parse_commandline()
 end
 
 function main()
-    println("ϟ Welcome to the elphbolt post-processor!")
+    println("ϟ Welcome to the elphbolt post-processor tool dos.jl")
     
     println("ϟ I'll be using $(Threads.nthreads()) threads.")
 
@@ -151,7 +151,7 @@ function main()
     #Set chemical potential
     chempot = parsed_args["chempot"]
 
-    calculate_dos(parsed_args["dosof"], rundir, outdir, chempot)
+    calculate_dos(parsed_args["particle"], rundir, outdir, chempot)
 
     println("ϟ All done!")
 end
