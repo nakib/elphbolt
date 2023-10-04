@@ -40,7 +40,8 @@ module bz_sums
 contains
   
   subroutine calculate_qTF(crys, el)
-    !! Calculate Thomas-Fermi screening wavevector in the simple electron-gas model.
+    !! Calculate Thomas-Fermi screening wave vector from the static
+    !! limit of the Lindhard function.
 
     type(crystal), intent(inout) :: crys
     type(electron), intent(in) :: el
@@ -53,7 +54,7 @@ contains
     crys%qTF=0.d0
 
     if(crys%epsilon0 /= 0) then
-       call print_message("Calculating Thomas-Fermi screening...")
+       call print_message("Calculating Thomas-Fermi screening wave vector...")
 
        do ib = 1, el%numbands
           do ik = 1, el%nwv
@@ -66,11 +67,6 @@ contains
        ! qTF**2 = spindeg*e^2*beta/nptq/vol_pcell/perm0/epsilon0*Sum_{BZ}f0_{k}(1-f0_{k})
        crys%qTF = sqrt(1.0e9_r64*crys%qTF*el%spindeg*beta*qe**2/product(el%wvmesh)&
             /crys%volume/perm0/crys%epsilon0) !nm^-1
-
-       !Compare the above to Eq. 22 of PRB 107, 125207 (2023) with the typo
-       !in the power of left hand side fixed.
-       !crys%qTF = sqrt(1.0e9_r64*crys%qTF*el%spindeg*beta*qe**2/product(el%wvmesh)&
-       !     /crys%volume/perm0) !nm^-1
 
        if(this_image() == 1) then
           write(*, "(A, 1E16.8, A)") ' Thomas-Fermi screening wave vector = ', crys%qTF, ' 1/nm'

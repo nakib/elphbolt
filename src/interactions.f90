@@ -115,35 +115,19 @@ contains
     !! Function to calculate the squared electron-charged impurity vertex.
     !!
     !! The expression implemented here was derived by Leveillee et al.
-    !! in PRB 107, 125207 (2023).
+    !! in PRB 107, 125207 (2023) with the G-dependent dielectric
+    !! from Ganose et al. Nat. Comm. 12:2222 (2021).
 
     type(crystal), intent(in) :: crys
     type(electron), intent(in) :: el
     real(r64), intent(in) :: qcrys(3)
     complex(r64),intent(in) :: evec_k(:), evec_kp(:)
 
-    real(r64) :: qcart(3), qmag, prefac, overlap, Gsum, &
+    real(r64) :: qcart(3), prefac, overlap, Gsum, &
          Gplusq(3), eps_3x3(3, 3)
     integer :: ik1, ik2, ik3
         
     qcart = matmul(crys%reclattvecs, qcrys)
-    qmag = twonorm(qcart)
-    !qmag = qdist(qcrys, crys%reclattvecs)
-
-    !Captain's log. Sept. 29. 2023.
-    !(1) Calculating a non-zero coupling for the zero momentum
-    !transfer case will lead to a large number of iterations in the
-    !electron BTE.
-    !(2) In the theory implemented here, the coupling for this
-    !term vanishes since for q = 0, G = 0 is trivially omitted from the G sum.
-
-    !gchimp2 = 0.0
-    !if(qmag > 0) then
-    !Note the difference compared to Eq. 23 of PRB 107, 125207 (2023).
-    !This is because in my expression for qTF^2 (module bz_sums > calculate_qTF),
-    !the denominator contains a factor of epsilon0.
-    !As such, (q_TF_effective)^2 in the above paper = epsilon0 x my qTF^2.
-    !eps_3x3 = crys%epsilon0*(1.0_r64 + (crys%qTF/qmag)**2)*eye(3_i64)
     
     !This is [U(k')U^\dagger(k)]_nm
     !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
@@ -161,7 +145,7 @@ contains
                   + ik2*crys%reclattvecs(:, 2) &
                   + ik3*crys%reclattvecs(:, 3)  ) + qcart
 
-             !TEST/DEBUG
+             !Following Eq. 7 of Nat. Comm. 12:2222 (2021)
              !G + q dependent dielectric function
              eps_3x3 = crys%epsilon0*&
                   (1.0_r64 + (crys%qTF/twonorm(Gplusq))**2)*eye(3_i64)
@@ -174,7 +158,6 @@ contains
     end do
 
     gchimp2 = prefac*overlap*Gsum !ev^2
-    !end if
   end function gchimp2
   
   pure real(r64) function Vm2_3ph(ev1_s1, ev2_s2, ev3_s3, &
