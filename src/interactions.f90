@@ -111,7 +111,7 @@ contains
 !!$         (el%chimp_conc_n*(qe*el%Zn)**2 + el%chimp_conc_p*(qe*el%Zp)**2) !ev^2
 !!$  end function gchimp2
   
-  real(r64) function gchimp2(el, crys, qcrys, evec_k, evec_kp)
+  pure real(r64) function gchimp2(el, crys, qcrys, evec_k, evec_kp)
     !! Function to calculate the squared electron-charged impurity vertex.
     !!
     !! The expression implemented here was derived by Leveillee et al.
