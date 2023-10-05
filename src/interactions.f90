@@ -96,21 +96,7 @@ contains
     end do
     qdist = minval(distfromcorners)
   end function qdist
-  
-!!$  pure real(r64) function gchimp2(el, crys, q)
-!!$    !! Function to calculate the squared electron-charged impurity vertex.
-!!$    !!
-!!$    !! This is the Fourier transform of the Yukawa potential, c.f. Eq. 33
-!!$    !! of RevModPhys.53.745 (1981).
-!!$
-!!$    type(crystal), intent(in) :: crys
-!!$    type(electron), intent(in) :: el
-!!$    real(r64), intent(in) :: q
-!!$
-!!$    gchimp2 = 1.0e-3_r64/crys%volume/((perm0*crys%epsilon0)*(q**2 + crys%qTF**2))**2*&
-!!$         (el%chimp_conc_n*(qe*el%Zn)**2 + el%chimp_conc_p*(qe*el%Zp)**2) !ev^2
-!!$  end function gchimp2
-  
+    
   pure real(r64) function gchimp2(el, crys, qcrys, evec_k, evec_kp)
     !! Function to calculate the squared electron-charged impurity vertex.
     !!
@@ -2035,7 +2021,7 @@ contains
     integer(i64) :: nstates_irred, istate, m, ik, n, ikp, &
          start, end, chunk, k_indvec(3), kp_indvec(3), &
          q_indvec(3), count, nprocs, num_active_images
-    real(r64) :: k(3), kp(3), q_crys(3), q_mag, const, en_el, delta, g2
+    real(r64) :: k(3), kp(3), q_crys(3), const, en_el, delta, g2
     real(r64), allocatable :: Xchimp_istate(:)
     integer(i64), allocatable :: istate_el(:)
     character(len = 1024) :: filename
@@ -2096,13 +2082,7 @@ contains
 
              !Above, but in crystal coordinates
              q_crys = q_indvec/dble(el%wvmesh)
-             
-             !Calculate length of the wave vector
-             !q_mag = qdist(q_indvec/dble(el%wvmesh), crys%reclattvecs)
-
-             !Calculate matrix element
-             !g2 = gchimp2(el, crys, q_mag)
-             
+                          
              !Run over final electron bands
              do n = 1, el%numbands
                 !Apply energy window to final electron
@@ -2447,20 +2427,9 @@ contains
              call read_transition_probs_e(trim(adjustl(filepath_Xchimp)), &
                   nprocs_echimp, X, istate_el_echimp)
 
-             if (num%inchimpexact) then
-               do iproc = 1, nprocs_echimp
-                  rta_rates_echimp(ik, m) = rta_rates_echimp(ik, m) + X(iproc)
-               end do
-             else
-               k = el%wavevecs_irred(ik, :) 
-               do iproc = 1, nprocs_echimp
-                  !Demux final state index into band (m) and wave vector (ik) indices
-                  call demux_state(istate_el_echimp(iproc), el%numbands, mp, ikp)
-                  kp = el%wavevecs(ikp, :)
-                  rta_rates_echimp(ik, m) = rta_rates_echimp(ik, m) + X(iproc) * &
-                     transfac(matmul(crys%reclattvecs,k), matmul(crys%reclattvecs,kp)) 
-               end do
-             end if
+             do iproc = 1, nprocs_echimp
+                rta_rates_echimp(ik, m) = rta_rates_echimp(ik, m) + X(iproc)
+             end do
           end if
        end do
     end if

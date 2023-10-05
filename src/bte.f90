@@ -1130,14 +1130,13 @@ contains
           call read_transition_probs_e(trim(adjustl(filepath_Xminus)), nprocs, Xminus)
 
           !Read Xchimp from file
-          if(num%elchimp .and. num%inchimpexact) then
+          if(num%elchimp) then
                !Set Xchimp filename
                write(tag, '(I9)') istate
                filepath_Xechimp = trim(adjustl(num%Xdir))//'/Xchimp.istate'//trim(adjustl(tag))
                call read_transition_probs_e(trim(adjustl(filepath_Xechimp)), nprocs_echimp, Xchimp, &
                     istate_el_echimp)
           end if
-
 
           !Sum over the number of equivalent k-points of the IBZ point
           do ieq = 1, el%nequiv(ik_ibz)
@@ -1159,7 +1158,7 @@ contains
              end do
 
              !Add charged impurity contribution to the self consistent term
-             if(num%elchimp .and. num%inchimpexact) then
+             if(num%elchimp) then
                  do iproc = 1, nprocs_echimp
                    !Grab the final electron and, if needed, the interacting phonon
                    call demux_state(istate_el_echimp(iproc), numbands, n, ikp)
@@ -1548,8 +1547,7 @@ contains
        sync all
        
        !  Calculate phonon mfp sampling grid [T-dependent quantity]
-!!$       !   Using a linear grid.
-!!$       !call linspace(ph_mfp_sampling_grid, 0.0_r64, maxval(ph_scalar_mfps), num%ph_mfp_npts)
+       
        !   Using a log grid with a 50% increased maximum mfp value. 
        call linspace(ph_mfp_sampling_grid, -6.0_r64, log10(1.5_r64*maxval(ph_scalar_mfps)), num%ph_mfp_npts)
        ph_mfp_sampling_grid = 10.0_r64**ph_mfp_sampling_grid
