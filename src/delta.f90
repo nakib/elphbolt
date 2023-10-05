@@ -26,11 +26,40 @@ module delta
   implicit none
 
   private
-  public form_tetrahedra_3d, fill_tetrahedra_3d, delta_fn_tetra, &
-       form_triangles, fill_triangles, delta_fn_triang, real_tetra
+!!$  public form_tetrahedra_3d, fill_tetrahedra_3d, delta_fn_tetra, &
+!!$       form_triangles, fill_triangles, delta_fn_triang, real_tetra
+  public form_tetrahedra_3d, fill_tetrahedra_3d, &
+       form_triangles, fill_triangles, real_tetra, &
+       delta_fn, get_delta_fn_pointer!, &
+       !delta_fn_tetra, delta_fn_triang
+
+  abstract interface
+     pure real(r64) function delta_fn(e, ik, ib, mesh, map, count, evals)
+       import r64, i64
+       
+       real(r64), intent(in) :: e
+       integer(i64), intent(in) :: ik, ib
+       integer(i64), intent(in) :: mesh(3), map(:,:,:), count(:)
+       real(r64), intent(in) :: evals(:,:,:)
+     end function delta_fn
+  end interface
   
 contains
 
+  pure function get_delta_fn_pointer(tetrahedra) result(ptr)
+    !! Return pointer to either tetrahedra or tringular delta
+    !! function evaulator.
+    
+    logical, intent(in) :: tetrahedra
+    procedure(delta_fn), pointer :: ptr
+    
+    if(tetrahedra) then
+       ptr => delta_fn_tetra
+    else
+       ptr => delta_fn_triang
+    end if    
+  end function get_delta_fn_pointer
+  
   pure real(r64) function delta_fn_tetra(e, ik, ib, mesh, tetramap, tetracount, tetra_evals)
     !! Calculate delta function using the tetraheron method.
     !!

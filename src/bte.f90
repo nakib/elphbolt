@@ -368,7 +368,6 @@ contains
     
     if(num%drag) then !Coupled BTEs
        call t%start_timer('Coupled e-ph BTEs')
-       call print_message("Building interpolator space for phonon drag")
        allocate(widc(product(el%wvmesh),6), idc(product(el%wvmesh),9), &
                 ksint(product(el%wvmesh),3))
        do ik = 1, size(ksint,1)
@@ -376,7 +375,6 @@ contains
        end do
        call precompute_interpolation_corners_and_weights(ph%wvmesh,  &
                                    el%mesh_ref_array, ksint, idc, widc)
-       call print_message("Building interpolator space for phonon drag: DONE")
        
        tot_alphabyT_scalar = el_alphabyT_scalar + ph_alphabyT_scalar
        KO_dev = 100.0_r64*abs(&

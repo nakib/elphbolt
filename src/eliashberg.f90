@@ -26,7 +26,7 @@ module eliashberg
   use electron_module, only: electron
   use phonon_module, only: phonon
   use numerics_module, only: numerics
-  use delta, only: delta_fn_tetra, delta_fn_triang
+  use delta, only: delta_fn, get_delta_fn_pointer
 
   implicit none
 
@@ -70,6 +70,7 @@ contains
          iso_a2F_branches(:, :), cum_iso_lambda_branches(:, :), eps_squared(:)
     character(len = 1024) :: filename
     logical :: use_external_eps = .false.
+    procedure(delta_fn), pointer :: delta_fn_ptr => null()
 
     !Number of equidistant Boson energy points
     numomega = size(omegas)
@@ -79,6 +80,9 @@ contains
     
     !Precalculate the phonon delta functions.
     call print_message("Precalculating FBZ phonon delta functions...")
+
+    !Associate delta function procedure pointer
+    delta_fn_ptr => get_delta_fn_pointer(num%tetrahedra)
     
     ! Allocate and initialize
     allocate(ph_deltas(wann%numbranches, ph%nwv, numomega))
@@ -86,35 +90,21 @@ contains
 
     call distribute_points(numomega, chunk, start, end, num_active_images)
     
-    ! Handle tetrahedron vs triangle choice.
-    if(num%tetrahedra) then !tetrahedron method
-       !Only work with the active images
-       if(this_image() <= num_active_images) then
-          do iomega = start, end
-             do iq = 1, ph%nwv
-                do s = 1, wann%numbranches
-                   ph_deltas(s, iq, iomega) = &
-                        delta_fn_tetra(omegas(iomega), iq, s, ph%wvmesh, ph%tetramap, &
-                        ph%tetracount, ph%tetra_evals)
-                end do
+    !Only work with the active images
+    if(this_image() <= num_active_images) then
+       do iomega = start, end
+          do iq = 1, ph%nwv
+             do s = 1, wann%numbranches
+                ph_deltas(s, iq, iomega) = &
+                     delta_fn_ptr(omegas(iomega), iq, s, ph%wvmesh, ph%simplex_map, &
+                     ph%simplex_count, ph%simplex_evals)
              end do
           end do
-       end if
-    else !triangle method
-       !Only work with the active images
-       if(this_image() <= num_active_images) then
-          do iomega = start, end
-             do iq = 1, ph%nwv
-                do s = 1, wann%numbranches
-                   ph_deltas(s, iq, iomega) = &
-                        delta_fn_triang(omegas(iomega), iq, s, ph%wvmesh, ph%triangmap, &
-                        ph%triangcount, ph%triang_evals)
-                end do
-             end do
-          end do
-       end if
+       end do
     end if
-
+    
+    if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
+   
     ! The delta weights above were supercell number normalized.
     ! Taking this fact into account here:
     ph_deltas = ph_deltas*product(ph%wvmesh)

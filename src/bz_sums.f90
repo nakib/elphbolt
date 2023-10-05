@@ -23,7 +23,7 @@ module bz_sums
   use phonon_module, only: phonon
   use electron_module, only: electron
   use crystal_module, only: crystal
-  use delta, only: delta_fn_tetra, delta_fn_triang
+  use delta, only: delta_fn, get_delta_fn_pointer
   use symmetry_module, only: symmetry, symmetrize_3x3_tensor
 
   implicit none
@@ -136,20 +136,20 @@ contains
     !Local variables
     integer(i64) :: ikp, ibp
     real(r64) :: delta
+    procedure(delta_fn), pointer :: delta_fn_ptr => null()
 
     call print_message("Calculating spin-normalized electronic density of states at Fermi level...")
 
+    !Associate delta function procedure pointer
+    delta_fn_ptr => get_delta_fn_pointer(usetetra)
+    
     el%spinnormed_dos_fermi = 0.0_r64
     do ikp = 1, el%nwv !over FBZ blocks
        do ibp = 1, el%numbands
-          if(usetetra) then
-             !Evaluate delta[E(iq',ib') - E_Fermi]
-             delta = delta_fn_tetra(el%chempot, ikp, ibp, el%wvmesh, el%tetramap, &
-                  el%tetracount, el%tetra_evals)
-          else
-             delta = delta_fn_triang(el%chempot, ikp, ibp, el%wvmesh, el%triangmap, &
-                  el%triangcount, el%triang_evals)
-          end if
+          !Evaluate delta[E(iq',ib') - E_Fermi]
+          delta = delta_fn_ptr(el%chempot, ikp, ibp, el%wvmesh, el%simplex_map, &
+               el%simplex_count, el%simplex_evals)
+          
           el%spinnormed_dos_fermi = el%spinnormed_dos_fermi + delta
        end do
     end do
@@ -158,6 +158,8 @@ contains
        write(*, "(A, 1E16.8, A)") ' Spin-normalized DOS(Ef) = ', el%spinnormed_dos_fermi, ' 1/eV/spin'
     end if
 
+    if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
+    
     sync all
   end subroutine calculate_el_dos_Fermi
 
@@ -230,9 +232,13 @@ contains
     !Local variables
     integer(i64) :: ik_ibz, ik_fbz, ieq, ib
     real(r64) :: delta
+    procedure(delta_fn), pointer :: delta_fn_ptr => null()
     
     call print_message("Calculating DOS(Ef) normalized electron delta functions...")
 
+    !Associate delta function procedure pointer
+    delta_fn_ptr => get_delta_fn_pointer(usetetra)
+    
     allocate(el%Ws(el%nwv, el%numbands))
     allocate(el%Ws_irred(el%nwv_irred, el%numbands))
 
@@ -241,14 +247,10 @@ contains
        do ieq = 1, el%nequiv(ik_ibz)
           call binsearch(el%indexlist, el%ibz2fbz_map(ieq, ik_ibz, 2), ik_fbz)
           do ib =1, el%numbands
-             if(usetetra) then
-                !Evaluate delta[E(ik,ib) - E_Fermi]
-                delta = delta_fn_tetra(el%chempot, ik_fbz, ib, el%wvmesh, el%tetramap, &
-                     el%tetracount, el%tetra_evals)
-             else
-                delta = delta_fn_triang(el%chempot, ik_fbz, ib, el%wvmesh, el%triangmap, &
-                     el%triangcount, el%triang_evals)
-             end if
+             !Evaluate delta[E(ik,ib) - E_Fermi]
+             delta = delta_fn_ptr(el%chempot, ik_fbz, ib, el%wvmesh, el%simplex_map, &
+                  el%simplex_count, el%simplex_evals)
+             
              el%Ws(ik_fbz, ib) = delta
           end do
           el%Ws_irred(ik_ibz, :) = el%Ws_irred(ik_ibz, :) + &
@@ -259,6 +261,8 @@ contains
     end do
     el%Ws = el%Ws/el%spinnormed_dos_fermi
     el%Ws_irred = el%Ws_irred/el%spinnormed_dos_fermi
+
+    if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
     
     sync all
   end subroutine calculate_el_Ws
@@ -278,8 +282,12 @@ contains
     integer(i64), allocatable :: start[:], end[:]
     real(r64) :: e, delta
     real(r64), allocatable :: dos_chunk(:,:)[:]
+    procedure(delta_fn), pointer :: delta_fn_ptr => null()
 
     call print_message("Calculating electron density of states...")
+
+    !Associate delta function procedure pointer
+    delta_fn_ptr => get_delta_fn_pointer(usetetra)
     
     !Allocate start and end coarrays
     allocate(start[*], end[*])
@@ -309,14 +317,10 @@ contains
 
              do ikp = 1, el%nwv !Sum over FBZ wave vectors
                 do ibp = 1, el%numbands !Sum over wave vectors
-                   if(usetetra) then
-                      !Evaluate delta[E(iq,ib) - E(iq',ib')]
-                      delta = delta_fn_tetra(e, ikp, ibp, el%wvmesh, el%tetramap, &
-                           el%tetracount, el%tetra_evals)
-                   else
-                      delta = delta_fn_triang(e, ikp, ibp, el%wvmesh, el%triangmap, &
-                           el%triangcount, el%triang_evals)
-                   end if
+                   !Evaluate delta[E(iq,ib) - E(iq',ib')]
+                   delta = delta_fn_ptr(e, ikp, ibp, el%wvmesh, el%simplex_map, &
+                        el%simplex_count, el%simplex_evals)
+
                    !Sum over delta function
                    dos_chunk(counter, ib) = dos_chunk(counter, ib) + delta
                 end do
@@ -326,6 +330,8 @@ contains
        !Multiply with spin degeneracy factor
        dos_chunk(:,:) = el%spindeg*dos_chunk(:,:)
     end if
+
+    if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
     
     !Gather from images and broadcast to all
     sync all
@@ -369,8 +375,12 @@ contains
     real(r64) :: e, delta, aux, matel_iso, matel_subs
     real(r64), allocatable :: dos_chunk(:,:)[:], W_phiso_chunk(:,:)[:], &
          W_phsubs_chunk(:,:)[:]
+    procedure(delta_fn), pointer :: delta_fn_ptr => null()
     
     call print_message("Calculating phonon density of states and (if needed) isotope/substitution scattering...")
+
+    !Associate delta function procedure pointer
+    delta_fn_ptr => get_delta_fn_pointer(usetetra)
 
     !Number of basis atoms
     numatoms = size(crys%atomtypes)
@@ -420,16 +430,11 @@ contains
              do iqp = 1, ph%nwv !Sum over FBZ wave vectors
                 do ibp = 1, ph%numbands !Sum over wave vectors
                    !Evaluate delta[E(iq,ib) - E(iq',ib')]
-                   if(usetetra) then
-                      delta = delta_fn_tetra(e, iqp, ibp, ph%wvmesh, ph%tetramap, &
-                           ph%tetracount, ph%tetra_evals)
-                   else
-                      delta = delta_fn_triang(e, iqp, ibp, ph%wvmesh, ph%triangmap, &
-                           ph%triangcount, ph%triang_evals)
-                   end if
+                   delta = delta_fn_ptr(e, iqp, ibp, ph%wvmesh, ph%simplex_map, &
+                        ph%simplex_count, ph%simplex_evals)
 
                    ! If not energy conserving ignore
-                   if (delta .le. 0.0_r64 ) then
+                   if (delta <= 0.0_r64 ) then
                      cycle
                    end if
 
@@ -479,6 +484,8 @@ contains
           end do
        end do
     end if
+
+    if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
     
     !Gather from images and broadcast to all
     sync all
@@ -647,7 +654,11 @@ contains
     ! Above, h(c)c = heat(charge) current
     integer(i64) :: ik, ib, ie, icart, nk, nbands, ne, pow_hc, pow_cc
     real(r64) :: dist_factor, e, v, fac, A_hc, A_cc, delta
+    procedure(delta_fn), pointer :: delta_fn_ptr => null()
 
+    !Associate delta function procedure pointer
+    delta_fn_ptr => get_delta_fn_pointer(usetetra)
+    
     nk = size(ens(:,1)) !Number of (transport active) wave vectors
     nbands = size(ens(1,:)) !Number of bands/branches
     ne = size(en_grid(:)) !Number of sampling energy mesh points    
@@ -725,26 +736,15 @@ contains
           !Run over sampling energies
           do ie = 1, ne
              !Evaluate delta function
-             if(usetetra) then
-                select type(species)
-                class is(phonon)
-                   delta = delta_fn_tetra(en_grid(ie), ik, ib, species%wvmesh, species%tetramap, &
-                        species%tetracount, species%tetra_evals)
-                class is(electron)
-                   delta = delta_fn_tetra(en_grid(ie), ik, ib, species%wvmesh, species%tetramap, &
-                        species%tetracount, species%tetra_evals)
-                end select
-             else
-                select type(species)
-                class is(phonon)
-                   delta = delta_fn_triang(en_grid(ie), ik, ib, species%wvmesh, species%triangmap, &
-                        species%triangcount, species%triang_evals)
-                class is(electron)
-                   delta = delta_fn_triang(en_grid(ie), ik, ib, species%wvmesh, species%triangmap, &
-                        species%triangcount, species%triang_evals)
-                end select
-             end if
-
+             select type(species)
+             class is(phonon)
+                delta = delta_fn_ptr(en_grid(ie), ik, ib, species%wvmesh, species%simplex_map, &
+                     species%simplex_count, species%simplex_evals)
+             class is(electron)
+                delta = delta_fn_ptr(en_grid(ie), ik, ib, species%wvmesh, species%simplex_map, &
+                     species%simplex_count, species%simplex_evals)
+             end select
+             
              do icart = 1, 3 !Run over Cartesian directions
                 v = vels(ik, ib, icart) !Grab velocity
                 trans_coeff_hc(ib, icart, :, ie) = trans_coeff_hc(ib, icart, :, ie) + &
@@ -772,6 +772,8 @@ contains
           if(A_cc /= 0.0_r64) call symmetrize_3x3_tensor(trans_coeff_cc(ib, :, :, ie), sym%crotations)
        end do
     end do
+
+    if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
   end subroutine calculate_spectral_transport_coeff
 
   subroutine calculate_mfp_cumulative_transport_coeff(species_prefix, field, T, deg, chempot, &

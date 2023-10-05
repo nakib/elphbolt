@@ -28,7 +28,7 @@ module phonon_module
   use crystal_module, only: crystal, calculate_wavevectors_full
   use symmetry_module, only: symmetry, find_irred_wedge, create_fbz2ibz_map
   use delta, only: form_tetrahedra_3d, fill_tetrahedra_3d, form_triangles, &
-       fill_triangles, delta_fn_tetra, delta_fn_triang
+       fill_triangles, delta_fn, get_delta_fn_pointer
   use wannier_module, only: Wannier, dyn_nonanalytic
   
   implicit none
@@ -65,8 +65,9 @@ module phonon_module
      !! Position of the 2nd and 3rd unitcell in supercell for an ifc3 triplet.
      integer(i64), allocatable :: Index_i(:), Index_j(:), Index_k(:)
      !! Label of primitive cell atoms in the ifc3 triplet.
-     real(r64), allocatable :: tetra_squared_evals(:,:,:)
-     !! Tetrahedra vertices filled with squared eigenvalues.
+     !real(r64), allocatable :: tetra_squared_evals(:,:,:)
+     real(r64), allocatable :: simplex_squared_evals(:,:,:)
+     !! Simplex vertices filled with squared eigenvalues.
      !! This is needed only for the phonon Green's function calculation.
 
      integer(i64), allocatable :: cg_indexlist_irred(:)
@@ -336,21 +337,23 @@ contains
        close(1)
     end if
     
-    !Calculate phonon tetrahedra
+    !Calculate phonon simplicial complex
     if(num%tetrahedra) then
        call print_message("Calculating phonon mesh tetrahedra...")
-       call form_tetrahedra_3d(self%nwv, self%wvmesh, self%tetra, self%tetracount, &
-            self%tetramap, .false.)
-       call fill_tetrahedra_3d(self%tetra, self%ens, self%tetra_evals)
+       call form_tetrahedra_3d(self%nwv, self%wvmesh, &
+            self%simplicial_complex, self%simplex_count, &
+            self%simplex_map, .false.)
+       call fill_tetrahedra_3d(self%simplicial_complex, self%ens, self%simplex_evals)
 
        if(num%phdef_Tmat) then
-          call fill_tetrahedra_3d(self%tetra, self%ens**2, self%tetra_squared_evals)
+          call fill_tetrahedra_3d(self%simplicial_complex, self%ens**2, self%simplex_squared_evals)
        end if
     else
        call print_message("Calculating phonon mesh triangles...")
-       call form_triangles(self%nwv, self%wvmesh, self%triang, self%triangcount, &
-            self%triangmap, .false.)
-       call fill_triangles(self%triang, self%ens, self%triang_evals)
+       call form_triangles(self%nwv, self%wvmesh, &
+            self%simplicial_complex, self%simplex_count, &
+            self%simplex_map, .false.)
+       call fill_triangles(self%simplicial_complex, self%ens, self%simplex_evals)
     end if
 
 !!$    !DBG Coarse graining stuff
@@ -1161,7 +1164,11 @@ contains
    integer(i64) :: iq, ib, iqp, ibp, chunk, num_active_images
    integer(i64), allocatable :: start[:], end[:]
    real(r64) ::  e, delta
+   procedure(delta_fn), pointer :: delta_fn_ptr => null()
 
+   !Associate delta function procedure pointer
+    delta_fn_ptr => get_delta_fn_pointer(usetetra)
+   
    !Allocate start and end coarrays
    allocate(start[*], end[*])
 
@@ -1169,36 +1176,34 @@ contains
    call distribute_points(ph%nwv_irred, chunk, start, end, num_active_images)
 
    if (.not. Tmat) then
-     if(this_image() <= num_active_images) then
-        do iq = start, end !Run over IBZ wave vectors
-           do ib = 1, ph%numbands !Run over wave vectors   
-              !Grab sample energy from the IBZ
-              e = ph%ens(ph%indexlist_irred(iq), ib)
-              do iqp = 1, ph%nwv !Sum over FBZ wave vectors
-                 do ibp = 1, ph%numbands !Sum over wave vectors
-                    !Evaluate delta[E(iq,ib) - E(iq',ib')]
-                    if(usetetra) then
-                       delta = delta_fn_tetra(e, iqp, ibp, ph%wvmesh, ph%tetramap, &
-                            ph%tetracount, ph%tetra_evals)
-                    else
-                       delta = delta_fn_triang(e, iqp, ibp, ph%wvmesh, ph%triangmap, &
-                            ph%triangcount, ph%triang_evals)
-                    end if
-                 if (delta .gt. 0.0_r64) self%nels = self%nels + 1_i64
-                 end do !ibp
-              end do !iqp
-           end do !ib
-        end do !iq
-     end if
+      if(this_image() <= num_active_images) then
+         do iq = start, end !Run over IBZ wave vectors
+            do ib = 1, ph%numbands !Run over wave vectors   
+               !Grab sample energy from the IBZ
+               e = ph%ens(ph%indexlist_irred(iq), ib)
+               do iqp = 1, ph%nwv !Sum over FBZ wave vectors
+                  do ibp = 1, ph%numbands !Sum over wave vectors
+                     !Evaluate delta[E(iq,ib) - E(iq',ib')]
+                     delta = delta_fn_ptr(e, iqp, ibp, ph%wvmesh, ph%simplex_map, &
+                          ph%simplex_count, ph%simplex_evals)
+                     
+                     if (delta .gt. 0.0_r64) self%nels = self%nels + 1_i64
+                     
+                  end do !ibp
+               end do !iqp
+            end do !ib
+         end do !iq
+      end if
    else
-     call print_message("WARNING: In-scattering correction due to mass variance"//&
-                            " for Tmatrix currently not implemented")
+      call print_message("WARNING: In-scattering correction due to mass variance"//&
+           " for Tmatrix currently not implemented")
    end if
-
+   
+   if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
+   
    ! Allocate arrays
    allocate(self%matel(self%nels))
    allocate(self%indexes(self%nels,2))
-
  end subroutine allocate_xmassvar
  
  subroutine clean_xmassvar(self)

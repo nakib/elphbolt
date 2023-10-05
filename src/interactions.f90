@@ -34,7 +34,7 @@ module interactions
   use electron_module, only: electron
   use phonon_module, only: phonon
   use numerics_module, only: numerics
-  use delta, only: delta_fn_tetra, delta_fn_triang
+  use delta, only: delta_fn, get_delta_fn_pointer
   
   implicit none
 
@@ -410,17 +410,17 @@ contains
 !!$
 !!$                   !Evaluate delta functions
 !!$                   if(num%tetrahedra) then
-!!$                      delta_minus = delta_fn_tetra(en1 - en3, iq2, s2, ph%wvmesh, ph%tetramap, &
-!!$                           ph%tetracount, ph%tetra_evals) !minus process
+!!$                      delta_minus = delta_fn_tetra(en1 - en3, iq2, s2, ph%wvmesh, ph%simplex_map, &
+!!$                           ph%simplex_count, ph%simplex_evals) !minus process
 !!$
-!!$                      delta_plus = delta_fn_tetra(en3 - en1, neg_iq2, s2, ph%wvmesh, ph%tetramap, &
-!!$                           ph%tetracount, ph%tetra_evals) !plus process
+!!$                      delta_plus = delta_fn_tetra(en3 - en1, neg_iq2, s2, ph%wvmesh, ph%simplex_map, &
+!!$                           ph%simplex_count, ph%simplex_evals) !plus process
 !!$                   else
-!!$                      delta_minus = delta_fn_triang(en1 - en3, iq2, s2, ph%wvmesh, ph%triangmap, &
-!!$                           ph%triangcount, ph%triang_evals) !minus process
+!!$                      delta_minus = delta_fn_triang(en1 - en3, iq2, s2, ph%wvmesh, ph%simplex_map, &
+!!$                           ph%simplex_count, ph%simplex_evals) !minus process
 !!$
-!!$                      delta_plus = delta_fn_triang(en3 - en1, neg_iq2, s2, ph%wvmesh, ph%triangmap, &
-!!$                           ph%triangcount, ph%triang_evals) !plus process
+!!$                      delta_plus = delta_fn_triang(en3 - en1, neg_iq2, s2, ph%wvmesh, ph%simplex_map, &
+!!$                           ph%simplex_count, ph%simplex_evals) !plus process
 !!$                   end if
 !!$
 !!$                   if(en1*en2*en3 == 0.0_r64) cycle
@@ -534,6 +534,7 @@ contains
     logical :: tetrahedra_gpu
     logical, allocatable :: minus_mask(:), plus_mask(:)
     type(resource) :: compute_resource
+    procedure(delta_fn), pointer :: delta_fn_ptr => null()
 
     if(key /= 'V' .and. key /= 'W') then
        call exit_with_message("Invalid value of key in call to calculate_3ph_interaction. Exiting.")
@@ -555,6 +556,9 @@ contains
        call print_message("Calculating 3-ph transition probabilities for all IBZ phonons...")
     end if
 
+    !Associate delta function procedure pointer
+    delta_fn_ptr => get_delta_fn_pointer(num%tetrahedra)
+    
     !Conversion factor in transition probability expression
     const = pi/4.0_r64*hbar_eVps**5*(qe/amu)**3*1.0d-12
 
@@ -596,9 +600,8 @@ contains
             reclattvecs => crys%reclattvecs, &
             masses => crys%masses, atomtypes => crys%atomtypes, &
             R_j => ph%R_j, R_k => ph%R_k, ens => ph%ens, &
-            tetramap => ph%tetramap, triangmap => ph%triangmap, &
-            tetracount => ph%tetracount, tetra_evals => ph%tetra_evals, &
-            triangcount => ph%triangcount, triang_evals => ph%triang_evals, &
+            simplex_map => ph%simplex_map, &
+            simplex_count => ph%simplex_count, simplex_evals => ph%simplex_evals, &
             evecs => ph%evecs, ifc3 => ph%ifc3, &
             Index_i => ph%Index_i, Index_j => ph%Index_j, Index_k => ph%Index_k)
 
@@ -628,8 +631,8 @@ contains
          !$acc data if(compute_resource%gpu_manager) copyin(nwv_gpu, ntrips_gpu, &
          !$acc             wavevecs, wvmesh, reclattvecs, &
          !$acc             masses, atomtypes, R_j, R_k, ens, evecs, ifc3, &
-         !$acc             tetrahedra_gpu, tetramap, tetracount, tetra_evals, &
-         !$acc             triangmap, triangcount, triang_evals, &
+         !$acc             tetrahedra_gpu, simplex_map, simplex_count, simplex_evals, &
+         !$acc             simplex_map, simplex_count, simplex_evals, &
          !$acc             Index_i, Index_j, Index_k, nbands_gpu)
          
          if(compute_resource%gpu_manager) &
@@ -719,21 +722,11 @@ contains
                      !Energy of phonon 3
                      en3 = ens(iq3_minus, s3)
 
-                     !TODO: This iffer can possibly be handled early on in the program.
-                     !Evaluate delta functions
-                     if(tetrahedra_gpu) then
-                        delta_minus = delta_fn_tetra(en1 - en3, iq2, s2, wvmesh, tetramap, &
-                             tetracount, tetra_evals) !minus process
-
-                        delta_plus = delta_fn_tetra(en3 - en1, neg_iq2, s2, wvmesh, tetramap, &
-                             tetracount, tetra_evals) !plus process
-                     else
-                        delta_minus = delta_fn_triang(en1 - en3, iq2, s2, wvmesh, triangmap, &
-                             triangcount, triang_evals) !minus process
-
-                        delta_plus = delta_fn_triang(en3 - en1, neg_iq2, s2, wvmesh, triangmap, &
-                             triangcount, triang_evals) !plus process
-                     end if
+                     delta_minus = delta_fn_ptr(en1 - en3, iq2, s2, wvmesh, simplex_map, &
+                          simplex_count, simplex_evals) !minus process
+                     
+                     delta_plus = delta_fn_ptr(en3 - en1, neg_iq2, s2, wvmesh, simplex_map, &
+                          simplex_count, simplex_evals) !plus process
 
                      if(en1*en2*en3 == 0.0_r64) cycle
 
@@ -896,20 +889,12 @@ contains
                    en3 = ph%ens(iq3_minus, s3)
 
                    !Evaluate delta functions
-                   if(num%tetrahedra) then
-                      delta_minus = delta_fn_tetra(en1 - en3, iq2, s2, ph%wvmesh, ph%tetramap, &
-                           ph%tetracount, ph%tetra_evals) !minus process
-
-                      delta_plus = delta_fn_tetra(en3 - en1, neg_iq2, s2, ph%wvmesh, ph%tetramap, &
-                           ph%tetracount, ph%tetra_evals) !plus process
-                   else
-                      delta_minus = delta_fn_triang(en1 - en3, iq2, s2, ph%wvmesh, ph%triangmap, &
-                           ph%triangcount, ph%triang_evals) !minus process
-
-                      delta_plus = delta_fn_triang(en3 - en1, neg_iq2, s2, ph%wvmesh, ph%triangmap, &
-                           ph%triangcount, ph%triang_evals) !plus process
-                   end if
-
+                   delta_minus = delta_fn_ptr(en1 - en3, iq2, s2, ph%wvmesh, ph%simplex_map, &
+                        ph%simplex_count, ph%simplex_evals) !minus process
+                   
+                   delta_plus = delta_fn_ptr(en3 - en1, neg_iq2, s2, ph%wvmesh, ph%simplex_map, &
+                        ph%simplex_count, ph%simplex_evals) !plus process
+                   
                    if(en1*en2*en3 == 0.0_r64) cycle
 
                    !Bose factor for phonon 3
@@ -989,6 +974,8 @@ contains
        end if
     end if
 
+    if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
+    
     sync all
   end subroutine calculate_3ph_interaction
 
@@ -1013,9 +1000,12 @@ contains
     character(len = 1024) :: filename
     logical :: tetrahedra_gpu
     logical, allocatable :: minus_mask(:), plus_mask(:)
-
+    procedure(delta_fn), pointer :: delta_fn_ptr => null()
     
     if(this_image() == 1) then
+       !Associate delta function procedure pointer
+       delta_fn_ptr => get_delta_fn_pointer(num%tetrahedra)
+       
        !Total number of IBZ blocks states
        nstates_irred = ph%nwv_irred*ph%numbands
 
@@ -1033,9 +1023,8 @@ contains
             reclattvecs => crys%reclattvecs, &
             masses => crys%masses, atomtypes => crys%atomtypes, &
             R_j => ph%R_j, R_k => ph%R_k, ens => ph%ens, &
-            tetramap => ph%tetramap, triangmap => ph%triangmap, &
-            tetracount => ph%tetracount, tetra_evals => ph%tetra_evals, &
-            triangcount => ph%triangcount, triang_evals => ph%triang_evals, &
+            simplex_map => ph%simplex_map, &
+            simplex_count => ph%simplex_count, simplex_evals => ph%simplex_evals, &
             evecs => ph%evecs, ifc3 => ph%ifc3, &
             Index_i => ph%Index_i, Index_j => ph%Index_j, Index_k => ph%Index_k)
 
@@ -1125,21 +1114,12 @@ contains
                !Energy of phonon 3
                en3 = ens(iq3_minus, s3)
 
-               !TODO: This iffer can possibly be handled early on in the program.
                !Evaluate delta functions
-               if(tetrahedra_gpu) then
-                  delta_minus = delta_fn_tetra(en1 - en3, iq2, s2, wvmesh, tetramap, &
-                       tetracount, tetra_evals) !minus process
-
-                  delta_plus = delta_fn_tetra(en3 - en1, neg_iq2, s2, wvmesh, tetramap, &
-                       tetracount, tetra_evals) !plus process
-               else
-                  delta_minus = delta_fn_triang(en1 - en3, iq2, s2, wvmesh, triangmap, &
-                       triangcount, triang_evals) !minus process
-
-                  delta_plus = delta_fn_triang(en3 - en1, neg_iq2, s2, wvmesh, triangmap, &
-                       triangcount, triang_evals) !plus process
-               end if
+               delta_minus = delta_fn_ptr(en1 - en3, iq2, s2, wvmesh, simplex_map, &
+                    simplex_count, simplex_evals) !minus process
+               
+               delta_plus = delta_fn_ptr(en3 - en1, neg_iq2, s2, wvmesh, simplex_map, &
+                    simplex_count, simplex_evals) !plus process
 
                if(en1*en2*en3 == 0.0_r64) cycle
 
@@ -1196,8 +1176,8 @@ contains
        !$acc data copyin(nwv_gpu, ntrips_gpu, &
        !$acc             wavevecs, wvmesh, reclattvecs, &
        !$acc             masses, atomtypes, R_j, R_k, ens, evecs, ifc3, &
-       !$acc             tetrahedra_gpu, tetramap, tetracount, tetra_evals, &
-       !$acc             triangmap, triangcount, triang_evals, &
+       !$acc             tetrahedra_gpu, simplex_map, simplex_count, simplex_evals, &
+       !$acc             simplex_map, simplex_count, simplex_evals, &
        !$acc             Index_i, Index_j, Index_k, nbands_gpu)
 #endif
 
@@ -1282,22 +1262,13 @@ contains
              !Energy of phonon 3
              en3 = ens(iq3_minus, s3)
 
-             !TODO: This iffer can possibly be handled early on in the program.
              !Evaluate delta functions
-             if(tetrahedra_gpu) then
-                delta_minus = delta_fn_tetra(en1 - en3, iq2, s2, wvmesh, tetramap, &
-                     tetracount, tetra_evals) !minus process
-
-                delta_plus = delta_fn_tetra(en3 - en1, neg_iq2, s2, wvmesh, tetramap, &
-                     tetracount, tetra_evals) !plus process
-             else
-                delta_minus = delta_fn_triang(en1 - en3, iq2, s2, wvmesh, triangmap, &
-                     triangcount, triang_evals) !minus process
-
-                delta_plus = delta_fn_triang(en3 - en1, neg_iq2, s2, wvmesh, triangmap, &
-                     triangcount, triang_evals) !plus process
-             end if
-
+             delta_minus = delta_fn_ptr(en1 - en3, iq2, s2, wvmesh, simplex_map, &
+                  simplex_count, simplex_evals) !minus process
+             
+             delta_plus = delta_fn_ptr(en3 - en1, neg_iq2, s2, wvmesh, simplex_map, &
+                  simplex_count, simplex_evals) !plus process
+             
              if(en1*en2*en3 == 0.0_r64) cycle
 
              if(delta_minus > 0.0_r64 .or. delta_plus > 0.0_r64) &
@@ -1354,6 +1325,8 @@ contains
      end associate
     end if !image 1 check
 
+    if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
+    
     sync all
     call co_broadcast(speedup_3ph_interactions, 1)
     sync all
@@ -1460,6 +1433,7 @@ contains
     real(r64), allocatable :: g2_istate(:), Y_istate(:)
     complex(r64), allocatable :: gReq_iq(:,:,:,:)
     character(len = 1024) :: filename
+    procedure(delta_fn), pointer :: delta_fn_ptr => null()
     
     if(key /= 'g' .and. key /= 'Y') then
        call exit_with_message(&
@@ -1482,6 +1456,9 @@ contains
        g2_istate(:) = 0.0_r64
     end if
 
+    !Associate delta function procedure pointer
+    delta_fn_ptr => get_delta_fn_pointer(num%tetrahedra)
+    
     !Conversion factor in transition probability expression
     const = twopi/hbar_eVps
     
@@ -1617,13 +1594,8 @@ contains
                       !Calculate Y:
 
                       !Evaluate delta function
-                      if(num%tetrahedra) then
-                         delta = delta_fn_tetra(en_elp - en_ph, ik, m, el%wvmesh, el%tetramap, &
-                              el%tetracount, el%tetra_evals)
-                      else
-                         delta = delta_fn_triang(en_elp - en_ph, ik, m, el%wvmesh, el%triangmap, &
-                              el%triangcount, el%triang_evals)
-                      end if
+                      delta = delta_fn_ptr(en_elp - en_ph, ik, m, el%wvmesh, el%simplex_map, &
+                           el%simplex_count, el%simplex_evals)
 
                       !Temperature dependent occupation factor
                       occup_fac = fermi1*(1.0_r64 - fermi2)*invboseplus1
@@ -1690,6 +1662,9 @@ contains
           call chdir(num%cwd)
        end if
     end if
+
+    if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
+
     sync all
   end subroutine calculate_eph_interaction_ibzq
   
@@ -1726,6 +1701,7 @@ contains
     complex(r64) :: ph_evecs_iq(1, ph%numbands,ph%numbands)
     character(len = 1024) :: filename
     logical :: needfinephon
+    procedure(delta_fn), pointer :: delta_fn_ptr => null()
     
     if(key /= 'g' .and. key /= 'X') then
        call exit_with_message(&
@@ -1748,6 +1724,9 @@ contains
        g2_istate(:) = 0.0_r64
     end if
 
+    !Associate delta function procedure pointer
+    delta_fn_ptr => get_delta_fn_pointer(num%tetrahedra)
+    
     !Conversion factor in transition probability expression
     const = twopi/hbar_eVps
 
@@ -1893,13 +1872,8 @@ contains
                       !Calculate X+:
 
                       !Evaulate delta function
-                      if(num%tetrahedra) then
-                         delta = delta_fn_tetra(en_el + en_ph, ikp, n, el%wvmesh, el%tetramap, &
-                              el%tetracount, el%tetra_evals)
-                      else
-                         delta = delta_fn_triang(en_el + en_ph, ikp, n, el%wvmesh, el%triangmap, &
-                              el%triangcount, el%triang_evals)
-                      end if
+                      delta = delta_fn_ptr(en_el + en_ph, ikp, n, el%wvmesh, el%simplex_map, &
+                           el%simplex_count, el%simplex_evals)
 
                       !Temperature dependent occupation factor
                       occup_fac = bosefac + fermi_plus_fac
@@ -1912,13 +1886,8 @@ contains
                       !Calculate X-:
 
                       !Evaulate delta function
-                      if(num%tetrahedra) then
-                         delta = delta_fn_tetra(en_el - en_ph, ikp, n, el%wvmesh, el%tetramap, &
-                              el%tetracount, el%tetra_evals)
-                      else
-                         delta = delta_fn_triang(en_el - en_ph, ikp, n, el%wvmesh, el%triangmap, &
-                              el%triangcount, el%triang_evals)
-                      end if
+                      delta = delta_fn_ptr(en_el - en_ph, ikp, n, el%wvmesh, el%simplex_map, &
+                           el%simplex_count, el%simplex_evals)
 
                       !Temperature dependent occupation factor
                       occup_fac = 1.0_r64 + bosefac - fermi_minus_fac
@@ -1993,6 +1962,8 @@ contains
        end do
     end if
     sync all
+
+    if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
     
     if(key == 'g') then
        !Delete the gkRp disk data
@@ -2025,8 +1996,12 @@ contains
     real(r64), allocatable :: Xchimp_istate(:)
     integer(i64), allocatable :: istate_el(:)
     character(len = 1024) :: filename
+    procedure(delta_fn), pointer :: delta_fn_ptr => null()
 
     call print_message("Calculating e-ch. imp. transition probabilities for all IBZ electrons...")
+
+    !Associate delta function procedure pointer
+    delta_fn_ptr => get_delta_fn_pointer(num%tetrahedra)
     
     !Conversion factor in transition probability expression
     const = twopi/hbar_eVps
@@ -2096,13 +2071,8 @@ contains
                      el%evecs_irred(ik, m, :), el%evecs(ikp, n, :))
 
                 !Evaulate delta function
-                if(num%tetrahedra) then
-                   delta = delta_fn_tetra(en_el, ikp, n, el%wvmesh, el%tetramap, &
-                        el%tetracount, el%tetra_evals)
-                else
-                   delta = delta_fn_triang(en_el, ikp, n, el%wvmesh, el%triangmap, &
-                        el%triangcount, el%triang_evals)
-                end if
+                delta = delta_fn_ptr(en_el, ikp, n, el%wvmesh, el%simplex_map, &
+                     el%simplex_count, el%simplex_evals)
 
                 !Save Xchimp (just the out-scattering part)
                 Xchimp_istate(count) = g2 * delta
@@ -2132,6 +2102,9 @@ contains
           call chdir(num%cwd)
        end do
     end if
+
+    if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
+    
     sync all
   end subroutine calculate_echimp_interaction_ibzk
   

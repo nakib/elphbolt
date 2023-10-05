@@ -56,24 +56,15 @@ module particle_module
      !! Axis 2 runs over wave vectors.
      real(r64), allocatable :: symmetrizers(:,:,:)
      !! Symmetrizers of wave vector dependent vectors.
-     integer(i64), allocatable :: tetra(:,:)
+     integer(i64), allocatable :: simplicial_complex(:,:)
      !! List of all the wave vector mesh tetrahedra vertices.
-     !! First axis list tetraheda and the second axis list the vertices.
-     integer(i64), allocatable :: tetracount(:)
-     !! The number of tetrahedra in which a wave vector belongs.
-     integer(i64), allocatable :: tetramap(:,:,:)
-     !! Mapping from a wave vector to the (tetrahedron, vertex) where it belongs.
-     real(r64), allocatable :: tetra_evals(:,:,:)
-     !! Tetrahedra vertices filled with eigenvalues.
-     integer(i64), allocatable :: triang(:,:)
-     !! List of all the wave vector mesh triangles vertices.
-     !! First axis lists triangles and the second axis lists the vertices.
-     integer(i64), allocatable :: triangcount(:)
-     !! The number of triangles in which a wave vector belongs.
-     integer(i64), allocatable :: triangmap(:,:,:)
-     !! Mapping from a wave vector to the (triangle, vertex) where it belongs.
-     real(r64), allocatable :: triang_evals(:,:,:)
-     !! Triangles vertices filled with eigenvalues.
+     !! First axis list simplices(tetrahedra/triangles) and the second axis list the vertices.
+     integer(i64), allocatable :: simplex_count(:)
+     !! The number of simplicies in which a wave vector belongs.
+     integer(i64), allocatable :: simplex_map(:,:,:)
+     !! Mapping from a wave vector to the (simplex, vertex) where it belongs.
+     real(r64), allocatable :: simplex_evals(:,:,:)
+     !! Simplex vertices filled with eigenvalues.     
      real(r64), allocatable :: ens(:,:)
      !! List of particle energies on FBZ.
      real(r64), allocatable :: ens_irred(:,:)

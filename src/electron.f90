@@ -578,17 +578,19 @@ contains
     call write2file_rank2_real("el.ens_fbz", self%ens)
     call write2file_rank3_real("el.vels_fbz", self%vels)
     
-    !Calculate electron tetrahedra
+    !Calculate electron simplicial complex
     if(num%tetrahedra) then
        call print_message("Calculating electron mesh tetrahedra...")
-       call form_tetrahedra_3d(self%nwv, self%wvmesh, self%tetra, self%tetracount, &
-            self%tetramap, .true., self%indexlist)
-       call fill_tetrahedra_3d(self%tetra, self%ens, self%tetra_evals)
+       call form_tetrahedra_3d(self%nwv, self%wvmesh, &
+            self%simplicial_complex, self%simplex_count, &
+            self%simplex_map, .true., self%indexlist)
+       call fill_tetrahedra_3d(self%simplicial_complex, self%ens, self%simplex_evals)
     else
        call print_message("Calculating electron mesh triangles...")
-       call form_triangles(self%nwv, self%wvmesh, self%triang, self%triangcount, &
-            self%triangmap, .true., self%indexlist)
-       call fill_triangles(self%triang, self%ens, self%triang_evals)
+       call form_triangles(self%nwv, self%wvmesh, &
+            self%simplicial_complex, self%simplex_count, &
+            self%simplex_map, .true., self%indexlist)
+       call fill_triangles(self%simplicial_complex, self%ens, self%simplex_evals)
     end if
   end subroutine calculate_electrons
 

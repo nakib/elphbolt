@@ -21,7 +21,7 @@ module Green_function
   use electron_module, only: electron
   use phonon_module, only: phonon
   use crystal_module, only: crystal
-  use delta, only: delta_fn_tetra, real_tetra
+  use delta, only: real_tetra, delta_fn, get_delta_fn_pointer
   use misc, only: exit_with_message, distribute_points, expi, demux_state, invert, &
        write2file_rank2_real, kronecker, mux_state
   
@@ -47,38 +47,50 @@ contains
 
     !Local variables
     real(r64) :: Im_resolvent, Re_resolvent
+    procedure(delta_fn), pointer :: delta_fn_ptr => null()
 
+    !TODO Pass delta_fn_ptr to this function.
+    
+    !Associate delta function procedure pointer
+    delta_fn_ptr => get_delta_fn_pointer(tetrahedra = .true.)
+    
     select type(species)
     class is(phonon)
        !Imaginary part of resolvent
        if(sampling_point < 1.0e-3) then !=>omega < 1e-3 eV^2
           !For very small energies, use the tetrahedra filled with omega.
           !This works better, numerically.
-          Im_resolvent = -pi*delta_fn_tetra(sqrt(sampling_point), iwv, ib, species%wvmesh, species%tetramap, &
-               species%tetracount, species%tetra_evals)/2.0_r64/sqrt(sampling_point)
+          Im_resolvent = -pi*delta_fn_ptr(sqrt(sampling_point), iwv, ib, species%wvmesh, species%simplex_map, &
+               species%simplex_count, species%simplex_evals)/2.0_r64/sqrt(sampling_point)
        else
           !Otherwise, use the omega^2 tetrahedra
-          Im_resolvent = -pi*delta_fn_tetra(sampling_point, iwv, ib, species%wvmesh, species%tetramap, &
-               species%tetracount, species%tetra_squared_evals)
+          Im_resolvent = -pi*delta_fn_ptr(sampling_point, iwv, ib, species%wvmesh, &
+               species%simplex_map, &
+               species%simplex_count, species%simplex_squared_evals)
        end if
 
        !Real part of resolvent
-       Re_resolvent = real_tetra(sampling_point, iwv, ib, species%wvmesh, species%tetramap, &
-            species%tetracount, species%tetra_squared_evals)
+       Re_resolvent = real_tetra(sampling_point, iwv, ib, species%wvmesh, &
+            species%simplex_map, &
+            species%simplex_count, species%simplex_squared_evals)
     class is(electron)
        !Imaginary part of resolvent
-       Im_resolvent = -pi*delta_fn_tetra(sampling_point, iwv, ib, species%wvmesh, species%tetramap, &
-            species%tetracount, species%tetra_evals)
+       Im_resolvent = -pi*delta_fn_ptr(sampling_point, iwv, ib, species%wvmesh, &
+            species%simplex_map, &
+            species%simplex_count, species%simplex_evals)
 
        !Real part of resolvent
-       Re_resolvent = real_tetra(sampling_point, iwv, ib, species%wvmesh, species%tetramap, &
-            species%tetracount, species%tetra_evals)
+       Re_resolvent = real_tetra(sampling_point, iwv, ib, species%wvmesh, &
+            species%simplex_map, &
+            species%simplex_count, species%simplex_evals)
     class default
        call exit_with_message(&
             "Unknown particle species in resolvent. Exiting.")
     end select
 
     resolvent = Re_resolvent + oneI*Im_resolvent
+
+    if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
   end function resolvent
 
   subroutine calculate_retarded_phonon_D0(ph, crys, def_supercell_cell_pos_intvec, &
