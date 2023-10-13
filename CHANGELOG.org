@@ -3,7 +3,7 @@
    + 4-phonon interactions. [[https://github.com/nakib/elphbolt/issues/71][#71]]
    + Phonon-thin-film scattering. [[https://github.com/nakib/elphbolt/issues/81][#81]]
    + Exact in-scattering correction due to phonon-isotope and electron-impurity scattering. [[https://github.com/nakib/elphbolt/pull/104][#104]]
-   + Scissor operator to conduction band. [[https://github.com/nakib/elphbolt/issues/83][#83]]
+   + Scissor operation to the conduction band. [[https://github.com/nakib/elphbolt/issues/83][#83]]
    + Distributed coarray of real-space, Wannier-rep electron-phonon matrix elements. [[https://github.com/nakib/elphbolt/issues/62][#62]]
    + Improved method for electron-charged impurity scattering following Ganose et al. Nat. Comm. 12:2222 (2021) and Leveillee et al. PRB 107, 125207 (2023)
    + Portable precision using ~iso_fortran_env~. [[https://github.com/nakib/elphbolt/issues/79][#79]]
@@ -11,7 +11,7 @@
    + Delta function evaulator is chosen outside of the internal summation loops over states. [[https://github.com/nakib/elphbolt/issues/105][#105]]
    + Superconductivity app, ~superconda~. [[https://github.com/nakib/elphbolt/issues/87][#87]]
    + Set up unit testing with ~testify~.
-   + Github actions.
+   + Set up Github actions.
    + Updated to ~epw~ v5.3.1. [[https://github.com/nakib/elphbolt/issues/93][#93]]
    + (Experimental) Offloading to accelerators using OpenACC. [[https://github.com/nakib/elphbolt/issues/63][#63]]
    + (Experimental) Interface between ~exciting~ and ~elphbolt~ + ~superconda~. [[https://github.com/nakib/elphbolt/issues/85][#85]]
