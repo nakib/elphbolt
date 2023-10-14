@@ -58,10 +58,16 @@ add_library(elphboltlib SHARED ${SRC})
 #Set elphbolt driver program
 add_executable(elphbolt app/elphbolt.f90)
 target_link_libraries(elphbolt elphboltlib ${LINKS})
+install(TARGETS elphbolt
+    DESTINATION ${CMAKE_INSTALL_PREFIX}
+)
 
 #Set superconda driver program
 add_executable(superconda app/superconda.f90)
 target_link_libraries(superconda elphboltlib ${LINKS})
+install(TARGETS superconda
+    DESTINATION ${CMAKE_INSTALL_PREFIX}
+)
 
 #Set test library
 add_library(testify thirdparty/testify/src/testify.f90)
@@ -73,6 +79,9 @@ foreach(component misc)
   #Set test program
   add_executable(test_${component} test/test_${component}.f90)
   target_link_libraries(test_${component} testify elphboltlib ${LINKS})
+  install(TARGETS test_${component}
+    DESTINATION ${CMAKE_INSTALL_PREFIX}
+  )
 
   #Add to test battery
   add_test(test_${component} bin/test_${component})
