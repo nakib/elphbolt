@@ -2,23 +2,23 @@ program test_misc
 
   use iso_fortran_env, only : r64 => real64, i64 => int64
   use testify_m, only : testify
-  use params, only: pi, kB
+  use params, only: pi, kB, oneI
   use misc, only: int_div, expi, trace, kronecker, sort, cross_product, &
        twonorm, binsearch, mux_vector, demux_vector, interpolate, coarse_grained, &
        unique, linspace, compsimps, mux_state, demux_state, demux_mesh, expm1, &
-       Fermi, Bose
+       Fermi, Bose, Pade_continued
   
   implicit none
 
   integer :: itest
-  integer, parameter :: num_tests = 22
+  integer, parameter :: num_tests = 23
   type(testify) :: test_array(num_tests), tests_all
   integer(i64) :: index, quotient, remainder, int_array(5), v1(3), v2(3), &
        v1_muxed, v2_muxed, ik1, ik2, ik3, ib1, ib2, ib3
   integer(i64), allocatable :: index_mesh_0(:, :), index_mesh_1(:, :)
   real(r64) :: pauli1(2, 2), ipauli2(2, 2), pauli3(2, 2), &
        real_array(5), result
-  real(r64), allocatable :: integrand(:), domain(:)
+  real(r64), allocatable :: integrand(:), domain(:), im_axis(:), real_func(:)
 
   !Some data to be used in the tests below
   pauli1 = reshape([0.0_r64, 1.0_r64, 1.0_r64, 0.0_r64], [2, 2])
@@ -238,9 +238,16 @@ program test_misc
 
   !Interpolate
 
-  !Pade_coeffs
-
-  !Pade_continued
+  !Pade_coeffs & Pade_continued
+  itest = itest + 1
+  test_array(itest) = testify("Pade approximant")
+  allocate(im_axis(10), real_func(10))
+  call linspace(im_axis, 0.0_r64, 1.0_r64, 10_i64)
+  real_func = 1.0_r64/(im_axis - 1.0_r64)
+  call test_array(itest)%assert(&
+       Pade_continued(oneI*im_axis, real_func, [0.0_r64, 0.5_r64, 1.0_r64]), &
+       [-1.0_r64 + 0.0_r64*oneI, -0.8_r64 + 0.4_r64*oneI, -0.5_r64 + 0.5_r64*oneI], &
+       tol = 1.0e-10_r64)
   
   tests_all = testify(test_array)
   call tests_all%report
