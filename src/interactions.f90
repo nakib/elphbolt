@@ -115,7 +115,7 @@ contains
         
     qcart = matmul(crys%reclattvecs, qcrys)
     
-    !This is [U(k')U^\dagger(k)]_nm
+    !This is [U(k')U^\dagger(k)]_nm squared
     !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
     overlap = (abs(dot_product(evec_kp, evec_k)))**2
 

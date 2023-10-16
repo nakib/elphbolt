@@ -19,12 +19,13 @@ module bz_sums
 
   use params, only: r64, i64, kB, qe, pi, hbar_eVps, perm0, twopi
   use misc, only: exit_with_message, print_message, write2file_rank2_real, &
-       distribute_points, Bose, Fermi, binsearch
+       distribute_points, Bose, Fermi, binsearch, mux_vector
   use phonon_module, only: phonon
   use electron_module, only: electron
   use crystal_module, only: crystal
   use delta, only: delta_fn, get_delta_fn_pointer
   use symmetry_module, only: symmetry, symmetrize_3x3_tensor
+  use Green_function, only: resolvent
 
   implicit none
 
@@ -38,6 +39,68 @@ module bz_sums
   end interface calculate_dos
   
 contains
+
+  complex(r64) function RPA_polarizability(Omega, q_indvec, el, pcell_vol, T)
+    !! Polarizability of the Kohn-Sham system in the
+    !! random-phase approximation (RPA) using Eq. B1 and B2
+    !! of Knapen, Kozaczukm and Lin Phys. Rev. D 104, 015031 (2021).
+    !!
+    !! Here we calculate the diagonal in G-G' space. Moreover,
+    !! we use the approximation G.r -> 0.
+    !!
+    !! Omega Energy of excitation in the electron gas
+    !! q_indvec Wave vector of excitation in the electron gas (0-based integer triplet)
+    !! el Electron data type
+    !! pcell_vol Primitive unit cell volume
+    !! T Temperature (K)
+
+    real(r64), intent(in) :: Omega, pcell_vol, T
+    integer(i64), intent(in) :: q_indvec(3)
+    type(electron), intent(in) :: el
+
+    !Locals
+    integer(i64) :: m, n, ik, ikp, ikp_window, k_indvec(3), kp_indvec(3)
+    real(r64) :: overlap, ek, ekp
+
+    RPA_polarizability = 0.0
+    do m = 1, el%numbands
+       do ik = 1, el%nwv
+          ek = el%ens(ik, m)
+          
+          !TODO Check energy window
+          !Apply energy window to initial electron
+          if(abs(ek - el%enref) > el%fsthick) cycle
+
+          !TODO Calculate index vector of final electron: k' = k + q
+          k_indvec = nint(el%wavevecs(ik, :)*el%wvmesh)
+          kp_indvec = modulo(k_indvec + q_indvec, el%wvmesh) !0-based index vector
+          
+          !Calculate ikp
+          ikp = mux_vector(kp_indvec, el%wvmesh, 0_i64)
+
+          !Check if final electron wave vector is within FBZ blocks
+          call binsearch(el%indexlist, ikp, ikp_window)
+          if(ikp_window < 0) cycle
+          
+          do n = 1, el%numbands
+             ekp = el%ens(ikp_window, n)
+             
+             !Apply energy window to final electron
+             if(abs(ekp - el%enref) > el%fsthick) cycle
+
+             !This is [U(k')U^\dagger(k)]_nm squared
+             !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
+             overlap = (abs(dot_product(el%evecs(ikp_window, n, :), el%evecs(ik, m, :))))**2
+             
+             RPA_polarizability = RPA_polarizability + &
+                  (Fermi(ekp, el%chempot, T) - &
+                  Fermi(ek, el%chempot, T))* &
+                  resolvent(el, m, ik, Omega + ekp)*overlap
+          end do
+       end do
+    end do
+    RPA_polarizability = RPA_polarizability*el%spindeg/pcell_vol/product(el%wvmesh)
+  end function RPA_polarizability
   
   subroutine calculate_qTF(crys, el)
     !! Calculate Thomas-Fermi screening wave vector from the static

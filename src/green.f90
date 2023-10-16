@@ -28,7 +28,7 @@ module Green_function
   implicit none
 
   private
-  public calculate_retarded_phonon_D0
+  public calculate_retarded_phonon_D0, resolvent
   
 contains
   
