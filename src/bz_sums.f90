@@ -119,10 +119,10 @@ contains
     type(numerics), intent(in) :: num
     
     !Locals
-    real(r64) :: Omega, k(3), kp(3), q(3), ek, ekp
-    integer(i64) :: G_indvec(3), ik, ikp, m, n, &
+    real(r64) :: Omega, k(3), kp(3), q(3), ek, ekp, Gplusq_crys(3)
+    integer(i64) :: ik, ikp, m, n, &
          k_indvec(3), kp_indvec(3), q_indvec(3), count, &
-         start, end, chunk, num_active_images, Gplusq_indvec(3)
+         start, end, chunk, num_active_images
     integer :: ig1, ig2, ig3, igmax, num_gmax
     complex(r64) :: polarizability
     complex(r64), allocatable :: diel_ik(:)
@@ -195,11 +195,11 @@ contains
                          count = count + 1
                          
                          !Calculate G+q
-                         Gplusq_indvec = [ig1, ig2, ig3] + q_indvec
+                         Gplusq_crys = ([ig1, ig2, ig3] + q_indvec)/dble(el%wvmesh)
 
                          !Calculate RPA dielectric (diagonal in G-G' space)
                          diel_ik(count) = 1.0_r64 - &
-                              (1.0_r64/twonorm(matmul(crys%reclattvecs, Gplusq_indvec)))**2* &
+                              (1.0_r64/twonorm(matmul(crys%reclattvecs, Gplusq_crys)))**2* &
                               polarizability
                       end do
                    end do
@@ -227,8 +227,8 @@ contains
     sync all
   end subroutine calculate_RPA_dielectric_3d
 
-  !TODO calculate_RPA_dielectric_3d_G0
-  
+  !TODO Implement RPA_dielectric_along_qpath
+    
   subroutine calculate_qTF(crys, el)
     !! Calculate Thomas-Fermi screening wave vector from the static
     !! limit of the Lindhard function.
