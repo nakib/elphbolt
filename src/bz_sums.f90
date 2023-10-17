@@ -23,6 +23,7 @@ module bz_sums
   use phonon_module, only: phonon
   use electron_module, only: electron
   use crystal_module, only: crystal
+  use numerics_module, only: numerics
   use delta, only: delta_fn, get_delta_fn_pointer
   use symmetry_module, only: symmetry, symmetrize_3x3_tensor
   use Green_function, only: resolvent
@@ -43,7 +44,7 @@ contains
   complex(r64) function RPA_polarizability_3d(Omega, q_indvec, el, pcell_vol, T)
     !! Polarizability of the 3d Kohn-Sham system in the
     !! random-phase approximation (RPA) using Eq. B1 and B2
-    !! of Knapen, Kozaczukm and Lin Phys. Rev. D 104, 015031 (2021).
+    !! of Knapen, Kozaczuk and Lin Phys. Rev. D 104, 015031 (2021).
     !!
     !! Here we calculate the diagonal in G-G' space. Moreover,
     !! we use the approximation G.r -> 0.
@@ -67,7 +68,6 @@ contains
        do ik = 1, el%nwv
           ek = el%ens(ik, m)
           
-          !Check energy window
           !Apply energy window to initial electron
           if(abs(ek - el%enref) > el%fsthick) cycle
 
@@ -102,33 +102,132 @@ contains
     RPA_polarizability_3d = RPA_polarizability_3d*el%spindeg/pcell_vol/product(el%wvmesh)
   end function RPA_polarizability_3d
 
-  complex(r64) function RPA_dielectric_3d(Omega, q_indvec, G_indvec, el, crys)
+  subroutine calculate_RPA_dielectric_3d(el, crys, num)
     !! Dielectric function of the 3d Kohn-Sham system in the
     !! random-phase approximation (RPA) using Eq. B1 and B2
-    !! of Knapen, Kozaczukm and Lin Phys. Rev. D 104, 015031 (2021).
+    !! of Knapen, Kozaczuk and Lin Phys. Rev. D 104, 015031 (2021).
     !!
     !! Here we calculate the diagonal in G-G' space. Moreover,
     !! we use the approximation G.r -> 0.
     !!
-    !! Omega Energy of excitation in the electron gas
-    !! q_indvec Wave vector of excitation in the electron gas (0-based integer triplet)
-    !! G_indvec G-vector (0-based integer triplet)
     !! el Electron data type
     !! crys Crystal data type
+    !! num Numerics data type
 
-    real(r64), intent(in) :: Omega
-    integer(i64), intent(in) :: q_indvec(3), G_indvec(3)
     type(electron), intent(in) :: el
     type(crystal), intent(in) :: crys
-
+    type(numerics), intent(in) :: num
+    
     !Locals
-    real(r64) :: Gplusq_crys(3)
+    real(r64) :: Omega, k(3), kp(3), q(3), ek, ekp
+    integer(i64) :: G_indvec(3), ik, ikp, m, n, &
+         k_indvec(3), kp_indvec(3), q_indvec(3), count, &
+         start, end, chunk, num_active_images, Gplusq_indvec(3)
+    integer :: ig1, ig2, ig3, igmax, num_gmax
+    complex(r64) :: polarizability
+    complex(r64), allocatable :: diel_ik(:)
+    character(len = 1024) :: filename
 
-    RPA_dielectric_3d = 1.0_r64 - &
-         (qe/twonorm(matmul(crys%reclattvecs, q_indvec + G_indvec)))**2/crys%epsilon0* &
-         RPA_polarizability_3d(Omega, q_indvec, el, crys%volume, crys%T)* &
-         (1.0e9_r64/qe) !Dimensionless
-  end function RPA_dielectric_3d
+    !This sets how large the G vectors can be. Choosing 3
+    !means including -3G to +3G in the calculations. This
+    !should be a safe range.
+    igmax = 3
+    num_gmax = (2*igmax + 1)**3
+
+    !Allocate diel_ik to hold maximum possible Omega x G points
+    allocate(diel_ik(num_gmax*el%nstates_inwindow*el%numbands))
+    
+    !Distribute points among images
+    call distribute_points(el%nwv_irred, chunk, start, end, num_active_images)
+
+    if(this_image() == 1) then
+       write(*, "(A, I10)") " #k-vecs = ", el%nwv_irred
+       write(*, "(A, I10)") " #k-vecs/image <= ", chunk
+    end if
+    
+    do ik = start, end !Over IBZ k points
+       !Initiate counter for Omega x G points
+       count = 0
+       
+       !Initial (IBZ blocks) wave vector (crystal coords.)
+       k = el%wavevecs_irred(ik, :)
+
+       !Convert from crystal to 0-based index vector
+       k_indvec = nint(k*el%wvmesh)
+       
+       do m = 1, el%numbands
+          !IBZ electron energy
+          ek = el%ens_irred(ik, m)
+          
+          !Check energy window
+          if(abs(ek - el%enref) > el%fsthick) cycle
+          
+          do ikp = 1, el%nwv
+             !Final wave vector (crystal coords.)
+             kp = el%wavevecs(ikp, :)
+
+             !Convert from crystal to 0-based index vector
+             kp_indvec = nint(kp*el%wvmesh)
+             
+             !Calculate q_indvec (folded back to the 1BZ)
+             q_indvec = modulo(kp_indvec - k_indvec, el%wvmesh) !0-based index vector
+
+             !Calculate q_indvec (without folding back to the 1BZ)
+             !q_indvec = kp_indvec - k_indvec !0-based index vector
+             
+             do n = 1, el%numbands
+                ekp = el%ens(ikp, n)
+                
+                !Check energy window
+                if(abs(el%ens(ikp, n) - el%enref) > el%fsthick) cycle
+             
+                !Electron-hole pair/plasmon energy
+                Omega = ekp - ek
+                
+                !Calculate RPA polarizability
+                polarizability = &
+                     RPA_polarizability_3d(Omega, q_indvec, el, crys%volume, crys%T)
+                
+                do ig1 = -igmax, igmax
+                   do ig2 = -igmax, igmax
+                      do ig3 = -igmax, igmax
+                         !Counter for Omega x G points
+                         count = count + 1
+                         
+                         !Calculate G+q
+                         Gplusq_indvec = [ig1, ig2, ig3] + q_indvec
+
+                         !Calculate RPA dielectric (diagonal in G-G' space)
+                         diel_ik(count) = 1.0_r64 - &
+                              (1.0_r64/twonorm(matmul(crys%reclattvecs, Gplusq_indvec)))**2* &
+                              polarizability
+                      end do
+                   end do
+                end do
+                
+             end do
+          end do
+       end do
+
+       diel_ik(1:count) = diel_ik(1:count)/crys%epsilon0*qe*1.0e9_r64 !dimensionless
+       
+       !Change to data output directory
+       call chdir(trim(adjustl(num%epsilondir)))
+
+       !Write data in binary format
+       !Note: this will overwrite existing data!
+       write (filename, '(I9)') ik
+       filename = 'epsilon_RPA.ik'//trim(adjustl(filename))
+       open(1, file = trim(filename), status = 'replace', access = 'stream')
+       write(1) count
+       write(1) diel_ik(1:count)
+       close(1)
+    end do
+
+    sync all
+  end subroutine calculate_RPA_dielectric_3d
+
+  !TODO calculate_RPA_dielectric_3d_G0
   
   subroutine calculate_qTF(crys, el)
     !! Calculate Thomas-Fermi screening wave vector from the static

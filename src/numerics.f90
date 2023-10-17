@@ -61,6 +61,8 @@ module numerics_module
      !! Directory for ph-e transition rates.
      character(len = 1024) :: scdir
      !! Directory for the superconductivity temporary data.
+     character(len = 1024) :: epsilondir
+     !! Directory for the dielectric function data.
      logical :: read_gq2
      !! Choose if earlier e-ph (IBZ q) vertices are to be used.
      logical :: read_gk2
@@ -455,6 +457,9 @@ contains
     !Create e-ph and ph-e transition probability data directories
     self%Xdir = trim(adjustl(self%datadumpdir_T_chempot)) // '/X'
     self%Ydir = trim(adjustl(self%datadumpdir_T_chempot)) // '/Y'
+
+    !Create chemical potential and T-dependent dielectric data directories
+    self%epsilondir = trim(adjustl(self%datadumpdir_T_chempot)) // '/epsilon'
     
     if(this_image() == 1) then
        call system('mkdir -p ' // trim(adjustl(self%datadumpdir_T_chempot)))
