@@ -59,43 +59,6 @@ module interactions
   real(r64), allocatable :: cg_Vm2(:, :, :, :, :)
   
 contains
-
-  pure real(r64) function transfac(v1, v2)
-    !! Calculate the "transport factor" that suppresses forward scattering
-    !! v1, v2: vectors in cartesian coordinates
-    
-    real(r64), intent(in) :: v1(3),v2(3)
-    real(r64) :: v1sc, v2sc, thresh
-
-    thresh = 1.0e-8_r64
-    transfac = 0.0_r64
-    v1sc = twonorm(v1)
-    v2sc = twonorm(v2)
-    if(v1sc /= v2sc .and. v1sc > thresh .and. v2sc > thresh) then
-       transfac = 1.0_r64 - dot_product(v1,v2)/v1sc/v2sc
-    end if
-  end function transfac
-
-  pure real(r64) function qdist(q, reclattvecs)
-    !! Function to calculate the smallest wave vector distance in the BZ.
-    !! q is in crystal coordinates.
-    !! qdist will be in nm^-1
-    
-    real(r64), intent(in) :: q(3), reclattvecs(3, 3)
-    real(r64) :: distfromcorners(3**3)
-    integer(i64) :: i, j, k, count
-
-    count = 1
-    do i = -1, 1
-       do j = -1, 1
-          do k = -1, 1
-             distfromcorners(count) = twonorm(matmul(reclattvecs, q - (/i, j, k/)))
-             count = count + 1
-          end do
-       end do
-    end do
-    qdist = minval(distfromcorners)
-  end function qdist
     
   pure real(r64) function gchimp2(el, crys, qcrys, evec_k, evec_kp)
     !! Function to calculate the squared electron-charged impurity vertex.
