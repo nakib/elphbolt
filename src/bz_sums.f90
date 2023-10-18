@@ -19,7 +19,8 @@ module bz_sums
 
   use params, only: r64, i64, kB, qe, pi, hbar_eVps, perm0, twopi
   use misc, only: exit_with_message, print_message, write2file_rank2_real, &
-       distribute_points, Bose, Fermi, binsearch, mux_vector, twonorm
+       distribute_points, Bose, Fermi, binsearch, mux_vector, twonorm, linspace, &
+       write2file_rank1_real
   use phonon_module, only: phonon
   use electron_module, only: electron
   use crystal_module, only: crystal
@@ -32,7 +33,8 @@ module bz_sums
 
   public calculate_dos, calculate_transport_coeff, calculate_qTF, &
        calculate_el_dos_fermi, calculate_el_Ws, calculate_mfp_cumulative_transport_coeff, &
-       calculate_el_dos_fermi_gaussian, calculate_el_Ws_gaussian
+       calculate_el_dos_fermi_gaussian, calculate_el_Ws_gaussian, &
+       calculate_RPA_dielectric_3d_G0_qpath
   private calculate_el_dos, calculate_ph_dos_iso
 
   interface calculate_dos
@@ -95,11 +97,13 @@ contains
              RPA_polarizability_3d = RPA_polarizability_3d + &
                   (Fermi(ekp, el%chempot, T) - &
                   Fermi(ek, el%chempot, T))* &
-                  resolvent(el, m, ik, Omega + ekp)*overlap
+                  resolvent(el, m, ik, ekp - Omega)*overlap
           end do
        end do
     end do
-    RPA_polarizability_3d = RPA_polarizability_3d*el%spindeg/pcell_vol/product(el%wvmesh)
+    !Recall that the resolvent is already normalized in the full wave vector mesh.
+    !As such, the 1/product(el%wvmesh) is not needed in the expression below.
+    RPA_polarizability_3d = RPA_polarizability_3d*el%spindeg/pcell_vol
   end function RPA_polarizability_3d
 
   subroutine calculate_RPA_dielectric_3d(el, crys, num)
@@ -200,7 +204,7 @@ contains
                          !Calculate RPA dielectric (diagonal in G-G' space)
                          diel_ik(count) = 1.0_r64 - &
                               (1.0_r64/twonorm(matmul(crys%reclattvecs, Gplusq_crys)))**2* &
-                              polarizability
+                              polarizability/perm0*qe*1.0e9_r64
                       end do
                    end do
                 end do
@@ -208,8 +212,6 @@ contains
              end do
           end do
        end do
-
-       diel_ik(1:count) = diel_ik(1:count)/crys%epsilon0*qe*1.0e9_r64 !dimensionless
        
        !Change to data output directory
        call chdir(trim(adjustl(num%epsilondir)))
@@ -227,7 +229,86 @@ contains
     sync all
   end subroutine calculate_RPA_dielectric_3d
 
-  !TODO Implement RPA_dielectric_along_qpath
+  !DEBUG/TEST
+  subroutine calculate_RPA_dielectric_3d_G0_qpath(el, crys, num)
+    !! Dielectric function of the 3d Kohn-Sham system in the
+    !! random-phase approximation (RPA) using Eq. B1 and B2
+    !! of Knapen, Kozaczuk and Lin Phys. Rev. D 104, 015031 (2021).
+    !!
+    !! Here we calculate the diagonal in G-G' space. Moreover,
+    !! we use the approximation G.r -> 0.
+    !!
+    !! el Electron data type
+    !! crys Crystal data type
+    !! num Numerics data type
+
+    type(electron), intent(in) :: el
+    type(crystal), intent(in) :: crys
+    type(numerics), intent(in) :: num
+
+    !Locals
+    real(r64), allocatable :: energylist(:), qlist(:, :)
+    real(r64) :: qcrys(3)
+    integer(i64) :: iq, iOmega, numomega, numq, &
+         start, end, chunk, num_active_images
+    complex(r64) :: polarizability
+    complex(r64), allocatable :: diel(:, :)
+    character(len = 1024) :: filename
+
+    !TEST
+    !Material: Si
+    !Uniform energy mesh from 0-1.5 eV with uniform q-vecs in Gamma-Gamma along x
+    numomega = 100
+    numq = 50
+    !Create qlist in crystal coordinates
+    allocate(qlist(numq, 3))
+    do iq = 1, numq
+       qlist(iq, :) = [(iq - 1.0_r64)/numq, 0.0_r64, 0.0_r64]
+    end do
+        
+    !TODO Create energy grid
+    allocate(energylist(numomega))
+    call linspace(energylist, 0.0_r64, 1.5_r64, numomega)
+    
+    !Allocate diel_ik to hold maximum possible Omega
+    allocate(diel(numq, numomega))
+    diel = 0.0_r64
+
+    !Distribute points among images
+    call distribute_points(numq, chunk, start, end, num_active_images)
+
+    if(this_image() == 1) then
+       write(*, "(A, I10)") " #q-vecs = ", numq
+       write(*, "(A, I10)") " #q-vecs/image <= ", chunk
+    end if
+
+    do iq = start, end !Over IBZ k points
+       qcrys = qlist(iq, :) !crystal coordinates
+
+       do iOmega = 1, numomega
+          !Calculate RPA polarizability
+          polarizability = &
+               RPA_polarizability_3d(energylist(iOmega), &
+               nint(qcrys*numq)+0_i64, el, crys%volume, crys%T)
+                    
+          !Calculate RPA dielectric (diagonal in G-G' space)
+          diel(iq, iOmega) = 1.0_r64 - &
+               (1.0_r64/twonorm(matmul(crys%reclattvecs, qcrys)))**2* &
+               polarizability/perm0*qe*1.0e9_r64
+       end do
+    end do
+    
+    sync all
+    call co_sum(diel)
+    sync all
+
+    !Print to file
+    call write2file_rank2_real("RPA_dielectric_3D_G0_qpath", qlist)
+    call write2file_rank1_real("RPA_dielectric_3D_G0_Omega", energylist)
+    call write2file_rank2_real("RPA_dielectric_3D_G0_real", real(diel)+0.0_r64)
+    call write2file_rank2_real("RPA_dielectric_3D_G0_imag", imag(diel)+0.0_r64)
+  end subroutine calculate_RPA_dielectric_3d_G0_qpath
+  !!
     
   subroutine calculate_qTF(crys, el)
     !! Calculate Thomas-Fermi screening wave vector from the static
