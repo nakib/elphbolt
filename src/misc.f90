@@ -205,6 +205,29 @@ contains
     end if
     sync all
   end subroutine write2file_rank2_real
+  
+  subroutine write2file_rank2_complex(filename, data)
+    !! Write rank-2 data to file.
+
+    character(len = *), intent(in) :: filename
+    complex(r64), intent(in) :: data(:,:)
+
+    integer(i64) :: ik, nk
+    character(len = 1024) :: numcols
+
+    nk = size(data(:, 1))
+    write(numcols, "(I0)") size(data(1, :))*2
+
+    if(this_image() == 1) then
+       open(1, file = trim(filename), status = "replace")
+       do ik = 1, nk
+          write(1, "(" // trim(adjustl(numcols)) // "E20.10)") &
+               data(ik, :)
+       end do
+       close(1)
+    end if
+    sync all
+  end subroutine write2file_rank2_complex
 
   subroutine write2file_rank3_real(filename, data)
     !! Write rank-3 data to file.

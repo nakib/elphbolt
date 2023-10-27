@@ -20,7 +20,7 @@ module wannier_module
   use params, only: r64, i64, Ryd2eV, Ryd2radTHz, oneI, pi, twopi, twopiI, &
        Ryd2amu, bohr2nm
   use misc, only: exit_with_message, print_message, expi, twonorm, &
-       distribute_points, demux_state, mux_vector, subtitle
+       distribute_points, demux_state, mux_vector, subtitle, write2file_rank2_complex
   use numerics_module, only: numerics
   use crystal_module, only: crystal
   
@@ -520,6 +520,65 @@ contains
        end if
     end do !ik
   end subroutine el_wann
+
+  !!!!
+  !From Sebastian Tillack (exciting code, gpl 2+)
+  !> For a given vector \({\bf s}\), this function returns all the lattice vectors \({\bf S}\) 
+  !> such that \({\bf s} + {\bf S}\) is in the Wigner-Seitz cell of the lattice defined by the
+  !> given lattice vectors. There might be multiple such wrapping vectors when \({\bf s}\) gets
+  !> wrapped onto the boundary of the Wigner-Seitz cell.
+  pure function ws_wrapping_vectors( lvec, vl, eps ) result( wrappers )
+    !> lattice vectors (columnwise)
+    real(r64), intent(in) :: lvec(3, 3)
+    !> input vector \({\bf s}\) in lattice coordinates
+    real(r64), intent(in) :: vl(3)
+    !> tolerance
+    real(r64), intent(in) :: eps
+    !> list of wrapping vectors \({\bf S}\)
+    integer, allocatable :: wrappers(:,:)
+
+    ! super cell search size
+    integer, parameter :: sc_size = 3
+
+    integer :: i, j, k, n, iv0(3)
+    real(r64) :: d, wl(3), wc(3)
+
+    iv0 = int( vl )
+    wl = vl - dble( iv0 )
+
+    ! find length and number of shortest vectors
+    n = 0
+    d = huge( 0.0_r64 )
+    do k = -sc_size, sc_size
+       do j = -sc_size, sc_size
+          do i = -sc_size, sc_size
+             wc = matmul(lvec, wl+[i,j,k])
+             if( abs( norm2( wc ) - d ) < eps ) then
+                n = n + 1
+             else if( norm2( wc ) < d ) then
+                n = 1
+                d = norm2( wc )
+             end if
+          end do
+       end do
+    end do
+
+    ! find all wrapping vectors
+    allocate( wrappers(3, n) )
+    n = 0
+    do k = -sc_size, sc_size
+       do j = -sc_size, sc_size
+          do i = -sc_size, sc_size
+             wc = matmul(lvec, wl+[i,j,k])
+             if( abs( norm2( wc ) - d ) < eps ) then
+                n = n + 1
+                wrappers(:, n) = [i,j,k] - iv0
+             end if
+          end do
+       end do
+    end do
+  end function ws_wrapping_vectors
+  !!!!!!
   
   subroutine ph_wann(self, crys, nq, qvecs, energies, evecs, velocities)  
     !! Wannier interpolate phonons on list of arb. q-vec
@@ -533,15 +592,17 @@ contains
     complex(r64), intent(out), optional :: evecs(nq, self%numbranches, self%numbranches)
 
     !Local variables
-    integer(i64) :: iuc, ipol, ib, jb, iq, na, nb, nwork, aux
-    real(r64) :: rcart(3)
+    integer(i64) :: iuc, ipol, ib, jb, iq, na, nb, nwork, aux, iat, jat
+    integer :: iw, num_wrap
+    integer, allocatable :: wrappers(:, :)
+    real(r64) :: rcart(3), dist(3)
     complex(r64) :: caux
     real(r64), allocatable :: rwork(:)
     complex(r64), allocatable :: work(:)
     real(r64) :: omega2(self%numbranches), massnorm
     complex(r64) :: dynmat(self%numbranches, self%numbranches), &
          dynmat_l(self%numbranches, self%numbranches)
-    complex(r64), allocatable :: ddynmat(:, :, :), ddynmat_l(:, :, :)
+    complex(r64), allocatable :: ddynmat(:, :, :), ddynmat_l(:, :, :), caux_mat(:, :)
 
     !External procedures
     external :: zheev
@@ -553,6 +614,7 @@ contains
     nwork = 1
     allocate(work(nwork))
     allocate(rwork(max(1, 9*crys%numatoms-2)))
+    allocate(caux_mat(self%numbranches, self%numbranches))
 
     if(present(velocities)) then
        allocate(ddynmat(self%numbranches, self%numbranches, 3), &
@@ -563,21 +625,59 @@ contains
        !Form dynamical matrix
        dynmat = (0.0_r64, 0.0_r64)
        if(present(velocities)) ddynmat = (0.0_r64, 0.0_r64)
+
        do iuc = 1, self%nwsq
-          caux = expi(twopi*dot_product(qvecs(iq, :), self%rcells_q(iuc, :)))&
-               /self%phwsdeg(iuc)
-          
-          dynmat = dynmat + caux*self%Dphwann(iuc, :, :)
+          !! More accurate method for interpolating the dynamical matrix compared
+          !! to the original. Will formalize this later... [TODO]
+          !! Thanks, Sebastian for the great pair programming experience!
+          caux_mat(:, :) = (0.0_r64, 0.0_r64)
+          do jat = 1, crys%numatoms
+             do iat = 1, crys%numatoms
+                ! all vectors in lattice coordinates
+                dist(:) = self%rcells_q(iuc, :) &
+                     - crys%basis(:, iat) + crys%basis(:, jat)
+                dist(:) = dist(:) / self%coarse_qmesh(:)
+                wrappers = ws_wrapping_vectors(crys%lattvecs, dist(:), eps = 1.0e-6_r64 )
+                num_wrap = size( wrappers, dim=2 )
+                do iw = 1, num_wrap
+                   caux = expi(twopi * dot_product( qvecs(iq, :), &
+                        self%rcells_q(iuc, :) + wrappers(:, iw) * self%coarse_qmesh(:) ))
+                   ! same for 3 x 3 blocks
+                   caux_mat((iat-1)*3+1:iat*3, (jat-1)*3+1:jat*3) = &
+                        caux_mat((iat-1)*3+1:iat*3, (jat-1)*3+1:jat*3) + &
+                        caux / (self%phwsdeg(iuc) * num_wrap)
+                end do
+             end do
+          end do
+
+          dynmat(:, :) = dynmat(:, :) + caux_mat(:, :) * self%Dphwann(iuc, :, :)
 
           if(present(velocities)) then
              rcart = matmul(crys%lattvecs, self%rcells_q(iuc, :))
 
              do ipol = 1, 3
                 ddynmat(:, :, ipol) = ddynmat(:, :, ipol) + &
-                     oneI*rcart(ipol)*caux*self%Dphwann(iuc, :, :)
+                     oneI*rcart(ipol)*caux_mat(:, :)*self%Dphwann(iuc, :, :)
              end do
           end if
+          !!
        end do
+
+!!$       do iuc = 1, self%nwsq
+!!$          caux = expi(twopi*dot_product(qvecs(iq, :), self%rcells_q(iuc, :)))&
+!!$               /self%phwsdeg(iuc)
+!!$
+!!$          dynmat = dynmat + caux*self%Dphwann(iuc, :, :)
+!!$
+!!$          if(present(velocities)) then
+!!$             rcart = matmul(crys%lattvecs, self%rcells_q(iuc, :))
+!!$
+!!$             do ipol = 1, 3
+!!$                ddynmat(:, :, ipol) = ddynmat(:, :, ipol) + &
+!!$                     oneI*rcart(ipol)*caux*self%Dphwann(iuc, :, :)
+!!$             end do
+!!$          end if
+!!$       end do
        
        !Non-analytic correction
        if(crys%polar) then
@@ -593,6 +693,13 @@ contains
                   self%coarse_qmesh, dynmat_l)
           end if
 
+!!$          if(iq == 2 .and. this_image() == 1) then
+!!$             print*, 'q = ', matmul(crys%reclattvecs, qvecs(iq, :))*bohr2nm
+!!$             print*, dynmat_l
+!!$             call write2file_rank2_complex("dyn_lr", dynmat_l)
+!!$             call exit
+!!$          end if
+          
           dynmat = dynmat + dynmat_l
        end if
        
@@ -787,7 +894,7 @@ contains
           end do
        end do
     end do
-
+    
     dyn_l = dyn_l*fac
     if(present(ddyn_l)) ddyn_l = ddyn_l*fac
   end subroutine dyn_nonanalytic
@@ -893,6 +1000,7 @@ contains
           unm = dot_product(el_evec_kp,el_evec_k)
           call long_range_prefac(self, crys, &
                matmul(crys%reclattvecs,qvec)*bohr2nm,u,glprefac)
+          !gbloch = gbloch + glprefac*unm
           gbloch = gbloch + glprefac*unm
        end if
 
@@ -1189,6 +1297,8 @@ contains
           do icart = 1, 3
              if(kp(1,icart) >= 1.0_r64) kp(1, icart) = kp(1, icart) - 1.0_r64
           end do
+
+          !TODO Would be great to have a progress bar here.
 
           !Calculate electrons at this final wave vector
           call el_wann(self, crys, 1_i64, kp, el_ens_kp, el_vels_kp, el_evecs_kp, &

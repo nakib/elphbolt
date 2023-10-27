@@ -17,7 +17,7 @@
 module bz_sums
   !! Module containing the procedures to do Brillouin zone sums.
 
-  use params, only: r64, i64, kB, qe, pi, hbar_eVps, perm0, twopi
+  use params, only: r64, i64, kB, qe, pi, hbar_eVps, perm0, twopi, oneI, bohr2nm
   use misc, only: exit_with_message, print_message, write2file_rank2_real, &
        distribute_points, Bose, Fermi, binsearch, mux_vector, twonorm, linspace, &
        write2file_rank1_real
@@ -63,9 +63,10 @@ contains
 
     !Locals
     integer(i64) :: m, n, ik, ikp, ikp_window, k_indvec(3), kp_indvec(3)
-    real(r64) :: overlap, ek, ekp
+    real(r64) :: overlap, ek, ekp, realpart, imagpart
+    complex(r64) :: aux
 
-    RPA_polarizability_3d = 0.0
+    aux = 0.0
     do m = 1, el%numbands
        do ik = 1, el%nwv
           ek = el%ens(ik, m)
@@ -83,7 +84,7 @@ contains
           !Check if final electron wave vector is within FBZ blocks
           call binsearch(el%indexlist, ikp, ikp_window)
           if(ikp_window < 0) cycle
-          
+
           do n = 1, el%numbands
              ekp = el%ens(ikp_window, n)
              
@@ -94,7 +95,7 @@ contains
              !(Recall that U^\dagger(k) is the diagonalizer of the electronic hamiltonian.)
              overlap = (abs(dot_product(el%evecs(ikp_window, n, :), el%evecs(ik, m, :))))**2
              
-             RPA_polarizability_3d = RPA_polarizability_3d + &
+             aux = aux + &
                   (Fermi(ekp, el%chempot, T) - &
                   Fermi(ek, el%chempot, T))* &
                   resolvent(el, m, ik, ekp - Omega)*overlap
@@ -103,7 +104,17 @@ contains
     end do
     !Recall that the resolvent is already normalized in the full wave vector mesh.
     !As such, the 1/product(el%wvmesh) is not needed in the expression below.
-    RPA_polarizability_3d = RPA_polarizability_3d*el%spindeg/pcell_vol
+    aux = aux*el%spindeg/pcell_vol
+
+    !RPA_polarizability_3d = aux
+
+    !Zero out extremely small numbers
+    realpart = real(aux)
+    imagpart = imag(aux)
+    if(abs(real(aux)) < 1.0e-30) realpart = 0.0_r64
+    if(abs(imag(aux)) < 1.0e-30) imagpart = 0.0_r64
+    
+    RPA_polarizability_3d = realpart + imagpart*oneI
   end function RPA_polarizability_3d
 
   subroutine calculate_RPA_dielectric_3d(el, crys, num)
@@ -132,6 +143,8 @@ contains
     complex(r64), allocatable :: diel_ik(:)
     character(len = 1024) :: filename
 
+    print*, el%numbands
+    
     !This sets how large the G vectors can be. Choosing 3
     !means including -3G to +3G in the calculations. This
     !should be a safe range.
@@ -247,28 +260,36 @@ contains
     type(numerics), intent(in) :: num
 
     !Locals
-    real(r64), allocatable :: energylist(:), qlist(:, :)
+    real(r64), allocatable :: energylist(:), qlist(:, :), qmaglist(:)
     real(r64) :: qcrys(3)
     integer(i64) :: iq, iOmega, numomega, numq, &
-         start, end, chunk, num_active_images
+         start, end, chunk, num_active_images, qxmesh
     complex(r64) :: polarizability
     complex(r64), allocatable :: diel(:, :)
     character(len = 1024) :: filename
+    real(r64) :: a0, eps0_q0_prefac, omega_plasma
+
+!!$    a0 = 1.0e-9_r64*bohr2nm !Bohr radius in m
+!!$    eps0_q0_prefac = (4.0_r64/9.0_r64/pi)/a0* &
+!!$         (3.0_r64*abs(sum(el%conc))*1.0e6_r64)**(-1.0_r64/3.0_r64) !
+    omega_plasma = 0.5025125628E-01 !eV
 
     !TEST
     !Material: Si
-    !Uniform energy mesh from 0-1.5 eV with uniform q-vecs in Gamma-Gamma along x
-    numomega = 100
+    !Uniform energy mesh from 0-1.0 eV with uniform q-vecs in Gamma-Gamma along x
+    numomega = 200
     numq = 50
+    qxmesh = 200
     !Create qlist in crystal coordinates
-    allocate(qlist(numq, 3))
+    allocate(qlist(numq, 3), qmaglist(numq))
     do iq = 1, numq
-       qlist(iq, :) = [(iq - 1.0_r64)/numq, 0.0_r64, 0.0_r64]
+       qlist(iq, :) = [(iq - 1.0_r64)/qxmesh, 0.0_r64, 0.0_r64]
+       qmaglist(iq) = twonorm(matmul(crys%reclattvecs, qlist(iq, :)))
     end do
         
-    !TODO Create energy grid
+    !Create energy grid
     allocate(energylist(numomega))
-    call linspace(energylist, 0.0_r64, 1.5_r64, numomega)
+    call linspace(energylist, 0.0_r64, 0.5_r64, numomega)
     
     !Allocate diel_ik to hold maximum possible Omega
     allocate(diel(numq, numomega))
@@ -285,17 +306,21 @@ contains
     do iq = start, end !Over IBZ k points
        qcrys = qlist(iq, :) !crystal coordinates
 
-       do iOmega = 1, numomega
-          !Calculate RPA polarizability
-          polarizability = &
-               RPA_polarizability_3d(energylist(iOmega), &
-               nint(qcrys*numq)+0_i64, el, crys%volume, crys%T)
-                    
-          !Calculate RPA dielectric (diagonal in G-G' space)
-          diel(iq, iOmega) = 1.0_r64 - &
-               (1.0_r64/twonorm(matmul(crys%reclattvecs, qcrys)))**2* &
-               polarizability/perm0*qe*1.0e9_r64
-       end do
+       if(all(qcrys == 0.0_r64)) then
+          diel(iq, :) = 1.0_r64 - (omega_plasma/energylist)**2 + 1.0e-3*oneI
+       else
+          do iOmega = 1, numomega
+             !Calculate RPA polarizability
+             polarizability = &
+                  RPA_polarizability_3d(energylist(iOmega), &
+                  nint(qcrys*numq)+0_i64, el, crys%volume, crys%T)
+
+             !Calculate RPA dielectric (diagonal in G-G' space)
+             diel(iq, iOmega) = 1.0_r64 - &
+                  (1.0_r64/twonorm(matmul(crys%reclattvecs, qcrys)))**2* &
+                  polarizability/perm0*qe*1.0e9_r64
+          end do
+       end if
     end do
     
     sync all
@@ -304,9 +329,10 @@ contains
 
     !Print to file
     call write2file_rank2_real("RPA_dielectric_3D_G0_qpath", qlist)
+    call write2file_rank1_real("RPA_dielectric_3D_G0_qmagpath", qmaglist)
     call write2file_rank1_real("RPA_dielectric_3D_G0_Omega", energylist)
-    call write2file_rank2_real("RPA_dielectric_3D_G0_real", real(diel)+0.0_r64)
-    call write2file_rank2_real("RPA_dielectric_3D_G0_imag", imag(diel)+0.0_r64)
+    call write2file_rank2_real("RPA_dielectric_3D_G0_real", real(diel)*1.0_r64)
+    call write2file_rank2_real("RPA_dielectric_3D_G0_imag", imag(diel)*1.0_r64)
   end subroutine calculate_RPA_dielectric_3d_G0_qpath
   !!
     
