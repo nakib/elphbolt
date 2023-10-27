@@ -660,7 +660,6 @@ contains
                      oneI*rcart(ipol)*caux_mat(:, :)*self%Dphwann(iuc, :, :)
              end do
           end if
-          !!
        end do
 
 !!$       do iuc = 1, self%nwsq
