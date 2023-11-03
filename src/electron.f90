@@ -259,7 +259,7 @@ contains
     !Computing the shift in energy due to scissor operator
     allocate(self%scissor(wann%numwannbands))
     self%scissor(:) = 0.0_r64
-    if (.not. metallic) then
+    if (.not. metallic .and. self%indlowconduction > self%indhighvalence) then
       self%scissor(self%indlowconduction:wann%numwannbands) = scissor
     end if
     
@@ -278,7 +278,7 @@ contains
        if(indhighvalence > 0) then
           write(*, "(A, I5)") "Highest valence band index = ", self%indhighvalence
        end if
-       if (scissor .ne. 0.0_r64) then
+       if (scissor .ne. 0.0_r64 .and. self%indlowconduction > self%indhighvalence) then
           write(*, "(A, 1E16.8, A)") "Scissor operator = ", &
             self%scissor(self%indlowconduction) , " eV"
        end if
@@ -766,7 +766,8 @@ contains
        high = self%indhighvalence
     end if
 
-    if (this_image() == 1 .and. (.not. self%metallic) ) then
+    if (this_image() == 1 .and. (.not. self%metallic) &
+         .and. self%indlowconduction >  self%indhighvalence) then
        write(*, "(A, 1E16.8, A)") 'Maximum energy valence band = ' , &
                maxval(self%ens_irred(:,self%indlowconduction-1)) , ' eV'
        write(*, "(A, 1E16.8, A)") 'Minimum energy conduction band = ' , &
