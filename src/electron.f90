@@ -511,6 +511,13 @@ contains
     call print_message("Calculating FBZ -> IBZ mappings...")
     call create_fbz2ibz_map(self%fbz2ibz_map,self%nwv,self%nwv_irred, &
          self%indexlist,self%nequiv,self%ibz2fbz_map)
+    if(this_image() == 1) then
+       open(1, file = "el.fbz2ibz_map", status = "replace")
+       do i = 1, self%nwv
+          write(1, "(I10)") self%fbz2ibz_map(i)
+       end do
+       close(1)
+    end if
     
     do i = 1, self%nwv_irred !IBZ
        do l = 1, self%nequiv(i) !number of equivalent points of i
