@@ -54,10 +54,10 @@ The source is heavily commented and can be auto-documented with ~FORD~ (https://
      For a cpu-only build and test with Fortran Package Manager (https://fpm.fortran-lang.org/), say
      
       #+BEGIN_SRC bash
-      . fpm_config_caf.sh; yes | fpm clean; fpm build; fpm test
+      . fpm_config_caf.sh; yes | fpm clean; fpm build; fpm install; fpm test
       #+END_SRC
 
-     The ~elphbolt~ and ~superconda~ apps will be available in the ~build/caf_*/app/~ directory.
+     The ~elphbolt~ and ~superconda~ apps will be available in your ~/.local/bin~ directory. They should both be directly callable from your shell.
 
      Modify the fpm manifest file, ~fpm.toml~, to suit your system. I'd appreciate any feedback.
 
