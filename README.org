@@ -54,7 +54,7 @@ The source is heavily commented and can be auto-documented with ~FORD~ (https://
      For a cpu-only build and test with Fortran Package Manager (https://fpm.fortran-lang.org/), say
      
       #+BEGIN_SRC bash
-      . fpm_config_caf.sh; yes | fpm clean; fpm build; fpm install; fpm test
+      source fpm_config_caf.sh; yes | fpm clean; fpm build; fpm install; fpm test
       #+END_SRC
 
      The ~elphbolt~ and ~superconda~ apps will be available in your ~/.local/bin~ directory. They should both be directly callable from your shell.
@@ -65,7 +65,7 @@ The source is heavily commented and can be auto-documented with ~FORD~ (https://
       For a cpu+gpu build with OpenACC (https://www.openacc.org/), say
       
      #+BEGIN_SRC bash
-      . fpm_config_caf_openacc.sh; yes | fpm clean; fpm build
+      source fpm_config_caf_openacc.sh; yes | fpm clean; fpm build; fpm install; fpm test
      #+END_SRC
      
      For this build, you will need a *recent* version of ~gcc~ build with ~nvptx~. You can have it on your HPC system using, for example, spack (https://spack.io/):
