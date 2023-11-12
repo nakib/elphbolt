@@ -4,6 +4,9 @@ author = "Nakib Haider Protik"
 maintainer = "nakib.haider.protik@gmail.com"
 copyright = "2023 Contributors of the elphbolt project."
 
+[fortran]
+implicit-external = true #Needed for v>=0.7 fpm
+
 [library]
 source-dir="src"
 
@@ -11,7 +14,10 @@ source-dir="src"
 [preprocess.cpp]
 
 [dependencies]
-testify = { git = "git@github.com:nakib/testify.git" }
+#Pull from github
+#testify = { git = "git@github.com:nakib/testify.git" }
+#Use local copy from thirdparty directory
+testify = {path = "thirdparty/testify"}
 
 [build]
 link = ["blas", "lapack", "symspg"]
