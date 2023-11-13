@@ -35,6 +35,5 @@ jobs:
         cafrun --version
         
     - name: Build with fpm
-      run: |
-        source fpm_config_caf.sh; yes | fpm clean; \
+      run: source fpm_config_caf.sh; yes | fpm clean && \
 	fpm build; fpm install; fpm test
