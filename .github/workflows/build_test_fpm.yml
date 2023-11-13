@@ -35,5 +35,7 @@ jobs:
         cafrun --version
         
     - name: Build with fpm
-      run: source fpm_config_caf.sh; yes | fpm clean && \
+      run: |
+        export FPM_FC=caf && \
+	export FPM_FFLAGS="-g -O2 -fPIC -fbounds-check -Wunused -Wconversion -Wunderflow -Wdo-subscript" && \
 	fpm build; fpm install; fpm test
