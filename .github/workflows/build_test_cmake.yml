@@ -1,4 +1,4 @@
-name: build_test
+name: build_test_cmake
 
 on: [pull_request, push]
 
