@@ -6,19 +6,23 @@ program test_misc
   use misc, only: int_div, expi, trace, kronecker, sort, cross_product, &
        twonorm, binsearch, mux_vector, demux_vector, interpolate, coarse_grained, &
        unique, linspace, compsimps, mux_state, demux_state, demux_mesh, expm1, &
-       Fermi, Bose, Pade_continued
+       Fermi, Bose, Pade_continued, precompute_interpolation_corners_and_weights, &
+       interpolate_using_precomputed
   
   implicit none
 
   integer :: itest
-  integer, parameter :: num_tests = 23
+  integer, parameter :: num_tests = 24
   type(testify) :: test_array(num_tests), tests_all
   integer(i64) :: index, quotient, remainder, int_array(5), v1(3), v2(3), &
-       v1_muxed, v2_muxed, ik1, ik2, ik3, ib1, ib2, ib3
-  integer(i64), allocatable :: index_mesh_0(:, :), index_mesh_1(:, :)
+       v1_muxed, v2_muxed, ik, ik1, ik2, ik3, ib1, ib2, ib3, wvmesh(3), &
+       mesh_ref_array(3), nk_coarse, ninterp
+  integer(i64), allocatable :: index_mesh_0(:, :), index_mesh_1(:, :), &
+       ksint(:, :), idc(:, :), ik_interp(:)
   real(r64) :: pauli1(2, 2), ipauli2(2, 2), pauli3(2, 2), &
        real_array(5), result
-  real(r64), allocatable :: integrand(:), domain(:), im_axis(:), real_func(:)
+  real(r64), allocatable :: integrand(:), domain(:), im_axis(:), real_func(:), &
+       widc(:, :), f_coarse(:), f_interp(:)
 
   !Some data to be used in the tests below
   pauli1 = reshape([0.0_r64, 1.0_r64, 1.0_r64, 0.0_r64], [2, 2])
@@ -237,7 +241,36 @@ program test_misc
        tol = 1.0e-8_r64)
 
   !Interpolate
+  itest = itest + 1
+  test_array(itest) = testify("Linear interpolation")
+  wvmesh = [4, 4, 4]
+  mesh_ref_array = [3, 3, 3]
+  nk_coarse = product(wvmesh)
+  ninterp = 4
 
+  allocate(widc(nk_coarse, 6), idc(nk_coarse, 9), &
+       ksint(nk_coarse, 3), f_coarse(nk_coarse), f_interp(ninterp), ik_interp(ninterp))
+  do ik = 1, nk_coarse
+     call demux_vector(ik, ksint(ik, :), wvmesh, 0_i64)
+  end do
+  call precompute_interpolation_corners_and_weights(wvmesh, &
+       mesh_ref_array, ksint, idc, widc)
+
+  call random_number(f_coarse)
+  f_coarse = 2.0_r64*f_coarse - 1.0_r64
+
+  ik_interp = [1, 2, 3, 4]
+
+  do ik = 1, ninterp
+     call interpolate_using_precomputed(idc(ik_interp(ik), :), widc(ik_interp(ik), :), &
+          f_coarse, f_interp(ik))
+  end do
+  
+  call test_array(itest)%assert(&
+       f_interp, &
+       [f_coarse(1), (2.0_r64*f_coarse(1) + f_coarse(2))/3.0_r64, (f_coarse(1) + 2.0_r64*f_coarse(2))/3.0_r64, f_coarse(2)], &
+       tol = 1.0e-12_r64)
+  
   !Pade_coeffs & Pade_continued
   itest = itest + 1
   test_array(itest) = testify("Pade approximant")

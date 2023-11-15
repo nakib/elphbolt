@@ -845,10 +845,6 @@ contains
     integer(i64), intent(in) :: v(3), mesh(3), base
     integer(i64) :: mux_vector
 
-!!$    if(base < 0 .or. base > 1) then
-!!$       call exit_with_message("Base has to be either 0 or 1 in misc.f90:mux_vector")
-!!$    end if
-
     if(base == 0) then
        mux_vector = (v(3)*mesh(2) + v(2))*mesh(1) + v(1) + 1
     else
@@ -1108,11 +1104,13 @@ contains
    end do !iq
 
    !Reduce from all images
+   sync all
    call co_sum(weights_reduce)
    call co_sum(idcorners_reduce)
+   sync all
+   
    weights   = weights_reduce
    idcorners = idcorners_reduce
-
   end subroutine precompute_interpolation_corners_and_weights
 
   subroutine interpolate_using_precomputed_3vector(idc, widc, f, interpolation)
