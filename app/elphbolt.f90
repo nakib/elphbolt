@@ -35,8 +35,8 @@ program elphbolt
        calculate_RPA_dielectric_3d_G0_qpath
   use interactions, only: calculate_gReq, calculate_gkRp, calculate_3ph_interaction, &
        calculate_eph_interaction_ibzq, calculate_eph_interaction_ibzk, &
-       calculate_echimp_interaction_ibzk!, calculate_coarse_grained_3ph_vertex, &
-       !calculate_W_fromcgV2
+       calculate_echimp_interaction_ibzk, calculate_coarse_grained_3ph_vertex, &
+       calculate_W_fromcgV2
   use phonon_defect_module, only: phonon_defect
   use Green_function, only: calculate_retarded_phonon_D0
   

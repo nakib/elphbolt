@@ -985,7 +985,6 @@ contains
     idcorners_reduce(:,:) = 0_i64
     weights_reduce(:,:) = 0.0_r64
 
-
     do iq = start, end
        !compute q for each ik
        q = qs(iq,:)
