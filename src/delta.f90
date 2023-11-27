@@ -26,12 +26,9 @@ module delta
   implicit none
 
   private
-!!$  public form_tetrahedra_3d, fill_tetrahedra_3d, delta_fn_tetra, &
-!!$       form_triangles, fill_triangles, delta_fn_triang, real_tetra
   public form_tetrahedra_3d, fill_tetrahedra_3d, &
        form_triangles, fill_triangles, real_tetra, &
-       delta_fn, get_delta_fn_pointer!, &
-       !delta_fn_tetra, delta_fn_triang
+       delta_fn, get_delta_fn_pointer
 
   abstract interface
      pure real(r64) function delta_fn(e, ik, ib, mesh, map, count, evals)
