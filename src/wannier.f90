@@ -1221,6 +1221,9 @@ contains
     character(len = 1024) :: filename
     character(len=8) :: saux
 
+    !DBG
+    real(r64), allocatable :: el_ens_kp_all(:,:)
+
     call print_message("Plotting bands, dispersions, and e-ph vertex along path...")
 
     call self%reshape_gwann_for_gkRp
@@ -1270,6 +1273,9 @@ contains
             el_evecs_kp(1, self%numwannbands, self%numwannbands))
        allocate(g2_qpath(nqpath, self%numbranches, self%numwannbands, self%numwannbands))
 
+       !DBG
+       allocate(el_ens_kp_all(nqpath, self%numwannbands))
+
        !Read wave vector of initial electron
        open(1, file = trim('initialk.txt'), status = 'old')
        read(1,*) k(1, :)
@@ -1287,7 +1293,7 @@ contains
        close(1)
        !Change back to working directory
        call chdir(num%cwd)
-
+       
        call el_wann(self, crys, 1_i64, k, el_ens_k, el_vels_k, el_evecs_k, &
             scissor = scissor)
 
@@ -1296,13 +1302,16 @@ contains
           do icart = 1, 3
              if(kp(1,icart) >= 1.0_r64) kp(1, icart) = kp(1, icart) - 1.0_r64
           end do
-
+          
           !TODO Would be great to have a progress bar here.
 
           !Calculate electrons at this final wave vector
           call el_wann(self, crys, 1_i64, kp, el_ens_kp, el_vels_kp, el_evecs_kp, &
                scissor = scissor)
 
+          !DBG
+          el_ens_kp_all(i, :) = el_ens_kp(1, :)
+          
           do n = 1, self%numwannbands
              do m = 1, self%numwannbands
                 do s = 1, self%numbranches
@@ -1377,6 +1386,15 @@ contains
           end do
        end do
 
+       !DBG
+       !Output electron dispersions
+       write(saux,"(I0)") self%numwannbands
+       open(1, file="el.ens_k+qpath",status="replace")
+       do i = 1, nqpath
+          write(1,"("//trim(adjustl(saux))//"E20.10)") el_ens_kp_all(i,:)
+       end do
+       close(1)
+       
        !Print out |gk(m,n,s,qpath)|
        open(1, file = 'gk_qpath',status="replace")
        write(1,*) '   m    n    s    |gk|[eV]'

@@ -7,12 +7,12 @@ program test_misc
        twonorm, binsearch, mux_vector, demux_vector, interpolate, coarse_grained, &
        unique, linspace, compsimps, mux_state, demux_state, demux_mesh, expm1, &
        Fermi, Bose, Pade_continued, precompute_interpolation_corners_and_weights, &
-       interpolate_using_precomputed
+       interpolate_using_precomputed, operator(.umklapp.)
   
   implicit none
 
   integer :: itest
-  integer, parameter :: num_tests = 24
+  integer, parameter :: num_tests = 26
   type(testify) :: test_array(num_tests), tests_all
   integer(i64) :: index, quotient, remainder, int_array(5), v1(3), v2(3), &
        v1_muxed, v2_muxed, ik, ik1, ik2, ik3, ib1, ib2, ib3, wvmesh(3), &
@@ -20,7 +20,7 @@ program test_misc
   integer(i64), allocatable :: index_mesh_0(:, :), index_mesh_1(:, :), &
        ksint(:, :), idc(:, :), ik_interp(:)
   real(r64) :: pauli1(2, 2), ipauli2(2, 2), pauli3(2, 2), &
-       real_array(5), result
+       real_array(5), result, q1(3, 4), q2(3, 4), q3(3, 4)
   real(r64), allocatable :: integrand(:), domain(:), im_axis(:), real_func(:), &
        widc(:, :), f_coarse(:), f_interp(:)
 
@@ -281,6 +281,36 @@ program test_misc
        Pade_continued(oneI*im_axis, real_func, [0.0_r64, 0.5_r64, 1.0_r64]), &
        [-1.0_r64 + 0.0_r64*oneI, -0.8_r64 + 0.4_r64*oneI, -0.5_r64 + 0.5_r64*oneI], &
        tol = 1.0e-10_r64)
+
+  !.umklapp.
+  q1(:, 1) = [0.5_r64, 0.0_r64, 0.0_r64]
+  q1(:, 2) = [0.5_r64, 0.5_r64, 0.0_r64]
+  q1(:, 3) = [0.5_r64, 0.5_r64, 0.5_r64]
+  q1(:, 4) = [0.1_r64, 0.2_r64, 0.0_r64]
+  q2(:, 1) = [0.5_r64, 0.0_r64, 0.0_r64]
+  q2(:, 2) = [0.5_r64, 0.5_r64, 0.0_r64]
+  q2(:, 3) = [0.5_r64, 0.5_r64, 0.5_r64]
+  q2(:, 4) = -[0.5_r64, 0.5_r64, 0.1_r64]
+  q3(:, 1) = [0.0_r64, 0.0_r64, 0.0_r64]
+  q3(:, 2) = [0.0_r64, 0.0_r64, 0.0_r64]
+  q3(:, 3) = [0.0_r64, 0.0_r64, 0.0_r64]
+  q3(:, 4) = [0.6_r64, 0.7_r64, 0.9_r64]
+  
+  itest = itest + 1
+  test_array(itest) = testify(".umklapp.")
+
+  call test_array(itest)%assert( &
+       [ &
+       q1(:, 1) .umklapp. q2(:, 1), &
+       q1(:, 2) .umklapp. q2(:, 2), &
+       q1(:, 3) .umklapp. q2(:, 3), &
+       q1(:, 4) .umklapp. q2(:, 4)], &
+       [q3(:, 1), q3(:, 2), q3(:, 3), q3(:, 4)], tol = 1.0e-12_r64)
+
+  !.umklapp. elemental
+  itest = itest + 1
+  test_array(itest) = testify("elemental .umklapp.")  
+  call test_array(itest)%assert(pack(q1 .umklapp. q2, .true.), reshape(q3, [size(q3)]))
   
   tests_all = testify(test_array)
   call tests_all%report

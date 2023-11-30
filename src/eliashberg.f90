@@ -203,7 +203,7 @@ contains
              !Find interacting phonon wave vector
              ! Note that q, k, and k' are all on the same mesh
              q_indvec = modulo(kp_indvec - k_indvec, el%wvmesh)
-
+             
              ! Muxed index of q
              iq = mux_vector(q_indvec, el%wvmesh, 0_i64)
 
@@ -222,7 +222,7 @@ contains
 
                    !Note that the phonon branch index iterates last for a2F_istate
                    a2F_istate(count, :) = g2_istate(count)*ph_deltas(s, iq, :)
-
+                   
                    !Sum contribuion to the isotropic a2F
                    iso_a2F_branches(:, s) = iso_a2F_branches(:, s) + &
                         a2F_istate(count, :)*WWp

@@ -21,9 +21,9 @@ module misc
   
   implicit none
   
-  public
+  public :: operator(.umklapp.)
   private :: sort_int, sort_real, Pade_coeffs, twonorm_real_rank1, twonorm_real_rank2, &
-       invert_complex_square
+       invert_complex_square, add_and_fold, add_and_fold_array
 
   type timer
      !! Container for timing related data and procedures.
@@ -57,7 +57,11 @@ module misc
   interface create_set
      module procedure :: create_set_int, create_set_char
   end interface create_set
-  
+
+  interface operator(.umklapp.)
+     module procedure add_and_fold
+     module procedure add_and_fold_array
+  end interface operator(.umklapp.)
 contains
 
   subroutine start_timer(self, event)
@@ -575,6 +579,38 @@ contains
 
     expi = cmplx(cos(x), sin(x), r64)
   end function expi
+
+  pure function add_and_fold(q1, q2) result(q3)
+    !! Adds two fractional coordinate wave vectors
+    !! and folds back into the 1st Brillouin zone.
+
+    real(r64), intent(in) :: q1(3), q2(3)
+    real(r64) :: q3(3)
+
+    integer :: icart
+    
+    q3 = q1 + q2
+    do icart = 1, 3
+       if(q3(icart) >= 1.0_r64) q3(icart) = q3(icart) - 1.0_r64
+       if(q3(icart) < 0.0_r64) q3(icart) = q3(icart) + 1.0_r64
+    end do
+  end function add_and_fold
+
+  pure function add_and_fold_array(q1, q2) result(q3)
+    !! Elementwise adds two fractional coordinate wave vector arrays
+    !! and folds back into the 1st Brillouin zone.
+
+    real(r64), intent(in) :: q1(:, :), q2(:, :)
+    real(r64) :: q3(3, size(q1, 2))
+
+    integer :: iq, nq
+    
+    nq = size(q3, 2)
+
+    do iq = 1, nq
+       q3(:, iq) = add_and_fold(q1(:, iq), q2(:, iq))
+    end do
+  end function add_and_fold_array
 
   pure real(r64) function twonorm_real_rank1(v)
     !! 2-norm of a rank-1 real vector
