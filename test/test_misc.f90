@@ -270,6 +270,10 @@ program test_misc
        f_interp, &
        [f_coarse(1), (2.0_r64*f_coarse(1) + f_coarse(2))/3.0_r64, (f_coarse(1) + 2.0_r64*f_coarse(2))/3.0_r64, f_coarse(2)], &
        tol = 1.0e-12_r64)
+
+  !TODO Bilinear
+
+  !TODO Trilinear
   
   !Pade_coeffs & Pade_continued
   itest = itest + 1

@@ -20,7 +20,8 @@ module wannier_module
   use params, only: r64, i64, Ryd2eV, Ryd2radTHz, oneI, pi, twopi, twopiI, &
        Ryd2amu, bohr2nm
   use misc, only: exit_with_message, print_message, expi, twonorm, &
-       distribute_points, demux_state, mux_vector, subtitle, write2file_rank2_complex
+       distribute_points, demux_state, mux_vector, subtitle, write2file_rank2_complex, &
+       operator(.umklapp.)
   use numerics_module, only: numerics
   use crystal_module, only: crystal
   
@@ -1213,16 +1214,13 @@ contains
     !Local variables
     integer(i64) :: i, nqpath, m, n, s, deg_count, mp, np, sp, icart
     real(r64) :: k(1, 3), kp(1, 3), thres, aux, el_en, ph_en
-    real(r64), allocatable :: qpathvecs(:,:), ph_ens_path(:,:), &
-         el_ens_path(:,:), el_ens_kp(:,:), &
+    real(r64), allocatable :: qpathvecs(:,:), kppathvecs(:,:), &
+         ph_ens_path(:,:), el_ens_path(:,:), el_ens_kp(:,:), el_ens_kp_all(:,:), &
          el_vels_kp(:,:,:), g2_qpath(:,:,:,:), el_ens_k(:,:), el_vels_k(:,:,:)
     complex(r64), allocatable :: ph_evecs_path(:,:,:), el_evecs_kp(:,:,:), &
          el_evecs_k(:,:,:), gmixed_k(:,:,:,:) 
     character(len = 1024) :: filename
     character(len=8) :: saux
-
-    !DBG
-    real(r64), allocatable :: el_ens_kp_all(:,:)
 
     call print_message("Plotting bands, dispersions, and e-ph vertex along path...")
 
@@ -1239,7 +1237,7 @@ contains
        read(1,*) nqpath
        allocate(qpathvecs(nqpath, 3))
        do i = 1, nqpath
-          read(1,*) qpathvecs(i,:)
+          read(1,*) qpathvecs(i, :)
        end do
 
        !Calculate phonon dispersions
@@ -1251,7 +1249,7 @@ contains
        write(saux, "(I0)") self%numbranches
        open(1, file = "ph.ens_qpath", status="replace")
        do i = 1, nqpath
-          write(1,"("//trim(adjustl(saux))//"E20.10)") ph_ens_path(i,:)
+          write(1,"("//trim(adjustl(saux))//"E20.10)") ph_ens_path(i, :)
        end do
        close(1)
 
@@ -1263,25 +1261,23 @@ contains
        write(saux,"(I0)") self%numwannbands
        open(1, file="el.ens_kpath",status="replace")
        do i = 1, nqpath
-          write(1,"("//trim(adjustl(saux))//"E20.10)") el_ens_path(i,:)
+          write(1,"("//trim(adjustl(saux))//"E20.10)") el_ens_path(i, :)
        end do
        close(1)
 
        allocate(el_ens_k(1, self%numwannbands), el_vels_k(1, self%numwannbands, 3),&
             el_evecs_k(1, self%numwannbands, self%numwannbands))
        allocate(el_ens_kp(1, self%numwannbands), el_vels_kp(1, self%numwannbands, 3),&
-            el_evecs_kp(1, self%numwannbands, self%numwannbands))
+            el_evecs_kp(1, self%numwannbands, self%numwannbands), &
+            el_ens_kp_all(nqpath, self%numwannbands))
        allocate(g2_qpath(nqpath, self%numbranches, self%numwannbands, self%numwannbands))
-
-       !DBG
-       allocate(el_ens_kp_all(nqpath, self%numwannbands))
 
        !Read wave vector of initial electron
        open(1, file = trim('initialk.txt'), status = 'old')
        read(1,*) k(1, :)
 
        !Calculate g(k, Rp)
-       call self%gkRp(num, 0_i64, k(1,:))
+       call self%gkRp(num, 0_i64, k(1, :))
 
        !Load gmixed from file
        !Change to data output directory
@@ -1297,19 +1293,20 @@ contains
        call el_wann(self, crys, 1_i64, k, el_ens_k, el_vels_k, el_evecs_k, &
             scissor = scissor)
 
+       !All k' = k + q modulo G 
+       allocate(kppathvecs(nqpath, 3))
        do i = 1, nqpath !Over phonon wave vectors path
-          kp(1, :) = k(1, :) + qpathvecs(i, :)
-          do icart = 1, 3
-             if(kp(1,icart) >= 1.0_r64) kp(1, icart) = kp(1, icart) - 1.0_r64
-          end do
-          
+          kppathvecs(i, :) = k(1, :) .umklapp. qpathvecs(i, :)
+       end do
+       
+       do i = 1, nqpath !Over phonon wave vectors path
           !TODO Would be great to have a progress bar here.
 
           !Calculate electrons at this final wave vector
-          call el_wann(self, crys, 1_i64, kp, el_ens_kp, el_vels_kp, el_evecs_kp, &
+          call el_wann(self, crys, 1_i64, kppathvecs(i, :), el_ens_kp, el_vels_kp, el_evecs_kp, &
                scissor = scissor)
 
-          !DBG
+          !Save electron energy over the k+q points
           el_ens_kp_all(i, :) = el_ens_kp(1, :)
           
           do n = 1, self%numwannbands
@@ -1386,8 +1383,7 @@ contains
           end do
        end do
 
-       !DBG
-       !Output electron dispersions
+       !Output electron dispersions over the k+q vectors
        write(saux,"(I0)") self%numwannbands
        open(1, file="el.ens_k+qpath",status="replace")
        do i = 1, nqpath
