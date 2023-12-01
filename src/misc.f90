@@ -994,7 +994,7 @@ contains
     real(r64), intent(in) :: f(:, :, :), lattvecs(3, 3)
     integer(i64), intent(in) :: kmesh(3), indexlist(:)
     real(r64), intent(out) :: gradf(:, :, :, :)
-    integer(i64), intent(in) :: dim
+    integer, intent(in) :: dim
     logical, intent(in) :: blocks
 
     !Locals

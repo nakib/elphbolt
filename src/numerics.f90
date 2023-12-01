@@ -125,6 +125,10 @@ module numerics_module
      !! Number of equidistant electron energy mesh points.
      integer(i64) :: ph_mfp_npts
      !! Number of equidistant phonon mean-free-path mesh points.
+     logical :: Bfield_on
+     !! Is B-field on?
+     real(r64) :: Bfield(3)
+     !! B-field vector
    contains
 
      procedure :: initialize=>read_input_and_setup, create_chempot_dirs
@@ -146,20 +150,20 @@ contains
     integer(i64) :: mesh_ref, qmesh(3), maxiter, runlevel, el_en_num, &
          ph_en_num, ph_mfp_npts, fourph_mesh_ref
     integer :: i
-    real(r64) :: fsthick, conv_thres, ph_en_min, ph_en_max, el_en_min, el_en_max
+    real(r64) :: fsthick, conv_thres, ph_en_min, ph_en_max, el_en_min, el_en_max, Bfield(3)
     character(len = 1024) :: datadumpdir, tag
     character(len = 6) :: phiso_1B_theory
     character(len = 1) :: numcols
     logical :: read_gq2, read_gk2, read_V, read_W, tetrahedra, phe, phiso, phsubs, &
          phbound, phdef_Tmat, onlyphbte, onlyebte, elchimp, elbound, drag, plot_along_path, &
-         phthinfilm, phthinfilm_ballistic, fourph, use_Wannier_ifc2s, phiso_Tmat
+         phthinfilm, phthinfilm_ballistic, fourph, use_Wannier_ifc2s, phiso_Tmat, Bfield_on
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
          read_V, read_W, tetrahedra, phe, phiso, phsubs, onlyphbte, onlyebte, maxiter, &
          conv_thres, drag, elchimp, plot_along_path, runlevel, ph_en_min, ph_en_max, &
          ph_en_num, el_en_min, el_en_max, el_en_num, phbound, elbound, phdef_Tmat, &
          ph_mfp_npts, phthinfilm, phthinfilm_ballistic, fourph, fourph_mesh_ref, use_Wannier_ifc2s, &
-         phiso_Tmat, phiso_1B_theory
+         phiso_Tmat, phiso_1B_theory, Bfield_on, Bfield
 
     call subtitle("Reading numerics information...")
     
@@ -167,7 +171,7 @@ contains
     open(1, file = 'input.nml', status = 'old')
 
     !Read numerics information
-    qmesh = (/1, 1, 1/)
+    qmesh = [1, 1, 1]
     mesh_ref = 1
     fourph_mesh_ref = 1
     fsthick = 0.0_r64
@@ -194,6 +198,8 @@ contains
     drag = .true.
     use_Wannier_ifc2s = .false.
     plot_along_path = .false.
+    Bfield_on = .false.
+    Bfield = [0.0_r64, 0.0_r64, 0.0_r64]
     maxiter = 50
     conv_thres = 1e-4_r64
     runlevel = 1

@@ -99,7 +99,7 @@ module crystal_module
      !! Concentrations [cm^-3] of the dopants at each host atom site.
      logical :: twod
      !! Is the system 2d?
-     real(r64) :: dim
+     integer :: dim
      !! Dimension of the system
      real(r64) :: thickness
      !! Thickness of the system
@@ -255,9 +255,9 @@ contains
                &of the for (0 0 h).')
        end if
        self%thickness = lattvecs(3,3)
-       self%dim = 2.0_r64
+       self%dim = 2
     else
-       self%dim = 3.0_r64
+       self%dim = 3
     end if
 
     !Generate periodic table

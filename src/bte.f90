@@ -18,13 +18,13 @@ module bte_module
   !! Module containing type and procedures related to the solution of the
   !! Boltzmann transport equation (BTE).
 
-  use params, only: r64, i64, qe, kB
+  use params, only: r64, i64, qe, kB, hbar
   use misc, only: print_message, exit_with_message, write2file_rank2_real, &
        distribute_points, demux_state, binsearch, interpolate, demux_vector, mux_vector, &
        trace, subtitle, append2file_transport_tensor, write2file_response, &
        linspace, readfile_response, write2file_spectral_tensor, subtitle, timer, &
        twonorm, write2file_rank1_real, precompute_interpolation_corners_and_weights, &
-       interpolate_using_precomputed
+       interpolate_using_precomputed, Jacobian, cross_product
   use numerics_module, only: numerics
   use crystal_module, only: crystal
   use symmetry_module, only: symmetry
@@ -427,10 +427,10 @@ contains
        do it_ph = 1, num%maxiter       
           !Scheme: for each step of phonon response, fully iterate the electron response.
 
-          !Iterate phonon response once
-          call iterate_bte_ph(crys%T, .True., num, ph, el, self%ph_rta_rates_ibz, &
+          !Iterate phonon response once          
+          call iterate_bte_ph(crys%T, num, ph, el, self%ph_rta_rates_ibz, &
                self%ph_field_term_T, self%ph_response_T, self%el_response_T)
-          call iterate_bte_ph(crys%T, .True., num, ph, el, self%ph_rta_rates_ibz, &
+          call iterate_bte_ph(crys%T, num, ph, el, self%ph_rta_rates_ibz, &
                self%ph_field_term_E, self%ph_response_E, self%el_response_E)
 
           !Calculate phonon transport coefficients
@@ -449,7 +449,7 @@ contains
           !Iterate electron response all the way
           do it_el = 1, num%maxiter
              !E field:
-             call iterate_bte_el(crys%T, .True., num, el, &
+             call iterate_bte_el(num, el, crys, &
                   self%el_rta_rates_ibz, self%el_field_term_E, self%el_response_E, ph_drag_term_E)
 
              !Calculate electron transport coefficients
@@ -459,7 +459,7 @@ contains
              el_alphabyT = el_alphabyT/crys%T
 
              !delT field:
-             call iterate_bte_el(crys%T, .True., num, el, &
+             call iterate_bte_el(num, el, crys, &
                   self%el_rta_rates_ibz, self%el_field_term_T, self%el_response_T, ph_drag_term_T)
              !Enforce Kelvin-Onsager relation:
              !Fix "diffusion" part
@@ -576,7 +576,7 @@ contains
        end if
 
        do it_ph = 1, num%maxiter
-          call iterate_bte_ph(crys%T, .False., num, ph, el, self%ph_rta_rates_ibz, &
+          call iterate_bte_ph(crys%T, num, ph, el, self%ph_rta_rates_ibz, &
                self%ph_field_term_T, self%ph_response_T)
 
           !Calculate phonon transport coefficients
@@ -630,7 +630,7 @@ contains
 
        do it_el = 1, num%maxiter
           !E field:
-          call iterate_bte_el(crys%T, .False., num, el, &
+          call iterate_bte_el(num, el, crys, &
                self%el_rta_rates_ibz, self%el_field_term_E, self%el_response_E)
 
           !Calculate electron transport coefficients
@@ -640,8 +640,8 @@ contains
           el_alphabyT = el_alphabyT/crys%T
 
           !delT field:
-          call iterate_bte_el(crys%T, .False., num, el, &
-               self%el_rta_rates_ibz, self%el_field_term_T, self%el_response_T, self%ph_response_T)
+          call iterate_bte_el(num, el, crys, &
+               self%el_rta_rates_ibz, self%el_field_term_T, self%el_response_T)
           !Enforce Kelvin-Onsager relation
           do icart = 1, 3
              self%el_response_T(:,:,icart) = (el%ens(:,:) - el%chempot)/qe/crys%T*&
@@ -836,7 +836,7 @@ contains
     end if
   end subroutine calculate_field_term
 
-  subroutine iterate_bte_ph(T, drag, num, ph, el, rta_rates_ibz, &
+  subroutine iterate_bte_ph(T, num, ph, el, rta_rates_ibz, &
        field_term, response_ph, response_el)
     !! Subroutine to iterate the phonon BTE one step.
     !! 
@@ -851,7 +851,7 @@ contains
     type(phonon), intent(in) :: ph
     type(electron), intent(in) :: el
     type(numerics), intent(in) :: num
-    logical, intent(in) :: drag
+    !logical, intent(in) :: drag
     real(r64), intent(in) :: T, rta_rates_ibz(:,:), field_term(:,:,:)
     real(r64), intent(in), optional :: response_el(:,:,:)
     real(r64), intent(inout) :: response_ph(:,:,:)
@@ -869,12 +869,8 @@ contains
 
     !Set output directory of transition probilities
     write(tag, "(E9.3)") T
-
-    if(drag .and. .not. present(response_el)) then
-       call exit_with_message("For drag in phonon BTE, must provide electron response. Exiting.")
-    end if
     
-    if(drag) then
+    if(present(response_el)) then
        !Number of electron bands
        numbands = size(response_el(1,:,1))
     end if
@@ -962,7 +958,7 @@ contains
           call read_transition_probs_e(trim(adjustl(filepath_Wm)), nprocs_3ph_minus, Wm, &
                istate2_minus, istate3_minus)
 
-          if(drag) then
+          if(present(response_el)) then
              !Set Y filename
              filepath_Y = trim(adjustl(num%Ydir))//'/Y.istate'//trim(adjustl(tag))
 
@@ -1004,7 +1000,7 @@ contains
 
              !Drag contribution:
 
-             if(drag) then
+             if(present(response_el)) then
                 do iproc = 1, nprocs_phe
                    !Grab initial and final electron states
                    call demux_state(istate_el1(iproc), numbands, m, ik)
@@ -1039,7 +1035,7 @@ contains
     end do
   end subroutine iterate_bte_ph
 
-  subroutine iterate_bte_el(T, drag, num, el, rta_rates_ibz, field_term, &
+  subroutine iterate_bte_el(num, el, crys, rta_rates_ibz, field_term, &
        response_el, ph_drag_term)
     !! Subroutine to iterate the electron BTE one step.
     !! 
@@ -1054,9 +1050,11 @@ contains
     
     type(electron), intent(in) :: el
     type(numerics), intent(in) :: num
-    logical, intent(in) :: drag
-    real(r64), intent(in) :: T, rta_rates_ibz(:,:), field_term(:,:,:)
+    type(crystal), intent(in) :: crys
+    !real(r64), intent(in) :: T, rta_rates_ibz(:,:), field_term(:,:,:)
+    real(r64), intent(in) :: rta_rates_ibz(:,:), field_term(:,:,:)
     real(r64), intent(in), optional :: ph_drag_term(:,:,:)
+    !real(r64), intent(in), optional :: Bfield(3)
     real(r64), intent(inout) :: response_el(:,:,:)
 
     !Local variables
@@ -1064,16 +1062,18 @@ contains
          ik_ibz, m, ieq, ik_sym, ik_fbz, iproc, ikp, n, nk, num_active_images, aux, &
          start, end, nprocs_echimp
     integer(i64), allocatable :: istate_el(:), istate_ph(:), istate_el_echimp(:)
-    real(r64) :: tau_ibz
-    real(r64), allocatable :: Xplus(:), Xminus(:),  Xchimp(:), response_el_reduce(:,:,:)
+    real(r64) :: tau_ibz, Bfield_unit_factor
+    real(r64), allocatable :: Xplus(:), Xminus(:),  Xchimp(:), response_el_reduce(:,:,:), &
+         Delk_response(:, :, :, :)
     character(1024) :: filepath_Xminus, filepath_Xplus, filepath_Xechimp, tag
 
+    !Factor to make B-field term have units of
+    !C.nm for the E-field BTE and
+    !eV.nm/K for the gradT-field BTE.
+    Bfield_unit_factor = 1.0e18_r64*qe/hbar
+    
     !Set output directory of transition probilities
-    write(tag, "(E9.3)") T
-
-    if(drag .and. .not. present(ph_drag_term)) then
-       call exit_with_message("For drag in electron BTE, must provide phonon drag term. Exiting.")
-    end if
+    write(tag, "(E9.3)") crys%T
     
     !Number of electron bands
     numbands = size(rta_rates_ibz(1,:))
@@ -1084,11 +1084,15 @@ contains
     !Total number of IBZ states
     nstates_irred = size(rta_rates_ibz(:,1))*numbands
 
-    if(drag) then
+    if(present(ph_drag_term)) then
        !Number of phonon branches
        numbranches = size(ph_drag_term(1,:,1))
     end if
 
+    !Bfield related
+    !Allocate Jacobian of response function
+    if(num%Bfield_on) allocate(Delk_response(nk, numbands, 3, 3))
+    
     !Allocate and initialize response reduction array
     allocate(response_el_reduce(nk, numbands, 3))
     response_el_reduce(:,:,:) = 0.0_r64
@@ -1096,6 +1100,15 @@ contains
     !Divide electron states among images
     call distribute_points(nstates_irred, chunk, start, end, num_active_images)
 
+    !Compute the Jacobian of the electronic response
+    if(num%Bfield_on) then
+       call Jacobian(response_el, Delk_response, crys%lattvecs, &
+            el%wvmesh, el%indexlist, crys%dim, blocks = .true.)
+       sync all
+       call co_sum(Delk_response)
+       sync all
+    end if
+    
     !Only work with the active images
     if(this_image() <= num_active_images) then
        !Run over electron IBZ states
@@ -1155,6 +1168,13 @@ contains
                      response_el(aux, n, :)*(Xplus(iproc) + Xminus(iproc))
              end do
 
+             !B-field term
+             if(num%Bfield_on) then
+                response_el_reduce(ik_fbz, m, :) = response_el_reduce(ik_fbz, m, :) + &
+                     Bfield_unit_factor*matmul(cross_product(el%vels(ik_fbz, m, :), num%Bfield), &
+                     Delk_response(ik_fbz, m, :, :))
+             end if
+             
              !Add charged impurity contribution to the self consistent term
              if(num%elchimp) then
                  do iproc = 1, nprocs_echimp
@@ -1170,7 +1190,6 @@ contains
                  end do
              end if
 
-
              !Iterate BTE
              response_el_reduce(ik_fbz, m, :) = field_term(ik_fbz, m, :) + &
                   response_el_reduce(ik_fbz, m, :)*tau_ibz
@@ -1184,7 +1203,7 @@ contains
     sync all
     response_el = response_el_reduce
 
-    if(drag) then
+    if(present(ph_drag_term)) then
        !Drag contribution:
        response_el(:,:,:) = response_el(:,:,:) + ph_drag_term(:,:,:)
     end if
@@ -1342,6 +1361,7 @@ contains
     end if
   end function converged
 
+  !TODO: Move this to the Julia script.
   subroutine post_process(self, num, crys, sym, ph, el)
     !! Subroutine to post-process results of the BTEs.
 
