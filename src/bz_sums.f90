@@ -913,6 +913,7 @@ contains
     trans_coeff_hc = A_hc*trans_coeff_hc
     if(A_cc /= 0.0_r64) trans_coeff_cc = A_cc*trans_coeff_cc
 
+    !TODO The following has to be generalized in the presence of a B-field
     !Symmetrize transport tensor
     do ib = 1, nbands
        call symmetrize_3x3_tensor(trans_coeff_hc(ib, :, :), sym%crotations)

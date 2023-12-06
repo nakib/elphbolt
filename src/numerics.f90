@@ -245,6 +245,12 @@ contains
     self%eco_mode = .true.
     self%econess = [2, 2, 2]
     !!
+
+    !TEST
+    self%Bfield_on = Bfield_on
+    self%Bfield = Bfield
+    !self%Bfield_on = .true.
+    !self%Bfield = [0.0_r64, 0.0_r64, 1.0e0_r64] !Tesla
     
     self%qmesh = qmesh
     self%runlevel = runlevel

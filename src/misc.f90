@@ -1008,7 +1008,7 @@ contains
     nk = size(f, 1)
     nb = size(f, 2)
 
-    allocate(f_stencil(nk, nb, 3))
+    allocate(f_stencil(6, nb, 3))
 
     !k-mesh spacing between opposite stencil points (fractional)
     diff = 2.0_r64/kmesh
@@ -1051,7 +1051,7 @@ contains
              stencil(sten_count + 2) = mux_vector([i, this_plus1, k], kmesh, 1_i64)
           else if(dim_k == 3) then !This might not be reached. Good.
              stencil(sten_count + 1) = mux_vector([i, j, this_minus1], kmesh, 1_i64)
-             stencil(sten_count + 2) = mux_vector([i, k, this_plus1], kmesh, 1_i64)
+             stencil(sten_count + 2) = mux_vector([i, j, this_plus1], kmesh, 1_i64)
           end if
           sten_count = sten_count + 2   
        end do

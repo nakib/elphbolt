@@ -18,7 +18,7 @@ module bte_module
   !! Module containing type and procedures related to the solution of the
   !! Boltzmann transport equation (BTE).
 
-  use params, only: r64, i64, qe, kB, hbar
+  use params, only: r64, i64, qe, kB, hbar_eVps
   use misc, only: print_message, exit_with_message, write2file_rank2_real, &
        distribute_points, demux_state, binsearch, interpolate, demux_vector, mux_vector, &
        trace, subtitle, append2file_transport_tensor, write2file_response, &
@@ -1070,7 +1070,7 @@ contains
     !Factor to make B-field term have units of
     !C.nm for the E-field BTE and
     !eV.nm/K for the gradT-field BTE.
-    Bfield_unit_factor = 1.0e18_r64*qe/hbar
+    Bfield_unit_factor = 1.0e-6/hbar_eVps
     
     !Set output directory of transition probilities
     write(tag, "(E9.3)") crys%T
@@ -1102,11 +1102,13 @@ contains
 
     !Compute the Jacobian of the electronic response
     if(num%Bfield_on) then
+       !TODO Parallelize this over IBZ states
+       !print*, 'B-field is on. B-field = ', num%Bfield
        call Jacobian(response_el, Delk_response, crys%lattvecs, &
             el%wvmesh, el%indexlist, crys%dim, blocks = .true.)
-       sync all
-       call co_sum(Delk_response)
-       sync all
+       !sync all
+       !call co_sum(Delk_response)
+       !sync all
     end if
     
     !Only work with the active images
@@ -1124,7 +1126,7 @@ contains
           if(rta_rates_ibz(ik_ibz, m) /= 0.0_r64) then
              tau_ibz = 1.0_r64/rta_rates_ibz(ik_ibz, m)
           end if
-
+          
           !Set X+ filename
           write(tag, '(I9)') istate
           filepath_Xplus = trim(adjustl(num%Xdir))//'/Xplus.istate'//trim(adjustl(tag))
@@ -1171,8 +1173,8 @@ contains
              !B-field term
              if(num%Bfield_on) then
                 response_el_reduce(ik_fbz, m, :) = response_el_reduce(ik_fbz, m, :) + &
-                     Bfield_unit_factor*matmul(cross_product(el%vels(ik_fbz, m, :), num%Bfield), &
-                     Delk_response(ik_fbz, m, :, :))
+                     Bfield_unit_factor*matmul( &
+                     Delk_response(ik_fbz, m, :, :), cross_product(el%vels(ik_fbz, m, :), num%Bfield))
              end if
              
              !Add charged impurity contribution to the self consistent term
@@ -1207,12 +1209,15 @@ contains
        !Drag contribution:
        response_el(:,:,:) = response_el(:,:,:) + ph_drag_term(:,:,:)
     end if
-       
-    !Symmetrize response function
-    do ik_fbz = 1, nk
-       response_el(ik_fbz,:,:)=transpose(&
-            matmul(el%symmetrizers(:,:,ik_fbz),transpose(response_el(ik_fbz,:,:))))
-    end do
+
+    !TODO The following has to be generalized in the presence of a B-field
+    if(.not. num%Bfield_on) then
+       !Symmetrize response function
+       do ik_fbz = 1, nk
+          response_el(ik_fbz,:,:)=transpose(&
+               matmul(el%symmetrizers(:,:,ik_fbz),transpose(response_el(ik_fbz,:,:))))
+       end do
+    end if
   end subroutine iterate_bte_el
 
   subroutine calculate_phonon_drag(num, el, ph, idc, widc, sym, rta_rates_ibz, response_ph, &
