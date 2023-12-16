@@ -18,11 +18,11 @@ source-dir="src"
 #testify = { git = "git@github.com:nakib/testify.git" }
 #Use local copy from thirdparty directory
 testify = {path = "thirdparty/testify"}
-spglib = {path = "thirdparty/spglib"}
+#spglib = {path = "thirdparty/spglib"}
 
 [build]
-#link = ["blas", "lapack", "symspg"]
-link = ["blas", "lapack"] #If local spglib build is used
+link = ["blas", "lapack", "symspg"]
+#link = ["blas", "lapack"] #If local spglib build is used
 external-modules = ["openacc"]
 auto-tests = false
 
