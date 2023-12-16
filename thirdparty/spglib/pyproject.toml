@@ -1,0 +1,104 @@
+[build-system]
+requires = ["scikit-build-core", "numpy"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "spglib"
+version = "2.1.0"
+requires-python = ">=3.7"
+description = "This is the spglib module."
+license = { text = "BSD-3-Clause" }
+readme = "python/README.rst"
+# TODO: Switch to dynamic variables scikit-build/scikit-build-core#172
+#dynamic = ["version", "name", "description"]
+dependencies = [
+    "numpy"
+]
+authors = [
+    {name="Atsushi Togo", email="atz.togo@gmail.com"},
+]
+maintainers = [
+    {name="Atsushi Togo", email="atz.togo@gmail.com"},
+    {name="Cristian Le", email="git@lecris.dev"},
+]
+
+[project.urls]
+homepage = "https://spglib.readthedocs.io/"
+documentation = "https://spglib.readthedocs.io/"
+repository = "https://github.com/spglib/spglib"
+changelog = "https://spglib.readthedocs.io/en/latest/releases.html"
+
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pyyaml",
+]
+docs = [
+    "Sphinx >= 7.0",
+    "sphinxcontrib-bibtex >= 2.5",
+    "sphinx-book-theme @ git+https://github.com/LecrisUT/sphinx-book-theme@sphinx-7",
+    "myst-parser >= 2.0",
+    "linkify-it-py",
+]
+test-cov = [
+    "spglib[test]",
+    "pytest-cov",
+]
+test-benchmark = [
+    "spglib[test]",
+    "pytest-benchmark",
+]
+dev = [
+    "spglib[test]",
+    "pre-commit",
+]
+# Alternative names for compatibility
+doc = [
+    "spglib[docs]",
+]
+testing = [
+    "spglib[test]",
+]
+
+[tool.scikit-build]
+wheel.packages = ["python/spglib"]
+wheel.install-dir = "spglib"
+cmake.args = [
+    "-DSPGLIB_WITH_Python=ON",
+    "-DSPGLIB_WITH_TESTS=OFF",
+    "-DSPGLIB_USE_OMP=OFF",
+]
+
+[tool.cibuildwheel]
+# cp312: Cannot build numpy yet
+# macosx_arm64: Cannot test on Github. Could add Cirrus CI/Circle CI
+# pp, win32, i686, muslinux: Remove 32bit variants, PyPY interpreter and unnecessary musl variant
+skip = ["pp*", "*-win32", "*-manylinux_i686", "*-musllinux*", "*-macosx_arm64", "cp312-*"]
+test-extras = "test"
+test-command = "pytest {package}/test/functional/python"
+# Do not run test on emulated environments
+test-skip = "*-*linux_{aarch64,ppc64le,s390x} *-macosx_arm64 *-macosx_universal2:arm64"
+
+[tool.cibuildwheel.linux]
+# TODO: auditwheel fails if LD_LIBRARY_PATH is not set correctly. Not sure about apprropriate value to set to
+#repair-wheel-command = "LD_LIBRARY_PATH=. auditwheel repair --lib-sdir . -w {dest_dir} {wheel}"
+repair-wheel-command = ""
+
+[tool.cibuildwheel.macos]
+# TODO: similar to above
+#repair-wheel-command = "DYLD_LIBRARY_PATH=. delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel}"
+repair-wheel-command = ""
+
+[tool.pytest.ini_options]
+addopts = "-m 'not benchmark'"
+testpaths = ["test/functional/python"]
+markers = [
+    # Define benchmark marker to avoid warnings of marker not defined
+    "benchmark: benchmarking tets",
+]
+
+[tool.coverage.run]
+command_line = '-m pytest'
+# TODO: Cannot report relative to project path because we cannot do editable installs yet
+#source = ['python/spglib']
+source = ['spglib']

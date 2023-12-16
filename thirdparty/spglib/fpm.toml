@@ -1,0 +1,19 @@
+name = "spglib"
+license = "BSD-3-Clause"
+copyright = "Copyright (c) 2014, Atsushi Togo"
+
+[library]
+source-dir="src"
+include-dir="src"
+
+[build]
+link = ["blas", "lapack"]
+
+[install]
+library = true
+
+#This is optional.
+[[executable]]
+name="spglib-fortran_api"
+source-dir="example/fortran_api"
+main="example.F90"
