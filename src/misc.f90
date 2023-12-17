@@ -1,4 +1,3 @@
-
 ! Copyright 2020 elphbolt contributors.
 ! This file is part of elphbolt <https://github.com/nakib/elphbolt>.
 !
@@ -25,7 +24,7 @@ module misc
   public :: operator(.umklapp.)
   private :: sort_int, sort_real, Pade_coeffs, twonorm_real_rank1, twonorm_real_rank2, &
        invert_complex_square, add_and_fold, add_and_fold_array
-
+  
   type timer
      !! Container for timing related data and procedures.
 
@@ -112,7 +111,7 @@ contains
        write(*, "(A)") ".............."
     end if
   end subroutine end_timer
-
+  
   pure function eye(N)
     !! Returns an NxN identity matrix.
 
