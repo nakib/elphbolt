@@ -1054,23 +1054,23 @@ contains
     !real(r64), intent(in) :: T, rta_rates_ibz(:,:), field_term(:,:,:)
     real(r64), intent(in) :: rta_rates_ibz(:,:), field_term(:,:,:)
     real(r64), intent(in), optional :: ph_drag_term(:,:,:)
-    !real(r64), intent(in), optional :: Bfield(3)
     real(r64), intent(inout) :: response_el(:,:,:)
 
     !Local variables
     integer(i64) :: nstates_irred, nprocs, chunk, istate, numbands, numbranches, &
          ik_ibz, m, ieq, ik_sym, ik_fbz, iproc, ikp, n, nk, num_active_images, aux, &
-         start, end, nprocs_echimp
+         start, end, nprocs_echimp, neg_ik_fbz
+    integer :: i, j
     integer(i64), allocatable :: istate_el(:), istate_ph(:), istate_el_echimp(:)
-    real(r64) :: tau_ibz, Bfield_unit_factor
+    real(r64) :: tau_ibz, Bfield_unit_factor, eps
     real(r64), allocatable :: Xplus(:), Xminus(:),  Xchimp(:), response_el_reduce(:,:,:), &
-         Delk_response(:, :, :, :)
+         Delk_response(:, :, :, :), scratch(:, :)
     character(1024) :: filepath_Xminus, filepath_Xplus, filepath_Xechimp, tag
 
     !Factor to make B-field term have units of
     !C.nm for the E-field BTE and
     !eV.nm/K for the gradT-field BTE.
-    Bfield_unit_factor = 1.0e-6/hbar_eVps
+    Bfield_unit_factor = 1.0e-6_r64/hbar_eVps
     
     !Set output directory of transition probilities
     write(tag, "(E9.3)") crys%T
@@ -1092,6 +1092,8 @@ contains
     !Bfield related
     !Allocate Jacobian of response function
     if(num%Bfield_on) allocate(Delk_response(nk, numbands, 3, 3))
+
+    allocate(scratch(numbands, 3))
     
     !Allocate and initialize response reduction array
     allocate(response_el_reduce(nk, numbands, 3))
@@ -1169,6 +1171,21 @@ contains
                 response_el_reduce(ik_fbz, m, :) = response_el_reduce(ik_fbz, m, :) + &
                      response_el(aux, n, :)*(Xplus(iproc) + Xminus(iproc))
              end do
+             
+             !Add charged impurity contribution to the self consistent term
+             if(num%elchimp) then
+                do iproc = 1, nprocs_echimp
+                   !Grab the final electron and, if needed, the interacting phonon
+                   call demux_state(istate_el_echimp(iproc), numbands, n, ikp)
+                   
+                   !Self contribution:
+                   !Find image of final electron wave vector due to the current symmetry
+                   call binsearch(el%indexlist, el%equiv_map(ik_sym, ikp), aux)
+                   
+                   response_el_reduce(ik_fbz, m, :) = response_el_reduce(ik_fbz, m, :) + &
+                        response_el(aux, n, :) * Xchimp(iproc)
+                end do
+             end if
 
              !B-field term
              if(num%Bfield_on) then
@@ -1177,34 +1194,19 @@ contains
                      Delk_response(ik_fbz, m, :, :), cross_product(el%vels(ik_fbz, m, :), num%Bfield))
              end if
              
-             !Add charged impurity contribution to the self consistent term
-             if(num%elchimp) then
-                 do iproc = 1, nprocs_echimp
-                   !Grab the final electron and, if needed, the interacting phonon
-                   call demux_state(istate_el_echimp(iproc), numbands, n, ikp)
-  
-                   !Self contribution:
-                   !Find image of final electron wave vector due to the current symmetry
-                   call binsearch(el%indexlist, el%equiv_map(ik_sym, ikp), aux)
-  
-                   response_el_reduce(ik_fbz, m, :) = response_el_reduce(ik_fbz, m, :) + &
-                        response_el(aux, n, :) * Xchimp(iproc)
-                 end do
-             end if
-
              !Iterate BTE
              response_el_reduce(ik_fbz, m, :) = field_term(ik_fbz, m, :) + &
                   response_el_reduce(ik_fbz, m, :)*tau_ibz
           end do
        end do
     end if
-
+    
     !Update the response function
     sync all
     call co_sum(response_el_reduce)
     sync all
     response_el = response_el_reduce
-
+    
     if(present(ph_drag_term)) then
        !Drag contribution:
        response_el(:,:,:) = response_el(:,:,:) + ph_drag_term(:,:,:)
@@ -1217,6 +1219,8 @@ contains
           response_el(ik_fbz,:,:)=transpose(&
                matmul(el%symmetrizers(:,:,ik_fbz),transpose(response_el(ik_fbz,:,:))))
        end do
+    else
+       !TODO
     end if
   end subroutine iterate_bte_el
 

@@ -28,7 +28,7 @@ module symmetry_module
   
   private
   public symmetry, find_equiv_map, find_irred_wedge, create_fbz2ibz_map, &
-       fbz2ibz, symmetrize_3x3_tensor
+       fbz2ibz, symmetrize_3x3_tensor, symmetrize_3x3_tensor_noTR
   
 
   type symmetry
@@ -486,7 +486,39 @@ contains
        aux(:,:) = aux(:,:) + matmul(crotations(:, :, irot),&
             matmul(tensor, transpose(crotations(:, :, irot))))
     end do
-
+    
     tensor(:,:) = aux(:,:)/nrots
-  end subroutine symmetrize_3x3_tensor  
+  end subroutine symmetrize_3x3_tensor
+
+  subroutine symmetrize_3x3_tensor_noTR(tensor, crotations)
+    !! Symmetrize a 3x3 tensor.
+
+    real(r64), intent(inout) :: tensor(3,3)
+    real(r64), intent(in) :: crotations(:,:,:)
+    integer :: irot, nrots, i
+    real(r64) :: aux(3,3)
+
+    nrots = size(crotations(1, 1, :))/2
+       
+    aux(:,:) = 0.0_r64
+    do irot = 1, nrots
+       aux(:,:) = aux(:,:) + matmul(crotations(:, :, irot),&
+            matmul(tensor, transpose(crotations(:, :, irot))))
+    end do
+
+    !DBG
+    !Only for B-field of the form [0 0 Bz]
+    !Symmetrize along z:
+    tensor(3, 1:2) = aux(3, 1:2)/nrots
+    tensor(1:2, 3) = aux(1:2, 3)/nrots
+
+    !Symmetrize diagonals
+    do i = 1, 2
+       tensor(i, i) = aux(i, i)/nrots
+    end do
+
+    !Enforce Onsager in the simplest way. Will refine later.
+    tensor(2, 1) = -tensor(1, 2)
+    
+  end subroutine symmetrize_3x3_tensor_noTR
 end module symmetry_module

@@ -26,7 +26,7 @@ module bz_sums
   use crystal_module, only: crystal
   use numerics_module, only: numerics
   use delta, only: delta_fn, get_delta_fn_pointer
-  use symmetry_module, only: symmetry, symmetrize_3x3_tensor
+  use symmetry_module, only: symmetry, symmetrize_3x3_tensor, symmetrize_3x3_tensor_noTR
   use Green_function, only: resolvent
 
   implicit none
@@ -918,6 +918,10 @@ contains
     do ib = 1, nbands
        call symmetrize_3x3_tensor(trans_coeff_hc(ib, :, :), sym%crotations)
        if(A_cc /= 0.0_r64) call symmetrize_3x3_tensor(trans_coeff_cc(ib, :, :), sym%crotations)
+
+       !B = Bz(0 0 1)
+       !call symmetrize_3x3_tensor_noTR(trans_coeff_hc(ib, :, :), sym%crotations)
+       !if(A_cc /= 0.0_r64) call symmetrize_3x3_tensor_noTR(trans_coeff_cc(ib, :, :), sym%crotations)
     end do
   end subroutine calculate_transport_coeff
   
