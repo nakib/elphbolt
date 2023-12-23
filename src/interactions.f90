@@ -34,7 +34,8 @@ module interactions
   use electron_module, only: electron
   use phonon_module, only: phonon
   use numerics_module, only: numerics
-  use delta, only: delta_fn, get_delta_fn_pointer
+  use delta, only: delta_fn, get_delta_fn_pointer, &
+       delta_fn_tetra, delta_fn_triang
   
   implicit none
 
@@ -599,8 +600,7 @@ contains
          !$acc             wavevecs, wvmesh, reclattvecs, &
          !$acc             masses, atomtypes, R_j, R_k, ens, evecs, ifc3, &
          !$acc             tetrahedra_gpu, simplex_map, simplex_count, simplex_evals, &
-         !$acc             simplex_map, simplex_count, simplex_evals, &
-         !$acc             Index_i, Index_j, Index_k, nbands_gpu)
+         !$acc             Index_i, Index_j, Index_k, nbands_gpu, delta_fn_ptr)
          
          if(compute_resource%gpu_manager) &
               print*, 'image ', this_image(), &
@@ -689,11 +689,26 @@ contains
                      !Energy of phonon 3
                      en3 = ens(iq3_minus, s3)
 
+#ifdef _OPENACC
+                     !Function pointers don't work on accelerators...:(
+                     if(tetrahedra_gpu) then
+                        delta_minus = delta_fn_tetra(en1 - en3, iq2, s2, wvmesh, simplex_map, &
+                             simplex_count, simplex_evals) !minus process
+                        delta_plus = delta_fn_tetra(en3 - en1, neg_iq2, s2, wvmesh, simplex_map, &
+                             simplex_count, simplex_evals) !plus process
+                     else
+                        delta_minus = delta_fn_triang(en1 - en3, iq2, s2, wvmesh, simplex_map, &
+                             simplex_count, simplex_evals) !minus process
+                        delta_plus = delta_fn_triang(en3 - en1, neg_iq2, s2, wvmesh, simplex_map, &
+                             simplex_count, simplex_evals) !plus process
+                     end if
+#else                
                      delta_minus = delta_fn_ptr(en1 - en3, iq2, s2, wvmesh, simplex_map, &
                           simplex_count, simplex_evals) !minus process
                      
                      delta_plus = delta_fn_ptr(en3 - en1, neg_iq2, s2, wvmesh, simplex_map, &
                           simplex_count, simplex_evals) !plus process
+#endif                     
 
                      if(en1*en2*en3 == 0.0_r64) cycle
 
@@ -1144,7 +1159,6 @@ contains
        !$acc             wavevecs, wvmesh, reclattvecs, &
        !$acc             masses, atomtypes, R_j, R_k, ens, evecs, ifc3, &
        !$acc             tetrahedra_gpu, simplex_map, simplex_count, simplex_evals, &
-       !$acc             simplex_map, simplex_count, simplex_evals, &
        !$acc             Index_i, Index_j, Index_k, nbands_gpu)
 #endif
 
@@ -1230,11 +1244,24 @@ contains
              en3 = ens(iq3_minus, s3)
 
              !Evaluate delta functions
-             delta_minus = delta_fn_ptr(en1 - en3, iq2, s2, wvmesh, simplex_map, &
-                  simplex_count, simplex_evals) !minus process
+             !delta_minus = delta_fn_ptr(en1 - en3, iq2, s2, wvmesh, simplex_map, &
+             !     simplex_count, simplex_evals) !minus process
              
-             delta_plus = delta_fn_ptr(en3 - en1, neg_iq2, s2, wvmesh, simplex_map, &
-                  simplex_count, simplex_evals) !plus process
+             !delta_plus = delta_fn_ptr(en3 - en1, neg_iq2, s2, wvmesh, simplex_map, &
+             !     simplex_count, simplex_evals) !plus process
+
+             !Function pointers don't work on accelerators...:(
+             if(tetrahedra_gpu) then
+                delta_minus = delta_fn_tetra(en1 - en3, iq2, s2, wvmesh, simplex_map, &
+                     simplex_count, simplex_evals) !minus process
+                delta_plus = delta_fn_tetra(en3 - en1, neg_iq2, s2, wvmesh, simplex_map, &
+                     simplex_count, simplex_evals) !plus process
+             else
+                delta_minus = delta_fn_triang(en1 - en3, iq2, s2, wvmesh, simplex_map, &
+                     simplex_count, simplex_evals) !minus process
+                delta_plus = delta_fn_triang(en3 - en1, neg_iq2, s2, wvmesh, simplex_map, &
+                     simplex_count, simplex_evals) !plus process
+             end if
              
              if(en1*en2*en3 == 0.0_r64) cycle
 
