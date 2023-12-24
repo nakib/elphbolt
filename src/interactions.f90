@@ -627,13 +627,13 @@ contains
                !Convert from crystal to 0-based index vector
                q1_indvec = nint(q1*ph%wvmesh)
 
-               !Precalculate phases phases_q1(iq2, it) here
+               !Initialize + and - process masks
                minus_mask = .false.
                plus_mask = .false.
 
 #ifdef _OPENACC
                !$acc data if(compute_resource%gpu_manager) copyin(s1, iq1, q1_indvec, en1), &
-               !$acc      copyout(phases_q1, Vm2_1, Vm2_2), &
+               !$acc      copyout(Vm2_1, Vm2_2), &
                !$acc      copy(minus_mask, plus_mask)
 
                !$acc parallel loop if(compute_resource%gpu_manager) &
@@ -738,7 +738,7 @@ contains
 
                !Change to data output directory
                call chdir(trim(adjustl(num%Vdir)))
-
+               
                !Write data in binary format
                !Note: this will overwrite existing data!
                write (filename, '(I9)') istate1
@@ -755,8 +755,6 @@ contains
                close(1)
             end do !istate1
          end if !num_active_images
-
-         !print*, this_image(), ': task finished!'
          
 #ifdef _OPENACC
          !$acc end data
