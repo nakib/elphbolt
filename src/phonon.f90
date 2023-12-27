@@ -502,7 +502,7 @@ contains
     integer(i64) :: ii, jj, ll, mm, nn, ltem, mtem, ntem, info, P(3), &
          na1, na2, na3, j1, j2, j3, na1_, na2_, na3_, j1_, j2_, j3_, &
          triplet_counter, nR, nR_, qscell(3), tipo(crys%numatoms), i, j, &
-         ibrav, ntype, nat, jn1, jn2, jn3, ind
+         ibrav, ntype, nat, jn1, jn2, jn3, ind, it
     integer(i64), allocatable :: nind(:), R2tmp(:,:), R3tmp(:,:), &
          R2(:,:), R3(:,:), triplet_map(:,:,:,:)
     character(len = 1) :: polar_key
@@ -846,8 +846,17 @@ contains
                matmul(crys%lattvecs, R3(:, ii)*10.0_r64) !Ang
        end do
        self%ifc3 = self%ifc3*Ryd2eV/(bohr2nm*10.0_r64)**3 !eV/Ang^3
-    end if
+    end if !input ifc3 format
 
+    !Normalize the ifc3s by sqrt(mass) of each atom in triplet
+    do it = 1, self%numtriplets
+       self%ifc3(:, :, :, it) = &
+            self%ifc3(:, :, :, it)/&
+            sqrt(crys%masses(crys%atomtypes(self%Index_i(it)))*&
+            crys%masses(crys%atomtypes(self%Index_j(it)))*&
+            crys%masses(crys%atomtypes(self%Index_k(it))))
+    end do
+    
     !Each vector is rounded to the nearest lattice vector.
     tmp = crys%lattvecs
     call dgesv(3, self%numtriplets, tmp, 3, P, self%R_j, 3, info)
