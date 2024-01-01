@@ -491,18 +491,19 @@ contains
          nprocs, s1, s2, s3, iq1_ibz, iq1, iq2, iq3_minus, it, &
          q1_indvec(3), q2_indvec(3), q3_minus_indvec(3), index_minus, index_plus, &
          neg_iq2, neg_q2_indvec(3), num_active_images, plus_count, minus_count, &
-         idim, jdim, nwv_gpu, ntrips_gpu, s2s3, nbands_gpu, proc_index
+         idim, jdim, nwv_gpu, ntrips_gpu, s2s3, nbands_gpu, proc_index, local_state_counter
     real(r64) :: en1, en2, en3, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
-         occup_fac, const, bose2, bose3, delta_minus, delta_plus, aux, load_split!, &
-         !q_dot_Rj(ph%nwv, ph%numtriplets), q_dot_Rk(ph%nwv, ph%numtriplets)
-    real(r64), allocatable :: Vm2_1(:), Vm2_2(:), Wm(:), Wp(:)
+         occup_fac, const, bose2, bose3, delta_minus, delta_plus, aux, load_split
+    !real(r64), allocatable :: Vm2_1(:), Vm2_2(:), Wm(:), Wp(:)
+    real(r64), allocatable :: Vm2_1(:, :), Vm2_2(:, :)
+    real(r64), allocatable :: Wm(:), Wp(:)
     integer(i64), allocatable :: istate2_plus(:), istate3_plus(:), istate2_minus(:), istate3_minus(:)
     integer(i64), allocatable :: chunk[:], start[:], end[:]
-    complex(r64) :: phase_q_dot_Rj(ph%numtriplets, ph%nwv), phase_q_dot_Rk(ph%numtriplets, ph%nwv), &
-         phases_q1(ph%numtriplets, ph%nwv)
+    complex(r64) :: phase_q_dot_Rj(ph%numtriplets, ph%nwv), phase_q_dot_Rk(ph%numtriplets, ph%nwv)
+    complex(r64) :: phases_q1(ph%numtriplets, ph%nwv)
     character(len = 1024) :: filename, filename_Wm, filename_Wp
     logical :: tetrahedra_gpu
-    logical, allocatable :: minus_mask(:), plus_mask(:)
+    logical, allocatable :: minus_mask(:, :), plus_mask(:, :)
     type(resource) :: compute_resource
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
 
@@ -539,6 +540,35 @@ contains
     nprocs = ph%nwv*ph%numbands**2
 
     allocate(chunk[*], start[*], end[*])
+
+    !Precalculate phases
+
+    ! Distribute ph%nwv
+    call distribute_points(ph%nwv, chunk, start, end, num_active_images)
+
+    phase_q_dot_Rj = 0.0_r64
+    phase_q_dot_Rk = 0.0_r64
+    !Only work with the active images
+    if(this_image() <= num_active_images) then
+       do iq2 = start, end
+          !FBZ wave vector in Cartesian coordinates
+          !Note: negated to reduce operations in the next step
+          q2_cart = -matmul(crys%reclattvecs, ph%wavevecs(iq2, :))
+
+          !Calculate the numtriplet number of phases for this (q2,q3) pair
+          !Note: Here the looping order is sub-optimal. But I the dimensions
+          !of the resulting array will make sense in the interactions calculation.
+          do it = 1, ph%numtriplets
+             phase_q_dot_Rj(it, iq2) = expi(dot_product(q2_cart, ph%R_j(:, it)))
+             phase_q_dot_Rk(it, iq2) = expi(dot_product(q2_cart, ph%R_k(:, it)))
+          end do
+       end do
+    end if
+    sync all
+    call co_sum(phase_q_dot_Rj)
+    call co_sum(phase_q_dot_Rk)
+    sync all
+    !!
     
     if(key == 'V') then       
        !Split load among cpus and gpus
@@ -546,11 +576,12 @@ contains
        load_split = 0.0
 #ifdef _OPENACC
        
-       !print*, speedup_3ph_interactions(ph, crys, num)
+       load_split = speedup_3ph_interactions(ph, crys, num)
+       print*, load_split
+       
        load_split = 1.0/(1.0 + 1.0/ &
-            (1.0*compute_resource%num_gpus/compute_resource%num_cpus*&
-            speedup_3ph_interactions(ph, crys, num)))
-
+            (1.0*compute_resource%num_gpus/compute_resource%num_cpus*load_split))
+       
        if(load_split > 1.0) then
           load_split = 0.0
           if(this_image() == 1) print*, 'No speed-up can be achieved for this problem.'
@@ -568,23 +599,27 @@ contains
        !Associations will work with openacc
        associate(wavevecs => ph%wavevecs, wvmesh => ph%wvmesh, &
             reclattvecs => crys%reclattvecs, &
-            atomtypes => crys%atomtypes, &
             R_j => ph%R_j, R_k => ph%R_k, ens => ph%ens, &
             simplex_map => ph%simplex_map, &
             simplex_count => ph%simplex_count, simplex_evals => ph%simplex_evals, &
             evecs => ph%evecs, ifc3 => ph%ifc3, &
             Index_i => ph%Index_i, Index_j => ph%Index_j, Index_k => ph%Index_k)
 
-         allocate(minus_mask(nprocs), plus_mask(nprocs))
-
          !Allocate |V^-|^2
-         allocate(Vm2_1(nprocs), Vm2_2(nprocs))
+         !allocate(Vm2_1(nprocs), Vm2_2(nprocs))
          ! Above, we split the |V-|^2 vertices into two parts:
          ! 1. that are non-zero when the minus-type processes are energetically allowed
          ! 2. that are non-zero when the symmetry-related plus-type processes are energetically allowed
 
          call compute_resource%balance_load(load_split, nstates_irred, &
               chunk, start, end, num_active_images)
+
+         allocate(minus_mask(nprocs, chunk), plus_mask(nprocs, chunk))
+         allocate(Vm2_1(nprocs, chunk), Vm2_2(nprocs, chunk))
+         
+         !Initialize + and - process masks
+         minus_mask = .false.
+         plus_mask = .false.
 
 !!$         !
 !!$         write(*, "(A, I10)") " Message from node ", compute_resource%this_node
@@ -595,14 +630,23 @@ contains
 !!$            write(*, "(A, I10)") " #states/cpu = ", chunk
 !!$         end if
 !!$         !
+
+         !TODO
+         !* Might have to revert to calculating phases on the device. Or
+         !  else might run out of memory there for dense mesh calculations.
          
 #ifdef _OPENACC
          !Send some data to the gpu
-         !$acc data if(compute_resource%gpu_manager) copyin(nwv_gpu, ntrips_gpu, &
+         !$acc data if(compute_resource%gpu_manager) &
+         !$acc      create(phases_q1), &
+         !$acc      copyin(nwv_gpu, ntrips_gpu, &
          !$acc             wavevecs, wvmesh, reclattvecs, &
-         !$acc             atomtypes, R_j, R_k, ens, evecs, ifc3, &
+         !$acc             ens, evecs, ifc3, &
          !$acc             tetrahedra_gpu, simplex_map, simplex_count, simplex_evals, &
-         !$acc             Index_i, Index_j, Index_k, nbands_gpu, delta_fn_ptr)
+         !$acc             Index_i, Index_j, Index_k, nbands_gpu, delta_fn_ptr, &
+         !$acc             phase_q_dot_Rj, phase_q_dot_Rk), &
+         !$acc         copy(minus_mask, plus_mask), &
+         !$acc      copyout(Vm2_1, Vm2_2)
          
          if(compute_resource%gpu_manager) &
               print*, 'image ', this_image(), &
@@ -610,25 +654,11 @@ contains
 #endif
          
          !Only work with the active images
-         if(this_image() <= num_active_images) then
-            !Precalculate dot products
-            !TODO This task can be distribute over images
-            do iq2 = 1, nwv_gpu
-               !FBZ wave vector in Cartesian coordinates
-               !Note: negated to reduce operations in the next step
-               q2_cart = -matmul(reclattvecs, wavevecs(iq2, :))
-
-               !Calculate the numtriplet number of phases for this (q2,q3) pair
-               !Note: Here the looping order is sub-optimal. But I the dimensions
-               !of the resulting array will make sense in the interactions calculation.
-               do it = 1, ntrips_gpu
-                  phase_q_dot_Rj(it, iq2) = expi(dot_product(q2_cart, R_j(:, it)))
-                  phase_q_dot_Rk(it, iq2) = expi(dot_product(q2_cart, R_k(:, it)))
-               end do
-            end do
-            
+         if(this_image() <= num_active_images) then            
             !Run over first phonon IBZ states
             do istate1 = start, end
+               local_state_counter = istate1 - start + 1
+               
                !Demux state index into branch (s) and wave vector (iq) indices
                call demux_state(istate1, ph%numbands, s1, iq1_ibz)
 
@@ -645,18 +675,13 @@ contains
                !Convert from crystal to 0-based index vector
                q1_indvec = nint(q1*ph%wvmesh)
 
-               !Initialize + and - process masks
-               minus_mask = .false.
-               plus_mask = .false.
-
 #ifdef _OPENACC
-               !$acc data if(compute_resource%gpu_manager) copyin(s1, iq1, q1_indvec, en1), &
-               !$acc      copyout(Vm2_1, Vm2_2), &
-               !$acc      copy(minus_mask, plus_mask)
-
+               !$acc data if(compute_resource%gpu_manager) copyin(s1, iq1, q1_indvec, en1, &
+               !$acc         local_state_counter)
+               
                !$acc parallel loop if(compute_resource%gpu_manager) &
                !$acc          private(iq2, it, q2, q2_indvec, q3_minus_indvec, &
-               !$acc          q3_minus, q2_cart, q3_minus_cart, iq3_minus, &
+               !$acc          q3_minus, iq3_minus, &
                !$acc          neg_q2_indvec, neg_iq2, aux, proc_index, &
                !$acc          delta_plus, delta_minus, s2s3, s2, s3, en2, en3)
 #endif
@@ -673,9 +698,17 @@ contains
 
                   !Muxed index of q3_minus
                   iq3_minus = mux_vector(q3_minus_indvec, wvmesh, 0_i64)
-                  
-                  !Calculate the numtriplet number of phases for this (q2,q3) pair
+
+                  !GPU note:
+                  !Ideally, should have phases_q1 of size ntrips_gpu as a private
+                  !variable. But getting cryptic compiler error regading feature
+                  !not being implemented yet.
+                  !Calculate the phases for this (q2,q3) pair
                   phases_q1(:, iq2) = phase_q_dot_Rj(:, iq2)*phase_q_dot_Rk(:, iq3_minus)
+
+                  !Get index of -q2
+                  neg_q2_indvec = modulo(-q2_indvec, wvmesh)
+                  neg_iq2 = mux_vector(neg_q2_indvec, wvmesh, 0_i64)
 
                   !Combined loop over the 2nd and 3rd phonon bands
                   do s2s3 = 1, nbands_gpu**2
@@ -686,10 +719,6 @@ contains
 
                      !Energy of phonon 2
                      en2 = ens(iq2, s2)
-
-                     !Get index of -q2
-                     neg_q2_indvec = modulo(-q2_indvec, wvmesh)
-                     neg_iq2 = mux_vector(neg_q2_indvec, wvmesh, 0_i64)
 
                      !Energy of phonon 3
                      en3 = ens(iq3_minus, s3)
@@ -716,7 +745,7 @@ contains
 #endif                     
 
                      if(en1*en2*en3 == 0.0_r64) cycle
-
+                                          
                      if(delta_minus > 0.0_r64 .or. delta_plus > 0.0_r64) &
                           aux = Vm2_3ph(evecs(iq1, s1, :), &
                           evecs(iq2, s2, :), evecs(iq3_minus, s3, :), &
@@ -725,14 +754,14 @@ contains
 
                      if(delta_minus > 0.0_r64) then
                         !Record energetically available minus process
-                        minus_mask(proc_index) = .true.
-                        Vm2_1(proc_index) = aux
+                        minus_mask(proc_index, local_state_counter) = .true.
+                        Vm2_1(proc_index, local_state_counter) = aux
                      end if
 
                      if(delta_plus > 0.0_r64) then
                         !Record energetically available plus process
-                        plus_mask(proc_index) = .true.
-                        Vm2_2(proc_index) = aux
+                        plus_mask(proc_index, local_state_counter) = .true.
+                        Vm2_2(proc_index, local_state_counter) = aux
                      end if
                   end do !s2s3
                end do !iq2
@@ -740,24 +769,6 @@ contains
                !$acc end parallel loop
                !$acc end data
 #endif
-
-               !Change to data output directory
-               call chdir(trim(adjustl(num%Vdir)))
-               
-               !Write data in binary format
-               !Note: this will overwrite existing data!
-               write (filename, '(I9)') istate1
-               filename = 'Vm2.istate'//trim(adjustl(filename))
-               open(1, file = trim(filename), status = 'replace', access = 'stream')
-               write(1) count(minus_mask, kind = i64)
-               do proc_index = 1, nprocs
-                  if(minus_mask(proc_index)) write(1) Vm2_1(proc_index)
-               end do
-               write(1) count(plus_mask, kind = i64)
-               do proc_index = 1, nprocs
-                  if(plus_mask(proc_index)) write(1) Vm2_2(proc_index)
-               end do
-               close(1)
             end do !istate1
          end if !num_active_images
          
@@ -765,6 +776,34 @@ contains
          !$acc end data
 #endif
        end associate
+       
+       !Dump to disk each image's portion of V
+
+       !Only work with the active images
+       if(this_image() <= num_active_images) then            
+          ! Change to data output directory
+          call chdir(trim(adjustl(num%Vdir)))
+          
+          do istate1 = start, end
+             local_state_counter = istate1 - start + 1
+             
+             ! Write data in binary format
+             ! Note: this will overwrite existing data!
+             write (filename, '(I9)') istate1
+             filename = 'Vm2.istate'//trim(adjustl(filename))
+             open(1, file = trim(filename), status = 'replace', access = 'stream')
+             write(1) count(minus_mask(:, local_state_counter), kind = i64)
+             do proc_index = 1, nprocs
+                if(minus_mask(proc_index, local_state_counter)) write(1) Vm2_1(proc_index, local_state_counter)
+             end do
+             write(1) count(plus_mask(:, local_state_counter), kind = i64)
+             do proc_index = 1, nprocs
+                if(plus_mask(proc_index, local_state_counter)) write(1) Vm2_2(proc_index, local_state_counter)
+             end do
+             close(1)
+          end do
+       end if
+       !!
     end if !key
 
     !Just on the cpus...
@@ -797,12 +836,14 @@ contains
 
              read(1) minus_count
              if(allocated(Vm2_1)) deallocate(Vm2_1)
-             allocate(Vm2_1(minus_count))
+             !allocate(Vm2_1(minus_count))
+             allocate(Vm2_1(minus_count, 1))
              if(minus_count > 0) read(1) Vm2_1
 
              read(1) plus_count
              if(allocated(Vm2_2)) deallocate(Vm2_2)
-             allocate(Vm2_2(plus_count))
+             !allocate(Vm2_2(plus_count))
+             allocate(Vm2_2(plus_count, 1))
              if(plus_count > 0) read(1) Vm2_2
              close(1)
 
@@ -897,7 +938,8 @@ contains
                       minus_count = minus_count + 1
 
                       !Save W-
-                      Wm(minus_count) = Vm2_1(minus_count)*occup_fac*delta_minus/en1/en2/en3
+                      !Wm(minus_count) = Vm2_1(minus_count)*occup_fac*delta_minus/en1/en2/en3
+                      Wm(minus_count) = Vm2_1(minus_count, 1)*occup_fac*delta_minus/en1/en2/en3
                       istate2_minus(minus_count) = mux_state(ph%numbands, s2, iq2)
                       istate3_minus(minus_count) = mux_state(ph%numbands, s3, iq3_minus)
                    end if
@@ -918,7 +960,8 @@ contains
                       plus_count = plus_count + 1
 
                       !Save W+
-                      Wp(plus_count) = Vm2_2(plus_count)*occup_fac*delta_plus/en1/en2/en3
+                      !Wp(plus_count) = Vm2_2(plus_count)*occup_fac*delta_plus/en1/en2/en3
+                      Wp(plus_count) = Vm2_2(plus_count, 1)*occup_fac*delta_plus/en1/en2/en3
                       istate2_plus(plus_count) = mux_state(ph%numbands, s2, neg_iq2)
                       istate3_plus(plus_count) = mux_state(ph%numbands, s3, iq3_minus)
                    end if
@@ -981,7 +1024,8 @@ contains
     real(r64) :: en1, en2, en3, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
          delta_minus, delta_plus, aux, gpu_time, cpu_time
     real(r64), allocatable :: Vm2_1(:), Vm2_2(:)
-    complex(r64) :: phases_q1(ph%numtriplets, ph%nwv)
+    complex(r64) :: phase_q_dot_Rj(ph%numtriplets, ph%nwv), phase_q_dot_Rk(ph%numtriplets, ph%nwv), &
+         phases_q1(ph%numtriplets, ph%nwv)
     character(len = 1024) :: filename
     logical :: tetrahedra_gpu
     logical, allocatable :: minus_mask(:), plus_mask(:)
@@ -1006,7 +1050,6 @@ contains
        !Associations will work with openacc
        associate(wavevecs => ph%wavevecs, wvmesh => ph%wvmesh, &
             reclattvecs => crys%reclattvecs, &
-            atomtypes => crys%atomtypes, &
             R_j => ph%R_j, R_k => ph%R_k, ens => ph%ens, &
             simplex_map => ph%simplex_map, &
             simplex_count => ph%simplex_count, simplex_evals => ph%simplex_evals, &
@@ -1021,6 +1064,24 @@ contains
          ! 1. that are non-zero when the minus-type processes are energetically allowed
          ! 2. that are non-zero when the symmetry-related plus-type processes are energetically allowed
 
+         !Precalculate phases phases_q1(iq2, it) here
+         phase_q_dot_Rj = 0.0_r64
+         phase_q_dot_Rk = 0.0_r64
+
+         do iq2 = 1, ph%nwv
+            !FBZ wave vector in Cartesian coordinates
+            !Note: negated to reduce operations in the next step
+            q2_cart = -matmul(crys%reclattvecs, ph%wavevecs(iq2, :))
+
+            !Calculate the numtriplet number of phases for this (q2,q3) pair
+            !Note: Here the looping order is sub-optimal. But I the dimensions
+            !of the resulting array will make sense in the interactions calculation.
+            do it = 1, ph%numtriplets
+               phase_q_dot_Rj(it, iq2) = expi(dot_product(q2_cart, ph%R_j(:, it)))
+               phase_q_dot_Rk(it, iq2) = expi(dot_product(q2_cart, ph%R_k(:, it)))
+            end do
+         end do
+         
          !The cpu run
 
          !Set the clock rate
@@ -1047,8 +1108,7 @@ contains
 
          !Convert from crystal to 0-based index vector
          q1_indvec = nint(q1*ph%wvmesh)
-
-         !Precalculate phases phases_q1(iq2, it) here
+         
          minus_mask = .false.
          plus_mask = .false.
 
@@ -1063,20 +1123,16 @@ contains
             q3_minus_indvec = modulo(q1_indvec - q2_indvec, wvmesh) !0-based index vector
             q3_minus = q3_minus_indvec/dble(wvmesh) !crystal coords.
 
-            q2_cart = matmul(reclattvecs, q2)
-            q3_minus_cart = matmul(reclattvecs, q3_minus)
-
-            !Calculate the numtriplet number of phases for this (q2,q3) pair
-            do it = 1, ntrips_gpu
-               !Note: expi won't work on the accelerator
-               phases_q1(it, iq2) = exp((0.0_r64, -1.0_r64)*&
-                    (dot_product(q2_cart, R_j(:,it)) + &
-                    dot_product(q3_minus_cart, R_k(:,it))))
-            end do
-
             !Muxed index of q3_minus
             iq3_minus = mux_vector(q3_minus_indvec, wvmesh, 0_i64)
 
+            !Calculate the phases for this (q2,q3) pair
+            phases_q1(:, iq2) = phase_q_dot_Rj(:, iq2)*phase_q_dot_Rk(:, iq3_minus)
+
+            !Get index of -q2
+            neg_q2_indvec = modulo(-q2_indvec, wvmesh)
+            neg_iq2 = mux_vector(neg_q2_indvec, wvmesh, 0_i64)
+            
             !Combined loop over the 2nd and 3rd phonon bands
             do s2s3 = 1, nbands_gpu**2
                s2 = int((s2s3 - 1)/nbands_gpu) + 1 !changes slow
@@ -1086,10 +1142,6 @@ contains
 
                !Energy of phonon 2
                en2 = ens(iq2, s2)
-
-               !Get index of -q2
-               neg_q2_indvec = modulo(-q2_indvec, wvmesh)
-               neg_iq2 = mux_vector(neg_q2_indvec, wvmesh, 0_i64)
 
                !Energy of phonon 3
                en3 = ens(iq3_minus, s3)
@@ -1123,24 +1175,6 @@ contains
             end do !s2s3
          end do !iq2
 
-         !Change to data output directory
-         call chdir(trim(adjustl(num%Vdir)))
-
-         !Write data in binary format
-         !Note: this will overwrite existing data!
-         write (filename, '(I9)') istate1
-         filename = 'Vm2.istate'//trim(adjustl(filename))
-         open(1, file = trim(filename), status = 'replace', access = 'stream')
-         write(1) count(minus_mask, kind = i64)
-         do proc_index = 1, nprocs
-            if(minus_mask(proc_index)) write(1) Vm2_1(proc_index)
-         end do
-         write(1) count(plus_mask, kind = i64)
-         do proc_index = 1, nprocs
-            if(plus_mask(proc_index)) write(1) Vm2_2(proc_index)
-         end do
-         close(1)
-
        !Clock out
        call system_clock(count = t_end)
 
@@ -1155,9 +1189,10 @@ contains
        !Send some data to the gpu
        !$acc data copyin(nwv_gpu, ntrips_gpu, &
        !$acc             wavevecs, wvmesh, reclattvecs, &
-       !$acc             atomtypes, R_j, R_k, ens, evecs, ifc3, &
+       !$acc             ens, evecs, ifc3, &
        !$acc             tetrahedra_gpu, simplex_map, simplex_count, simplex_evals, &
-       !$acc             Index_i, Index_j, Index_k, nbands_gpu)
+       !$acc             Index_i, Index_j, Index_k, nbands_gpu, phases_q1), &
+       !$acc      copyout(Vm2_1, Vm2_2, minus_mask, plus_mask)
 #endif
 
        !Pick a test first phonon IBZ state
@@ -1179,18 +1214,12 @@ contains
        !Convert from crystal to 0-based index vector
        q1_indvec = nint(q1*ph%wvmesh)
 
-       !Precalculate phases phases_q1(iq2, it) here
-       minus_mask = .false.
-       plus_mask = .false.
-
 #ifdef _OPENACC
-       !$acc data copyin(s1, iq1, q1_indvec, en1), &
-       !$acc      copyout(phases_q1, Vm2_1, Vm2_2), &
-       !$acc      copy(minus_mask, plus_mask)
+       !$acc data copyin(s1, iq1, q1_indvec, en1)
 
        !$acc parallel loop &
        !$acc          private(iq2, it, q2, q2_indvec, q3_minus_indvec, &
-       !$acc          q3_minus, q2_cart, q3_minus_cart, iq3_minus, &
+       !$acc          q3_minus, iq3_minus, &
        !$acc          neg_q2_indvec, neg_iq2, aux, proc_index, &
        !$acc          delta_plus, delta_minus, s2s3, s2, s3, en2, en3)
 #endif
@@ -1205,19 +1234,15 @@ contains
           q3_minus_indvec = modulo(q1_indvec - q2_indvec, wvmesh) !0-based index vector
           q3_minus = q3_minus_indvec/dble(wvmesh) !crystal coords.
 
-          q2_cart = matmul(reclattvecs, q2)
-          q3_minus_cart = matmul(reclattvecs, q3_minus)
-
-          !Calculate the numtriplet number of phases for this (q2,q3) pair
-          do it = 1, ntrips_gpu
-             !Note: expi won't work on the accelerator
-             phases_q1(it, iq2) = exp((0.0_r64, -1.0_r64)*&
-                  (dot_product(q2_cart, R_j(:,it)) + &
-                  dot_product(q3_minus_cart, R_k(:,it))))
-          end do
-
           !Muxed index of q3_minus
           iq3_minus = mux_vector(q3_minus_indvec, wvmesh, 0_i64)
+
+          !Calculate the phases for this (q2,q3) pair
+          phases_q1(:, iq2) = phase_q_dot_Rj(:, iq2)*phase_q_dot_Rk(:, iq3_minus)
+          
+          !Get index of -q2
+          neg_q2_indvec = modulo(-q2_indvec, wvmesh)
+          neg_iq2 = mux_vector(neg_q2_indvec, wvmesh, 0_i64)
 
           !Combined loop over the 2nd and 3rd phonon bands
           do s2s3 = 1, nbands_gpu**2
@@ -1229,21 +1254,12 @@ contains
              !Energy of phonon 2
              en2 = ens(iq2, s2)
 
-             !Get index of -q2
-             neg_q2_indvec = modulo(-q2_indvec, wvmesh)
-             neg_iq2 = mux_vector(neg_q2_indvec, wvmesh, 0_i64)
-
              !Energy of phonon 3
              en3 = ens(iq3_minus, s3)
 
              !Evaluate delta functions
-             !delta_minus = delta_fn_ptr(en1 - en3, iq2, s2, wvmesh, simplex_map, &
-             !     simplex_count, simplex_evals) !minus process
              
-             !delta_plus = delta_fn_ptr(en3 - en1, neg_iq2, s2, wvmesh, simplex_map, &
-             !     simplex_count, simplex_evals) !plus process
-
-             !Function pointers don't work on accelerators...:(
+             ! Function pointers don't work on accelerators...:(
              if(tetrahedra_gpu) then
                 delta_minus = delta_fn_tetra(en1 - en3, iq2, s2, wvmesh, simplex_map, &
                      simplex_count, simplex_evals) !minus process
@@ -1255,6 +1271,7 @@ contains
                 delta_plus = delta_fn_triang(en3 - en1, neg_iq2, s2, wvmesh, simplex_map, &
                      simplex_count, simplex_evals) !plus process
              end if
+             !!
              
              if(en1*en2*en3 == 0.0_r64) cycle
 
@@ -1282,24 +1299,6 @@ contains
        !$acc end data
        !$acc end data
 #endif
-
-       !Change to data output directory
-       call chdir(trim(adjustl(num%Vdir)))
-
-       !Write data in binary format
-       !Note: this will overwrite existing data!
-       write (filename, '(I9)') istate1
-       filename = 'Vm2.istate'//trim(adjustl(filename))
-       open(1, file = trim(filename), status = 'replace', access = 'stream')
-       write(1) count(minus_mask, kind = i64)
-       do proc_index = 1, nprocs
-          if(minus_mask(proc_index)) write(1) Vm2_1(proc_index)
-       end do
-       write(1) count(plus_mask, kind = i64)
-       do proc_index = 1, nprocs
-          if(plus_mask(proc_index)) write(1) Vm2_2(proc_index)
-       end do
-       close(1)
        
        !Clock out
        call system_clock(count = t_end)
