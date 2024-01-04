@@ -15,10 +15,10 @@ Using /ab initio/ electron-phonon and a fully wave vector and electron band/phon
 - anisotropic and isotropic Eliashberg spectral function and
 - phonon-mediated superconducting transition temperature.
 
-To date (July 03, 2023), ~elphbolt~ / ~superconda~ has been used in the following works:
+To date (January 04, 2024), ~elphbolt~ / ~superconda~ has been used in the following works:
 | material(s) | physics probed                                                    | publication               |
 |-------------+-------------------------------------------------------------------+---------------------------|
-| GaN         | 3+4 phonons and thin-film scattering limited thermal conductivity | [[https://arxiv.org/abs/2306.16980][arXiv:2306.16980]]          |
+| GaN         | 3+4 phonons and thin-film scattering limited thermal conductivity | [[https://journals.aps.org/prb/abstract/10.1103/PhysRevB.108.235313][Phys. Rev. B 108, 235313]]                                                     |
 | GaN & AlN   | drag                                                              | [[https://journals.aps.org/prb/abstract/10.1103/PhysRevB.107.245202][Phys. Rev. B 107, 245202]]  |
 | MgB_{2}     | superconductivity enhancement                                     | [[https://journals.aps.org/prb/abstract/10.1103/PhysRevB.107.184518][Phys. Rev. B 107, 184518]]  |
 | BAs         | drag                                                              | [[https://doi.org/10.1103/PhysRevB.107.L081202][Phys. Rev. B 107, L081202]] |
