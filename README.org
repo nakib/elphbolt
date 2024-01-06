@@ -50,7 +50,8 @@ The source is heavily commented and can be auto-documented with ~FORD~ (https://
 
 *** 3. Build
     Use one of the following two methods:
-**** Using ~fpm~ (v>=0.7)
+**** Using ~fpm~ [v>=0.7]
+***** Standard method (no gpu)
      For a cpu-only build and test with Fortran Package Manager (https://fpm.fortran-lang.org/), say
      
       #+BEGIN_SRC bash
@@ -64,12 +65,15 @@ The source is heavily commented and can be auto-documented with ~FORD~ (https://
 
      Modify the fpm manifest file, ~fpm.toml~, to suit your system. I'd appreciate any feedback.
 
-***** Experimental
+***** Experimental method (with gpu)
       For a cpu+gpu build with OpenACC (https://www.openacc.org/), say
       
-     #+BEGIN_SRC bash
-      source fpm_config_caf_openacc.sh; yes | fpm clean; fpm build; fpm install; fpm test
-     #+END_SRC
+      #+BEGIN_SRC bash
+	source fpm_config_caf_openacc.sh; yes | fpm clean; fpm build; fpm install
+	fpm test test_misc
+	fpm test test_autodiff
+	fpm test bte_regression --runner="sh test/3C-SiC/fpm_run_bte_caf.sh"
+      #+END_SRC
      
      For this build, you will need a *recent* version of ~gcc~ build with ~nvptx~. You can have it on your HPC system using, for example, spack (https://spack.io/):
      
@@ -80,7 +84,7 @@ The source is heavily commented and can be auto-documented with ~FORD~ (https://
      and adding the relevant ~<path to spack build of gcc>/bin~ directory to your ~PATH~.
 **** Using ~cmake~
 Issue the following command to build and run tests: ~mkdir build; cd build; cmake ..; make; ctest~. If all goes well, the exectuable will be available as ~build/bin/{elphbolt, superconda}~.
-** Docker (requires internet connection)
+** Docker
 To build a docker image, say
 
       #+BEGIN_SRC bash
