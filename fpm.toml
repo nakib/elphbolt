@@ -49,11 +49,8 @@ name = "test_autodiff"
 source-dir="test"
 main = "test_autodiff.f90"
 
-#TODO
-#Figure out how to call the regression test calculation
-#setup shell script before running the test binary.
-#[[test]]
-#name = "bte_regression"
-#source-dir="test"
-#main = "bte_regression.f90"
+[[test]]
+name = "bte_regression"
+source-dir="test"
+main = "bte_regression.f90"
 
