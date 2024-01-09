@@ -1104,13 +1104,10 @@ contains
 
     !Compute the Jacobian of the electronic response
     if(num%Bfield_on) then
-       !TODO Parallelize this over IBZ states
        !print*, 'B-field is on. B-field = ', num%Bfield
+       !TODO The call below will be parallel and blocking.
        call Jacobian(response_el, Delk_response, crys%lattvecs, &
             el%wvmesh, el%indexlist, crys%dim, blocks = .true.)
-       !sync all
-       !call co_sum(Delk_response)
-       !sync all
     end if
     
     !Only work with the active images

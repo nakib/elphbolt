@@ -976,7 +976,7 @@ contains
 
   pure elemental real(r64) function expm1(x)
     !! High accuracy evaluation of exp(x) - 1.
-    !! This is more accurate that real64 evaluation when x is "small".
+    !! This is more accurate than the real64 evaluation when x is "small".
     !! Numpy equivalent: https://numpy.org/doc/stable/reference/generated/numpy.expm1.html
     
     real(r64), intent(in) :: x
@@ -986,6 +986,7 @@ contains
 
   subroutine Jacobian(f, gradf, lattvecs, kmesh, indexlist, dim, blocks)
     !! Calculates the Jacobian of vector function f.
+    !! TODO Parallelize this. This becomes a blocking call.
     !
     !The stencil used here is on the fractional coordinates system.
     !As such, the derivative initially gives a vector along the reciprocal lattice vectors.
