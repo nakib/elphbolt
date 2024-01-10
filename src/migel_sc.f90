@@ -189,6 +189,7 @@ contains
          aniso_quasi_Delta(:, :), aniso_quasi_Z(:, :)
     integer(i64) :: iter, nstates_irred, i, istate, m, ik
     character(len = 1024) :: filename, numcols
+    real(r64), parameter :: zero_plus = 1.0e-6_r64
     
     !Total number of IBZ blocks states
     nstates_irred = el%nwv_irred*wann%numwannbands
@@ -308,8 +309,8 @@ contains
 
           !Reduced quasiparticle density of states
           !Eq. 11 of H.J. Choi et al. Physica C 385 (2003) 66–74
-          quasi_dos = real((self%qp_ens + oneI*1.0e-6_r64)/ &
-               sqrt((self%qp_ens + oneI*1.0e-6_r64)**2 - iso_quasi_Delta**2))
+          quasi_dos = real((self%qp_ens + oneI*zero_plus)/ &
+               sqrt((self%qp_ens + oneI*zero_plus)**2 - iso_quasi_Delta**2))
 
           !Write quasiparticle Delta and reduced DOS as text data to file
           if(this_image() == 1) then
@@ -359,11 +360,13 @@ contains
                 call demux_state(istate, wann%numwannbands, m, ik)
                 
                 aux = aux + el%nequiv(ik)*el%Ws_irred(ik, m)*&
-                     real((self%qp_ens(i) + oneI*1.0e-6_r64)/ &
-                     sqrt((self%qp_ens(i) + oneI*1.0e-6_r64)**2 - aniso_quasi_Delta(istate, i)**2))
+                     real((self%qp_ens(i) + oneI*zero_plus)/ &
+                     sqrt((self%qp_ens(i) + oneI*zero_plus)**2 - aniso_quasi_Delta(istate, i)**2))
              end do
              quasi_dos(i) = aux
           end do
+
+          !TODO Print out quasi_dos as a band resolved quantity.
 
           !Write quasiparticle reduced DOS as text data to file
           if(this_image() == 1) then
