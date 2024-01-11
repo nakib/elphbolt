@@ -74,6 +74,8 @@ module MigEl_sc_module
      !! Use isotropic approximation?
      logical :: use_external_eps
      !! Use user generated |epsilon|^2 to screen a2F?
+     logical :: print_aniso_gap
+     !! Print out anisotropic gap function to file?
 
    contains
      procedure, public :: initialize, calculate_MD_theory, calculate_MigEl_theory
@@ -91,10 +93,10 @@ contains
     !Local variables
     real(r64) :: domega, Tstart, Tend, &
          dT, mustar, qp_cutoff, matsubara_cutoff
-    logical(r64) :: isotropic, use_external_eps
+    logical(r64) :: isotropic, use_external_eps, print_aniso_gap
     
     namelist /superconductivity/ domega, matsubara_cutoff, qp_cutoff, &
-         Tstart, Tend, dT, mustar, isotropic, use_external_eps
+         Tstart, Tend, dT, mustar, isotropic, use_external_eps, print_aniso_gap
 
     call subtitle("Setting up Migdal-Eliashberg solver environment...")
 
@@ -111,6 +113,7 @@ contains
     mustar = 0.0_r64
     isotropic = .false.
     use_external_eps = .false.
+    print_aniso_gap = .false.
     read(1, nml = superconductivity)
     if(domega*qp_cutoff*matsubara_cutoff*Tstart* &
          Tend*dT == 0) then
@@ -125,6 +128,7 @@ contains
     self%mustar = mustar
     self%isotropic = isotropic
     self%use_external_eps = use_external_eps
+    self%print_aniso_gap = print_aniso_gap
     
     if(.not. self%isotropic .and. self%use_external_eps) &
          call exit_with_message('External screening for the anisotropic case is not supported. Exiting.')
@@ -143,6 +147,8 @@ contains
        write(*, "(A, 1E16.8)") "Coulomb pseudopotential parameter = ", self%mustar
        write(*, "(A, L)") "Use isotropic Migdal-Eliashberg theory: ", self%isotropic
        write(*, "(A, L)") "Use user generated |epsilon|^2 to screen a2F: ", self%use_external_eps
+       if(.not. self%isotropic) &
+            write(*, "(A, L)") "Print out anisotropic gap to file: ", self%print_aniso_gap
     end if
 
     sync all
@@ -317,21 +323,18 @@ contains
              call chdir(num%cwd)
              write (filename, '(f10.3)') T
              filename = 'iso_quasiparticle_Delta.T' // trim(adjustl(filename))
-             write(numcols, "(I0)") 3
+             write(numcols, "(I0)") 2
              open(1,file = trim(filename), status = 'replace')
              do i = 1, self%numqp
-                write(1, "("//trim(adjustl(numcols))//"E20.10)") self%qp_ens(i), &
-                     iso_quasi_Delta(i)
+                write(1, "("//trim(adjustl(numcols))//"E20.10)") iso_quasi_Delta(i)
              end do
              close(1)
 
              write (filename, '(f10.3)') T
              filename = 'iso_quasiparticle_DOS.T' // trim(adjustl(filename))
-             write(numcols, "(I0)") 2
              open(1,file = trim(filename), status = 'replace')
              do i = 1, self%numqp
-                write(1, "("//trim(adjustl(numcols))//"E20.10)") self%qp_ens(i), &
-                     quasi_dos(i)
+                write(1, "(E20.10)") quasi_dos(i)
              end do
              close(1)
           end if
@@ -348,8 +351,6 @@ contains
                   oneI*self%fermi_matsubara_ens(self%nummatsubara_upper:self%nummatsubara), &
                   aniso_matsubara_Delta(istate, self%nummatsubara_upper:self%nummatsubara), self%qp_ens)
           end do
-
-          !TODO Need to decide if this should be printed out since it can be a pretty large file
           
           !Reduced quasiparticle density of states
           !Eq. 11 of H.J. Choi et al. Physica C 385 (2003) 66–74
@@ -366,18 +367,35 @@ contains
              quasi_dos(i) = aux
           end do
 
-          !TODO Print out quasi_dos as a band resolved quantity.
-
-          !Write quasiparticle reduced DOS as text data to file
+          !Write quasiparticle reduced DOS and Delta as text data to file
           if(this_image() == 1) then
              call chdir(num%cwd)
+
+             !Print this large file only if asked for
+             if(self%print_aniso_gap) then
+                write (filename, '(f10.3)') T
+                filename = 'aniso_quasiparticle_Delta.T' // trim(adjustl(filename))
+                write(numcols, "(I0)") 3
+                open(1,file = trim(filename), status = 'replace')
+                do istate = 1, nstates_irred
+                   !Demux state index into band (m) and wave vector (ik) indices
+                   call demux_state(istate, wann%numwannbands, m, ik)
+
+                   if(abs(el%ens_irred(ik, m) - el%enref) <= el%fsthick) then
+                      do i = 1, self%numqp
+                         write(1, "(I10, 2E20.10)") &
+                              el%nequiv(ik), aniso_quasi_Delta(istate, i)
+                      end do
+                   end if
+                end do
+                close(1)
+             end if
+             
              write (filename, '(f10.3)') T
              filename = 'aniso_quasiparticle_DOS.T' // trim(adjustl(filename))
-             write(numcols, "(I0)") 2
              open(1,file = trim(filename), status = 'replace')
              do i = 1, self%numqp
-                write(1, "("//trim(adjustl(numcols))//"E20.10)") self%qp_ens(i), &
-                     quasi_dos(i)
+                write(1, "(E20.10)") quasi_dos(i)
              end do
              close(1)
           end if

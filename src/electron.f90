@@ -219,13 +219,13 @@ contains
     self%metallic = metallic
     self%indlowconduction = indlowconduction
     self%indhighvalence = indhighvalence
-    !Define all cases even when one of them is not defined
-    if (.not. metallic .and. indlowconduction < 1) then
-        self%indlowconduction = indhighvalence + 1
-    end if
-    if (.not. metallic .and. indhighvalence < 1) then
-        self%indhighvalence = indlowconduction - 1
-    end if
+!!$    !Define all cases even when one of them is not defined
+!!$    if (.not. metallic .and. indlowconduction < 1) then
+!!$        self%indlowconduction = indhighvalence + 1
+!!$    end if
+!!$    if (.not. metallic .and. indhighvalence < 1) then
+!!$        self%indhighvalence = indlowconduction - 1
+!!$    end if
     self%enref = enref
     self%chempot = chempot
     self%Zn = Zn
@@ -789,7 +789,6 @@ contains
            minval(self%ens_irred(:,self%indlowconduction)) - &
            maxval(self%ens_irred(:,self%indlowconduction-1)) , ' eV'
     end if
-
 
     !Loop over temperatures
     do itemp = 1, numtemp
