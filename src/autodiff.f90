@@ -29,7 +29,7 @@ module autodiff_m
 
   type autodiff
      !! Augmented arithmetic of reals.
-     
+
      real(r64) :: f
      real(r64) :: df
   end type autodiff
@@ -60,7 +60,7 @@ module autodiff_m
   end interface operator(/)
 
 contains
-  
+
   pure function add(x, y) result(z)
     type(autodiff), intent(in) :: x
     type(autodiff), intent(in) :: y
