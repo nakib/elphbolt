@@ -490,24 +490,24 @@ contains
     tensor(:,:) = aux(:,:)/nrots
   end subroutine symmetrize_3x3_tensor
 
-  subroutine symmetrize_3x3_tensor_noTR(tensor, crotations)
-    !! Symmetrize a 3x3 tensor.
+  subroutine symmetrize_3x3_tensor_noTR(tensor, crotations, Bfield)
+    !! Symmetrize a 3x3 tensor in the presence of a B-field.
+    !! Note: Only for B-field of the form [0 0 Bz]
 
-    real(r64), intent(inout) :: tensor(3,3)
-    real(r64), intent(in) :: crotations(:,:,:)
+    real(r64), intent(inout) :: tensor(3, 3)
+    real(r64), intent(in) :: crotations(:, :, :)
+    real(r64), intent(in) :: Bfield(3) !At the moment not doing anything with it.
     integer :: irot, nrots, i
     real(r64) :: aux(3,3)
 
     nrots = size(crotations(1, 1, :))/2
        
-    aux(:,:) = 0.0_r64
+    aux = 0.0_r64
     do irot = 1, nrots
-       aux(:,:) = aux(:,:) + matmul(crotations(:, :, irot),&
+       aux(:, :) = aux(:, :) + matmul(crotations(:, :, irot),&
             matmul(tensor, transpose(crotations(:, :, irot))))
     end do
-
-    !DBG
-    !Only for B-field of the form [0 0 Bz]
+    
     !Symmetrize along z:
     tensor(3, 1:2) = aux(3, 1:2)/nrots
     tensor(1:2, 3) = aux(1:2, 3)/nrots
@@ -519,6 +519,5 @@ contains
 
     !Enforce Onsager in the simplest way. Will refine later.
     tensor(2, 1) = -tensor(1, 2)
-    
   end subroutine symmetrize_3x3_tensor_noTR
 end module symmetry_module

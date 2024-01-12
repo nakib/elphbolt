@@ -809,7 +809,7 @@ contains
   end subroutine calculate_ph_dos_iso
 
   subroutine calculate_transport_coeff(species_prefix, field, T, deg, chempot, ens, vels, &
-       volume, mesh, response, sym, trans_coeff_hc, trans_coeff_cc)
+       volume, mesh, response, sym, trans_coeff_hc, trans_coeff_cc, Bfield)
     !! Subroutine to calculate transport coefficients.
     !!
     !! species_prefix Prefix of particle type
@@ -831,6 +831,7 @@ contains
     integer(i64), intent(in) :: mesh(3), deg
     real(r64), intent(in) :: T, chempot, ens(:,:), vels(:,:,:), volume, response(:,:,:)
     type(symmetry), intent(in) :: sym
+    real(r64), optional, intent(in) :: Bfield(3)
     real(r64), intent(out) :: trans_coeff_hc(:,:,:), trans_coeff_cc(:,:,:)
     ! Above, h(c)c = heat(charge) current
     
@@ -916,12 +917,16 @@ contains
     !TODO The following has to be generalized in the presence of a B-field
     !Symmetrize transport tensor
     do ib = 1, nbands
-       call symmetrize_3x3_tensor(trans_coeff_hc(ib, :, :), sym%crotations)
-       if(A_cc /= 0.0_r64) call symmetrize_3x3_tensor(trans_coeff_cc(ib, :, :), sym%crotations)
-
-       !B = Bz(0 0 1)
-       !call symmetrize_3x3_tensor_noTR(trans_coeff_hc(ib, :, :), sym%crotations)
-       !if(A_cc /= 0.0_r64) call symmetrize_3x3_tensor_noTR(trans_coeff_cc(ib, :, :), sym%crotations)
+       !Note that fortran does not short-circuit logical expression chains
+       if(present(Bfield)) then
+          if(any(Bfield /= 0.0_r64)) then
+             call symmetrize_3x3_tensor_noTR(trans_coeff_hc(ib, :, :), sym%crotations, Bfield)
+             if(A_cc /= 0.0_r64) call symmetrize_3x3_tensor_noTR(trans_coeff_cc(ib, :, :), sym%crotations, Bfield)
+          end if
+       else
+          call symmetrize_3x3_tensor(trans_coeff_hc(ib, :, :), sym%crotations)
+          if(A_cc /= 0.0_r64) call symmetrize_3x3_tensor(trans_coeff_cc(ib, :, :), sym%crotations)
+       end if
     end do
   end subroutine calculate_transport_coeff
   

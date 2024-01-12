@@ -211,16 +211,20 @@ contains
     el_en_num = 100
     ph_mfp_npts = 100
     read(1, nml = numerics)
+
     if(any(qmesh <= 0) .or. fourph_mesh_ref < 1 .or. mesh_ref < 1 .or. fsthick < 0) then
        call exit_with_message('Bad input(s) in numerics.')
     end if
+
     if(crys%twod .and. tetrahedra) then
        call exit_with_message('The tetrahedra method only works for 3d. Exiting.')
     end if
+
     if(crys%epsilon0 == 0.0 .and. elchimp) then
        call exit_with_message(&
             'Need to provide non-zero epsilon0 for e-ch. imp. interaction. Exiting.')
     end if
+
     if(phbound .and. phthinfilm) then
        call exit_with_message('ph-boundary and ph-thin-film scattering not allowed together. Exiting.')
     end if
@@ -237,6 +241,18 @@ contains
        end if
     end if
 
+    !Only allow B-field along z for now.
+    if(Bfield_on) then
+       if(.not. (Bfield(1) == 0.0_r64 .and. Bfield(2) == 0.0_r64 .and. Bfield(3) /= 0.0_r64)) then
+          call exit_with_message("B-field has to be of the form [0 0 B]. Exiting.")
+       end if
+!!$       if( .not. (Bfield(1) /= 0.0_r64 .and. Bfield(2) == 0.0_r64 .and. Bfield(3) == 0.0_r64) .or. &
+!!$            (Bfield(1) == 0.0_r64 .and. Bfield(2) /= 0.0_r64 .and. Bfield(3 == 0.0_r64)) .or. &
+!!$            (Bfield(1) == 0.0_r64 .and. Bfield(2) == 0.0_r64 .and. Bfield(3 /= 0.0_r64))) then
+!!$          call exit_with_message("B-field has to be of the form [B 0 0], [0 B 0], or [0 0 B]. Exiting.")
+!!$       end if
+    end if
+
     !TODO
     !! [ ] Read eco mode info from input
     !! [ ] Check for valid choice of econess
@@ -246,11 +262,8 @@ contains
     self%econess = [2, 2, 2]
     !!
 
-    !TEST
     self%Bfield_on = Bfield_on
     self%Bfield = Bfield
-    !self%Bfield_on = .true.
-    !self%Bfield = [0.0_r64, 0.0_r64, 1.0e0_r64] !Tesla
     
     self%qmesh = qmesh
     self%runlevel = runlevel
@@ -448,6 +461,8 @@ contains
        write(*, "(A, L)") "Plot quantities along path: ", self%plot_along_path
        write(*, "(A, I5)") "Maximum number of BTE/Migdal-Eliashberg equations iterations = ", self%maxiter
        write(*, "(A, 1E16.8)") "BTE/Migdal-Eliashberg equations convergence threshold = ", self%conv_thres
+       write(*, "(A, L)") "B-field is on: ", self%Bfield_on
+       if(self%Bfield_on) write(*, "(A, 3E16.8)") "B-field  = ", self%Bfield
     end if
     sync all
   end subroutine read_input_and_setup

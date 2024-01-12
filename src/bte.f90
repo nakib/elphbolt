@@ -455,7 +455,7 @@ contains
              !Calculate electron transport coefficients
              call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, &
                   el%ens, el%vels, crys%volume, el%wvmesh, self%el_response_E, sym, &
-                  el_alphabyT, el_sigma)
+                  el_alphabyT, el_sigma, Bfield = num%Bfield)
              el_alphabyT = el_alphabyT/crys%T
 
              !delT field:
@@ -475,7 +475,7 @@ contains
              !Calculate electron transport coefficients
              call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
                   el%ens, el%vels, crys%volume, el%wvmesh, self%el_response_T, sym, &
-                  el_kappa0, el_sigmaS)
+                  el_kappa0, el_sigmaS, Bfield = num%Bfield)
 
              !Calculate electron transport scalars
              el_kappa0_scalar = trace(sum(el_kappa0, dim = 1))/crys%dim
@@ -636,7 +636,7 @@ contains
           !Calculate electron transport coefficients
           call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, &
                el%ens, el%vels, crys%volume, el%wvmesh, self%el_response_E, sym, &
-               el_alphabyT, el_sigma)
+               el_alphabyT, el_sigma, Bfield = num%Bfield)
           el_alphabyT = el_alphabyT/crys%T
 
           !delT field:
@@ -650,7 +650,7 @@ contains
 
           call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
                el%ens, el%vels, crys%volume, el%wvmesh, self%el_response_T, sym, &
-               el_kappa0, el_sigmaS)
+               el_kappa0, el_sigmaS, Bfield = num%Bfield)
 
           !Calculate and print electron transport scalars
           el_kappa0_scalar = trace(sum(el_kappa0, dim = 1))/crys%dim
@@ -1213,8 +1213,8 @@ contains
     if(.not. num%Bfield_on) then
        !Symmetrize response function
        do ik_fbz = 1, nk
-          response_el(ik_fbz,:,:)=transpose(&
-               matmul(el%symmetrizers(:,:,ik_fbz),transpose(response_el(ik_fbz,:,:))))
+          response_el(ik_fbz, :, :) = transpose(&
+               matmul(el%symmetrizers(:, :, ik_fbz), transpose(response_el(ik_fbz, :, :))))
        end do
     else
        !TODO
