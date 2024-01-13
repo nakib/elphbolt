@@ -18,7 +18,6 @@ rm -r 3C-SiC
 cd $workdir
 
 #gcc+opencoarrays
-cafrun -n 1 ../build/caf_*/test/bte_regression | tee 3C_SiC_test.output
-#TODO: How to get fpm to call a multiimage cafrun?
+cafrun -n 2 ../build/caf_*/test/bte_regression | tee 3C_SiC_test.output
 
 cd ..

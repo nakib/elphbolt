@@ -32,9 +32,11 @@ program bte_regression
 
   character(:), allocatable :: datalink, curl_arg, workdir, datadir, inputdir
 
-  write(*, '(A)')  'Regression test on 3C-SiC'
-  write(*, '(A, I5)') 'Number of coarray images = ', num_images()
-      
+  if(this_image() == 1) then
+     write(*, '(A)')  'Regression test on 3C-SiC'
+     write(*, '(A, I5)') 'Number of coarray images = ', num_images()
+  end if
+     
   !Test counter
   itest = 0
 
