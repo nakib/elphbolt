@@ -74,8 +74,8 @@ module MigEl_sc_module
      !! Use isotropic approximation?
      logical :: use_external_eps
      !! Use user generated |epsilon|^2 to screen a2F?
-     logical :: print_aniso_gap
-     !! Print out anisotropic gap function to file?
+     logical :: print_aniso_gap_FS
+     !! Print out anisotropic gap function at the Fermi surface to file?
 
    contains
      procedure, public :: initialize, calculate_MD_theory, calculate_MigEl_theory
@@ -93,10 +93,10 @@ contains
     !Local variables
     real(r64) :: domega, Tstart, Tend, &
          dT, mustar, qp_cutoff, matsubara_cutoff
-    logical(r64) :: isotropic, use_external_eps, print_aniso_gap
+    logical(r64) :: isotropic, use_external_eps, print_aniso_gap_FS
     
     namelist /superconductivity/ domega, matsubara_cutoff, qp_cutoff, &
-         Tstart, Tend, dT, mustar, isotropic, use_external_eps, print_aniso_gap
+         Tstart, Tend, dT, mustar, isotropic, use_external_eps, print_aniso_gap_FS
 
     call subtitle("Setting up Migdal-Eliashberg solver environment...")
 
@@ -113,7 +113,7 @@ contains
     mustar = 0.0_r64
     isotropic = .false.
     use_external_eps = .false.
-    print_aniso_gap = .false.
+    print_aniso_gap_FS = .false.
     read(1, nml = superconductivity)
     if(domega*qp_cutoff*matsubara_cutoff*Tstart* &
          Tend*dT == 0) then
@@ -128,7 +128,7 @@ contains
     self%mustar = mustar
     self%isotropic = isotropic
     self%use_external_eps = use_external_eps
-    self%print_aniso_gap = print_aniso_gap
+    self%print_aniso_gap_FS = print_aniso_gap_FS
     
     if(.not. self%isotropic .and. self%use_external_eps) &
          call exit_with_message('External screening for the anisotropic case is not supported. Exiting.')
@@ -148,7 +148,7 @@ contains
        write(*, "(A, L)") "Use isotropic Migdal-Eliashberg theory: ", self%isotropic
        write(*, "(A, L)") "Use user generated |epsilon|^2 to screen a2F: ", self%use_external_eps
        if(.not. self%isotropic) &
-            write(*, "(A, L)") "Print out anisotropic gap to file: ", self%print_aniso_gap
+            write(*, "(A, L)") "Print out anisotropic gap at the Fermi surface to file: ", self%print_aniso_gap_FS
     end if
 
     sync all
@@ -371,10 +371,10 @@ contains
           if(this_image() == 1) then
              call chdir(num%cwd)
 
-             !Print this large file only if asked for
-             if(self%print_aniso_gap) then
+             !Print gap at the Fermi surface, i.e. omega = 0
+             if(self%print_aniso_gap_FS) then
                 write (filename, '(f10.3)') T
-                filename = 'aniso_quasiparticle_Delta.T' // trim(adjustl(filename))
+                filename = 'aniso_quasiparticle_Delta_FS.T' // trim(adjustl(filename))
                 write(numcols, "(I0)") 3
                 open(1,file = trim(filename), status = 'replace')
                 do istate = 1, nstates_irred
@@ -382,10 +382,8 @@ contains
                    call demux_state(istate, wann%numwannbands, m, ik)
 
                    if(abs(el%ens_irred(ik, m) - el%enref) <= el%fsthick) then
-                      do i = 1, self%numqp
-                         write(1, "(I10, 2E20.10)") &
-                              el%nequiv(ik), aniso_quasi_Delta(istate, i)
-                      end do
+                      write(1, "(I10, 2E20.10)") &
+                           el%nequiv(ik), aniso_quasi_Delta(istate, 1)
                    end if
                 end do
                 close(1)

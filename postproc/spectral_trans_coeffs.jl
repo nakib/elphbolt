@@ -2,37 +2,23 @@ include("statistics.jl")
 
 using ArgParse
 
-function calculate_spectral_coeffs(species, rundir, outdir, T, chempot)
-    # TODO...
+function calculate_mfp_cumulative_kappa(rundir, outdir, T)
+    # TODO ...
 
-    #TODO Set temperature-dependent directory
-    #Tdir = rundir*...
+    #TODO Generate T-dependent directory from T
+    Tdir = "T0.300E+03/"
     
     #Read full-Brillouin zone energies and velocities. Reshape the latter appropriately.
-    println("ϟ Reading full-Brillouin zone energies and velocities...")
-    εs = readdlm(rundir*species*".ens_fbz") #eV
-    vs = readdlm(rundir*species*".vels_fbz") #Km/s
-    vs_shape = size(vs)
-    vs = reshape(vs, (vs_shape[1], vs_shape[2]÷3, 3))
+    println("ϟ Reading full-Brillouin zone mean-free-paths (mfps)...")
+    λs = readdlm(rundir*Tdir"nodrag_iterated_ph_mfps_ibz_3+4ph") #nm
 
-    #Read reciprocal lattice vectors and their discretization grid
-    println("ϟ Reading reciprocal lattice vector data...")
-    reclattvecs_data = readdlm(rundir*species*".reclattvecs") #nm^-1
-    Bs = reclattvecs_data[1:3, :]
-    wvmesh = convert.(Int32, reclattvecs_data[4, :])
-
-    #TODO Read response function
-    # RTA
-    println("ϟ Reading reciprocal lattice vector data...")
-    response_fn = readdlm(Tdir*"RTA_F0_tot") #nm.eV/K
-    # TODO Full
-    #...
-
-    #TODO (Can postpone this for later)
-    # Talk to spglib to generate symmetry operations
-    # to symmetrize the transport coefficients.
-    # This might be an overkill since elphbolt already
-    # symmetrizes the response functions and the velocities.
+    #Create mfp sampling grid (log scale)
+    low = -6 #1e-6 nm, a really tiny number I'd say.
+    high = log10(1.5*maximum(λs)) #50% higher than largest value in λs
+    N = 10 # TODO should read this from user input
+    λ' = exp10.(range(-6, 1, length = N))
+    
+    
 end
 
 function parse_commandline()

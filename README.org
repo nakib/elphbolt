@@ -250,7 +250,7 @@ For the ~elphbolt~ app, there are 5 Namelists in the ~input.nml~ file: ~allocati
 | ~Tstart~           | Real    | 0.0 K   | Starting point of the temperature sweep.                                                                                                         |
 | ~Tend~             | Real    | 0.0 K   | End point of the temperature sweep.                                                                                                              |
 | ~dT~               | Real    | 0.0 K   | Temperature difference used in temperature sweep.                                                                                                |
-| ~print_aniso_gap~  | Logical | .False. | Print out the anisotropic gap function?                                                                                                          |
+| ~print_aniso_gap_FS~ | Logical | .False. | Print out the anisotropic gap function at the Fermi surface?                                                                                     |
 
 ** Description of output files
 
@@ -306,7 +306,7 @@ Below I(F)BZ = irreducible (full) Brillouin zone; RTA = relaxation time approxim
 | ~drag_G0_*~                        | ~./T*/~              | nmC               | Branch resolved (~_<integer>~) and total (~_tot~) phononic response function to E-field in fully coupled theory.                                                                                                 |
 | ~iso_quasiparticle_DOS.T*~         | ~./~                 | none              | Scaled quasiparticle density of states on the equidistant electronic quasiparticle energy mesh.                                                                                                                  |
 | ~iso_quasiparticle_Delta.T*~       | ~./~                 | eV                | Isotropic superconducting gap on the equidistant electronic quasiparticle energy mesh.                                                                                                                           |
-| ~aniso_quasiparticle_Delta.T~      | ~./~                 | eV                | Anisotropic superconducting gap on the equidistant electronic quasiparticle energy mesh for each IBZ electronic state within the Fermi window. The first column gives the number of FBZ images of the IBZ point. |
+| ~aniso_quasiparticle_Delta_FS.T~   | ~./~                 | eV                | Anisotropic superconducting gap on the Fermi surface for each IBZ electronic state within the Fermi window. The first column gives the number of FBZ images of the IBZ point.                                    |
 
 *** Postprocessing (runlevel 2)
 
