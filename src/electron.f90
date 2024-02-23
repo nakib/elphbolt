@@ -773,21 +773,27 @@ contains
        high = self%indhighvalence
     end if
 
-    if (this_image() == 1 .and. (.not. self%metallic) &
+    if(this_image() == 1 .and. (.not. self%metallic) &
          .and. self%indlowconduction >  self%indhighvalence) then
-       write(*, "(A, 1E16.8, A)") 'Maximum energy valence band = ' , &
-               maxval(self%ens_irred(:,self%indlowconduction-1)) , ' eV'
-       write(*, "(A, 1E16.8, A)") 'Minimum energy conduction band = ' , &
+       if(self%indhighvalence > 0) then
+          write(*, "(A, 1E16.8, A)") 'Maximum energy valence band = ' , &
+               maxval(self%ens_irred(:, self%indhighvalence)) , ' eV'
+       end if
+
+       if(self%indlowconduction > 0 .and. any(self%scissor .ne. 0.0_r64)) then
+          write(*, "(A, 1E16.8, A)") 'Minimum energy conduction band = ' , &
                minval(self%ens_irred(:,self%indlowconduction)), ' eV'
-       if (any(self%scissor .ne. 0.0_r64)) then
+
           write(*,"(A, 1E16.8,A)") 'Scissor operator applied at CBs = ', maxval(self%scissor), 'eV'
           write(*, "(A, 1E16.8, A)") 'Minimum uncorrected energy conduction band = ' , &
                minval(self%ens_irred(:,self%indlowconduction)) - self%scissor, ' eV'
-
        end if
-       write(*, "(A, 1E16.8, A)") 'Band gap = ' , &
-           minval(self%ens_irred(:,self%indlowconduction)) - &
-           maxval(self%ens_irred(:,self%indlowconduction-1)) , ' eV'
+       
+       if(self%indhighvalence > 0 .and. self%indlowconduction > 0) then
+          write(*, "(A, 1E16.8, A)") 'Band gap = ' , &
+               minval(self%ens_irred(:,self%indlowconduction)) - &
+               maxval(self%ens_irred(:,self%indhighvalence)) , ' eV'
+       end if
     end if
 
     !Loop over temperatures
