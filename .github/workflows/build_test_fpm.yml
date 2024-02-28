@@ -37,8 +37,7 @@ jobs:
     - name: Build with fpm
       run: |
         sh install_blas+lapack.sh
-        export FPM_FC=caf && \
-        export FPM_FFLAGS="-g -O2 -fPIC -fbounds-check -Wunused -Wconversion -Wunderflow -Wdo-subscript" && \
+        source fpm_config_caf.sh
         fpm build; fpm install && \
         fpm test test_misc; fpm test test_autodiff && \
         fpm test bte_regression --runner="sh test/3C-SiC/fpm_run_bte_caf.sh"
