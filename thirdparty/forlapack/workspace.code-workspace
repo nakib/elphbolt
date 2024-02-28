@@ -1,0 +1,16 @@
+{
+	"folders": [
+		{
+			"name": "forlapack",
+			"path": "."
+		}
+	],
+	"settings": {
+		"fortran.linter.modOutput": "${workspaceFolder}/mod/",
+		"fortran.fortls.directories": [
+			"${workspaceFolder}/src",
+			"${workspaceFolder}/test",
+			"${workspaceFolder}/app"
+		]
+	}
+}

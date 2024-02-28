@@ -1,0 +1,39 @@
+name       = "forblas"
+maintainer = "info@gha3mi.com"
+
+[build]
+auto-executables = false
+auto-tests       = false
+auto-examples    = false
+module-naming    = false
+
+[install]
+library = true
+
+[fortran]
+implicit-typing   = true
+implicit-external = true
+source-form       = "default"
+
+[library]
+source-dir = "src/BLAS/SRC"
+
+[[test]]
+name       = "cblat1"
+source-dir = "src/BLAS/TESTING"
+main       = "cblat1.f"
+
+[[test]]
+name       = "dblat1"
+source-dir = "src/BLAS/TESTING"
+main       = "dblat1.f"
+
+[[test]]
+name       = "sblat1"
+source-dir = "src/BLAS/TESTING"
+main       = "sblat1.f"
+
+[[test]]
+name       = "zblat1"
+source-dir = "src/BLAS/TESTING"
+main       = "zblat1.f"

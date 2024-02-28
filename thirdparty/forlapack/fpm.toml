@@ -1,0 +1,21 @@
+name       = "forlapack"
+maintainer = "info@gha3mi.com"
+copyright  = "Copyright (c) 2023, Seyed Ali Ghasemi"
+license    = "BSD-3"
+
+[build]
+auto-executables = false
+auto-tests       = false
+auto-examples    = false
+module-naming    = false
+
+[install]
+library = true
+
+[fortran]
+implicit-typing   = true
+implicit-external = true
+source-form       = "default"
+
+[library]
+source-dir = "src/SRC"
