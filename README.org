@@ -40,47 +40,57 @@ The source is heavily commented and can be auto-documented with ~FORD~ (https://
 
 ** Install on HPC systems with ~gcc~
 
-*** 1. Get ~spglib~
+*** 1. Get compiler
 
-~elphbolt~ uses the ~spglib~ ([[https://spglib.github.io/spglib/]]) library for crystal symmetry analysis. Currently, versions 1.6.0 and 1.14.1 have been tried and tested. A lot of HPCs provide this library as a module, so check before building from source.
-
-*** 2. Get ~OpenCoarrays~
-
-~OpenCoarrays~ ([[http://www.opencoarrays.org]]) is an implementation of the ~coarrays~ functionalities. Some HPC systems include it (for example, MareNostrum4 (BSC) and LaPalma (IAC)). In that case, load it. If not, you can build it from source.
-
-*** 3. Build
-    Use one of the following two methods:
-**** Using ~fpm~ [v>=0.7]
-***** Standard method (no gpu)
-     For a cpu-only build and test with Fortran Package Manager (https://fpm.fortran-lang.org/), say
+     You will need a *recent* version of ~gcc~ that supports Fortran 2018 features. Here I show how you can build it with spack (https://spack.io/). I suggest building with ~nvptx~ since that will allow you to use gpu acceleration later on. If you do not care for gpus at the moment, leave out the ~+nvptx~ bit in the following command.
      
+     #+BEGIN_SRC bash
+     spack install gcc@12.3.0+nvptx
+     #+END_SRC
+     
+    I like to add the ~<path to spack build of gcc>/bin~ directory to my system ~PATH~. Alternatively, you can follow spack's own recommendations for using its packages.
+
+*** 2. Get MPI
+
+    You need an MPI implementation. It could be MPICH or OpenMPI. The first is preferred.
+
+*** 3. Get ~OpenCoarrays~
+
+~OpenCoarrays~ ([[http://www.opencoarrays.org]]) is an implementation of the ~coarrays~ functionalities. Follows its installation guide to build it on your system. I personally like to use its install script where I pass my compiler and MPI relared flags explicitly.
+
+*** 4. Build ~elphbolt~
+    Use one of the following two methods:
+**** Using ~fpm~ [v>=0.7, preferred method]
+***** Standard (no gpu)
+     For a cpu-only build and test with Fortran Package Manager (https://fpm.fortran-lang.org/), first say
+
+     #+BEGIN_SRC bash
+        sh install_blas+lapack.sh
+      #+END_SRC
+
+      This will build ~blas~ and ~lapack~ using a local copy of https://github.com/gha3mi/forblas and  https://github.com/gha3mi/forlapack. You need to do this just once. The libraries will be placed in ~$HOME/.local/lib/~.
+    
       #+BEGIN_SRC bash
 	source fpm_config_caf.sh; fpm install
 	fpm test test_*
 	fpm test bte_regression --runner="sh test/3C-SiC/fpm_run_bte_caf.sh"
       #+END_SRC
 
-     The ~elphbolt~ and ~superconda~ apps will be available in your ~/.local/bin~ directory. They should both be directly callable from your shell.
+     The ~elphbolt~ and ~superconda~ apps will be available in your ~$HOME/.local/bin~ directory. They should both be directly callable from your shell. If not, add the above directory to our path.
 
      Modify the fpm manifest file, ~fpm.toml~, to suit your system. I'd appreciate any feedback.
 
 ***** Experimental method (with gpu)
       For a cpu+gpu build with OpenACC (https://www.openacc.org/), say
-      
+
       #+BEGIN_SRC bash
 	source fpm_config_caf_openacc.sh; fpm install
 	fpm test test_*
 	fpm test bte_regression --runner="sh test/3C-SiC/fpm_run_bte_caf.sh"
       #+END_SRC
      
-     For this build, you will need a *recent* version of ~gcc~ build with ~nvptx~. You can have it on your HPC system using, for example, spack (https://spack.io/):
-     
-     #+BEGIN_SRC bash
-     spack install gcc@12.3.0+nvptx
-     #+END_SRC
-     
-     and adding the relevant ~<path to spack build of gcc>/bin~ directory to your ~PATH~.
-**** Using ~cmake~
+      Here I have assumed that you have already done ~blas~ and ~lapack~ building step.
+**** Using ~cmake~ [Deprecated]
 Issue the following command to build and run tests: ~mkdir build; cd build; cmake ..; make; ctest~. If all goes well, the exectuable will be available as ~build/bin/{elphbolt, superconda}~.
 ** Docker
 To build a docker image, say
