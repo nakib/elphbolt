@@ -48,7 +48,7 @@ The source is heavily commented and can be auto-documented with ~FORD~ (https://
      spack install gcc@12.3.0+nvptx
      #+END_SRC
      
-    I like to add the ~<path to spack build of gcc>/bin~ directory to my system ~PATH~. Alternatively, you can follow spack's own recommendations for using its packages.
+    I like to add the ~<path to spack build of gcc>/bin~ directory to my system ~$PATH~. Alternatively, you can follow spack's own recommendations for using its packages.
 
 *** 2. Get MPI
 
@@ -56,7 +56,16 @@ The source is heavily commented and can be auto-documented with ~FORD~ (https://
 
 *** 3. Get ~OpenCoarrays~
 
-~OpenCoarrays~ ([[http://www.opencoarrays.org]]) is an implementation of the ~coarrays~ functionalities. Follows its installation guide to build it on your system. I personally like to use its install script where I pass my compiler and MPI relared flags explicitly.
+~OpenCoarrays~ ([[http://www.opencoarrays.org]]) is an implementation of the ~coarrays~ functionalities. Follow its installation guide to build it on your system. I personally like to use its install script where I pass my compiler and MPI relared flags explicitly. So something like the following should work
+
+     #+BEGIN_SRC bash
+     ./install.sh --with-fortran <path to>/gfortran \
+     --with-cxx <path to>/g++ \
+     --with-c <path to>/gcc \ 
+     --with-mpi <path to mpich installation directory>
+     #+END_SRC
+
+Carefully read the output on the screen and add the paths to ~caf~ and ~cafrun~ to your ~$PATH~.
 
 *** 4. Build ~elphbolt~
     Use one of the following two methods:
