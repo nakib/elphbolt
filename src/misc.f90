@@ -264,7 +264,7 @@ contains
 
     !Local variables
     integer(i64) :: ib, ibstart, ibend, nb, ik, nk, dim
-    character(len = 1) :: numcols
+    character(len = 128) :: numcols
     character(len = 1024) :: bandtag
     real(r64), allocatable :: aux(:,:)
 
@@ -287,7 +287,7 @@ contains
        allocate(aux(nk, 3))
        aux = sum(data, dim = 2)
        do ik = 1, nk
-          write(1, "(3(1E20.10),x)") aux(ik, :)
+          write(1, "(" // trim(adjustl(numcols)) // "E20.10,x)")  aux(ik, :)
        end do
        close(1)
 
@@ -296,7 +296,7 @@ contains
           write(bandtag, "(I0)") ib
           open(2, file = trim(filename//bandtag), status = "replace")
           do ik = 1, nk
-             write(2, "(3(1E20.10),x)") data(ik, ib, :)
+             write(2, "(" // trim(adjustl(numcols)) // "E20.10,x)") data(ik, ib, :)
           end do
           close(2)
        end do
@@ -313,7 +313,7 @@ contains
 
     !Local variables
     integer(i64) :: ib, ibstart, ibend, nb, ik, nk, dim
-    character(len = 1) :: numcols
+    character(len = 128)  :: numcols
     character(len = 1024) :: bandtag
     
     nk = size(data(:, 1, 1))
@@ -351,7 +351,7 @@ contains
 
     !Local variables
     integer(i64) :: ib, nb, ibstart, ibend
-    character(len = 1) :: numcols
+    character(len = 128)  :: numcols
     character(len = 1024) :: bandtag
 
     if(this_image() == 1) then
@@ -364,8 +364,7 @@ contains
           ibstart = 1
           ibend = nb
        end if
-
-       write(numcols, "(I0)") 9
+       write(numcols, "(I0)") size(data,2) * size(data,3)
 
        !Band/branch summed
        if(it == 0) then
@@ -402,7 +401,7 @@ contains
 
     !Local variables
     integer(i64) :: ie, ne, ib, nb, ibstart, ibend
-    character(len = 1) :: numcols
+    character(len = 128)  :: numcols
     character(len = 1024) :: bandtag
     real(r64) :: aux(3,3)
     

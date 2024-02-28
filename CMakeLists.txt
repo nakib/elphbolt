@@ -47,6 +47,7 @@ set(SRC
   src/phonon.f90
   src/bz_sums.f90
   src/green.f90
+  src/nano.f90
   src/phonon_defect.f90
   src/interactions.f90
   src/eliashberg.f90
