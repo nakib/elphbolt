@@ -23,7 +23,7 @@ jobs:
       if: contains( matrix.os, 'ubuntu')
       run: |
         sudo apt update
-        sudo apt install -yq cmake gfortran mpich liblapack-dev libsymspg-dev
+        sudo apt install -yq cmake gfortran mpich
         sudo apt clean -q
         git clone https://github.com/sourceryinstitute/OpenCoarrays && \
         mkdir OpenCoarrays/opencoarrays-install  && \
@@ -36,6 +36,7 @@ jobs:
         
     - name: Build with fpm
       run: |
+        sh install_blas+lapack.sh
         export FPM_FC=caf && \
         export FPM_FFLAGS="-g -O2 -fPIC -fbounds-check -Wunused -Wconversion -Wunderflow -Wdo-subscript" && \
         fpm build; fpm install && \
