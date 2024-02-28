@@ -6,9 +6,6 @@ copyright = "Copyright (c) 2014, Atsushi Togo"
 source-dir="src"
 include-dir="src"
 
-[build]
-link = ["blas", "lapack"]
-
 [install]
 library = true
 

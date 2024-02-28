@@ -16,13 +16,23 @@ source-dir="src"
 [dependencies]
 #Pull from github
 #testify = { git = "git@github.com:nakib/testify.git" }
-#Use local copy from thirdparty directory
 testify = {path = "thirdparty/testify"}
-#spglib = {path = "thirdparty/spglib"}
+
+#Use local copy from thirdparty directory
+spglib = {path = "thirdparty/spglib"}
 
 [build]
-link = ["blas", "lapack", "symspg"]
-#link = ["blas", "lapack"] #If local spglib build is used
+#[build]
+#By default, I will use try to use the forlapack and forblas builds from ~/.local/lib/
+#These will have been put there by the configuration step.
+link = ["forlapack", "forblas"]
+#
+#Alternatively, you can use your preexisting blas and lapack, or openblas,
+#or whatever other implementation by commenting out the above and uncommenting
+#one of the following. Modify according to your system.
+#link = ["blas", "lapack"]
+#link = ["openblas"]
+
 external-modules = ["openacc"]
 auto-tests = false
 
