@@ -456,57 +456,6 @@ contains
     q = num/denom
     r = mod(num, denom)
   end subroutine int_div
-
-!!$  subroutine distribute_points_cpu_gpu(gpu_load, cpu_load, &
-!!$       chunk, istart, iend, num_active_images)
-!!$    !! Distribute points among images
-!!$
-!!$    integer(i64), intent(in) :: gpu_load, cpu_load
-!!$    integer(i64), intent(out) :: chunk, istart, iend, num_active_images
-!!$
-!!$    !Locals
-!!$    integer(i64) :: smallest_chunk, remaining_npts, istart_offset, image_offset, &
-!!$         num_active_cpu_images
-!!$
-!!$    !Number of active images
-!!$    num_active_images = min(gpu_load + cpu_load, num_images())
-!!$    
-!!$    !Load distribution among gpu image. For now take this to be image 1.
-!!$    !
-!!$    if(this_image() == 1) then
-!!$       chunk = gpu_load
-!!$       istart = 1
-!!$       iend = chunk
-!!$    else
-!!$       !Load distribution among cpu images:
-!!$       !
-!!$       num_active_cpu_images = min(cpu_load, num_images() - 1)
-!!$       !Smallest number of points per image
-!!$       smallest_chunk = cpu_load/num_active_cpu_images
-!!$       !The remainder
-!!$       remaining_npts = modulo(cpu_load, num_active_cpu_images)
-!!$
-!!$       if(this_image() <= remaining_npts) then
-!!$          istart_offset = 0
-!!$          image_offset = 0
-!!$          chunk = smallest_chunk + 1
-!!$
-!!$          istart = istart_offset + (this_image() - image_offset - 1)*chunk + 1
-!!$          iend = istart + chunk - 1
-!!$       else if(this_image() > remaining_npts .and. this_image() <= num_active_images) then
-!!$          istart_offset = (smallest_chunk + 1)*remaining_npts
-!!$          image_offset = remaining_npts
-!!$          chunk = smallest_chunk
-!!$
-!!$          istart = istart_offset + (this_image() - image_offset - 1)*chunk + 1
-!!$          iend = istart + chunk - 1
-!!$       else
-!!$          chunk = 0
-!!$          istart = 0
-!!$          iend = 0
-!!$       end if
-!!$    end if
-!!$  end subroutine distribute_points_cpu_gpu
   
   subroutine distribute_points(npts, chunk, istart, iend, num_active_images)
     !! Distribute points among images

@@ -611,15 +611,15 @@ contains
          call compute_resource%balance_load(load_split, nstates_irred, &
               chunk, start, end, num_active_images)
 
-         !
-         write(*, "(A, I10)") " Message from node ", compute_resource%this_node
-         print*, 'num_active_images, image number: ', num_active_images, this_image()
-         if(compute_resource%gpu_manager) then
-            write(*, "(A, I10)") " #states/gpu = ", chunk
-         else
-            write(*, "(A, I10)") " #states/cpu = ", chunk
-         end if
-         !
+         !!
+         !write(*, "(A, I10)") " Message from node ", compute_resource%this_node
+         !print*, 'num_active_images, image number: ', num_active_images, this_image()
+         !if(compute_resource%gpu_manager) then
+         !   write(*, "(A, I10)") " #states/gpu = ", chunk
+         !else
+         !   write(*, "(A, I10)") " #states/cpu = ", chunk
+         !end if
+         !!
          
 #ifdef _OPENACC
          !Send some data to the gpu

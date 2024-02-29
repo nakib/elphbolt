@@ -591,20 +591,20 @@ contains
     
     !Divide wave vectors among images
     call distribute_points(el%nwv_irred, chunk, start, end, num_active_images)
-
+    
     !Allocate dos
     allocate(el%dos(el%nwv_irred, el%numbands))
 
     !Initialize dos array
     el%dos(:,:) = 0.0_r64
 
+    !Allocate small work variable chunk for each image and initialize
+    allocate(dos_chunk(chunk, el%numbands)[*])
+    dos_chunk(:,:) = 0.0_r64
+    
     counter = 0
     !Only work with the active images
-    if(this_image() <= num_active_images) then
-       !Allocate small work variable chunk for each image and initialize
-       allocate(dos_chunk(chunk, el%numbands)[*])
-       dos_chunk(:,:) = 0.0_r64
-       
+    if(this_image() <= num_active_images) then       
        do ik = start, end !Run over IBZ wave vectors
           !Increase counter
           counter = counter + 1
@@ -631,7 +631,7 @@ contains
     if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
     
     !Gather from images and broadcast to all
-    sync all
+    sync all    
     if(this_image() == 1) then
        do im = 1, num_active_images
           el%dos(start[im]:end[im], :) = dos_chunk(:,:)[im]
@@ -705,18 +705,18 @@ contains
     if (phsubs) then
       call ph%xsubs%allocate_xmassvar(ph, usetetra, phiso_Tmat)
     end if
-
+    
+    !Allocate small work variable chunk for each image
+    allocate(dos_chunk(chunk, ph%numbands)[*])
+    if(phiso .and. .not. phiso_Tmat) allocate(W_phiso_chunk(chunk, ph%numbands)[*])
+    if(phsubs) allocate(W_phsubs_chunk(chunk, ph%numbands)[*])
+    dos_chunk(:,:) = 0.0_r64
+    if(phiso .and. .not. phiso_Tmat) W_phiso_chunk(:,:) = 0.0_r64
+    if(phsubs) W_phsubs_chunk(:,:) = 0.0_r64
+    
     counter = 0
     !Only work with the active images
-    if(this_image() <= num_active_images) then
-       !Allocate small work variable chunk for each image
-       allocate(dos_chunk(chunk, ph%numbands)[*])
-       if(phiso .and. .not. phiso_Tmat) allocate(W_phiso_chunk(chunk, ph%numbands)[*])
-       if(phsubs) allocate(W_phsubs_chunk(chunk, ph%numbands)[*])
-       dos_chunk(:,:) = 0.0_r64
-       if(phiso .and. .not. phiso_Tmat) W_phiso_chunk(:,:) = 0.0_r64
-       if(phsubs) W_phsubs_chunk(:,:) = 0.0_r64
-       
+    if(this_image() <= num_active_images) then       
        do iq = start, end !Run over IBZ wave vectors
           !Increase counter
           counter = counter + 1

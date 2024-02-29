@@ -1,5 +1,5 @@
 module resource_module
-  !Module containing the data type for resouce management.
+  !Module containing the data type for resource management.
 
 #ifdef _OPENACC
   use openacc
