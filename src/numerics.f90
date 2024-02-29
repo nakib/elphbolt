@@ -87,6 +87,8 @@ module numerics_module
      !! Use phonon-boundary scattering?
      logical :: fourph
      !! Use 4-ph scattering?
+     logical :: need_Wannier
+     !! Is Wannier data needed?
      integer(i64) :: fourph_mesh_ref
      !! Mesh refinement factor of phonon wavectors with respect to external 4-ph calculation 
      logical :: phthinfilm
@@ -336,6 +338,11 @@ contains
        self%onlyphbte = .false.
        self%phe = .true.
     end if
+
+    !Set Wannier usage flag
+    self%need_Wannier = self%use_Wannier_ifc2s .or. self%onlyebte .or. self%drag &
+         .or. (self%phe .and. self%onlyphbte) &
+         .or. self%plot_along_path .or. self%runlevel == 3
 
     !Check if T-matrix and tetrahedron method consistency
     if(self%phdef_Tmat .and. .not. self%tetrahedra) then

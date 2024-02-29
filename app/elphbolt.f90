@@ -71,8 +71,7 @@ program elphbolt
   sync all
   call t_event%end_timer('Initialization')
   
-  if(num%use_Wannier_ifc2s .or. num%onlyebte .or. num%drag .or. num%phe &
-       .or. num%plot_along_path .or. num%runlevel == 3) then
+  if(num%need_Wannier) then
      call t_event%start_timer('Wannier')
      
      !Read EPW Wannier data
@@ -209,8 +208,7 @@ program elphbolt
         call t_event%end_timer('IBZ e-ph transition probabilities')
      end if
 
-     if(num%onlyebte .or. num%drag .or. num%phe .or. num%drag &
-          .or. num%plot_along_path) then
+     if(num%need_Wannier) then
         !Deallocate Wannier quantities
         call wann%deallocate_wannier(num)
      end if
