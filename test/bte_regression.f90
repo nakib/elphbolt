@@ -18,7 +18,7 @@ program bte_regression
   implicit none
 
   integer :: itest
-  integer, parameter :: num_tests = 7
+  integer, parameter :: num_tests = 8
   type(testify) :: test_array(num_tests), tests_all
 
   type(numerics) :: num
@@ -59,13 +59,9 @@ program bte_regression
      test_array(itest) = testify("number of symmetries")
      call test_array(itest)%assert(sym%nsymm, 24_i64)
 
-     !TODO The following is assertion is problematic since
-     !the trimming of the string sym%international does not
-     !seem to work on all machine. For now disabling this.
-!!$     itest = itest + 1
-!!$     test_array(itest) = testify("symmetry group")
-!!$     call test_array(itest)%assert( &
-!!$          sym%international(1 : len(trim(sym%international)) - 1), "F-43m")
+     itest = itest + 1
+     test_array(itest) = testify("symmetry group")
+     call test_array(itest)%assert(sym%international, "F-43m")
   end if
   sync all
   !!

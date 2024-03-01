@@ -22,7 +22,9 @@ module symmetry_module
   use misc, only: mux_vector, demux_mesh, demux_vector, &
        exit_with_message, subtitle, distribute_points
   use crystal_module, only : crystal
-  use spglib_wrapper, only: get_operations, get_cartesian_operations, get_num_operations
+
+  use iso_c_binding
+  use spglib_f08, only: SpglibDataset, spg_get_dataset
   
   implicit none
   
@@ -30,7 +32,6 @@ module symmetry_module
   public symmetry, find_equiv_map, find_irred_wedge, create_fbz2ibz_map, &
        fbz2ibz, symmetrize_3x3_tensor, symmetrize_3x3_tensor_noTR
   
-
   type symmetry
      !! Data and procedure related to symmetries.
      
@@ -78,7 +79,10 @@ contains
     logical, allocatable :: valid(:)
     real(r64), allocatable :: crtmp(:,:,:), qrtmp(:,:,:)
     real(r64), allocatable :: translations(:,:), ctranslations(:,:)
-    real(r64) :: tmp1(3,3), tmp2(3,3), tmp3(3,3)
+    real(r64) :: tmp1(3, 3), tmp2(3, 3), tmp3(3, 3)
+    type(spglibdataset) :: symdataset
+    integer(kind = C_INT) :: numatoms_cint
+    integer(kind = C_INT) :: atomtypes_cint(crys%numatoms)
 
     !External procedures
     external :: dgesv
@@ -88,42 +92,64 @@ contains
     !Number of points in wave vector mesh
     nq = product(mesh)
     
-    !Number of crystal symmetries.
-    self%nsymm = get_num_operations(crys%lattvecs,crys%numatoms,crys%atomtypes,crys%basis)
-    !Double the above to take time reversal symetry (TRS) into account.
+    numatoms_cint = crys%numatoms
+    atomtypes_cint = crys%atomtypes
+    symdataset = spg_get_dataset(transpose(crys%lattvecs), crys%basis, &
+         atomtypes_cint, numatoms_cint, 1.0e-5_r64)
+    
+    !Grab subset of symmetry info from spglib data set
+    ! Number of symmetry operations
+    self%nsymm = symdataset%n_operations
+
+    ! Double the above to take time reversal symetry (TRS) into account.
     self%nsymm_rot = 2*self%nsymm
 
+    ! Allocate internal symmetry related data
     allocate(self%rotations(3,3,self%nsymm_rot),self%crotations(3,3,self%nsymm_rot),&
          self%qrotations(3,3,self%nsymm_rot),self%rotations_orig(3,3,self%nsymm),&
          self%crotations_orig(3,3,self%nsymm),self%qrotations_orig(3,3,self%nsymm),&
          translations(3,self%nsymm),ctranslations(3,self%nsymm))
 
-    !Get symmetry operations.
-    call get_operations(crys%lattvecs,crys%numatoms,crys%atomtypes,&
-         crys%basis,self%nsymm,self%rotations_orig,translations,self%international)
-    self%rotations(:,:,1:self%nsymm) = self%rotations_orig
+    ! Mind the difference in convention between spglib and this code
+    do i = 1, self%nsymm
+       self%rotations_orig(:, :, i) = transpose(symdataset%rotations(:, :, i))
+    end do
 
+    ! Set Just the front half
+    self%rotations(:, :, 1:self%nsymm) = self%rotations_orig
+
+    ! Set the translations
+    translations = symdataset%translations
+
+    ! Set the international symbol
+    self%international = trim(adjustl(symdataset%international_symbol))
+    !!
+        
     if(this_image() == 1) then
-       !This is a hacky fix to the problem of a trailing binary character
-       !printing that happens on some machines.
-       nlen = len(trim(self%international)) - 1
-       write(*, "(A, A)") "Crystal symmetry group = ", self%international(1:nlen)
+       write(*, "(A, A)") "Crystal symmetry group = ", self%international
+       write(*, "(A, I3)") "Spacegroup number = ", symdataset%spacegroup_number
        write(*, "(A, I5)") "Number of crystal symmetries (without time-reversal) = ", self%nsymm
     end if
 
-    !Get symmertry operations in Cartesian basis.
-    call get_cartesian_operations(crys%lattvecs,self%nsymm,&
-         self%rotations_orig,translations,&
-         self%crotations_orig,ctranslations)
-    self%crotations(:,:,1:self%nsymm) = self%crotations_orig
-
+    !Set symmetry operations in Cartesian basis.
+    ctranslations = matmul(crys%lattvecs, translations)
+    
+    do i = 1, self%nsymm
+       tmp1 = transpose(crys%lattvecs)
+       tmp2 = transpose(matmul(crys%lattvecs, self%rotations_orig(:, :, i)))
+       call dgesv(3, 3, tmp1, 3, P, tmp2, 3, info)
+       self%crotations_orig(:, :, i) = transpose(tmp2)
+    end do
+    self%crotations(:, :, 1:self%nsymm) = self%crotations_orig
+    !!
+    
     !Transform the rotation matrices to the reciprocal-space basis.
-    do i = 1,self%nsymm
-       tmp1 = matmul(transpose(crys%lattvecs),crys%lattvecs)
+    do i = 1, self%nsymm
+       tmp1 = matmul(transpose(crys%lattvecs), crys%lattvecs)
        tmp2 = transpose(self%rotations_orig(:, :, i))
        tmp3 = tmp1
-       call dgesv(3,3,tmp1,3,P,tmp2,3,info)
-       self%qrotations_orig(:,:,i) = transpose(matmul(tmp2,tmp3))
+       call dgesv(3, 3, tmp1, 3, P, tmp2, 3, info)
+       self%qrotations_orig(:, :, i) = transpose(matmul(tmp2, tmp3))
     end do
     self%qrotations(:,:,1:self%nsymm) = self%qrotations_orig
 
