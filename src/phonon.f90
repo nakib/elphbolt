@@ -197,13 +197,13 @@ contains
     !Divide wave vectors among images
     call distribute_points(self%nwv, chunk, start, end, num_active_images)
 
+    !Allocate small work variable chunk for each image
+    allocate(ens_chunk(chunk, self%numbands)[*])
+    allocate(vels_chunk(chunk, self%numbands, 3)[*])
+    allocate(evecs_chunk(chunk, self%numbands, self%numbands)[*])
+    
     !Only work with the active images
     if(this_image() <= num_active_images) then
-       !Allocate small work variable chunk for each image
-       allocate(ens_chunk(chunk, self%numbands)[*])
-       allocate(vels_chunk(chunk, self%numbands, 3)[*])
-       allocate(evecs_chunk(chunk, self%numbands, self%numbands)[*])
-
        !Calculate FBZ phonon quantities
        if(num%use_Wannier_ifc2s .and. present(wann)) then
           call wann%ph_wann(crys, chunk, self%wavevecs(start:end, :), &
@@ -212,8 +212,8 @@ contains
           call phonon_espresso(self, crys, chunk, self%wavevecs(start:end, :), &
                ens_chunk, evecs_chunk, vels_chunk)
        end if
-
     end if
+    
     !Gather the chunks from the images and broadcast to all
     sync all
     if(this_image() == 1) then
@@ -239,11 +239,12 @@ contains
 
     !Print phonon IBZ mesh
     call write2file_rank2_real("ph.wavevecs_ibz", self%wavevecs_irred)
+
+    !Create symmetrizers of wave vector dependent vectors ShengBTE style
+    allocate(symmetrizers_chunk(3, 3, chunk)[*])
     
     !Only work with the active images
     if(this_image() <= num_active_images) then
-       !Create symmetrizers of wave vector dependent vectors ShengBTE style
-       allocate(symmetrizers_chunk(3, 3, chunk)[*])
        symmetrizers_chunk = 0.0_r64
        do iq = start, end
           kk = 0
