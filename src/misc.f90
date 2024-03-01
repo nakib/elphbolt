@@ -472,8 +472,6 @@ contains
     !The remainder
     remaining_npts = modulo(npts, num_active_images)
 
-    !print*,'     this_image    istart        iend        chunk'
-
     if(this_image() <= remaining_npts) then
        istart_offset = 0
        image_offset = 0
@@ -493,8 +491,6 @@ contains
        istart = 0
        iend = 0
     end if
-
-    !print*, this_image(), istart, iend, chunk
   end subroutine distribute_points
   
   pure function cross_product(A, B)

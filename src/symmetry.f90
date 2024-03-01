@@ -238,12 +238,12 @@ contains
     
     !Divide wave vectors among images
     call distribute_points(nmesh, chunk, start, end, num_active_images)
-
+    
+    !Allocate small work variable chunk for each image
+    allocate(equiv_map_chunk(nsymm_rot, chunk)[*])
+    
     !Only work with the active images
     if(this_image() <= num_active_images) then
-       !Allocate small work variable chunk for each image
-       allocate(equiv_map_chunk(nsymm_rot, chunk)[*])
-
        counter = 0
        do i = start, end !Run over total number of wave vectors.
           !Increase counter
@@ -351,7 +351,7 @@ contains
        if(nrunninglist > 0) then
           !Divide wave vectors among images
           call distribute_points(nrunninglist, chunk, start, end, num_active_images)
-          
+
           check = 0
           if(start > 0) then
              if(any(runninglist(start:end) == imux)) check = 1

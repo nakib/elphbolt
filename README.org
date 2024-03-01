@@ -102,7 +102,7 @@ Carefully read the output on the screen and add the paths to ~caf~ and ~cafrun~ 
      
       Here I have assumed that you have already done ~blas~ and ~lapack~ building step.
 **** Using ~cmake~ [Deprecated]
-     I am sunsetting the ~cmake~ build. You are on your own to figure out how to use it. Something like the following should work after you have fiddled with the like ~CMakeLists.txt~:
+     I am sunsetting the ~cmake~ build. You are on your own to figure out how to use it. Something like the following should work after you have fiddled with the file ~CMakeLists.txt~:
 
      Issue the following command to build and run tests: ~mkdir build; cd build; cmake ..; make; ctest~. If all goes well, the exectuable will be available as ~build/bin/{elphbolt, superconda}~.
 ** Docker
