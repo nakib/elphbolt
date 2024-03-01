@@ -54,7 +54,10 @@ The source is heavily commented and can be auto-documented with ~FORD~ (https://
 
     You need an MPI implementation. It could be MPICH or OpenMPI. The first is preferred.
 
-*** 3. Get ~OpenCoarrays~
+*** 3. Get Fortran package manager (~fpm~)
+    Follow the instructions here: https://fpm.fortran-lang.org/install/index.html#install to install ~fpm~. I, personally, like to build from source, as described here: https://fpm.fortran-lang.org/install/index.html#building-from-source.
+
+*** 4. Get ~OpenCoarrays~
 
 ~OpenCoarrays~ ([[http://www.opencoarrays.org]]) is an implementation of the ~coarrays~ functionalities. Follow its installation guide to build it on your system. I personally like to use its install script where I pass my compiler and MPI relared flags explicitly. So something like the following should work
 
@@ -67,8 +70,7 @@ The source is heavily commented and can be auto-documented with ~FORD~ (https://
 
 Carefully read the output on the screen and add the paths to ~caf~ and ~cafrun~ to your ~$PATH~.
 
-*** 4. Build ~elphbolt~
-    Use one of the following two methods:
+*** 5. Build ~elphbolt~
 **** Using ~fpm~ [v>=0.7, preferred method]
 ***** Standard (no gpu)
      For a cpu-only build and test with Fortran Package Manager (https://fpm.fortran-lang.org/), first say
@@ -100,7 +102,9 @@ Carefully read the output on the screen and add the paths to ~caf~ and ~cafrun~ 
      
       Here I have assumed that you have already done ~blas~ and ~lapack~ building step.
 **** Using ~cmake~ [Deprecated]
-Issue the following command to build and run tests: ~mkdir build; cd build; cmake ..; make; ctest~. If all goes well, the exectuable will be available as ~build/bin/{elphbolt, superconda}~.
+     I am sunsetting the ~cmake~ build. You are on your own to figure out how to use it. Something like the following should work after you have fiddled with the like ~CMakeLists.txt~:
+
+     Issue the following command to build and run tests: ~mkdir build; cd build; cmake ..; make; ctest~. If all goes well, the exectuable will be available as ~build/bin/{elphbolt, superconda}~.
 ** Docker
 To build a docker image, say
 
