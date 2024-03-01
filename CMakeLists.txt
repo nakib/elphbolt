@@ -35,7 +35,6 @@ set(SRC
   src/resource.f90
   src/params.f90
   src/misc.f90
-  src/spglib_wrapper.f90
   src/numerics.f90
   src/migel_sc.f90
   src/crystal.f90
