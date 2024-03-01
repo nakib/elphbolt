@@ -58,7 +58,7 @@ The source is heavily commented and can be auto-documented with ~FORD~ (https://
     Follow the instructions here: https://fpm.fortran-lang.org/install/index.html#install to install ~fpm~. I, personally, like to build from source, as described here: https://fpm.fortran-lang.org/install/index.html#building-from-source.
 
 *** 4. Get ~OpenCoarrays~
-
+    
 ~OpenCoarrays~ ([[http://www.opencoarrays.org]]) is an implementation of the ~coarrays~ functionalities. Follow its installation guide to build it on your system. I personally like to use its install script where I pass my compiler and MPI relared flags explicitly. So something like the following should work
 
      #+BEGIN_SRC bash
@@ -92,15 +92,13 @@ Carefully read the output on the screen and add the paths to ~caf~ and ~cafrun~ 
      Modify the fpm manifest file, ~fpm.toml~, to suit your system. I'd appreciate any feedback.
 
 ***** Experimental method (with gpu)
-      For a cpu+gpu build with OpenACC (https://www.openacc.org/), say
+      For a cpu+gpu build with OpenACC (https://www.openacc.org/), the only difference from the above is that you need to source a different file before the install:
 
       #+BEGIN_SRC bash
 	source fpm_config_caf_openacc.sh; fpm install
-	fpm test test_*
-	fpm test bte_regression --runner="sh test/3C-SiC/fpm_run_bte_caf.sh"
       #+END_SRC
      
-      Here I have assumed that you have already done ~blas~ and ~lapack~ building step.
+      Here I have assumed that you have already done ~blas~ and ~lapack~ building step. The testing commands are the same as before.
 **** Using ~cmake~ [Deprecated]
      I am sunsetting the ~cmake~ build. You are on your own to figure out how to use it. Something like the following should work after you have fiddled with the file ~CMakeLists.txt~:
 
