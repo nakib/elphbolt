@@ -27,6 +27,7 @@ module bte_module
        interpolate_using_precomputed, Jacobian, cross_product
   use numerics_module, only: numerics
   use crystal_module, only: crystal
+  use nano_module, only: nanostructure
   use symmetry_module, only: symmetry
   use phonon_module, only: phonon
   use electron_module, only: electron
@@ -1249,7 +1250,7 @@ contains
          ik_ibz, m, ieq, ik_sym, ik_fbz, iproc, iq, s, nk, num_active_images, &
          fineq_indvec(3), start, end, iq2inter
     integer(i64), allocatable :: istate_el(:), istate_ph(:)
-    real(r64) :: tau_ibz, ForG(3)
+    real(r64) :: tau_ibz, ForG(size(ph%vels,3))
     real(r64), allocatable :: Xplus(:), Xminus(:), ph_drag_term_reduce(:,:,:)
     character(1024) :: filepath_Xminus, filepath_Xplus, tag
     
@@ -1266,7 +1267,7 @@ contains
     numbranches = ph%numbands
 
     !Allocate and initialize response reduction array
-    allocate(ph_drag_term_reduce(nk, numbands, 3))
+    allocate(ph_drag_term_reduce(nk, numbands, size(ph%vels,3)))
     ph_drag_term_reduce(:,:,:) = 0.0_r64
 
     !Divide electron states among images
