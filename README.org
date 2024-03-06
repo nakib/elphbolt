@@ -16,15 +16,16 @@ Using /ab initio/ electron-phonon and a fully wave vector and electron band/phon
 - phonon-mediated superconducting transition temperature.
 
 To date (January 10, 2024), ~elphbolt~ / ~superconda~ has been used in the following works:
-| material(s)         | physics probed                                                                                        | publication               |
-|---------------------+-------------------------------------------------------------------------------------------------------+---------------------------|
-| Si, BAs, LiF, & GaN | new models of phonon-isotope interaction and temperature dependent 3+4ph limited thermal conductivity | [[https://arxiv.org/abs/2401.04473][arXiv:2401.04473]]          |
-| GaN                 | 3+4 phonons and thin-film scattering limited thermal conductivity                                     | [[https://journals.aps.org/prb/abstract/10.1103/PhysRevB.108.235313][Phys. Rev. B 108, 235313]]  |
-| GaN & AlN           | drag                                                                                                  | [[https://journals.aps.org/prb/abstract/10.1103/PhysRevB.107.245202][Phys. Rev. B 107, 245202]]  |
-| MgB_{2}             | superconductivity enhancement                                                                         | [[https://journals.aps.org/prb/abstract/10.1103/PhysRevB.107.184518][Phys. Rev. B 107, 184518]]  |
-| BAs                 | drag                                                                                                  | [[https://doi.org/10.1103/PhysRevB.107.L081202][Phys. Rev. B 107, L081202]] |
-| Diamond             | drag                                                                                                  | [[https://doi.org/10.1016/j.mtphys.2022.100740][Mat. Tod. Phys 27, 100740]] |
-| Si                  | drag                                                                                                  | [[https://www.nature.com/articles/s41524-022-00710-0][npj Comp. Mat. 8, 28]]      |
+| material(s)         | physics probed                                                                                        | publication                             |
+|---------------------+-------------------------------------------------------------------------------------------------------+-----------------------------------------|
+| Si nanowires        | effect of nanostructuring on drag and thermoelectric figure of merit, ZT                              | [[https://www.sciencedirect.com/science/article/pii/S0017931024002163][Intl. J. Heat & Mass Trans. 225, 125385]] |
+| Si, BAs, LiF, & GaN | new models of phonon-isotope interaction and temperature dependent 3+4ph limited thermal conductivity | [[https://arxiv.org/abs/2401.04473][arXiv:2401.04473]]                        |
+| GaN                 | 3+4 phonons and thin-film scattering limited thermal conductivity                                     | [[https://journals.aps.org/prb/abstract/10.1103/PhysRevB.108.235313][Phys. Rev. B 108, 235313]]                |
+| GaN & AlN           | drag                                                                                                  | [[https://journals.aps.org/prb/abstract/10.1103/PhysRevB.107.245202][Phys. Rev. B 107, 245202]]                |
+| MgB_{2}             | superconductivity enhancement                                                                         | [[https://journals.aps.org/prb/abstract/10.1103/PhysRevB.107.184518][Phys. Rev. B 107, 184518]]                |
+| BAs                 | drag                                                                                                  | [[https://doi.org/10.1103/PhysRevB.107.L081202][Phys. Rev. B 107, L081202]]               |
+| Diamond             | drag                                                                                                  | [[https://doi.org/10.1016/j.mtphys.2022.100740][Mat. Tod. Phys 27, 100740]]               |
+| Si                  | drag                                                                                                  | [[https://www.nature.com/articles/s41524-022-00710-0][npj Comp. Mat. 8, 28]]                    |
 
 Stylistically, ~elphbolt~ is designed to be simple, small, fast, and extensible. It uses an object-based procedural style, which allows fast development, while resulting in a rather compact source (~ 10k lines of code, generated using David A. Wheeler's ~SLOCCount~). The symmetries of the crystal are fully exploited and the transport active Fermi window is used to allow the sampling of extremely fine wave vector meshes needed for accurate solutions of the BTEs and Eliashberg equations. Parallelism is achieved through modern Fortran's intrinsic ~coarrays~ feature that is fully supported by recent versions of both the ~gcc~ and ~intel~ compilers.
 
