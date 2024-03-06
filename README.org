@@ -8,7 +8,8 @@ Using /ab initio/ electron-phonon and 3- and 4-phonon interactions and a fully w
 - phonon and electronic thermal conductivities;
 - electronic conductivity;
 - phonon and electronic contributions to the thermopower; and
-- effect of the mutual electron-phonon drag on the transport coefficients listed above.
+- effect of the mutual electron-phonon drag on the transport coefficients listed above;
+- effective thermoelectric transport coefficients for nanostructures (nanowires, nanoribbons, and thin-films).
 
 Using /ab initio/ electron-phonon and a fully wave vector and electron band/phonon branch resolved, Eliashberg formulation of superconductivity, the ~superconda~ app gives you the
 
@@ -195,6 +196,8 @@ For the ~elphbolt~ app, there are 5 Namelists in the ~input.nml~ file: ~allocati
 | ~subs_masses~     | Real array of size ~numelements~      |       0.0 | Masses of substitution atoms in amu. This is needed if ~phsubs~ is .True. See table of keys for Namelist ~numerics~.                                                                                                                       |
 | ~subs_conc~       | Real array of size ~numelements~      |       0.0 | Concentration of the substitutional atoms in cm^{-3} (or cm^{-2} if ~twod~ is .True.). This is needed if ~phsubs~ is .True. See table of keys for Namelist ~numerics~.                                                                     |
 | ~bound_length~    | Real                                  |   1e12 mm | Characteristic sample length for boundary scattering. This is needed if ~phbound~ or ~elbound~ is .True. See table of keys for Namelist ~numerics~.                                                                                        |
+| ~nano~            | Logical                               |   .False. | Do you want to compute effective thermoelectric properties for highly symmetric nanostructure? See description of ~nano~ block. 
+|
 *** ~electrons~
 | key              | Type                         |       Default | Description                                                                                                                                                               |
 |--------------------+------------------------------+---------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -274,6 +277,15 @@ For the ~elphbolt~ app, there are 5 Namelists in the ~input.nml~ file: ~allocati
 | ~dT~               | Real    | 0.0 K   | Temperature difference used in temperature sweep.                                                                                                |
 | ~print_aniso_gap_FS~ | Logical | .False. | Print out the anisotropic gap function at the Fermi surface?                                                                                     |
 
+*** ~nano~
+| key                | Type            | Default | Description                                                                                                                                      |
+|--------------------+-----------------+---------+--------------------------------------------------------------------------------------------------------------------------------------------------|
+| ~nsys~             | Integer         |  -1     | Number of nanostructures to tackle                                                                                                               |
+| ~tag~              | Character(nsys) | 'xx'    | Tags to choose the kind of nanostructures we are dealing with in each case ('nw': nanowire; 'nr': nanoribbon; 'tf': thin-film)                   |
+| ~limit~            | Real(nsys)      |   -1    | Limit length of the nanostructures in nm (radius for nw, width for nr, and thickness for tf)                                                     |
+| ~taxis~            | Real(nsys,3)    | 0 0 0   | Direction in which transport will be computed (for tf and nr it must be perpendicular to the normal vector)                                      |
+| ~naxis~            | Real(nsys,3)    | 0 0 0   | Vector defining the normal of the system for tf and nr (only fill for those cases)                                                               |
+
 ** Description of output files
 
 The code produces a large amount of data. Here, we provide a description of the various types output files.
@@ -329,6 +341,16 @@ Below I(F)BZ = irreducible (full) Brillouin zone; RTA = relaxation time approxim
 | ~iso_quasiparticle_DOS.T*~         | ~./~                 | none              | Scaled quasiparticle density of states on the equidistant electronic quasiparticle energy mesh.                                                                                                                  |
 | ~iso_quasiparticle_Delta.T*~       | ~./~                 | eV                | Isotropic superconducting gap on the equidistant electronic quasiparticle energy mesh.                                                                                                                           |
 | ~aniso_quasiparticle_Delta_FS.T~   | ~./~                 | eV                | Anisotropic superconducting gap on the Fermi surface for each IBZ electronic state within the Fermi window. The first column gives the number of FBZ images of the IBZ point.                                    |
+
+Note: When computing the effective properties for the nanostructures, the tensors are reshaped so that each columnn refers to the respective nanostructure from input.
+
+*** Nanostructure data 
+| File name                        | Directory         | Units                | Description                                                                                                                                    |
+|----------------------------------+-------------------+----------------------+------------------------------------------------------------------------------------------------------------------------------------------------|
+| ~nano_info~                      | ~./~              | -/nm/-/-/-/-/-/-                | Nanostructure information tag(i)/limit(i)/taxis(i,:)/naxis(i,:)                                                                     |
+| ~Sph~                            | ~./~              | eV/Kms^{-1}/Kms^{-1}/Kms^{-1}/- | Nanostructure suppression factor for phonons in FBZ energy(i,ib)/vg(i,ib,:)/Sph(i,ib,:)                                             |
+| ~Sel~                            | ~./~              | eV/Kms^{-1}/Kms^{-1}/Kms^{-1}/- | Nanostructure suppression factor for electrons in FBZ energy(i,ib)/vg(i,ib,:)/Sel(i,ib,:)                                           |
+           
 
 *** Postprocessing (runlevel 2)
 
