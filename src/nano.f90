@@ -72,6 +72,8 @@ module nano_module
     !! Subroutine to clean up the object
     !!
     !! self nansotructure object
+
+    class(nanostructure), intent(inout) :: self
     
     if (allocated(self%tag))     deallocate(self%tag)
     if (allocated(self%limit))   deallocate(self%limit)
