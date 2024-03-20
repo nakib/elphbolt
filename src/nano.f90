@@ -233,7 +233,7 @@ module nano_module
     if (species_prefix == 'ph') then
 
       if (.not. present(ph)) then
-        call exit_with_message("Error in nanostructure%compute_transport_vg: asked for ph vg in nanostructures but no ph object is provided")
+        call exit_with_message("Error asked for ph vg in nanostructures but no ph object is provided")
       end if
       
       allocate(self%vg_ph(size(ph%vels,1),size(ph%vels,2),self%nsys))
@@ -250,7 +250,7 @@ module nano_module
     else if (species_prefix == 'el') then
 
       if (.not. present(el)) then
-        call exit_with_message("Error in nanostructure%compute_transport_vg: asked for el vg in nansotructures but no el object is provided")
+        call exit_with_message("Error asked for el vg in nansotructures but no el object is provided")
       end if
       
       allocate(self%vg_el(size(el%vels,1),size(el%vels,2),self%nsys))
