@@ -86,7 +86,7 @@ module nano_module
     if (allocated(self%conv_ph)) deallocate(self%conv_ph)
     if (allocated(self%conv_el)) deallocate(self%conv_el)
     if (allocated(self%vg_ph))   deallocate(self%vg_ph)
-    if (allocated(self$vg_el))   deallocate(self%vg_el)
+    if (allocated(self%vg_el))   deallocate(self%vg_el)
 
   end subroutine clean
   
