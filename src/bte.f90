@@ -27,6 +27,7 @@ module bte_module
        interpolate_using_precomputed, Jacobian, cross_product
   use numerics_module, only: numerics
   use crystal_module, only: crystal
+  use nano_module, only: nanostructure
   use symmetry_module, only: symmetry
   use phonon_module, only: phonon
   use electron_module, only: electron

@@ -24,7 +24,6 @@ module nano_module
   !! particles at reference equilibrium of the absorbing wall).
   !! See the subroutine compute_suppression for more information
   !!
-  !!
   use params, only: r64, i64, pi
   use misc, only: print_message, exit_with_message
   use symmetry_module, only: symmetry
@@ -55,20 +54,46 @@ module nano_module
     !! the suppression factors for phonons and electrons
     logical, allocatable :: conv_ph(:), conv_el(:)
     !! convergence for each distribution for all system
+    real(r64), allocatable :: vg_ph(:,:,:) 
+    !! phonon group velocities (iq,ib, isystem)
+    real(r64), allocatable :: vg_el(:,:,:)
+    !! phonon group velocities (ik,ib, isystem)
     
    contains
    
    procedure, public :: initialize=>read_nanostructure, compute_suppression, &
-                 compute_transport_vg, print_nanogeominfo
+                 compute_transport_vg, print_nanogeominfo, clean
   
   end type nanostructure
   
   contains
+
+  subroutine clean(self)
+    !! Subroutine to clean up the object
+    !!
+    !! self nansotructure object
+
+    class(nanostructure), intent(inout) :: self
+    
+    if (allocated(self%tag))     deallocate(self%tag)
+    if (allocated(self%limit))   deallocate(self%limit)
+    if (allocated(self%taxis))   deallocate(self%taxis)
+    if (allocated(self%tnorm))   deallocate(self%tnorm)
+    if (allocated(self%naxis))   deallocate(self%naxis)
+    if (allocated(self%nnorm))   deallocate(self%nnorm)
+    if (allocated(self%Sph))     deallocate(self%Sph)
+    if (allocated(self%Sel))     deallocate(self%Sel)
+    if (allocated(self%conv_ph)) deallocate(self%conv_ph)
+    if (allocated(self%conv_el)) deallocate(self%conv_el)
+    if (allocated(self%vg_ph))   deallocate(self%vg_ph)
+    if (allocated(self%vg_el))   deallocate(self%vg_el)
+
+  end subroutine clean
   
   subroutine read_nanostructure(self)
     !! Subroutine to read nanostructure information
     !!
-    !! self Nanostructuration object
+    !! self nanostructure object
     
     class(nanostructure), intent(inout) :: self
     
@@ -197,47 +222,48 @@ module nano_module
     !! ph phonon information
     !! el electron information
     !! 
-    class(nanostructure) , intent(inout) :: self
-    character(len = 2), intent(in) :: species_prefix
-    type(phonon), intent(inout)   :: ph
-    type(electron), intent(inout), optional :: el
+    class(nanostructure) , intent(inout)  :: self
+    character(len = 2), intent(in)        :: species_prefix
+    type(phonon), intent(in), optional    :: ph
+    type(electron), intent(in), optional  :: el
     
     !! Local
     integer(i64) :: i, j, k
-    real(r64), allocatable :: v(:,:,:)
     
     if (species_prefix == 'ph') then
+
+      if (.not. present(ph)) then
+        call exit_with_message("Error asked for ph vg in nanostructures but no ph object is provided")
+      end if
       
-      call move_alloc(ph%vels,v)
-      allocate(ph%vels(size(v,1),size(v,2),self%nsys))
+      allocate(self%vg_ph(size(ph%vels,1),size(ph%vels,2),self%nsys))
       
       do i = 1, size(ph%vels,1)
         do j = 1, size(ph%vels,2)
           do k = 1, self%nsys
-            ph%vels(i,j,k) = dot_product(v(i,j,:), &
+            self%vg_ph(i,j,k) = dot_product(ph%vels(i,j,:), &
                               self%taxis(k,:)/self%tnorm(k))
           end do
         end do
       end do
       
-      deallocate(v)
-      
     else if (species_prefix == 'el') then
+
+      if (.not. present(el)) then
+        call exit_with_message("Error asked for el vg in nansotructures but no el object is provided")
+      end if
       
-      call move_alloc(el%vels,v)
-      allocate(el%vels(size(v,1),size(v,2),self%nsys))
+      allocate(self%vg_el(size(el%vels,1),size(el%vels,2),self%nsys))
       
       do i = 1, size(el%vels,1)
         do j = 1, size(el%vels,2)
           do k = 1, self%nsys
-            el%vels(i,j,k) = dot_product(v(i,j,:), &
+            self%vg_el(i,j,k) = dot_product(el%vels(i,j,:), &
                               self%taxis(k,:)/self%tnorm(k))
           end do
         end do
       end do
-      
-      deallocate(v)
-      
+
     else
       call exit_with_message("Unknown particle in compute_suppression. Exiting.")
     end if
@@ -254,7 +280,8 @@ module nano_module
     !! averaged non-homogeneous electron phonon Boltzmann transport
     !! Equation. It is averaged in the sense that RTA-deviations are 
     !! averaged over the cross section normal to the transport direction
-    !! See XXX for more information regarding the methodology.
+    !! See 10.1016/j.ijheatmasstransfer.2024.125385 for more information regarding the methodology
+    !! for the coupled electron-phonon BTE
     !!
     !! self Nanostructuration object
     !! species_prefix kind of particle
@@ -436,7 +463,7 @@ module nano_module
     
     !We implement as it is need for computation the trapezoidal rule
     !an analytical formula using Bessel and Struve modified functions exists
-    !but has to much numerical noise so trapezoidal is better.
+    !but has too much numerical noise. So numerical integration is the way to go.
     pure function supress_nw(R,mfp) result(sf)
       implicit none
       real(r64), intent(in) :: R, mfp
