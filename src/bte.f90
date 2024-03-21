@@ -933,7 +933,7 @@ contains
 
     !Locals
     real(r64), allocatable :: el_kappa0(:,:,:), el_alphabyT(:,:,:), &
-         el_sigma(:, :,:), el_sigmaS(:, :, :) ,dummy(:,:,:)
+         el_sigma(:, :,:), el_sigmaS(:, :, :)
     real(r64) :: el_kappa0_scalar, el_kappa0_scalar_old, el_alphabyT_scalar, el_alphabyT_scalar_old, &
          el_sigma_scalar, el_sigma_scalar_old, el_sigmaS_scalar, el_sigmaS_scalar_old
     type(timer) :: t
@@ -943,7 +943,11 @@ contains
 
     call print_message("Dragless electron transport:")
     call print_message("-----------------------------")
-
+    
+    !Allocate electron transport coefficients
+    allocate(el_sigma(el%numbands, 3, 3), el_sigmaS(el%numbands, 3, 3), &
+         el_alphabyT(el%numbands, 3, 3), el_kappa0(el%numbands, 3, 3))
+    
     !Restart with RTA solution
     self%el_response_T = self%el_field_term_T
     self%el_response_E = self%el_field_term_E
@@ -1185,6 +1189,10 @@ contains
     call print_message("Dragless phonon transport:")
     call print_message("---------------------------")
 
+    !Allocate phonon transport coefficients
+    allocate(ph_kappa(ph%numbands, 3, 3), ph_alphabyT(ph%numbands, 3, 3), &
+         dummy(ph%numbands, 3, 3))
+    
     !Restart with RTA solution
     self%ph_response_T = self%ph_field_term_T
 
@@ -1260,6 +1268,7 @@ contains
     type(timer) :: t
     
     call t%start_timer('Coupled e-ph BTEs')
+
     allocate(widc(product(el%wvmesh),6), idc(product(el%wvmesh),9), &
          ksint(product(el%wvmesh),3))
     do ik = 1, size(ksint,1)
@@ -1268,6 +1277,14 @@ contains
     call precompute_interpolation_corners_and_weights(ph%wvmesh,  &
          el%mesh_ref_array, ksint, idc, widc)
 
+    !Allocate electron transport coefficients
+    allocate(el_sigma(el%numbands, 3, 3), el_sigmaS(el%numbands, 3, 3), &
+         el_alphabyT(el%numbands, 3, 3), el_kappa0(el%numbands, 3, 3))
+
+    !Allocate phonon transport coefficients
+    allocate(ph_kappa(ph%numbands, 3, 3), ph_alphabyT(ph%numbands, 3, 3), &
+         dummy(ph%numbands, 3, 3))
+    
     tot_alphabyT_scalar = el_alphabyT_scalar + ph_alphabyT_scalar
     KO_dev = 100.0_r64*abs(&
          (el_sigmaS_scalar - tot_alphabyT_scalar)/tot_alphabyT_scalar)
