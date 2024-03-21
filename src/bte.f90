@@ -114,7 +114,7 @@ contains
     type(electron), intent(in), optional :: el
 
     !Local variables
-    character(:), allocatable :: tag, Tdir
+    character(1024) :: tag, Tdir
 
     call subtitle("Calculating transport...")
 
