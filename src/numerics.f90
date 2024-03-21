@@ -109,7 +109,7 @@ module numerics_module
      !! Choose if the drag effect will be included.
      logical :: use_Wannier_ifc2s
      !! Choose if Wannier 2nd order ifcs will be used for usual phonon calculations.
-     integer(i64) :: maxiter
+     integer :: maxiter
      !! Maximum number of iterations in the BTE/Migdal-Eliashberg equations solver.
      real(r64) :: conv_thres
      !! BTE/Migdal-Eliashberg euqations iteration convergence criterion.

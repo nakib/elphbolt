@@ -260,10 +260,11 @@ contains
 
     character(len = *), intent(in) :: filename
     real(r64), intent(in) :: data(:,:,:)
-    integer(i64), intent(in), optional :: bandlist(:)
+    integer, intent(in), optional :: bandlist(:)
 
     !Local variables
-    integer(i64) :: ib, ibstart, ibend, nb, ik, nk, dim
+    integer(i64) :: ik, nk
+    integer :: ib, ibstart, ibend, nb, dim
     character(len = 128) :: numcols
     character(len = 1024) :: bandtag
     real(r64), allocatable :: aux(:,:)
@@ -309,10 +310,12 @@ contains
 
     character(len = *), intent(in) :: filename
     real(r64), intent(out) :: data(:,:,:)
-    integer(i64), intent(in), optional :: bandlist(:)
+    integer, intent(in), optional :: bandlist(:)
 
     !Local variables
-    integer(i64) :: ib, ibstart, ibend, nb, ik, nk, dim
+    !integer(i64) :: ib, ibstart, ibend, nb, ik, nk, dim
+    integer(i64) :: ik, nk
+    integer :: ib, ibstart, ibend, nb, dim
     character(len = 128)  :: numcols
     character(len = 1024) :: bandtag
     
@@ -345,9 +348,9 @@ contains
     !! Append 3x3 tensor to band/branch resolved files.
 
     character(len = *), intent(in) :: filename
-    integer(i64), intent(in) :: it
+    integer, intent(in) :: it
     real(r64), intent(in) :: data(:,:,:)
-    integer(i64), intent(in), optional :: bandlist(:)
+    integer, intent(in), optional :: bandlist(:)
 
     !Local variables
     integer(i64) :: ib, nb, ibstart, ibend
@@ -397,10 +400,10 @@ contains
 
     character(len = *), intent(in) :: filename
     real(r64), intent(in) :: data(:,:,:,:)
-    integer(i64), intent(in), optional :: bandlist(:)
+    integer, intent(in), optional :: bandlist(:)
 
     !Local variables
-    integer(i64) :: ie, ne, ib, nb, ibstart, ibend
+    integer :: ie, ne, ib, nb, ibstart, ibend
     character(len = 128)  :: numcols
     character(len = 1024) :: bandtag
     real(r64) :: aux(3,3)

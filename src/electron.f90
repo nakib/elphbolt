@@ -52,7 +52,7 @@ module electron_module
      !! Lowest conduction band index.
      integer(i64) :: indhighvalence
      !! Highest valence band index.
-     integer(i64), allocatable :: bandlist(:)
+     integer, allocatable :: bandlist(:)
      !! List of transport active band indices.
      integer(i64) :: mesh_ref
      !! Electron mesh refinement factor compared to the phonon mesh.

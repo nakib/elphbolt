@@ -115,7 +115,8 @@ contains
 
     !Local variables
     character(len = 1024) :: tag, Tdir, tableheader
-    integer(i64) :: iq, ik, it_ph, it_el, icart
+    integer :: it_ph, it_el, icart
+    integer(i64) :: iq, ik
     integer(i64), allocatable :: idc(:,:) , ksint(:,:)
     real(r64), allocatable :: I_diff(:,:,:), I_drag(:,:,:), ph_kappa(:,:,:), ph_alphabyT(:,:,:), &
          el_sigma(:,:,:), el_sigmaS(:,:,:), el_alphabyT(:,:,:), el_kappa0(:,:,:), &
@@ -138,12 +139,15 @@ contains
     end if
     sync all
 
+    !Phonon RTA
     if(.not. num%onlyebte) &
          call dragless_phbte_RTA(Tdir, self, num, crys, sym, ph, el)
-    
+
+    !Electron RTA
     if(.not. num%onlyphbte) &
          call dragless_ebte_RTA(Tdir, self, num, crys, sym, el, ph)
     
+    !Dragful electron-phonon BTEs
     if(num%drag) then !Coupled BTEs
        call t%start_timer('Coupled e-ph BTEs')
        allocate(widc(product(el%wvmesh),6), idc(product(el%wvmesh),9), &
@@ -178,12 +182,12 @@ contains
        !Append RTA coefficients in drag files
        ! Change to data output directory
        call chdir(trim(adjustl(Tdir)))
-       call append2file_transport_tensor('drag_ph_kappa_', 0_i64, ph_kappa)
-       call append2file_transport_tensor('drag_ph_alphabyT_', 0_i64, ph_alphabyT)
-       call append2file_transport_tensor('drag_el_sigmaS_', 0_i64, el_sigmaS, el%bandlist)
-       call append2file_transport_tensor('drag_el_sigma_', 0_i64, el_sigma, el%bandlist)
-       call append2file_transport_tensor('drag_el_alphabyT_', 0_i64, el_alphabyT, el%bandlist)
-       call append2file_transport_tensor('drag_el_kappa0_', 0_i64, el_kappa0, el%bandlist)
+       call append2file_transport_tensor('drag_ph_kappa_', 0, ph_kappa)
+       call append2file_transport_tensor('drag_ph_alphabyT_', 0, ph_alphabyT)
+       call append2file_transport_tensor('drag_el_sigmaS_', 0, el_sigmaS, el%bandlist)
+       call append2file_transport_tensor('drag_el_sigma_', 0, el_sigma, el%bandlist)
+       call append2file_transport_tensor('drag_el_alphabyT_', 0, el_alphabyT, el%bandlist)
+       call append2file_transport_tensor('drag_el_kappa0_', 0, el_kappa0, el%bandlist)
        ! Change back to cwd
        call chdir(trim(adjustl(num%cwd)))
        
@@ -339,143 +343,14 @@ contains
 
        call t%end_timer('Coupled e-ph BTEs')
     end if !drag
-    
-    if(num%onlyphbte .or. num%drag) then !Phonon BTE
-       call t%start_timer('Iterative decoupled ph BTE')
-       
-       call print_message("Decoupled phonon transport:")
-       call print_message("---------------------------")
 
-       !Restart with RTA solution
-       self%ph_response_T = self%ph_field_term_T
+    !Dragless full phonon BTE
+    if(num%onlyphbte .or. num%drag) &
+         call dragless_phbte_full(Tdir, self, num, crys, sym, ph, el)
 
-       if(this_image() == 1) then
-          write(*,*) "iter    k_ph[W/m/K]"
-       end if
-
-       do it_ph = 1, num%maxiter
-          call iterate_bte_ph(crys%T, num, ph, el, self%ph_rta_rates_ibz, &
-               self%ph_field_term_T, self%ph_response_T)
-
-          !Calculate phonon transport coefficients
-          call calculate_transport_coeff('ph', 'T', crys%T, 1_i64, 0.0_r64, ph%ens, ph%vels, &
-               crys%volume, ph%wvmesh, self%ph_response_T, sym, ph_kappa, dummy)
-
-          !Calculate and print phonon transport scalar
-          ph_kappa_scalar = trace(sum(ph_kappa, dim = 1))/crys%dim
-          if(this_image() == 1) then
-             write(*,"(I3, A, 1E16.8)") it_ph, "    ", ph_kappa_scalar
-          end if
-
-          !Print out branch resolved transport coefficients
-          ! Change to data output directory
-          call chdir(trim(adjustl(Tdir)))
-          call append2file_transport_tensor('nodrag_ph_kappa_', it_ph, ph_kappa)
-          ! Change back to cwd
-          call chdir(trim(adjustl(num%cwd)))
-          
-          if(converged(ph_kappa_scalar_old, ph_kappa_scalar, num%conv_thres)) then
-             !Print converged branch resolved response functions
-             ! Change to data output directory
-             call chdir(trim(adjustl(Tdir)))
-             call write2file_response('nodrag_F0_', self%ph_response_T) !gradT, ph
-             ! Change back to cwd
-             call chdir(trim(adjustl(num%cwd)))
-             
-             exit
-          else
-             ph_kappa_scalar_old = ph_kappa_scalar
-          end if
-       end do
-
-       call t%end_timer('Iterative decoupled ph BTE')
-    end if
-
-    if(num%onlyebte .or. num%drag) then !Electron BTE
-       call t%start_timer('Iterative decoupled e BTE')
-       
-       call print_message("Decoupled electron transport:")
-       call print_message("-----------------------------")
-
-       !Restart with RTA solution
-       self%el_response_T = self%el_field_term_T
-       self%el_response_E = self%el_field_term_E
-       
-       if(this_image() == 1) then
-          write(*,*) "iter    k0_el[W/m/K]        sigmaS[A/m/K]", &
-               "         sigma[1/Ohm/m]      alpha_el/T[A/m/K]"
-       end if
-
-       do it_el = 1, num%maxiter
-          !E field:
-          call iterate_bte_el(num, el, crys, &
-               self%el_rta_rates_ibz, self%el_field_term_E, self%el_response_E)
-
-          !Calculate electron transport coefficients
-          call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, &
-               el%ens, el%vels, crys%volume, el%wvmesh, self%el_response_E, sym, &
-               el_alphabyT, el_sigma, Bfield = num%Bfield)
-          el_alphabyT = el_alphabyT/crys%T
-
-          !delT field:
-          call iterate_bte_el(num, el, crys, &
-               self%el_rta_rates_ibz, self%el_field_term_T, self%el_response_T)
-          !Enforce Kelvin-Onsager relation
-          do icart = 1, 3
-             self%el_response_T(:,:,icart) = (el%ens(:,:) - el%chempot)/qe/crys%T*&
-                  self%el_response_E(:,:,icart)
-          end do
-
-          call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
-               el%ens, el%vels, crys%volume, el%wvmesh, self%el_response_T, sym, &
-               el_kappa0, el_sigmaS, Bfield = num%Bfield)
-
-          !Calculate and print electron transport scalars
-          el_kappa0_scalar = trace(sum(el_kappa0, dim = 1))/crys%dim
-          el_sigmaS_scalar = trace(sum(el_sigmaS, dim = 1))/crys%dim
-          el_sigma_scalar = trace(sum(el_sigma, dim = 1))/crys%dim
-          el_alphabyT_scalar = trace(sum(el_alphabyT, dim = 1))/crys%dim
-          if(this_image() == 1) then
-             write(*,"(I3, A, 1E16.8, A, 1E16.8, A, 1E16.8, A, 1E16.8)") it_el, &
-                  "    ", el_kappa0_scalar, "     ", el_sigmaS_scalar, &
-                  "     ", el_sigma_scalar, "     ", el_alphabyT_scalar
-          end if
-
-          !Print out band resolved transport coefficients
-          ! Change to data output directory
-          call chdir(trim(adjustl(Tdir)))
-          call append2file_transport_tensor('nodrag_el_sigmaS_', it_el, el_sigmaS, el%bandlist)
-          call append2file_transport_tensor('nodrag_el_sigma_', it_el, el_sigma, el%bandlist)
-          call append2file_transport_tensor('nodrag_el_alphabyT_', it_el, el_alphabyT, el%bandlist)
-          call append2file_transport_tensor('nodrag_el_kappa0_', it_el, el_kappa0, el%bandlist)
-          ! Change back to cwd
-          call chdir(trim(adjustl(num%cwd)))
-          
-          !Check convergence
-          if(converged(el_kappa0_scalar_old, el_kappa0_scalar, num%conv_thres) .and. &
-               converged(el_sigmaS_scalar_old, el_sigmaS_scalar, num%conv_thres) .and. &
-               converged(el_sigma_scalar_old, el_sigma_scalar, num%conv_thres) .and. &
-               converged(el_alphabyT_scalar_old, el_alphabyT_scalar, num%conv_thres)) then
-
-             !Print converged band resolved response functions
-             ! Change to data output directory
-             call chdir(trim(adjustl(Tdir)))
-             call write2file_response('nodrag_I0_', self%el_response_T, el%bandlist) !gradT, el
-             call write2file_response('nodrag_J0_', self%el_response_E, el%bandlist) !E, el
-             ! Change back to cwd
-             call chdir(trim(adjustl(num%cwd)))
-             
-             exit
-          else
-             el_kappa0_scalar_old = el_kappa0_scalar
-             el_sigmaS_scalar_old = el_sigmaS_scalar
-             el_sigma_scalar_old = el_sigma_scalar
-             el_alphabyT_scalar_old = el_alphabyT_scalar
-          end if
-       end do
-
-       call t%end_timer('Iterative decoupled e BTE')
-    end if
+    !Dragless full electron BTE
+    if(num%onlyebte .or. num%drag) &
+         call dragless_ebte_full(Tdir, self, num, crys, sym, el)
 
   contains
 
@@ -1145,8 +1020,9 @@ contains
     end if
   end function converged
 
+  
   subroutine dragless_ebte_RTA(Tdir, self, num, crys, sym, el, ph)
-    !! Dragless electron BTE calculator in the relaxation time approximation.x
+    !! Dragless electron BTE calculator in the relaxation time approximation.
     !! It is impure as it mutates the electron sector of the bte data type and
     !! writes to disk. It should be kept private to this data type unless made safer.
 
@@ -1266,10 +1142,10 @@ contains
     ! Append RTA coefficients in no-drag files
     ! Change to data output directory
     call chdir(trim(adjustl(Tdir)))
-    call append2file_transport_tensor('nodrag_el_sigmaS_', 0_i64, el_sigmaS, el%bandlist)
-    call append2file_transport_tensor('nodrag_el_sigma_', 0_i64, el_sigma, el%bandlist)
-    call append2file_transport_tensor('nodrag_el_alphabyT_', 0_i64, el_alphabyT, el%bandlist)
-    call append2file_transport_tensor('nodrag_el_kappa0_', 0_i64, el_kappa0, el%bandlist)
+    call append2file_transport_tensor('nodrag_el_sigmaS_', 0, el_sigmaS, el%bandlist)
+    call append2file_transport_tensor('nodrag_el_sigma_', 0, el_sigma, el%bandlist)
+    call append2file_transport_tensor('nodrag_el_alphabyT_', 0, el_alphabyT, el%bandlist)
+    call append2file_transport_tensor('nodrag_el_kappa0_', 0, el_kappa0, el%bandlist)
 
     ! Print RTA band/branch resolved response functions
     call write2file_response('RTA_I0_', self%el_response_T, el%bandlist) !gradT, el
@@ -1281,6 +1157,113 @@ contains
     call t%end_timer('RTA e BTE')
   end subroutine dragless_ebte_RTA
 
+
+  subroutine dragless_ebte_full(Tdir, self, num, crys, sym, el)
+    !! Dragless full electron BTE calculator.
+    !! It is impure as it mutates the electron sector of the bte data type and
+    !! writes to disk. It should be kept private to this data type unless made safer.
+
+    class(bte), intent(inout) :: self !Mutation alert!
+    type(numerics), intent(in) :: num
+    type(crystal), intent(in) :: crys
+    type(symmetry), intent(in) :: sym
+    type(electron), intent(in) :: el
+    character(*), intent(in) :: Tdir
+
+    !Locals
+    real(r64), allocatable :: el_kappa0(:,:,:), el_alphabyT(:,:,:), &
+         el_sigma(:, :,:), el_sigmaS(:, :, :) ,dummy(:,:,:)
+    real(r64) :: el_kappa0_scalar, el_kappa0_scalar_old, el_alphabyT_scalar, el_alphabyT_scalar_old, &
+         el_sigma_scalar, el_sigma_scalar_old, el_sigmaS_scalar, el_sigmaS_scalar_old
+    type(timer) :: t
+    integer :: it_el, icart
+
+    call t%start_timer('Iterative dragless e BTE')
+
+    call print_message("Dragless electron transport:")
+    call print_message("-----------------------------")
+
+    !Restart with RTA solution
+    self%el_response_T = self%el_field_term_T
+    self%el_response_E = self%el_field_term_E
+
+    if(this_image() == 1) then
+       write(*,*) "iter    k0_el[W/m/K]        sigmaS[A/m/K]", &
+            "         sigma[1/Ohm/m]      alpha_el/T[A/m/K]"
+    end if
+
+    do it_el = 1, num%maxiter
+       !E field:
+       call iterate_bte_el(num, el, crys, &
+            self%el_rta_rates_ibz, self%el_field_term_E, self%el_response_E)
+
+       !Calculate electron transport coefficients
+       call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, &
+            el%ens, el%vels, crys%volume, el%wvmesh, self%el_response_E, sym, &
+            el_alphabyT, el_sigma, Bfield = num%Bfield)
+       el_alphabyT = el_alphabyT/crys%T
+
+       !delT field:
+       call iterate_bte_el(num, el, crys, &
+            self%el_rta_rates_ibz, self%el_field_term_T, self%el_response_T)
+       !Enforce Kelvin-Onsager relation
+       do icart = 1, 3
+          self%el_response_T(:,:,icart) = (el%ens(:,:) - el%chempot)/qe/crys%T*&
+               self%el_response_E(:,:,icart)
+       end do
+
+       call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
+            el%ens, el%vels, crys%volume, el%wvmesh, self%el_response_T, sym, &
+            el_kappa0, el_sigmaS, Bfield = num%Bfield)
+
+       !Calculate and print electron transport scalars
+       el_kappa0_scalar = trace(sum(el_kappa0, dim = 1))/crys%dim
+       el_sigmaS_scalar = trace(sum(el_sigmaS, dim = 1))/crys%dim
+       el_sigma_scalar = trace(sum(el_sigma, dim = 1))/crys%dim
+       el_alphabyT_scalar = trace(sum(el_alphabyT, dim = 1))/crys%dim
+       if(this_image() == 1) then
+          write(*,"(I3, A, 1E16.8, A, 1E16.8, A, 1E16.8, A, 1E16.8)") it_el, &
+               "    ", el_kappa0_scalar, "     ", el_sigmaS_scalar, &
+               "     ", el_sigma_scalar, "     ", el_alphabyT_scalar
+       end if
+
+       !Print out band resolved transport coefficients
+       ! Change to data output directory
+       call chdir(trim(adjustl(Tdir)))
+       call append2file_transport_tensor('nodrag_el_sigmaS_', it_el, el_sigmaS, el%bandlist)
+       call append2file_transport_tensor('nodrag_el_sigma_', it_el, el_sigma, el%bandlist)
+       call append2file_transport_tensor('nodrag_el_alphabyT_', it_el, el_alphabyT, el%bandlist)
+       call append2file_transport_tensor('nodrag_el_kappa0_', it_el, el_kappa0, el%bandlist)
+       ! Change back to cwd
+       call chdir(trim(adjustl(num%cwd)))
+
+       !Check convergence
+       if(converged(el_kappa0_scalar_old, el_kappa0_scalar, num%conv_thres) .and. &
+            converged(el_sigmaS_scalar_old, el_sigmaS_scalar, num%conv_thres) .and. &
+            converged(el_sigma_scalar_old, el_sigma_scalar, num%conv_thres) .and. &
+            converged(el_alphabyT_scalar_old, el_alphabyT_scalar, num%conv_thres)) then
+
+          !Print converged band resolved response functions
+          ! Change to data output directory
+          call chdir(trim(adjustl(Tdir)))
+          call write2file_response('nodrag_I0_', self%el_response_T, el%bandlist) !gradT, el
+          call write2file_response('nodrag_J0_', self%el_response_E, el%bandlist) !E, el
+          ! Change back to cwd
+          call chdir(trim(adjustl(num%cwd)))
+
+          exit
+       else
+          el_kappa0_scalar_old = el_kappa0_scalar
+          el_sigmaS_scalar_old = el_sigmaS_scalar
+          el_sigma_scalar_old = el_sigma_scalar
+          el_alphabyT_scalar_old = el_alphabyT_scalar
+       end if
+    end do
+
+    call t%end_timer('Iterative dragless e BTE')
+  end subroutine dragless_ebte_full
+
+  
   subroutine dragless_phbte_RTA(Tdir, self, num, crys, sym, ph, el)
     !! Dragless phonon BTE calculator in the relaxation time approximation.
     !! It is impure as it mutates the phonon sector of the bte data type and
@@ -1402,7 +1385,7 @@ contains
     ! Append RTA coefficients in no-drag files
     ! Change to data output directory
     call chdir(trim(adjustl(Tdir)))
-    call append2file_transport_tensor('nodrag_ph_kappa_', 0_i64, ph_kappa)
+    call append2file_transport_tensor('nodrag_ph_kappa_', 0, ph_kappa)
 
     ! Print RTA band/branch resolved response functions
     call write2file_response('RTA_F0_', self%ph_response_T) !gradT, ph
@@ -1412,6 +1395,77 @@ contains
 
     call t%end_timer('RTA ph BTE')
   end subroutine dragless_phbte_RTA
+
+
+  subroutine dragless_phbte_full(Tdir, self, num, crys, sym, ph, el)
+    !! Dragless phonon BTE calculator in the relaxation time approximation.
+    !! It is impure as it mutates the phonon sector of the bte data type and
+    !! writes to disk. It should be kept private to this data type unless made safer.
+
+    class(bte), intent(inout) :: self !Mutation alert!
+    type(numerics), intent(in) :: num
+    type(crystal), intent(in) :: crys
+    type(symmetry), intent(in) :: sym
+    type(phonon), intent(in) :: ph
+    type(electron), intent(in) :: el
+    character(*), intent(in) :: Tdir
+
+    !Locals
+    real(r64), allocatable :: ph_kappa(:,:,:), ph_alphabyT(:,:,:), &
+         dummy(:,:,:)
+    real(r64) :: ph_kappa_scalar, ph_kappa_scalar_old, ph_alphabyT_scalar, ph_alphabyT_scalar_old
+    type(timer) :: t
+    integer :: it_ph
+
+    call t%start_timer('Iterative dragless ph BTE')
+
+    call print_message("Dragless phonon transport:")
+    call print_message("---------------------------")
+
+    !Restart with RTA solution
+    self%ph_response_T = self%ph_field_term_T
+
+    if(this_image() == 1) then
+       write(*,*) "iter    k_ph[W/m/K]"
+    end if
+
+    do it_ph = 1, num%maxiter
+       call iterate_bte_ph(crys%T, num, ph, el, self%ph_rta_rates_ibz, &
+            self%ph_field_term_T, self%ph_response_T)
+
+       !Calculate phonon transport coefficients
+       call calculate_transport_coeff('ph', 'T', crys%T, 1_i64, 0.0_r64, ph%ens, ph%vels, &
+            crys%volume, ph%wvmesh, self%ph_response_T, sym, ph_kappa, dummy)
+
+       !Calculate and print phonon transport scalar
+       ph_kappa_scalar = trace(sum(ph_kappa, dim = 1))/crys%dim
+       if(this_image() == 1) then
+          write(*,"(I3, A, 1E16.8)") it_ph, "    ", ph_kappa_scalar
+       end if
+
+       !Print out branch resolved transport coefficients
+       ! Change to data output directory
+       call chdir(trim(adjustl(Tdir)))
+       call append2file_transport_tensor('nodrag_ph_kappa_', it_ph, ph_kappa)
+       ! Change back to cwd
+       call chdir(trim(adjustl(num%cwd)))
+
+       if(converged(ph_kappa_scalar_old, ph_kappa_scalar, num%conv_thres)) then
+          !Print converged branch resolved response functions
+          ! Change to data output directory
+          call chdir(trim(adjustl(Tdir)))
+          call write2file_response('nodrag_F0_', self%ph_response_T) !gradT, ph
+          ! Change back to cwd
+          call chdir(trim(adjustl(num%cwd)))
+
+          exit
+       else
+          ph_kappa_scalar_old = ph_kappa_scalar
+       end if
+    end do
+
+    call t%end_timer('Iterative dragless ph BTE')
+  end subroutine dragless_phbte_full
 
   
   !TODO: Move this to the Julia script.
