@@ -108,27 +108,34 @@ module bte_module
      
    contains
 
-     procedure :: initialize=>allocate_transport_coeffs !TODO, display, destroy
+     procedure :: initialize_ph=>allocate_ph_transport_coeffs, &
+          initialize_el=>allocate_el_transport_coeffs
      
   end type transport_coeffs
     
 contains
 
-  subroutine allocate_transport_coeffs(self, el_numbands, ph_numbands)
-    !! Allocator of a subset of the transport coefficients in the pack.
+  subroutine allocate_ph_transport_coeffs(self, ph_numbands)
+    !! Allocator of the phonon transport coefficients in the pack.
+    !! TODO Generalize this to handle the case for multiple nanostructures.
+    
+    class(transport_coeffs), intent(out) :: self
+    integer(i64), intent(in) :: ph_numbands
+
+    allocate(self%ph_kappa(ph_numbands, 3, 3), self%ph_alphabyT(ph_numbands, 3, 3), &
+         self%dummy(ph_numbands, 3, 3))
+  end subroutine allocate_ph_transport_coeffs
+
+  subroutine allocate_el_transport_coeffs(self, el_numbands)
+    !! Allocator of the electron transport coefficients in the pack.
     !! TODO Generalize this to handle the case for multiple nanostructures.
     
     class(transport_coeffs), intent(out) :: self
     integer(i64), intent(in) :: el_numbands
-    integer(i64), intent(in), optional :: ph_numbands
 
     allocate(self%el_sigma(el_numbands, 3, 3), self%el_sigmaS(el_numbands, 3, 3), &
          self%el_alphabyT(el_numbands, 3, 3), self%el_kappa0(el_numbands, 3, 3))
-
-    if(present(ph_numbands)) &
-         allocate(self%ph_kappa(ph_numbands, 3, 3), self%ph_alphabyT(ph_numbands, 3, 3), &
-         self%dummy(ph_numbands, 3, 3))
-  end subroutine allocate_transport_coeffs
+  end subroutine allocate_el_transport_coeffs
   
   subroutine bte_driver(self, num, crys, sym, ph, el)
     !! Subroutine to orchestrate the BTE calculations.
@@ -203,7 +210,7 @@ contains
     integer(i64) :: ik
     type(transport_coeffs) :: trans
 
-    call trans%initialize(el%numbands, ph%numbands)
+    call trans%initialize_el(el%numbands)
     
     call t%start_timer('RTA e BTE')
 
@@ -340,7 +347,7 @@ contains
     integer :: it_el, icart
     type(transport_coeffs) :: trans
 
-    call trans%initialize(el%numbands)
+    call trans%initialize_el(el%numbands)
     
     call t%start_timer('Iterative dragless e BTE')
 
@@ -448,7 +455,7 @@ contains
     integer(i64) :: iq
     type(transport_coeffs) :: trans
 
-    call trans%initialize(el%numbands, ph%numbands)
+    call trans%initialize_ph(ph%numbands)
     
     call t%start_timer('RTA ph BTE')
 
@@ -582,7 +589,7 @@ contains
     integer :: it_ph
     type(transport_coeffs) :: trans
 
-    call trans%initialize(el%numbands, ph%numbands)
+    call trans%initialize_ph(ph%numbands)
     
     call t%start_timer('Iterative dragless ph BTE')
 
@@ -663,7 +670,8 @@ contains
     type(timer) :: t
     type(transport_coeffs) :: trans
 
-    call trans%initialize(el%numbands, ph%numbands)
+    call trans%initialize_el(el%numbands)
+    call trans%initialize_ph(ph%numbands)
     
     call t%start_timer('Coupled e-ph BTEs')
     

@@ -1,3 +1,4 @@
+include("parameters.jl")
 include("statistics.jl")
 
 using ArgParse
@@ -5,20 +6,31 @@ using ArgParse
 function calculate_mfp_cumulative_kappa(rundir, outdir, T)
     # TODO ...
 
+    #TODO generalize this to allow "el" also
+    species = "ph"
+    
     #TODO Generate T-dependent directory from T
     Tdir = "T0.300E+03/"
+
+    #Read full-Brillouin zone energies and velocities. Reshape the latter appropriately.
+    println("ϟ Reading full-Brillouin zone energies...")
+    εs = readdlm(rundir*species*".ens_fbz") #eV
+    εs_shape = size(εs)
+
+    println("εs_shape = ", εs_shape)
     
     #Read full-Brillouin zone energies and velocities. Reshape the latter appropriately.
     println("ϟ Reading full-Brillouin zone mean-free-paths (mfps)...")
-    λs = readdlm(rundir*Tdir"nodrag_iterated_ph_mfps_ibz_3+4ph") #nm
+    λs = readdlm(rundir*Tdir*"nodrag_iterated_ph_mfps_ibz_3+4ph") #nm
 
     #Create mfp sampling grid (log scale)
     low = -6 #1e-6 nm, a really tiny number I'd say.
     high = log10(1.5*maximum(λs)) #50% higher than largest value in λs
     N = 10 # TODO should read this from user input
-    λ' = exp10.(range(-6, 1, length = N))
+    λ' = exp10.(range(low, high, length = N))
     
-    
+    #Common multiplicative factor
+    fac = 1.0e21/kB/T/volume/product(mesh)
 end
 
 function parse_commandline()
@@ -69,6 +81,8 @@ function main()
     chempot = parsed_args["T"]
 
     #TODO...
+    T = 300
+    calculate_mfp_cumulative_kappa(rundir, outdir, T)
 
     println("ϟ All done!")
 end

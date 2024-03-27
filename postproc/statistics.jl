@@ -12,5 +12,5 @@ function Fermi(ε, μ, T)
     #in eV, chemical potential μ in eV, and temperature
     #T in K.
 
-    return 1.0_r64/(exp((ε - μ)/kB/T) + 1.0)
+    return 1.0/(exp((ε - μ)/kB/T) + 1.0)
 end
