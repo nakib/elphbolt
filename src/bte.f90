@@ -119,7 +119,7 @@ contains
     !! Allocator of the phonon transport coefficients in the pack.
     !! TODO Generalize this to handle the case for multiple nanostructures.
     
-    class(transport_coeffs), intent(out) :: self
+    class(transport_coeffs), intent(inout) :: self
     integer(i64), intent(in) :: ph_numbands
 
     allocate(self%ph_kappa(ph_numbands, 3, 3), self%ph_alphabyT(ph_numbands, 3, 3), &
@@ -130,7 +130,7 @@ contains
     !! Allocator of the electron transport coefficients in the pack.
     !! TODO Generalize this to handle the case for multiple nanostructures.
     
-    class(transport_coeffs), intent(out) :: self
+    class(transport_coeffs), intent(inout) :: self
     integer(i64), intent(in) :: el_numbands
 
     allocate(self%el_sigma(el_numbands, 3, 3), self%el_sigmaS(el_numbands, 3, 3), &

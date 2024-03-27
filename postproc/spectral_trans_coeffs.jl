@@ -7,12 +7,15 @@ using DelimitedFiles
 function calculate_mfp_cumulative_kappa(rundir, outdir, T)
     # TODO ...
 
+    #TODO read info from input.nml and calculate volume
+    volume = 0.39409804E-01 #nm^3, primitive cell volume
+    
     #TODO generalize this to allow "el" also
     species = "ph"
     
     #TODO Generate T-dependent directory from T
     Tdir = "T0.300E+03/"
-
+    
     #Read full-Brillouin zone energies and velocities. Reshape the latter appropriately.
     println("ϟ Reading full-Brillouin zone energies...")
     εs = readdlm(rundir*species*".ens_fbz") #eV
@@ -26,8 +29,8 @@ function calculate_mfp_cumulative_kappa(rundir, outdir, T)
     #Create mfp sampling grid (log scale)
     low = -6 #1e-6 nm, a really tiny number I'd say.
     high = log10(1.5*maximum(λs)) #50% higher than largest value in λs
-    println(maximum(λs))
-    N = 10 # TODO should read this from user input
+
+    N = 25 # TODO should read this from user input
     #λ' = exp10.(range(low, high, length = N))
     λp = exp10.(range(low, high, length = N))
     
