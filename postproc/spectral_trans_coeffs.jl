@@ -2,6 +2,7 @@ include("parameters.jl")
 include("statistics.jl")
 
 using ArgParse
+using DelimitedFiles
 
 function calculate_mfp_cumulative_kappa(rundir, outdir, T)
     # TODO ...
@@ -16,21 +17,22 @@ function calculate_mfp_cumulative_kappa(rundir, outdir, T)
     println("ϟ Reading full-Brillouin zone energies...")
     εs = readdlm(rundir*species*".ens_fbz") #eV
     εs_shape = size(εs)
-
-    println("εs_shape = ", εs_shape)
+    nq_fbz, nb = εs_shape[1], εs_shape[2] #number of FBZ points, bands
     
     #Read full-Brillouin zone energies and velocities. Reshape the latter appropriately.
     println("ϟ Reading full-Brillouin zone mean-free-paths (mfps)...")
-    λs = readdlm(rundir*Tdir*"nodrag_iterated_ph_mfps_ibz_3+4ph") #nm
+    λs = readdlm(rundir*Tdir*"nodrag_iterated_ph_mfps_ibz") #nm
 
     #Create mfp sampling grid (log scale)
     low = -6 #1e-6 nm, a really tiny number I'd say.
     high = log10(1.5*maximum(λs)) #50% higher than largest value in λs
+    println(maximum(λs))
     N = 10 # TODO should read this from user input
-    λ' = exp10.(range(low, high, length = N))
+    #λ' = exp10.(range(low, high, length = N))
+    λp = exp10.(range(low, high, length = N))
     
     #Common multiplicative factor
-    fac = 1.0e21/kB/T/volume/product(mesh)
+    fac = 1.0e21/kB/T/volume/nq_fbz
 end
 
 function parse_commandline()

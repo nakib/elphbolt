@@ -1703,15 +1703,18 @@ contains
 
        !  Calculate scalar phonon mean-free-paths(mfps) for the grad-T field [T-dependent quantity]
        allocate(ph_scalar_mfps(ph%nwv, ph%numbands))
+       ph_scalar_mfps = 0.0_r64
+       
        do ib = 1, ph%numbands
           do ik = 1, ph%nwv
-             ph_scalar_mfps(ik, ib) = &
-                  dot_product(self%ph_response_T(ik, ib, :), ph%vels(ik, ib, :)) &
-                  /twonorm(ph%vels(ik, ib, :))
+             if(all(ph%vels(ik, ib, :) /= 0.0_r64)) then
+                ph_scalar_mfps(ik, ib) = &
+                     dot_product(self%ph_response_T(ik, ib, :), ph%vels(ik, ib, :)) &
+                     /twonorm(ph%vels(ik, ib, :))
+             end if
           end do
        end do
        ph_scalar_mfps = ph_scalar_mfps/kB !nm
-       ph_scalar_mfps(1, :) = 0.0_r64 !handle gamma point modes
 
        !  Print out IBZ mfps
        if(this_image() == 1) then
