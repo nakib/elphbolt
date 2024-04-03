@@ -33,7 +33,7 @@ module bte_module
   use electron_module, only: electron
   use interactions, only: calculate_ph_rta_rates, read_transition_probs_e, &
        calculate_el_rta_rates, calculate_bound_scatt_rates, calculate_thinfilm_scatt_rates, &
-       calculate_4ph_rta_rates
+       calculate_4ph_rta_rates, calculate_W3ph_OTF
   use bz_sums, only: calculate_transport_coeff, calculate_spectral_transport_coeff, &
        calculate_mfp_cumulative_transport_coeff
 
@@ -1086,33 +1086,41 @@ contains
           !Demux state index into branch (s) and wave vector (iq1_ibz) indices
           call demux_state(istate1, numbranches, s1, iq1_ibz)
 
+          !Set file tag
+          write(tag, '(I9)') istate1
+          
           !RTA lifetime
           tau_ibz = 0.0_r64
           if(rta_rates_ibz(iq1_ibz, s1) /= 0.0_r64) then
              tau_ibz = 1.0_r64/rta_rates_ibz(iq1_ibz, s1)
           end if
+          
+          if(num%W_OTF) then
+             call calculate_W3ph_OTF(ph, num, istate1, T, &
+                  Wm, Wp, istate2_plus, istate3_plus, istate2_minus, istate3_minus)
+             nprocs_3ph_plus = size(Wp); nprocs_3ph_minus = size(Wm)
+          else
+             !Set W+ filename
+             filepath_Wp = trim(adjustl(num%Wdir))//'/Wp.istate'//trim(adjustl(tag))
 
-          !Set W+ filename
-          write(tag, '(I9)') istate1
-          filepath_Wp = trim(adjustl(num%Wdir))//'/Wp.istate'//trim(adjustl(tag))
+             !Read W+ from file
+             if(allocated(Wp)) deallocate(Wp)
+             if(allocated(istate2_plus)) deallocate(istate2_plus)
+             if(allocated(istate3_plus)) deallocate(istate3_plus)
+             call read_transition_probs_e(trim(adjustl(filepath_Wp)), nprocs_3ph_plus, Wp, &
+                  istate2_plus, istate3_plus)
 
-          !Read W+ from file
-          if(allocated(Wp)) deallocate(Wp)
-          if(allocated(istate2_plus)) deallocate(istate2_plus)
-          if(allocated(istate3_plus)) deallocate(istate3_plus)
-          call read_transition_probs_e(trim(adjustl(filepath_Wp)), nprocs_3ph_plus, Wp, &
-               istate2_plus, istate3_plus)
+             !Set W- filename
+             filepath_Wm = trim(adjustl(num%Wdir))//'/Wm.istate'//trim(adjustl(tag))
 
-          !Set W- filename
-          filepath_Wm = trim(adjustl(num%Wdir))//'/Wm.istate'//trim(adjustl(tag))
-
-          !Read W- from file
-          if(allocated(Wm)) deallocate(Wm)
-          if(allocated(istate2_minus)) deallocate(istate2_minus)
-          if(allocated(istate3_minus)) deallocate(istate3_minus)
-          call read_transition_probs_e(trim(adjustl(filepath_Wm)), nprocs_3ph_minus, Wm, &
-               istate2_minus, istate3_minus)
-
+             !Read W- from file
+             if(allocated(Wm)) deallocate(Wm)
+             if(allocated(istate2_minus)) deallocate(istate2_minus)
+             if(allocated(istate3_minus)) deallocate(istate3_minus)
+             call read_transition_probs_e(trim(adjustl(filepath_Wm)), nprocs_3ph_minus, Wm, &
+                  istate2_minus, istate3_minus)
+          end if
+          
           if(present(response_el)) then
              !Set Y filename
              filepath_Y = trim(adjustl(num%Ydir))//'/Y.istate'//trim(adjustl(tag))

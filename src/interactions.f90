@@ -26,7 +26,7 @@ module interactions
        demux_state, mux_vector, mux_state, expi, Bose, binsearch, Fermi, &
        twonorm, write2file_rank2_real, demux_vector, interpolate, expm1, &
        precompute_interpolation_corners_and_weights, interpolate_using_precomputed, &
-       create_set, coarse_grain, timer, eye
+       create_set, coarse_grain, timer, eye, shrink
   use resource_module, only: resource
   
   use wannier_module, only: wannier
@@ -46,7 +46,7 @@ module interactions
        calculate_echimp_interaction_ibzk, calculate_el_rta_rates, &
        calculate_bound_scatt_rates, calculate_thinfilm_scatt_rates, &
        calculate_4ph_rta_rates, calculate_coarse_grained_3ph_vertex, &
-       calculate_W_fromcgV2
+       calculate_W_fromcgV2, calculate_W3ph_OTF
 
   !external chdir, system
 
@@ -473,7 +473,7 @@ contains
     
     sync all
   end subroutine calculate_W_fromcgV2
-
+  
   subroutine calculate_3ph_interaction(ph, crys, num, key)
     !! Parallel driver of the 3-ph vertex calculator for all IBZ phonon wave vectors.
     !! This subroutine calculates |V-(s1<q1>|s2q2,s3q3)|^2, W-(s1<q1>|s2q2,s3q3),
@@ -843,7 +843,7 @@ contains
              istate2_minus(:) = 0_i64
              istate3_minus(:) = 0_i64
 
-             !Initialize transition probabilities
+             !Initialize process counters
              plus_count = 0_i64
              minus_count = 0_i64
 
@@ -1835,7 +1835,213 @@ contains
     call co_broadcast(speedup_3ph_interactions, 1)
     sync all
   end function speedup_3ph_interactions
+  
+  subroutine calculate_W3ph_OTF(ph, num, istate1, T, &
+       Wm, Wp, istate2_plus, istate3_plus, istate2_minus, istate3_minus)
+    !! On-the-fly (OTF), serial calcualator of the 3-ph transition probability
+    !! for all IBZ phonon wave vectors. This subroutine calculates
+    !! W-(s2q2,s3q3) and W+(s2q2,s3q3) for a given irreducible phonon state s1q1.
+    !! The interaction vertex for the given state is read from disk.
 
+    type(phonon), intent(in) :: ph
+    type(numerics), intent(in) :: num
+    integer(i64), intent(in) :: istate1
+    real(r64), intent(in) :: T
+    real(r64), allocatable, intent(out) :: Wm(:), Wp(:)
+    integer(i64), allocatable, intent(out), optional :: istate2_plus(:), istate3_plus(:), &
+         istate2_minus(:), istate3_minus(:)
+    
+    !Locals
+    integer(i64) :: nstates_irred, nprocs, s1, s2, s3, iq1_ibz, iq1, iq2, iq3_minus, &
+         q1_indvec(3), q2_indvec(3), q3_minus_indvec(3), &
+         neg_iq2, neg_q2_indvec(3), plus_count, minus_count, &
+         nwv_gpu, ntrips_gpu, s2s3
+    real(r64) :: en1, en2, en3, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
+         occup_fac, const, bose2, bose3, delta_minus, delta_plus
+    real(r64), allocatable :: Vm2_1(:), Vm2_2(:)
+    character(len = 1024) :: filename
+    procedure(delta_fn), pointer :: delta_fn_ptr => null()
+    logical :: keep_interaction_tally
+
+    !Do I need to keep a tally of the all the interacting states?
+    keep_interaction_tally = present(istate2_plus) .and. present(istate3_plus) .and. &
+         present(istate2_minus) .and. present(istate3_minus)
+    
+    !Associate delta function procedure pointer
+    delta_fn_ptr => get_delta_fn_pointer(num%tetrahedra)
+
+    !Conversion factor in transition probability expression
+    const = pi/4.0_r64*hbar_eVps**5*(qe/amu)**3*1.0e-12_r64
+
+    !Total number of IBZ blocks states
+    nstates_irred = ph%nwv_irred*ph%numbands
+
+    !Maximum total number of 3-phonon processes for a given initial phonon state
+    nprocs = ph%nwv*ph%numbands**2
+
+    !Do the allocs
+    allocate(Wm(nprocs), Wp(nprocs))
+    if(keep_interaction_tally) &
+         allocate(istate2_minus(nprocs), istate2_plus(nprocs), &
+         istate3_minus(nprocs), istate3_plus(nprocs))
+    
+    !Load |V^-|^2 from disk for scattering rates calculation
+    
+    !Change to data output directory
+    call chdir(trim(adjustl(num%Vdir)))
+
+    !Read data in binary format
+    write (filename, '(I9)') istate1
+    filename = 'Vm2.istate'//trim(adjustl(filename))
+    open(1, file = trim(filename), status = 'old', access = 'stream')
+
+    read(1) minus_count
+    if(allocated(Vm2_1)) deallocate(Vm2_1)
+    allocate(Vm2_1(minus_count))
+    if(minus_count > 0) read(1) Vm2_1
+
+    read(1) plus_count
+    if(allocated(Vm2_2)) deallocate(Vm2_2)
+    allocate(Vm2_2(plus_count))
+    if(plus_count > 0) read(1) Vm2_2
+    close(1)
+
+    !Change back to working directory
+    call chdir(num%cwd)
+    
+    !Zero out W- and W+ and process tallies
+    Wm = 0.0_r64; Wp = 0.0_r64
+    if(keep_interaction_tally) then
+       istate2_plus(:) = 0_i64; istate3_plus(:) = 0_i64
+       istate2_minus(:) = 0_i64; istate3_minus(:) = 0_i64
+    end if
+       
+    !Initialize process counters
+    plus_count = 0_i64
+    minus_count = 0_i64
+
+    !Demux state index into branch (s) and wave vector (iq) indices
+    call demux_state(istate1, ph%numbands, s1, iq1_ibz)
+
+    !Muxed index of wave vector from the IBZ index list.
+    !This will be used to access IBZ information from the FBZ quantities.
+    iq1 = ph%indexlist_irred(iq1_ibz)
+
+    !Energy of phonon 1
+    en1 = ph%ens(iq1, s1)
+
+    !Initial (IBZ blocks) wave vector (crystal coords.)
+    q1 = ph%wavevecs(iq1, :)
+
+    !Convert from crystal to 0-based index vector
+    q1_indvec = nint(q1*ph%wvmesh)
+
+    !Run over second (FBZ) phonon wave vectors
+    do iq2 = 1, ph%nwv
+       !Initial (IBZ blocks) wave vector (crystal coords.)
+       q2 = ph%wavevecs(iq2, :)
+
+       !Convert from crystal to 0-based index vector
+       q2_indvec = nint(q2*ph%wvmesh)
+
+       !Folded final phonon wave vector
+       q3_minus_indvec = modulo(q1_indvec - q2_indvec, ph%wvmesh) !0-based index vector
+       q3_minus = q3_minus_indvec/dble(ph%wvmesh) !crystal coords.
+
+       !Muxed index of q3_minus
+       iq3_minus = mux_vector(q3_minus_indvec, ph%wvmesh, 0_i64)
+
+       !Combined loop over the 2nd and 3rd phonon bands
+       do s2s3 = 1, ph%numbands**2
+          s2 = int((s2s3 - 1)/ph%numbands) + 1 !changes slow
+          s3 = modulo(s2s3 - 1, ph%numbands) + 1 !changes fast
+
+          !Energy of phonon 2
+          en2 = ph%ens(iq2, s2)
+
+          !Get index of -q2
+          neg_q2_indvec = modulo(-q2_indvec, ph%wvmesh)
+          neg_iq2 = mux_vector(neg_q2_indvec, ph%wvmesh, 0_i64)
+
+          !Bose factor for phonon 2
+          bose2 = Bose(en2, T)
+
+          !Energy of phonon 3
+          en3 = ph%ens(iq3_minus, s3)
+
+          !Evaluate delta functions
+          delta_minus = delta_fn_ptr(en1 - en3, iq2, s2, ph%wvmesh, ph%simplex_map, &
+               ph%simplex_count, ph%simplex_evals) !minus process
+
+          delta_plus = delta_fn_ptr(en3 - en1, neg_iq2, s2, ph%wvmesh, ph%simplex_map, &
+               ph%simplex_count, ph%simplex_evals) !plus process
+
+          if(en1*en2*en3 == 0.0_r64) cycle
+
+          !Bose factor for phonon 3
+          bose3 = Bose(en3, T)
+
+          !Calculate W-:
+
+          !Temperature dependent occupation factor
+          !(bose1 + 1)*bose2*bose3/(bose1*(bose1 + 1))
+          ! = (bose2 + bose3 + 1)
+          occup_fac = (bose2 + bose3 + 1.0_r64)
+
+          if(delta_minus > 0.0_r64) then
+             !Non-zero process counter
+             minus_count = minus_count + 1
+
+             !Save W-
+             Wm(minus_count) = Vm2_1(minus_count)*occup_fac*delta_minus/en1/en2/en3
+             
+             if(keep_interaction_tally) then
+                istate2_minus(minus_count) = mux_state(ph%numbands, s2, iq2)
+                istate3_minus(minus_count) = mux_state(ph%numbands, s3, iq3_minus)
+             end if
+          end if
+
+          !Calculate W+:
+
+          !Temperature dependent occupation factor
+          !(bose1 + 1)*(bose2 + 1)*bose3/(bose1*(bose1 + 1))
+          ! = bose2 - bose3.
+          occup_fac = (bose2 - bose3)
+
+          if(delta_plus > 0.0_r64) then
+             !Non-zero process counter
+             plus_count = plus_count + 1
+
+             !Save W+
+             Wp(plus_count) = Vm2_2(plus_count)*occup_fac*delta_plus/en1/en2/en3
+             
+             if(keep_interaction_tally) then
+                istate2_plus(plus_count) = mux_state(ph%numbands, s2, neg_iq2)
+                istate3_plus(plus_count) = mux_state(ph%numbands, s3, iq3_minus)
+             end if
+          end if
+       end do !s2s3
+    end do !iq2
+
+    !Multiply constant factor, unit factor, etc.
+    Wm(:) = const*Wm(:) !THz
+    Wp(:) = const*Wp(:) !THz
+
+    !Shrink Wm and Wp
+    call shrink(Wp, plus_count)
+    call shrink(Wm, minus_count)
+
+    !Shrink process tallies
+    if(keep_interaction_tally) then
+       call shrink(istate2_plus, plus_count)
+       call shrink(istate2_minus, minus_count)
+       call shrink(istate3_plus, plus_count)
+       call shrink(istate3_minus, minus_count)
+    end if
+       
+    if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
+  end subroutine calculate_W3ph_OTF
+  
   subroutine calculate_gReq(wann, ph, num)
     !! Parallel driver of gReq_epw over IBZ phonon wave vectors.
 
@@ -2627,7 +2833,7 @@ contains
     !Local variables
     integer(i64) :: nstates_irred, istate, nprocs_3ph_plus, nprocs_3ph_minus, &
          nprocs_phe, iproc, chunk, s, iq, num_active_images, start, end
-    real(r64), allocatable :: W(:), Y(:)
+    real(r64), allocatable :: W(:), Y(:), Wp(:), Wm(:)
     character(len = 1024) :: filepath_Wm, filepath_Wp, filepath_Y, tag
     
     !Set output directory of transition probilities
@@ -2648,31 +2854,46 @@ contains
     if(this_image() <= num_active_images) then
        !Run over first phonon IBZ states
        do istate = start, end
+
           !Demux state index into branch (s) and wave vector (iq) indices
           call demux_state(istate, ph%numbands, s, iq)
 
-          !Set W+ filename
+          !Set file tag
           write(tag, '(I9)') istate
-          filepath_Wp = trim(adjustl(num%Wdir))//'/Wp.istate'//trim(adjustl(tag))
+          
+          if(num%W_OTF) then
+             call calculate_W3ph_OTF(ph, num, istate, crys%T, Wm, Wp)
 
-          !Read W+ from file
-          if(allocated(W)) deallocate(W)
-          call read_transition_probs_e(trim(adjustl(filepath_Wp)), nprocs_3ph_plus, W)
+             do iproc = 1, size(Wp)
+                rta_rates_3ph(iq, s) = rta_rates_3ph(iq, s) + Wp(iproc)
+             end do
+             
+             do iproc = 1, size(Wm)
+                rta_rates_3ph(iq, s) = rta_rates_3ph(iq, s) + 0.5_r64*Wm(iproc)
+             end do
+          else
+             !Set W+ filename
+             filepath_Wp = trim(adjustl(num%Wdir))//'/Wp.istate'//trim(adjustl(tag))
 
-          do iproc = 1, nprocs_3ph_plus
-             rta_rates_3ph(iq, s) = rta_rates_3ph(iq, s) + W(iproc) 
-          end do
+             !Read W+ from file
+             if(allocated(W)) deallocate(W)
+             call read_transition_probs_e(trim(adjustl(filepath_Wp)), nprocs_3ph_plus, W)
 
-          !Set W- filename
-          filepath_Wm = trim(adjustl(num%Wdir))//'/Wm.istate'//trim(adjustl(tag))
+             do iproc = 1, nprocs_3ph_plus
+                rta_rates_3ph(iq, s) = rta_rates_3ph(iq, s) + W(iproc) 
+             end do
 
-          !Read W- from file
-          if(allocated(W)) deallocate(W)
-          call read_transition_probs_e(trim(adjustl(filepath_Wm)), nprocs_3ph_minus, W)
+             !Set W- filename
+             filepath_Wm = trim(adjustl(num%Wdir))//'/Wm.istate'//trim(adjustl(tag))
 
-          do iproc = 1, nprocs_3ph_minus
-             rta_rates_3ph(iq, s) = rta_rates_3ph(iq, s) + 0.5_r64*W(iproc)
-          end do
+             !Read W- from file
+             if(allocated(W)) deallocate(W)
+             call read_transition_probs_e(trim(adjustl(filepath_Wm)), nprocs_3ph_minus, W)
+
+             do iproc = 1, nprocs_3ph_minus
+                rta_rates_3ph(iq, s) = rta_rates_3ph(iq, s) + 0.5_r64*W(iproc)
+             end do
+          end if
 
           if(present(el)) then
              !Set Y filename

@@ -235,18 +235,25 @@ program elphbolt
            
            !Calculate ph-ph vertex
            call calculate_3ph_interaction(ph, crys, num, 'V')
-!!$           call calculate_coarse_grained_3ph_vertex(ph, crys, num)
 
            call t_event%end_timer('IBZ q ph-ph interactions')
         end if
 
-        if(.not. num%read_W) then
+!!$        if(.not. num%read_W) then
+!!$           call t_event%start_timer('IBZ ph-ph scattering rates')
+!!$           
+!!$           !Calculate ph-ph transition probabilities
+!!$           call calculate_3ph_interaction(ph, crys, num, 'W')
+!!$           
+!!$           call t_event%end_timer('IBZ ph-ph scattering rates')
+!!$        end if
+
+        if(.not. num%W_OTF) then
            call t_event%start_timer('IBZ ph-ph scattering rates')
-           
+
            !Calculate ph-ph transition probabilities
            call calculate_3ph_interaction(ph, crys, num, 'W')
-!!$           call calculate_W_fromcgV2(ph, crys, num)
-           
+
            call t_event%end_timer('IBZ ph-ph scattering rates')
         end if
      end if

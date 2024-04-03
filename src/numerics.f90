@@ -131,6 +131,8 @@ module numerics_module
      !! Is B-field on?
      real(r64) :: Bfield(3)
      !! B-field vector
+     logical :: W_OTF
+     !! (Re)calculate W+ and W- on-the-fly. That is, no disk I/O for these quantities. 
    contains
 
      procedure :: initialize=>read_input_and_setup, create_chempot_dirs
@@ -158,14 +160,14 @@ contains
     character(len = 1) :: numcols
     logical :: read_gq2, read_gk2, read_V, read_W, tetrahedra, phe, phiso, phsubs, &
          phbound, phdef_Tmat, onlyphbte, onlyebte, elchimp, elbound, drag, plot_along_path, &
-         phthinfilm, phthinfilm_ballistic, fourph, use_Wannier_ifc2s, phiso_Tmat, Bfield_on
+         phthinfilm, phthinfilm_ballistic, fourph, use_Wannier_ifc2s, phiso_Tmat, Bfield_on, W_OTF
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
          read_V, read_W, tetrahedra, phe, phiso, phsubs, onlyphbte, onlyebte, maxiter, &
          conv_thres, drag, elchimp, plot_along_path, runlevel, ph_en_min, ph_en_max, &
          ph_en_num, el_en_min, el_en_max, el_en_num, phbound, elbound, phdef_Tmat, &
          ph_mfp_npts, phthinfilm, phthinfilm_ballistic, fourph, fourph_mesh_ref, use_Wannier_ifc2s, &
-         phiso_Tmat, phiso_1B_theory, Bfield_on, Bfield
+         phiso_Tmat, phiso_1B_theory, Bfield_on, Bfield, W_OTF
 
     call subtitle("Reading numerics information...")
     
@@ -212,8 +214,12 @@ contains
     el_en_max = 10.0_r64
     el_en_num = 100
     ph_mfp_npts = 100
+    W_OTF = .true.
     read(1, nml = numerics)
 
+    if(read_W .and. W_OTF) &
+         call exit_with_message("read_W and W_OTF can't both be true. Exiting.")
+    
     if(any(qmesh <= 0) .or. fourph_mesh_ref < 1 .or. mesh_ref < 1 .or. fsthick < 0) then
        call exit_with_message('Bad input(s) in numerics.')
     end if
@@ -254,7 +260,7 @@ contains
 !!$          call exit_with_message("B-field has to be of the form [B 0 0], [0 B 0], or [0 0 B]. Exiting.")
 !!$       end if
     end if
-
+    
     !TODO
     !! [ ] Read eco mode info from input
     !! [ ] Check for valid choice of econess
@@ -279,6 +285,7 @@ contains
        self%read_gq2 = read_gq2
        self%read_V = read_V
        self%read_W = read_W
+       self%W_OTF = W_OTF
        self%phe = phe
        self%phiso = phiso
        self%phiso_1B_theory = phiso_1B_theory
@@ -338,7 +345,7 @@ contains
        self%onlyphbte = .false.
        self%phe = .true.
     end if
-
+    
     !Set Wannier usage flag
     self%need_Wannier = self%use_Wannier_ifc2s .or. self%onlyebte .or. self%drag &
          .or. (self%phe .and. self%onlyphbte) &
@@ -435,6 +442,7 @@ contains
           write(*, "(A, L)") "Reuse ph-e matrix elements: ", self%read_gq2
           write(*, "(A, L)") "Reuse ph-ph matrix elements: ", self%read_V
           write(*, "(A, L)") "Reuse ph-ph transition probabilities: ", self%read_W
+          write(*, "(A, L)") "Calculate ph-ph transition probalities on-the-fly: ", self%W_OTF
           write(*, "(A, L)") "Calculate ph-e interaction: ", self%phe
           write(*, "(A, L)") "Calculate 1st Born ph-isotope interaction: ", self%phiso
           if(self%phiso) &

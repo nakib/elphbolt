@@ -308,7 +308,16 @@ program bte_regression
         call t_event%end_timer('IBZ q ph-ph interactions')
      end if
 
-     if(.not. num%read_W) then
+!!$     if(.not. num%read_W) then
+!!$        call t_event%start_timer('IBZ ph-ph scattering rates')
+!!$
+!!$        !Calculate ph-ph transition probabilities
+!!$        call calculate_3ph_interaction(ph, crys, num, 'W')
+!!$
+!!$        call t_event%end_timer('IBZ ph-ph scattering rates')
+!!$     end if
+
+     if(.not. num%W_OTF) then
         call t_event%start_timer('IBZ ph-ph scattering rates')
 
         !Calculate ph-ph transition probabilities

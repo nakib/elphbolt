@@ -23,7 +23,7 @@ module misc
   
   public :: operator(.umklapp.)
   private :: sort_int, sort_real, Pade_coeffs, twonorm_real_rank1, twonorm_real_rank2, &
-       invert_complex_square, add_and_fold, add_and_fold_array
+       invert_complex_square, add_and_fold, add_and_fold_array, shrink_int, shrink_real
   
   type timer
      !! Container for timing related data and procedures.
@@ -58,6 +58,10 @@ module misc
      module procedure :: create_set_int, create_set_char
   end interface create_set
 
+  interface shrink
+     module procedure :: shrink_int, shrink_real
+  end interface shrink
+  
   interface operator(.umklapp.)
      module procedure add_and_fold
      module procedure add_and_fold_array
@@ -147,6 +151,44 @@ contains
        grid(i) = min + (i - 1)*spacing
     end do
   end subroutine linspace
+
+  subroutine shrink_int(data, len)
+    !! Returns integer data(1:n)
+    
+    integer(i64), intent(inout), allocatable :: data(:)
+    integer(i64), intent(in) :: len
+
+    integer(i64) :: tmp(len)
+
+    !Temporary hold
+    tmp = data(1:len)
+
+    !Shrink data
+    deallocate(data)
+    allocate(data(len))
+
+    !Copy over from temporary
+    data = tmp
+  end subroutine shrink_int
+
+  subroutine shrink_real(data, len)    
+    !! Returns real data(1:n)
+    
+    real(r64), intent(inout), allocatable :: data(:)
+    integer(i64), intent(in) :: len
+
+    real(r64) :: tmp(len)
+
+    !Temporary hold
+    tmp = data(1:len)
+
+    !Shrink data
+    deallocate(data)
+    allocate(data(len))
+
+    !Copy over from temporary
+    data = tmp
+  end subroutine shrink_real
   
   subroutine exit_with_message(message)
     !! Exit with error message.
