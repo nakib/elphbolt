@@ -447,9 +447,9 @@ contains
           write(*, "(A, L)") "Reuse ph-e matrix elements: ", self%read_gq2
           write(*, "(A, L)") "Reuse ph-ph matrix elements: ", self%read_V
           write(*, "(A, L)") "Reuse ph-ph transition probabilities: ", self%read_W
-          write(*, "(A, L)") "Calculate ph-ph transition probalities on-the-fly: ", self%W_OTF
+          write(*, "(A, L)") "Calculate ph-ph transition probabilities on-the-fly: ", self%W_OTF
           write(*, "(A, L)") "Calculate ph-e interaction: ", self%phe
-          write(*, "(A, L)") "Calculate ph-e transition probalities on-the-fly: ", self%Y_OTF
+          write(*, "(A, L)") "Calculate ph-e transition probabilities on-the-fly: ", self%Y_OTF
           write(*, "(A, L)") "Calculate 1st Born ph-isotope interaction: ", self%phiso
           if(self%phiso) &
                write(*, "(A, A)") "Selected ph-isotope 1st Born theory: ", self%phiso_1B_theory
