@@ -46,7 +46,7 @@ module interactions
        calculate_echimp_interaction_ibzk, calculate_el_rta_rates, &
        calculate_bound_scatt_rates, calculate_thinfilm_scatt_rates, &
        calculate_4ph_rta_rates, calculate_coarse_grained_3ph_vertex, &
-       calculate_W_fromcgV2, calculate_W3ph_OTF
+       calculate_W_fromcgV2, calculate_W3ph_OTF, calculate_Y_OTF
 
   !external chdir, system
 
@@ -2377,6 +2377,176 @@ contains
 
     sync all
   end subroutine calculate_eph_interaction_ibzq
+
+  subroutine calculate_Y_OTF(el, ph, num, istate, T, &
+       Y_istate, istate_el1, istate_el2)
+    !! On-the-fly (OTF), serial calcualator of the ph-e transition probability
+    !! for all IBZ phonon wave vectors. This subroutine calculates
+    !! Y(s2q2,s3q3) for a given irreducible phonon state s1q1.
+    !! The interaction vertex for the given state is read from disk.
+
+    type(electron), intent(in) :: el
+    type(phonon), intent(in) :: ph
+    type(numerics), intent(in) :: num
+    real(r64), intent(in) :: T
+    real(r64), intent(out), allocatable :: Y_istate(:)
+    integer(i64), intent(out), allocatable, optional :: istate_el1(:), istate_el2(:)
+    
+    !Local variables
+    integer(i64) :: nstates_irred, istate, m, iq, iq_fbz, n, ik, ikp, s, &
+         ikp_window, start, end, chunk, k_indvec(3), kp_indvec(3), &
+         q_indvec(3), nprocs, count, num_active_images
+    real(r64) :: k(3), q(3), en_ph, en_el, en_elp, const, delta_val, &
+         invboseplus1, fermi1, fermi2, occup_fac
+    real(r64), allocatable :: g2_istate(:)
+    character(len = 1024) :: filename
+    procedure(delta_fn), pointer :: delta_fn_ptr => null()
+    logical :: keep_interaction_tally
+    
+    !Do I need to keep a tally of the all the interacting states?
+    keep_interaction_tally = present(istate_el1) .and. present(istate_el2)
+    
+    !Associate delta function procedure pointer
+    delta_fn_ptr => get_delta_fn_pointer(num%tetrahedra)
+    
+    !Conversion factor in transition probability expression
+    const = twopi/hbar_eVps
+    
+    !Maximum length of g2_istate
+    nprocs = el%nstates_inwindow*ph%numbands
+
+    !Allocate and initialize quantities related to transition probabilities
+    allocate(Y_istate(nprocs))
+    if(keep_interaction_tally) &
+         allocate(istate_el1(nprocs), istate_el2(nprocs))
+
+    !Initialize Y and and the process tallies
+    Y_istate(:) = 0.0_r64
+    if(keep_interaction_tally) then
+       istate_el1(:) = -1_i64
+       istate_el2(:) = -1_i64
+    end if
+
+    !Demux state index into branch (s) and wave vector (iq) indices
+    call demux_state(istate, ph%numbands, s, iq)
+
+    !Get the muxed index of FBZ wave vector from the IBZ blocks index list
+    iq_fbz = ph%indexlist_irred(iq)
+
+    !Energy of phonon
+    en_ph = ph%ens(iq_fbz, s)
+
+    !1/(1 + Bose factor) for phonon
+    if(en_ph /= 0.0_r64) then
+       invboseplus1 = 1.0_r64/(1.0_r64 + Bose(en_ph, T))
+    else
+       invboseplus1 = 0.0_r64
+    end if
+
+    !Initial (IBZ blocks) wave vector (crystal coords.)
+    q = ph%wavevecs(iq_fbz, :)
+
+    !Convert from crystal to 0-based index vector
+    q_indvec = nint(q*ph%wvmesh)
+
+    !Load g2_istate from disk for scattering rates calculation
+    !Change to data output directory
+    call chdir(trim(adjustl(num%g2dir)))
+
+    !Read data in binary format
+    write (filename, '(I9)') istate
+    filename = 'gq2.istate'//trim(adjustl(filename))
+    open(1, file = trim(filename), status = 'old', access = 'stream')
+    read(1) nprocs
+    if(allocated(g2_istate)) deallocate(g2_istate)
+    allocate(g2_istate(nprocs))
+    if(nprocs > 0) read(1) g2_istate
+    close(1)
+
+    !Change back to working directory
+    call chdir(num%cwd)
+
+    !Initialize process counter
+    count = 0
+
+    !Run over initial (in-window, FBZ blocks) electron wave vectors
+    do ik = 1, el%nwv
+       !Initial wave vector (crystal coords.)
+       k = el%wavevecs(ik, :)
+
+       !Convert from crystal to 0-based index vector
+       k_indvec = nint(k*el%wvmesh)
+
+       !Find final electron wave vector
+       kp_indvec = modulo(k_indvec + el%mesh_ref_array*q_indvec, el%wvmesh) !0-based index vector
+
+       !Muxed index of kp
+       ikp = mux_vector(kp_indvec, el%wvmesh, 0_i64)
+
+       !Check if final electron wave vector is within energy window
+       call binsearch(el%indexlist, ikp, ikp_window)
+       if(ikp_window < 0) cycle
+
+       !Run over initial electron bands
+       do m = 1, el%numbands
+          !Energy of initial electron
+          en_el = el%ens(ik, m)
+
+          !Apply energy window to initial electron
+          if(abs(en_el - el%enref) > el%fsthick) cycle
+
+          !Fermi factor for initial and final electrons
+          fermi1 = Fermi(en_el, el%chempot, T)
+          fermi2 = Fermi(en_el + en_ph, el%chempot, T)
+
+          !Run over final electron bands
+          do n = 1, el%numbands
+             !Energy of final electron
+             en_elp = el%ens(ikp_window, n)
+
+             !Apply energy window to final electron
+             if(abs(en_elp - el%enref) > el%fsthick) cycle
+
+             !Increment g2 process counter
+             count = count + 1
+
+             !Calculate Y:
+             
+             !Evaluate delta function
+             delta_val = delta_fn_ptr(en_elp - en_ph, ik, m, el%wvmesh, el%simplex_map, &
+                  el%simplex_count, el%simplex_evals)
+
+             !Temperature dependent occupation factor
+             occup_fac = fermi1*(1.0_r64 - fermi2)*invboseplus1
+
+             !Save Y
+             if(en_ph >= 0.5e-3) then !Use a small phonon energy cut-off
+                Y_istate(count) = g2_istate(count)*occup_fac*delta_val
+             end if
+
+             !Save initial and final electron states
+             if(keep_interaction_tally) then
+                istate_el1(count) = mux_state(el%numbands, m, ik)
+                istate_el2(count) = mux_state(el%numbands, n, ikp_window)
+             end if
+          end do !n
+       end do !m
+    end do !ik
+
+    !Shrink Y
+    call shrink(Y_istate, count)
+
+    !Multiply constant/units factor, etc.
+    Y_istate = const*Y_istate
+    
+    !Shrink process tallies
+    if(keep_interaction_tally) then
+       call shrink(istate_el2, count)
+       call shrink(istate_el2, count)
+    end if
+
+    if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
+  end subroutine calculate_Y_OTF
   
   subroutine calculate_eph_interaction_ibzk(wann, crys, el, ph, num, key)
     !! Parallel driver of g2(k,q) over IBZ electron states.
@@ -2896,14 +3066,18 @@ contains
           end if
 
           if(present(el)) then
-             !Set Y filename
-             filepath_Y = trim(adjustl(num%Ydir))//'/Y.istate'//trim(adjustl(tag))
-
-             !Read Y from file
-             if(allocated(Y)) deallocate(Y)
-             call read_transition_probs_e(trim(adjustl(filepath_Y)), nprocs_phe, Y)
-
-             do iproc = 1, nprocs_phe
+             if(num%Y_OTF) then
+                call calculate_Y_OTF(el, ph, num, istate, crys%T, Y)
+             else
+                !Set Y filename
+                filepath_Y = trim(adjustl(num%Ydir))//'/Y.istate'//trim(adjustl(tag))
+                
+                !Read Y from file
+                if(allocated(Y)) deallocate(Y)
+                call read_transition_probs_e(trim(adjustl(filepath_Y)), nprocs_phe, Y)
+             end if
+             
+             do iproc = 1, size(Y)
                 rta_rates_phe(iq, s) = rta_rates_phe(iq, s) + el%spindeg*Y(iproc)
              end do
           end if

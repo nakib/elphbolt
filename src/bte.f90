@@ -33,7 +33,7 @@ module bte_module
   use electron_module, only: electron
   use interactions, only: calculate_ph_rta_rates, read_transition_probs_e, &
        calculate_el_rta_rates, calculate_bound_scatt_rates, calculate_thinfilm_scatt_rates, &
-       calculate_4ph_rta_rates, calculate_W3ph_OTF
+       calculate_4ph_rta_rates, calculate_W3ph_OTF, calculate_Y_OTF
   use bz_sums, only: calculate_transport_coeff, calculate_spectral_transport_coeff, &
        calculate_mfp_cumulative_transport_coeff
 
@@ -1122,15 +1122,20 @@ contains
           end if
           
           if(present(response_el)) then
-             !Set Y filename
-             filepath_Y = trim(adjustl(num%Ydir))//'/Y.istate'//trim(adjustl(tag))
+             if(num%Y_OTF) then
+                call calculate_Y_OTF(el, ph, num, istate1, T, Y, istate_el1, istate_el2)
+                nprocs_phe = size(Y)
+             else
+                !Set Y filename
+                filepath_Y = trim(adjustl(num%Ydir))//'/Y.istate'//trim(adjustl(tag))
 
-             !Read Y from file
-             if(allocated(Y)) deallocate(Y)
-             if(allocated(istate_el1)) deallocate(istate_el1)
-             if(allocated(istate_el2)) deallocate(istate_el2)
-             call read_transition_probs_e(trim(adjustl(filepath_Y)), nprocs_phe, Y, &
-                  istate_el1, istate_el2)
+                !Read Y from file
+                if(allocated(Y)) deallocate(Y)
+                if(allocated(istate_el1)) deallocate(istate_el1)
+                if(allocated(istate_el2)) deallocate(istate_el2)
+                call read_transition_probs_e(trim(adjustl(filepath_Y)), nprocs_phe, Y, &
+                     istate_el1, istate_el2)
+             end if
           end if
 
           !Sum over the number of equivalent q-points of the IBZ point

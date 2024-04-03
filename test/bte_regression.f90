@@ -247,12 +247,14 @@ program bte_regression
         call t_event%end_timer('IBZ q e-ph interactions')
      end if
 
-     call t_event%start_timer('IBZ ph-e transition probilities')
-
      !Calculate ph-e transition probabilities
-     call calculate_eph_interaction_ibzq(wann, crys, el, ph, num, 'Y')
-
-     call t_event%end_timer('IBZ ph-e transition probilities')
+     if(.not. num%Y_OTF) then
+        call t_event%start_timer('IBZ ph-e transition probilities')
+        
+        call calculate_eph_interaction_ibzq(wann, crys, el, ph, num, 'Y')
+        
+        call t_event%end_timer('IBZ ph-e transition probilities')
+     end if
   end if
 
   if(num%onlyebte .or. num%drag) then

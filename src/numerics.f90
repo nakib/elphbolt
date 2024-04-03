@@ -132,7 +132,9 @@ module numerics_module
      real(r64) :: Bfield(3)
      !! B-field vector
      logical :: W_OTF
-     !! (Re)calculate W+ and W- on-the-fly. That is, no disk I/O for these quantities. 
+     !! (Re)calculate W+ and W- on-the-fly. That is, no disk I/O for these quantities.
+     logical :: Y_OTF
+     !! (Re)calculate Y on-the-fly. That is, no disk I/O for these quantities. 
    contains
 
      procedure :: initialize=>read_input_and_setup, create_chempot_dirs
@@ -160,14 +162,15 @@ contains
     character(len = 1) :: numcols
     logical :: read_gq2, read_gk2, read_V, read_W, tetrahedra, phe, phiso, phsubs, &
          phbound, phdef_Tmat, onlyphbte, onlyebte, elchimp, elbound, drag, plot_along_path, &
-         phthinfilm, phthinfilm_ballistic, fourph, use_Wannier_ifc2s, phiso_Tmat, Bfield_on, W_OTF
+         phthinfilm, phthinfilm_ballistic, fourph, use_Wannier_ifc2s, phiso_Tmat, Bfield_on, &
+         W_OTF, Y_OTF
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
          read_V, read_W, tetrahedra, phe, phiso, phsubs, onlyphbte, onlyebte, maxiter, &
          conv_thres, drag, elchimp, plot_along_path, runlevel, ph_en_min, ph_en_max, &
          ph_en_num, el_en_min, el_en_max, el_en_num, phbound, elbound, phdef_Tmat, &
          ph_mfp_npts, phthinfilm, phthinfilm_ballistic, fourph, fourph_mesh_ref, use_Wannier_ifc2s, &
-         phiso_Tmat, phiso_1B_theory, Bfield_on, Bfield, W_OTF
+         phiso_Tmat, phiso_1B_theory, Bfield_on, Bfield, W_OTF, Y_OTF
 
     call subtitle("Reading numerics information...")
     
@@ -215,6 +218,7 @@ contains
     el_en_num = 100
     ph_mfp_npts = 100
     W_OTF = .true.
+    Y_OTF = .true.
     read(1, nml = numerics)
 
     if(read_W .and. W_OTF) &
@@ -301,6 +305,7 @@ contains
        self%elchimp = elchimp
        self%elbound = elbound
        self%drag = drag
+       self%Y_OTF = Y_OTF
     else
        self%mesh_ref = 1 !Enforce this for superconductivity mode
     end if
@@ -444,6 +449,7 @@ contains
           write(*, "(A, L)") "Reuse ph-ph transition probabilities: ", self%read_W
           write(*, "(A, L)") "Calculate ph-ph transition probalities on-the-fly: ", self%W_OTF
           write(*, "(A, L)") "Calculate ph-e interaction: ", self%phe
+          write(*, "(A, L)") "Calculate ph-e transition probalities on-the-fly: ", self%Y_OTF
           write(*, "(A, L)") "Calculate 1st Born ph-isotope interaction: ", self%phiso
           if(self%phiso) &
                write(*, "(A, A)") "Selected ph-isotope 1st Born theory: ", self%phiso_1B_theory
