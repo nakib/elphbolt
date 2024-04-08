@@ -24,7 +24,7 @@ module bte_module
        trace, subtitle, append2file_transport_tensor, write2file_response, &
        linspace, readfile_response, write2file_spectral_tensor, subtitle, timer, &
        twonorm, write2file_rank1_real, precompute_interpolation_corners_and_weights, &
-       interpolate_using_precomputed, Jacobian, cross_product
+       interpolate_using_precomputed, Jacobian, cross_product, qdist
   use numerics_module, only: numerics
   use crystal_module, only: crystal
   use nano_module, only: nanostructure
@@ -35,7 +35,7 @@ module bte_module
        calculate_el_rta_rates, calculate_bound_scatt_rates, calculate_thinfilm_scatt_rates, &
        calculate_4ph_rta_rates, calculate_W3ph_OTF, calculate_Y_OTF
   use bz_sums, only: calculate_transport_coeff, calculate_spectral_transport_coeff, &
-       calculate_mfp_cumulative_transport_coeff
+       calculate_cumulative_transport_coeff
 
   implicit none
 
@@ -1549,18 +1549,30 @@ contains
     !Local variables
     real(r64), allocatable :: ph_en_grid(:), el_en_grid(:), ph_kappa(:,:,:,:), dummy(:,:,:,:), &
          el_kappa0(:,:,:,:), el_sigmaS(:,:,:,:), el_sigma(:,:,:,:), el_alphabyT(:,:,:,:), &
-         ph_alphabyT(:,:,:,:), ph_scalar_mfps(:, :), ph_mfp_sampling_grid(:), &
-         ph_kappa_cumulative_mfp(:, :, :, :)
+         ph_alphabyT(:,:,:,:), ph_scalar_mfps(:, :), &
+         ph_mfp_sampling_grid(:), ph_q_sampling_grid(:), &
+         ph_kappa_cumulative_mfp(:, :, :, :), ph_kappa_cumulative_q(:, :, :, :)
+    real(r64) :: ph_abs_qs(ph%nwv)
     character(len = 1024) :: tag, Tdir, numcols
     integer(i64) :: ik, ib
 
     !Calculate electron and/or phonon sampling energy grid
     call linspace(ph_en_grid, num%ph_en_min, num%ph_en_max, num%ph_en_num)
     call linspace(el_en_grid, num%el_en_min, num%el_en_max, num%el_en_num)
-
+    
     !Write energy grids to file
     call write2file_rank1_real("ph.en_grid", ph_en_grid)
     call write2file_rank1_real("el.en_grid", el_en_grid)
+
+    !Calcualte |q|_FBZ
+    ph_abs_qs = [(qdist(ph%wavevecs(ik, :), crys%reclattvecs), ik = 1, ph%nwv)]
+    
+    !Calculate phonon |q|-sampling grid
+    ! using a linear grid with a 15% increased |q| value. 
+    call linspace(ph_q_sampling_grid, 0.0_r64, 1.5_r64*maxval(ph_abs_qs), num%ph_abs_q_npts)
+
+    !Write the sampling mfps to file
+    call write2file_rank1_real("ph_abs_q_sampling", ph_q_sampling_grid)
 
     !Change to T-dependent directory
     write(tag, "(E9.3)") crys%T
@@ -1743,23 +1755,33 @@ contains
        
        !  Calculate phonon mfp sampling grid [T-dependent quantity]
        
-       !   Using a log grid with a 50% increased maximum mfp value. 
+       !  Using a log grid with a 50% increased maximum mfp value. 
        call linspace(ph_mfp_sampling_grid, -6.0_r64, log10(1.5_r64*maxval(ph_scalar_mfps)), num%ph_mfp_npts)
        ph_mfp_sampling_grid = 10.0_r64**ph_mfp_sampling_grid
 
        !  Write the sampling mfps to file
        call write2file_rank1_real("nodrag_iterated_ph_mfps_sampling", ph_mfp_sampling_grid)
 
-       !  Allocate phonon mfp
+       !  Allocate cumulative kappa wrt mfp
        allocate(ph_kappa_cumulative_mfp(ph%numbands, 3, 3, num%ph_mfp_npts))
 
-       !  Calculate culumative phonon kappa vs scalar mean-free-path (mfp)
-       call calculate_mfp_cumulative_transport_coeff(ph%prefix, 'T', crys%T, 1_i64, 0.0_r64, &
-            ph%ens, ph%vels, ph%wvmesh, crys%volume, self%ph_response_T, ph_mfp_sampling_grid, &
-            ph_scalar_mfps, sym, ph_kappa_cumulative_mfp)!, dummy)
+       !  Allocate cumulative kappa wrt |q|
+       allocate(ph_kappa_cumulative_q(ph%numbands, 3, 3, num%ph_abs_q_npts))
 
-       !  Write scalar mfp cumulative phonon kappa
+       !  Calculate culumative phonon kappa vs scalar mean-free-path (mfp)
+!!$       call calculate_mfp_cumulative_transport_coeff(ph%prefix, 'T', crys%T, 1_i64, 0.0_r64, &
+!!$            ph%ens, ph%vels, ph%wvmesh, crys%volume, self%ph_response_T, ph_mfp_sampling_grid, &
+!!$            ph_scalar_mfps, sym, ph_kappa_cumulative_mfp)!, dummy)
+
+       call calculate_cumulative_transport_coeff(ph%prefix, 'T', crys%T, 1_i64, 0.0_r64, &
+            ph%ens, ph%vels, ph%wvmesh, crys%volume, self%ph_response_T, &
+            ph_scalar_mfps, ph_abs_qs, sym, &
+            ph_kappa_cumulative_mfp, ph_kappa_cumulative_q, &
+            ph_mfp_sampling_grid, ph_q_sampling_grid)
+
+       !  Write scalar cumulative phonon kappa
        call write2file_spectral_tensor('nodrag_iterated_ph_kappa_mfp_cumulative_', ph_kappa_cumulative_mfp)
+       call write2file_spectral_tensor('nodrag_iterated_ph_kappa_abs_q_cumulative_', ph_kappa_cumulative_q)
        
        !  Release memory
        deallocate(self%ph_response_T, ph_kappa, dummy, ph_kappa_cumulative_mfp)

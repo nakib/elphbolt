@@ -127,6 +127,8 @@ module numerics_module
      !! Number of equidistant electron energy mesh points.
      integer(i64) :: ph_mfp_npts
      !! Number of equidistant phonon mean-free-path mesh points.
+     integer(i64) :: ph_abs_q_npts
+     !! Number of equidistant phonon |q| points.
      logical :: Bfield_on
      !! Is B-field on?
      real(r64) :: Bfield(3)
@@ -154,7 +156,7 @@ contains
     
     !Local variables
     integer(i64) :: mesh_ref, qmesh(3), maxiter, runlevel, el_en_num, &
-         ph_en_num, ph_mfp_npts, fourph_mesh_ref
+         ph_en_num, ph_mfp_npts, ph_abs_q_npts, fourph_mesh_ref
     integer :: i
     real(r64) :: fsthick, conv_thres, ph_en_min, ph_en_max, el_en_min, el_en_max, Bfield(3)
     character(len = 1024) :: datadumpdir, tag
@@ -169,7 +171,8 @@ contains
          read_V, read_W, tetrahedra, phe, phiso, phsubs, onlyphbte, onlyebte, maxiter, &
          conv_thres, drag, elchimp, plot_along_path, runlevel, ph_en_min, ph_en_max, &
          ph_en_num, el_en_min, el_en_max, el_en_num, phbound, elbound, phdef_Tmat, &
-         ph_mfp_npts, phthinfilm, phthinfilm_ballistic, fourph, fourph_mesh_ref, use_Wannier_ifc2s, &
+         ph_mfp_npts, ph_abs_q_npts, phthinfilm, phthinfilm_ballistic, &
+         fourph, fourph_mesh_ref, use_Wannier_ifc2s, &
          phiso_Tmat, phiso_1B_theory, Bfield_on, Bfield, W_OTF, Y_OTF
 
     call subtitle("Reading numerics information...")
@@ -217,6 +220,7 @@ contains
     el_en_max = 10.0_r64
     el_en_num = 100
     ph_mfp_npts = 100
+    ph_abs_q_npts = 100
     W_OTF = .true.
     Y_OTF = .true.
     read(1, nml = numerics)
@@ -326,6 +330,7 @@ contains
        self%el_en_max = el_en_max
        self%el_en_num = el_en_num
        self%ph_mfp_npts = ph_mfp_npts
+       self%ph_abs_q_npts = ph_abs_q_npts
     end if
     
     if(crys%twod .and. self%qmesh(3) /= 1) then

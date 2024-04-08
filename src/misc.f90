@@ -633,6 +633,27 @@ contains
     twonorm_real_rank2 = sqrt(twonorm_real_rank2)
   end function twonorm_real_rank2
 
+  pure real(r64) function qdist(q, reclattvecs)
+    !! Function to calculate the smallest wave vector distance in the Brillouin zone.
+    !! q is in crystal coordinates.
+    !! qdist will be in nm^-1
+
+    real(r64), intent(in) :: q(3), reclattvecs(3, 3)
+    real(r64) :: distfromcorners(3**3)
+    integer(i64) :: i, j, k, count
+
+    count = 1
+    do i = -1, 1
+       do j = -1, 1
+          do k = -1, 1
+             distfromcorners(count) = twonorm(matmul(reclattvecs, q - (/i, j, k/)))
+             count = count + 1
+          end do
+       end do
+    end do
+    qdist = minval(distfromcorners)
+  end function qdist
+  
   pure real(r64) function trace(mat)
     !! Trace of square matrix
 
