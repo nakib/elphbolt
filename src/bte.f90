@@ -1566,6 +1566,18 @@ contains
 
     !Calcualte |q|_FBZ
     ph_abs_qs = [(qdist(ph%wavevecs(ik, :), crys%reclattvecs), ik = 1, ph%nwv)]
+
+    !Print out IBZ |q|
+    if(this_image() == 1) then
+       write(numcols, "(I0)") ph%numbands
+       open(1, file = "ph.abs_q_ibz", status = "replace")
+       do ik = 1, ph%nwv_irred
+          write(1, "(E20.10)") &
+               ph_abs_qs(ph%indexlist_irred(ik))
+       end do
+       close(1)
+    end if
+    sync all
     
     !Calculate phonon |q|-sampling grid
     ! using a linear grid with a 15% increased |q| value. 
