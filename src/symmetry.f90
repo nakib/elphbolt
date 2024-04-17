@@ -20,7 +20,7 @@ module symmetry_module
 
   use params, only: r64, i64
   use misc, only: mux_vector, demux_mesh, demux_vector, &
-       exit_with_message, subtitle, distribute_points
+       exit_with_message, subtitle, distribute_points, shrink
   use crystal_module, only : crystal
 
   use iso_c_binding
@@ -330,8 +330,7 @@ contains
     !Local variables
     integer(i64) :: nwavevecs, i, imux, s, image, imagelist(nsymm_rot), &
          nrunninglist, counter, ijk(3), aux, num_active_images, chunk, check
-    integer(i64), allocatable :: runninglist(:), &
-         indexlist_irred_tmp(:), nequivalent_tmp(:), ibz2fbz_map_tmp(:,:,:), &
+    integer(i64), allocatable :: runninglist(:), ibz2fbz_map_tmp(:,:,:), &
          start[:], end[:]
     logical :: in_list
 
@@ -343,7 +342,7 @@ contains
     else
        nwavevecs = product(mesh)
     end if
-    
+
     allocate(equivalence_map(nsymm_rot, nwavevecs))
 
     if(blocks) then
@@ -352,18 +351,18 @@ contains
        call find_equiv_map(nsymm_rot, equivalence_map, mesh, qrotations)
     end if
 
-    allocate(indexlist_irred_tmp(nwavevecs), nequivalent_tmp(nwavevecs), &
+    allocate(indexlist_irred(nwavevecs), nequivalent(nwavevecs), &
          runninglist(nwavevecs), ibz2fbz_map_tmp(nsymm_rot, nwavevecs, 2))
-    
+
     !Allocate coarrays
     allocate(start[*], end[*])
-    
+
     runninglist = 0
     nrunninglist = 0
     nwavevecs_irred = 0
-    nequivalent_tmp = 0
+    nequivalent = 0
     counter = 0
-    
+
     do i = 1, nwavevecs !Take a point from the FBZ
        !Get the muxed index of the wave vector
        if(blocks) then
@@ -394,18 +393,18 @@ contains
           !Increment irreducible point counter
           nwavevecs_irred = nwavevecs_irred + 1
           !Save point to irreducible wedge list
-          indexlist_irred_tmp(nwavevecs_irred) = imux
+          indexlist_irred(nwavevecs_irred) = imux
 
           !Generate images of this irreducible point
           do s = 1, nsymm_rot !Take a rotation
              image = equivalence_map(s, i) !This is the image
 
              !Check if image is not already in the list of images
-             if(.not. any(imagelist(1:nequivalent_tmp(nwavevecs_irred)) == image)) then
+             if(.not. any(imagelist(1:nequivalent(nwavevecs_irred)) == image)) then
                 !Increment equivalent image counter
-                nequivalent_tmp(nwavevecs_irred) = & 
-                     nequivalent_tmp(nwavevecs_irred) + 1
-                aux = nequivalent_tmp(nwavevecs_irred)
+                nequivalent(nwavevecs_irred) = & 
+                     nequivalent(nwavevecs_irred) + 1
+                aux = nequivalent(nwavevecs_irred)
                 !Save image to list of images and running list of
                 !points that have already been considered
                 imagelist(aux) = image
@@ -416,7 +415,7 @@ contains
                      nwavevecs_irred, :) = [s, image]
              end if
           end do
-          counter = counter + nequivalent_tmp(nwavevecs_irred)
+          counter = counter + nequivalent(nwavevecs_irred)
        end if
     end do
 
@@ -431,19 +430,16 @@ contains
     !Deallocate some internal data
     deallocate(runninglist)
 
-    !Copy the tmp data into (much) smaller sized global data holders
-    allocate(indexlist_irred(nwavevecs_irred))
-    indexlist_irred(1:nwavevecs_irred) = indexlist_irred_tmp(1:nwavevecs_irred)
-    deallocate(indexlist_irred_tmp)
+    !Shrink indexlist_irred to the correct size
+    call shrink(indexlist_irred, nwavevecs_irred)
 
-    allocate(nequivalent(nwavevecs_irred))
-    nequivalent(1:nwavevecs_irred) = nequivalent_tmp(1:nwavevecs_irred)
-    deallocate(nequivalent_tmp)
+    !Shrink nequivalent to the correct size
+    call shrink(nequivalent, nwavevecs_irred)
 
     allocate(ibz2fbz_map(nsymm_rot, nwavevecs_irred, 2))
     ibz2fbz_map(:, 1:nwavevecs_irred, :) = ibz2fbz_map_tmp(:, 1:nwavevecs_irred, :)
     deallocate(ibz2fbz_map_tmp)
-    
+
     !Create crystal coords IBZ wave vectors
     allocate(wavevecs_irred(nwavevecs_irred,3))
     do i = 1, nwavevecs_irred !run over total number of vectors
@@ -453,7 +449,7 @@ contains
        wavevecs_irred(i,:) = dble(ijk)/mesh !wave vectors in crystal coordinates
     end do
   end subroutine find_irred_wedge
-
+  
   function fbz2ibz(iwvmux,nwv_irred,nequiv,ibz2fbz_map)
     !! Find index in IBZ blocks list for a given FBZ blocks muxed vector index
 
