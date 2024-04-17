@@ -7,23 +7,25 @@ program test_misc
        twonorm, binsearch, mux_vector, demux_vector, interpolate, coarse_grained, &
        unique, linspace, compsimps, mux_state, demux_state, demux_mesh, expm1, &
        Fermi, Bose, Pade_continued, precompute_interpolation_corners_and_weights, &
-       interpolate_using_precomputed, operator(.umklapp.)
+       interpolate_using_precomputed, operator(.umklapp.), shrink
   
   implicit none
 
   integer :: itest
-  integer, parameter :: num_tests = 26
+  integer, parameter :: num_tests = 28
   type(testify) :: test_array(num_tests), tests_all
   integer(i64) :: index, quotient, remainder, int_array(5), v1(3), v2(3), &
        v1_muxed, v2_muxed, ik, ik1, ik2, ik3, ib1, ib2, ib3, wvmesh(3), &
        mesh_ref_array(3), nk_coarse, ninterp
   integer(i64), allocatable :: index_mesh_0(:, :), index_mesh_1(:, :), &
-       ksint(:, :), idc(:, :), ik_interp(:)
+       ksint(:, :), idc(:, :), ik_interp(:), array_of_ints(:)
   real(r64) :: pauli1(2, 2), ipauli2(2, 2), pauli3(2, 2), &
        real_array(5), result, q1(3, 4), q2(3, 4), q3(3, 4)
   real(r64), allocatable :: integrand(:), domain(:), im_axis(:), real_func(:), &
-       widc(:, :), f_coarse(:), f_interp(:)
+       widc(:, :), f_coarse(:), f_interp(:), array_of_reals(:)
 
+  print*, '<<module misc unit tests>>'
+  
   !Some data to be used in the tests below
   pauli1 = reshape([0.0_r64, 1.0_r64, 1.0_r64, 0.0_r64], [2, 2])
   ipauli2 = reshape([0.0_r64, -1.0_r64, 1.0_r64, 0.0_r64], [2, 2])
@@ -315,6 +317,22 @@ program test_misc
   itest = itest + 1
   test_array(itest) = testify("elemental .umklapp.")  
   call test_array(itest)%assert(pack(q1 .umklapp. q2, .true.), reshape(q3, [size(q3)]))
+
+  !shrink int
+  itest = itest + 1
+  test_array(itest) = testify("shrink integer array")
+  allocate(array_of_ints(5))
+  array_of_ints = [1, 2, 3, 4, 5]*1_i64
+  call shrink(array_of_ints, 2_i64)
+  call test_array(itest)%assert(array_of_ints, [1, 2]*1_i64)
+
+  !shrink real
+  itest = itest + 1
+  test_array(itest) = testify("shrink real array")
+  allocate(array_of_reals(5))
+  array_of_reals = [1, 2, 3, 4, 5]*1.0_r64
+  call shrink(array_of_reals, 2_i64)
+  call test_array(itest)%assert(array_of_reals, [1, 2]*1.0_r64)
   
   tests_all = testify(test_array)
   call tests_all%report

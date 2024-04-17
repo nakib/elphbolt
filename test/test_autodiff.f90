@@ -16,9 +16,11 @@ program test_autodiff
   integer(i64), parameter :: N = 3
   real(r64), allocatable :: x(:)
   type(autodiff) :: ad_x(N), ad_fx(N)
-    
-  call linspace(x, 0.0_r64, 1.0_r64, N)
 
+  print*, '<<module autodiff unit tests>>'
+  
+  call linspace(x, 0.0_r64, 1.0_r64, N)
+  
   itest = 1
   test_array(itest) = testify("f(x) = x^2 + 2x")
   do i = 1, N
