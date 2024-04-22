@@ -18,7 +18,8 @@ module bte_module
   !! Module containing type and procedures related to the solution of the
   !! Boltzmann transport equation (BTE).
 
-  use params, only: r64, i64, qe, kB, hbar_eVps
+  use precision, only: r64, i64
+  use params, only: qe, kB, hbar_eVps
   use misc, only: print_message, exit_with_message, write2file_rank2_real, &
        distribute_points, demux_state, binsearch, interpolate, demux_vector, mux_vector, &
        trace, subtitle, append2file_transport_tensor, write2file_response, &

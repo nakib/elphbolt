@@ -17,7 +17,7 @@
 module electron_module
   !! Module containing types and procedures related to the electronic properties.
 
-  use params, only: r64, i64
+  use precision, only: r64, i64
   use particle_module, only: particle
   use misc, only: exit_with_message, print_message, demux_state, sort, &
        binsearch, subtitle, Fermi, write2file_rank2_real, write2file_rank3_real 

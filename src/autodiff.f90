@@ -19,7 +19,7 @@ module autodiff_m
   !! automatic differentiation. At the moment, only the real(64)
   !! kind is supported along with just the basis arithmetic operations.
 
-  use params, only: r64
+  use precision, only: r64
 
   implicit none
 

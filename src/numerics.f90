@@ -17,7 +17,8 @@
 module numerics_module
   !! Module containing type and procedures related to the numerics.
 
-  use params, only: r64, i64, twopi
+  use precision, only: r64, i64
+  use params, only: twopi
   use misc, only: exit_with_message, subtitle
   use crystal_module, only: crystal
 

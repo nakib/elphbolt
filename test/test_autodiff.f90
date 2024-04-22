@@ -1,6 +1,6 @@
 program test_autodiff
 
-  use params, only : r64, i64
+  use precision, only : r64, i64
   use misc, only : linspace
   use testify_m, only : testify
   use autodiff_m, only : autodiff, &

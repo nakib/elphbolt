@@ -17,7 +17,8 @@
 module wannier_module
   !! Module containing type and procedures related to Wannierization.
 
-  use params, only: r64, i64, Ryd2eV, Ryd2radTHz, oneI, pi, twopi, twopiI, &
+  use precision, only: r64, i64
+  use params, only: Ryd2eV, Ryd2radTHz, oneI, pi, twopi, twopiI, &
        Ryd2amu, bohr2nm
   use misc, only: exit_with_message, print_message, expi, twonorm, &
        distribute_points, demux_state, mux_vector, subtitle, write2file_rank2_complex, &

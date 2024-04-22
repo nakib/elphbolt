@@ -17,6 +17,7 @@ source-dir="src"
 #Pull from github
 #testify = { git = "git@github.com:nakib/testify.git" }
 testify = {path = "thirdparty/testify"}
+fhash = { git = "https://github.com/LKedward/fhash.git" }
 
 #Use local copy from thirdparty directory
 spglib = {path = "thirdparty/spglib"}

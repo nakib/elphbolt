@@ -19,7 +19,8 @@
 module phonon_module
   !! Module containing type and procedures related to the phononic properties.
 
-  use params, only: r64, i64, bohr2nm, pi, twopi, Ryd2eV, oneI
+  use precision, only: r64, i64
+  use params, only: bohr2nm, pi, twopi, Ryd2eV, oneI
   use particle_module, only: particle
   use misc, only: print_message, subtitle, expi, distribute_points, &
        write2file_rank2_real, exit_with_message, create_set, coarse_grain, &

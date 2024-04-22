@@ -21,7 +21,8 @@ module interactions
   use openacc
 #endif
   
-  use params, only: i64, r64, pi, twopi, amu, qe, hbar_eVps, perm0, oneI
+  use precision, only: i64, r64
+  use params, only: pi, twopi, amu, qe, hbar_eVps, perm0, oneI
   use misc, only: exit_with_message, print_message, distribute_points, &
        demux_state, mux_vector, mux_state, expi, Bose, binsearch, Fermi, &
        twonorm, write2file_rank2_real, demux_vector, interpolate, expm1, &

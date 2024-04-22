@@ -18,7 +18,7 @@ module symmetry_module
   !! Module containing type and procedures related to crystal and
   !! Brillouin zone symmetries.
 
-  use params, only: r64, i64
+  use precision, only: r64, i64
   use misc, only: mux_vector, demux_mesh, demux_vector, &
        exit_with_message, subtitle, distribute_points, shrink
   use crystal_module, only : crystal

@@ -17,7 +17,8 @@
 module Green_function
   !! Module containing Green's function related procedures.
 
-  use params, only: i64, r64, pi, oneI, twopi, hbar_eVps
+  use precision, only: i64, r64
+  use params, only: pi, oneI, twopi, hbar_eVps
   use electron_module, only: electron
   use phonon_module, only: phonon
   use crystal_module, only: crystal

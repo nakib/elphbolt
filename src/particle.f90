@@ -17,7 +17,7 @@
 module particle_module
   !! Module containing the particle abstract data type.
 
-  use params, only: r64, i64
+  use precision, only: r64, i64
   
   implicit none
 

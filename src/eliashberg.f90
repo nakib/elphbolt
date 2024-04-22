@@ -18,7 +18,7 @@ module eliashberg
   !! Module containing the procedures related to the computation of the Eliashberg
   !! spectral function a2F and the e-ph coupling factor lambda.
   
-  use params, only: i64, r64
+  use precision, only: i64, r64
   use misc, only: exit_with_message, print_message, distribute_points, &
        demux_state, mux_vector, write2file_rank1_real, write2file_rank2_real, &
        compsimps

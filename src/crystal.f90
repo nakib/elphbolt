@@ -17,7 +17,8 @@
 module crystal_module
   !! Module containing type and procedures related to the crystal structure.
 
-  use params, only: r64, i64, twopi
+  use precision, only: r64, i64
+  use params, only: twopi
   use misc, only: exit_with_message, print_message, cross_product, demux_vector, &
        subtitle, trace
 
