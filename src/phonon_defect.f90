@@ -17,7 +17,8 @@
 module phonon_defect_module
   !! Module containing phonon defect related data type and procedures.
 
-  use params, only: i64, r64, hbar_eVps, twopi, pi
+  use precision, only: i64, r64
+  use params, only: hbar_eVps, twopi, pi
   use misc, only: exit_with_message, subtitle, demux_vector, twonorm, write2file_rank2_real, &
        kronecker, expi, demux_state, invert, distribute_points, mux_state
   use crystal_module, only: crystal

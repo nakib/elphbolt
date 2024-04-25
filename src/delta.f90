@@ -17,7 +17,7 @@
 module delta
   !! Module containing the procedures related to delta function evaulation.
 
-  use params, only: r64, i64
+  use precision, only: r64, i64
   use crystal_module, only: crystal
   use wannier_module, only: wannier
   use misc, only: exit_with_message, print_message, demux_vector, mux_vector, &

@@ -24,7 +24,8 @@ module nano_module
   !! particles at reference equilibrium of the absorbing wall).
   !! See the subroutine compute_suppression for more information
   !!
-  use params, only: r64, i64, pi
+  use precision, only: r64, i64
+  use params, only: pi
   use misc, only: print_message, exit_with_message
   use symmetry_module, only: symmetry
   use phonon_module, only: phonon

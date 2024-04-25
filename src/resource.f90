@@ -4,7 +4,7 @@ module resource_module
 #ifdef _OPENACC
   use openacc
 #endif
-  use params, only: r64, i64
+  use precision, only: r64, i64
   use misc, only: create_set
   
   implicit none

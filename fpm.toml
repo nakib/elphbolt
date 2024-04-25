@@ -17,6 +17,7 @@ source-dir="src"
 #Pull from github
 #testify = { git = "git@github.com:nakib/testify.git" }
 testify = {path = "thirdparty/testify"}
+fhash = { git = "https://github.com/LKedward/fhash.git" }
 
 #Use local copy from thirdparty directory
 spglib = {path = "thirdparty/spglib"}
@@ -58,6 +59,11 @@ main = "test_misc.f90"
 name = "test_autodiff"
 source-dir="test"
 main = "test_autodiff.f90"
+
+[[test]]
+name = "test_periodictable"
+source-dir="test"
+main = "test_periodictable.f90"
 
 [[test]]
 name = "bte_regression"

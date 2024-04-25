@@ -17,7 +17,8 @@
 module bz_sums
   !! Module containing the procedures to do Brillouin zone sums.
 
-  use params, only: r64, i64, kB, qe, pi, hbar_eVps, perm0, twopi, oneI, bohr2nm
+  use precision, only: r64, i64
+  use params, only: kB, qe, pi, hbar_eVps, perm0, twopi, oneI, bohr2nm
   use misc, only: exit_with_message, print_message, write2file_rank2_real, &
        distribute_points, Bose, Fermi, binsearch, mux_vector, twonorm, linspace, &
        write2file_rank1_real

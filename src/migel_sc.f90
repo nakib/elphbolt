@@ -18,7 +18,8 @@ module MigEl_sc_module
   !! Module containing types and procedures related to the
   !! Migdal-Eliashberg (MigEl) solver environment.
   
-  use params, only: r64, i64, pi, kB, oneI
+  use precision, only: r64, i64
+  use params, only: pi, kB, oneI
   use misc, only: subtitle, print_message, exit_with_message, write2file_rank1_real, &
        twonorm, distribute_points, Pade_continued, demux_state, mux_state
   use numerics_module, only: numerics
