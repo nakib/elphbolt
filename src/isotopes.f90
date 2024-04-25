@@ -8,9 +8,13 @@ module isotopes_module
   public :: isotopes
   
   type isotopes
+     !! Datatype for storing information related to isotopes of a species
      integer :: numisotopes = 0
+     !! Number of isotopes
      real(r64), allocatable :: masses(:)
+     !! Mass of each isotope in atomic mass units
      real(r64), allocatable :: abundances(:)
+     !! Abundance of each isoptope in percent
    contains
      !TODO Add getters for:
      !VCA mass
@@ -27,6 +31,10 @@ module isotopes_module
 contains
   
   function constructor(masses, abundances) result(this)
+    real(r64), intent(in) :: masses(:)
+    !! Array containing the mass of each isotope in atomic mass units
+    real(r64), intent(in) :: abundances(:)
+    !! Array containing the abundance of each isotope in percent
     type(isotopes) :: this
 
     this%numisotopes = size(masses)

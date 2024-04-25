@@ -63,12 +63,16 @@ module params
 contains
 
   function lookup_periodic_table(element) result(data)
+      !! Return the isotopes of a specific element
       character(*), intent(in) :: element
+      !! Symbol of the element to be looked up
       type(isotopes) :: data
 
       class(*), allocatable :: raw_data
 
       if (.not. periodic_table_exists) then
+         ! Only, the first time a look-up is requested the periodic table is 
+         ! generated
          call create_periodic_table(periodic_table)
          periodic_table_exists = .true.
       end if
@@ -84,8 +88,8 @@ contains
    end function lookup_periodic_table
 
    subroutine create_periodic_table(periodic_table)
+      !! Initialize the periodic table
       type(fhash_tbl_t), intent(out) :: periodic_table
-
       call periodic_table%set( & 
          key('Ag'), value=isotopes( & 
             [106.905095_r64, 108.904754_r64], & 
