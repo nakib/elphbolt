@@ -415,11 +415,10 @@ contains
     real(r64), intent(out) :: m(:), g(:)
 
     !Local variables
-    integer(i64) :: i, niso, nelems, e
+    integer(i64) :: i, nelems, e
     type(isotopes) :: iso_data
 
     nelems = size(elements)
-    niso = 287
         
     do e = 1, nelems
        iso_data = lookup_periodic_table(elements(e))
@@ -440,18 +439,16 @@ contains
     !! Find the dominant isotopic masses from the periodic table
     !! and the average mass perturbation for use in the DIB-1st Born ph-iso scattering theory.
     use params, only: lookup_periodic_table
-    use m_isotopes, only: isotopes
+    use isotopes_module, only: isotopes
     
     character(len=3), intent(in) :: elements(:)
     real(r64), intent(out) :: m(:), g(:)
 
     !Local variables
-    integer :: i, total_numiso, nelems, e, iso_count, numiso
-    real(r64), allocatable :: these_iso_masses(:), these_iso_abundances(:)
+    integer :: i, nelems, e
     type(isotopes) :: iso_data 
 
     nelems = size(elements)
-    total_numiso = 287
 
     do e = 1, nelems
        iso_data = lookup_periodic_table(elements(e))
