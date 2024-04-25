@@ -61,6 +61,11 @@ source-dir="test"
 main = "test_autodiff.f90"
 
 [[test]]
+name = "test_periodictable"
+source-dir="test"
+main = "test_periodictable.f90"
+
+[[test]]
 name = "bte_regression"
 source-dir="test"
 main = "bte_regression.f90"
