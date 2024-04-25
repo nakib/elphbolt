@@ -17,7 +17,7 @@
 module params
   !! Module containing various parameters and constants.
 
-  use precision
+  use precision, only: r64
   use fhash, only: fhash_tbl_t, key => fhash_key
   use isotopes_module, only: isotopes
 
