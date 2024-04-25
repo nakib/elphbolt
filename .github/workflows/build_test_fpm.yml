@@ -39,5 +39,5 @@ jobs:
         sh install_blas+lapack.sh
         source fpm_config_caf.sh
         fpm build; fpm install && \
-        fpm test test_misc; fpm test test_autodiff && \
+        fpm test test_* && \
         fpm test bte_regression --runner="sh test/3C-SiC/fpm_run_bte_caf.sh"

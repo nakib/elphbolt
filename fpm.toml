@@ -69,4 +69,3 @@ main = "test_periodictable.f90"
 name = "bte_regression"
 source-dir="test"
 main = "bte_regression.f90"
-
