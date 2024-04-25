@@ -2,10 +2,10 @@
 ** Generate force constants and Wannier data
    - All the input files for the ~Quantum Espresso~ and ~EPW~ calculations are provided in the directory ~qe_and_epw_inputs~.
 ** Run ~elphbolt~
-   - Runtime: approximately ~3 minutes on 2 cpu cores.
+   - Runtime: approximately ~3 minutes.
 
  This is a test calculation for cubic Si to demonstrate the use of ~elphbolt~. Please note that the wave vector meshes in ~input.nml~ are extremely coarse and will not produce converged results for the transport coefficients. For converged results, you must use something along the lines of: ~qmesh = 50 50 50~ and ~mesh_ref = 3~.
 
  The file /output_gcc.txt/ gives the terminal print of the run.
 
- This calculation was done on 2 cpu cores on a Dell Precision 3630 machine running Debian 4.19.289-1 (2023-07-24) x86_64 GNU/Linux. The code was compiled with ~gcc (Debian 8.3.0-6) 8.3.0~ and ~OpenCoarrays v2.9.2~.
+ This calculation was done on 2 cpu cores on a Dell Latitude 5430 laptop running ~Ubuntu 22.04.4 LTS~. The code was compiled with ~gcc 11.4.0~ and ~OpenCoarrays v2.9.2~.

@@ -42,7 +42,7 @@ ____________________________________________Reading numerics information...
 q-mesh =     6    6    6
 k-mesh =    24   24   24
 Fermi window thickness (each side of reference energy) =   0.40000000E+00 eV
-Working directory = /users/sol/nakib/elphbolt/examples/Si_local/Si_input_output/inputtest/example
+Working directory = /home/nimda/elphbolt/examples/Si/local_run/Si_6r4_300K_CBM_gcc
 Data dump directory = ./scratch/
 T-dependent data dump directory = ./scratch/T0.300E+03
 e-ph directory = ./scratch/g2
@@ -52,9 +52,11 @@ Reuse e-ph matrix elements: F
 Reuse ph-e matrix elements: F
 Reuse ph-ph matrix elements: F
 Reuse ph-ph transition probabilities: F
-Include ph-e interaction: T
-Include ph-isotope interaction: F
-Calculate ph-isotope interaction from T-matrix: F
+Calculate ph-ph transition probabilities on-the-fly: T
+Calculate ph-e interaction: T
+Calculate ph-e transition probabilities on-the-fly: T
+Calculate 1st Born ph-isotope interaction: F
+Calculate ph-isotope interaction via T-matrix: F
 Include ph-substitution interaction: F
 Include ph-boundary interaction: F
 Include 4-ph interaction: F
@@ -67,12 +69,14 @@ Use tetrahedron method: F
 Plot quantities along path: F
 Maximum number of BTE/Migdal-Eliashberg equations iterations =    50
 BTE/Migdal-Eliashberg equations convergence threshold =   0.10000000E-03
+B-field is on: F
 ___________________________________________________________________________
 ______________________________________________________Analyzing symmetry...
-Crystal symmetry group = Fd-3m
+Crystal symmetry group = Fd-3m     
+Spacegroup number = 227
 Number of crystal symmetries (without time-reversal) =    48
 ..............
-| Timing info: Initialization  0.21172240E-04 hr
+| Timing info: Initialization  0.77599744E-05 hr
 ..............
 ___________________________________________________________________________
 ______________________________________________________Setting up Wannier...
@@ -82,7 +86,7 @@ Reading Wannier rep. dynamical matrix...
 Reading Wannier rep. e-ph vertex and distributing...
 Reading Wannier cells and multiplicities...
 ..............
-| Timing info: Wannier  0.61124237E-02 hr
+| Timing info: Wannier  0.66777553E-03 hr
 ..............
 ___________________________________________________________________________
 ____________________________________________________Setting up electrons...
@@ -128,7 +132,7 @@ Ionization of acceptor impurity =   0.00000000E+00
 Donor impurity concentration =   0.00000000E+00 cm^-3
 Acceptor impurity concentration =   0.00000000E+00 cm^-3
 ..............
-| Timing info: Electrons  0.31193496E-03 hr
+| Timing info: Electrons  0.18123796E-03 hr
 ..............
 ___________________________________________________________________________
 ______________________________________________________Setting up phonons...
@@ -141,16 +145,16 @@ Calculating phonon mesh triangles...
 Reading ShengBTE format third order force constants...
  Number triplets read in =       4646
 ..............
-| Timing info: Phonons  0.69690913E-04 hr
+| Timing info: Phonons  0.37392326E-04 hr
 ..............
 ___________________________________________________________________________
 ___________________________________________Calculating density of states...
 Calculating electron density of states...
-Calculating Thomas-Fermi screening...
+Calculating Thomas-Fermi screening wave vector...
  Thomas-Fermi screening wave vector =   0.10097865E+01 1/nm
 Calculating phonon density of states and (if needed) isotope/substitution scattering...
 ..............
-| Timing info: Density of states and one-particle scattering rates  0.11544712E-04 hr
+| Timing info: Density of states and one-particle scattering rates  0.32431192E-05 hr
 ..............
 ___________________________________________________________________________
 ________________________________________________Calculating interactions...
@@ -161,13 +165,10 @@ Calculating g(Re,q) -> |g(k,q)|^2 for all IBZ phonons...
  #states =         96
  #states/image <=         48
 ..............
-| Timing info: IBZ q e-ph interactions  0.42027416E-02 hr
+| Timing info: IBZ q e-ph interactions  0.34894268E-02 hr
 ..............
-Calculating ph-e transition probabilities for all IBZ phonons...
- #states =         96
- #states/image <=         48
 ..............
-| Timing info: IBZ ph-e transition probilities  0.12470810E-03 hr
+| Timing info: IBZ ph-e transition probilities  0.12061111E-08 hr
 ..............
 Calculating g(Re,Rp) -> g(k,Rp) for all IBZ k...
  Current shape of gwann =            8           8        1957           6         140
@@ -180,78 +181,72 @@ Calculating g(k,Rp) -> |g(k,q)|^2 for all IBZ electrons...
  #states =        200
  #states/image <=        100
 ..............
-| Timing info: IBZ k e-ph interactions  0.82054851E-02 hr
+| Timing info: IBZ k e-ph interactions  0.26930453E-01 hr
 ..............
 Calculating e-ph transition probabilities for all IBZ electrons...
  #states =        200
  #states/image <=        100
 ..............
-| Timing info: IBZ e-ph transition probabilities  0.22215065E-03 hr
+| Timing info: IBZ e-ph transition probabilities  0.21665465E-01 hr
 ..............
 Calculating 3-ph vertices for all IBZ phonons...
- #states =         96
- #states/image <=         48
 ..............
-| Timing info: IBZ q ph-ph interactions  0.54162255E-02 hr
-..............
-Calculating 3-ph transition probabilities for all IBZ phonons...
- #states =         96
- #states/image <=         48
-..............
-| Timing info: IBZ ph-ph scattering rates  0.44161060E-03 hr
+| Timing info: IBZ q ph-ph interactions  0.23468270E-02 hr
 ..............
 ___________________________________________________________________________
 ___________________________________________________Calculating transport...
 Only the trace-averaged transport coefficients are printed below:
-..............
-| Timing info: RTA ph BTE  0.15861756E-03 hr
-..............
-..............
-| Timing info: RTA e BTE  0.68878334E-04 hr
-..............
-Building interpolator space for phonon drag
-Building interpolator space for phonon drag: DONE
 RTA solution:
 -------------
- iter     k0_el[W/m/K]         sigmaS[A/m/K]         k_ph[W/m/K]         sigma[1/Ohm/m]         alpha_el/T[A/m/K]         alpha_ph/T[A/m/K]         KO dev.[%]
-  0       0.53726944E+01       -0.60117549E+02       0.83906025E+02      0.25373539E+06         -0.60117549E+02           0.00000000E+00            0.000
+ iter    k_ph[W/m/K]
+  0      0.83895644E+02
+..............
+| Timing info: RTA ph BTE  0.16526636E-03 hr
+..............
+RTA solution:
+-------------
+ iter    k0_el[W/m/K]        sigmaS[A/m/K]         sigma[1/Ohm/m]      alpha_el/T[A/m/K]
+  0      0.53573659E+01      -0.59968012E+02       0.25316974E+06      -0.59968012E+02
+..............
+| Timing info: RTA e BTE  0.15168689E-05 hr
+..............
 Coupled electron-phonon transport:
 ----------------------------------
  iter     k0_el[W/m/K]         sigmaS[A/m/K]         k_ph[W/m/K]         sigma[1/Ohm/m]         alpha_el/T[A/m/K]         alpha_ph/T[A/m/K]         KO dev.[%]
-  1       0.60628725E+01       -0.68782469E+02       0.86036118E+02      0.24794621E+06         -0.59916743E+02          -0.88657266E+01            0.000
-  2       0.60753581E+01       -0.68953658E+02       0.88126144E+02      0.24797594E+06         -0.59923334E+02          -0.90303246E+01            0.000
-  3       0.60815098E+01       -0.69033740E+02       0.87962244E+02      0.24798037E+06         -0.59924493E+02          -0.91092469E+01            0.000
-  4       0.60805360E+01       -0.69020175E+02       0.88095578E+02      0.24798020E+06         -0.59924457E+02          -0.90957188E+01            0.000
-  5       0.60809618E+01       -0.69025953E+02       0.88066875E+02      0.24798039E+06         -0.59924502E+02          -0.91014519E+01            0.000
-  6       0.60808547E+01       -0.69024364E+02       0.88079615E+02      0.24798035E+06         -0.59924494E+02          -0.90998689E+01            0.000
-  7       0.60808976E+01       -0.69024950E+02       0.88076056E+02      0.24798036E+06         -0.59924498E+02          -0.91004519E+01            0.000
+  1       0.60470652E+01       -0.68609044E+02       0.86024503E+02      0.24737052E+06         -0.59765503E+02          -0.88435411E+01            0.000
+  2       0.60598699E+01       -0.68784140E+02       0.88112700E+02      0.24740075E+06         -0.59772217E+02          -0.90119239E+01            0.000
+  3       0.60659962E+01       -0.68863827E+02       0.87949637E+02      0.24740518E+06         -0.59773376E+02          -0.90904518E+01            0.000
+  4       0.60650320E+01       -0.68850391E+02       0.88082764E+02      0.24740501E+06         -0.59773341E+02          -0.90770503E+01            0.000
+  5       0.60654556E+01       -0.68856135E+02       0.88054175E+02      0.24740520E+06         -0.59773386E+02          -0.90827490E+01            0.000
+  6       0.60653491E+01       -0.68854557E+02       0.88066888E+02      0.24740516E+06         -0.59773378E+02          -0.90811795E+01            0.000
+  7       0.60653918E+01       -0.68855141E+02       0.88063342E+02      0.24740517E+06         -0.59773382E+02          -0.90817586E+01            0.000
 ..............
-| Timing info: Coupled e-ph BTEs  0.48618163E-02 hr
+| Timing info: Coupled e-ph BTEs  0.30354162E-02 hr
 ..............
-Decoupled phonon transport:
+Dragless phonon transport:
 ---------------------------
  iter    k_ph[W/m/K]
-  1      0.84715716E+02
-  2      0.86492742E+02
-  3      0.86318059E+02
-  4      0.86448704E+02
-  5      0.86420157E+02
-  6      0.86432772E+02
-  7      0.86429236E+02
+  1      0.84708997E+02
+  2      0.86484147E+02
+  3      0.86310250E+02
+  4      0.86440682E+02
+  5      0.86412249E+02
+  6      0.86424837E+02
+  7      0.86421314E+02
 ..............
-| Timing info: Iterative decoupled ph BTE  0.72492177E-03 hr
+| Timing info: Iterative dragless ph BTE  0.11619967E-02 hr
 ..............
-Decoupled electron transport:
+Dragless electron transport:
 -----------------------------
  iter    k0_el[W/m/K]        sigmaS[A/m/K]         sigma[1/Ohm/m]      alpha_el/T[A/m/K]
-  1      0.53745487E+01      -0.59556858E+02       0.24662235E+06      -0.59556858E+02
-  2      0.53855923E+01      -0.59698916E+02       0.24708298E+06      -0.59698916E+02
-  3      0.53860521E+01      -0.59699684E+02       0.24703413E+06      -0.59699684E+02
-  4      0.53863157E+01      -0.59702222E+02       0.24703253E+06      -0.59702222E+02
+  1      0.53593248E+01      -0.59403341E+02       0.24603853E+06      -0.59403341E+02
+  2      0.53705813E+01      -0.59547863E+02       0.24650810E+06      -0.59547863E+02
+  3      0.53710480E+01      -0.59548691E+02       0.24645970E+06      -0.59548691E+02
+  4      0.53713162E+01      -0.59551284E+02       0.24645832E+06      -0.59551284E+02
 ..............
-| Timing info: Iterative decoupled e BTE  0.40079838E-03 hr
+| Timing info: Iterative dragless e BTE  0.61039708E-04 hr
 ..............
 ..............
-| Timing info: elphbolt  0.31361647E-01 hr
+| Timing info: elphbolt  0.59755921E-01 hr
 ..............
 ______________________Thanks for using elphbolt. Bye!______________________

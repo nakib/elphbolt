@@ -74,7 +74,7 @@ The source is heavily commented and can be auto-documented with ~FORD~ (https://
 Carefully read the output on the screen and add the paths to ~caf~ and ~cafrun~ to your ~$PATH~.
 
 *** 5. Build ~elphbolt~
-**** Using ~fpm~ [v>=0.7, preferred method]
+**** Using ~fpm~ [v>=0.7]
 ***** Standard (no gpu)
      For a cpu-only build and test with Fortran Package Manager (https://fpm.fortran-lang.org/), first say
 
@@ -102,18 +102,6 @@ Carefully read the output on the screen and add the paths to ~caf~ and ~cafrun~ 
       #+END_SRC
      
       Here I have assumed that you have already done ~blas~ and ~lapack~ building step. The testing commands are the same as before.
-**** Using ~cmake~ [Deprecated]
-     I am sunsetting the ~cmake~ build. You are on your own to figure out how to use it. Something like the following should work after you have fiddled with the file ~CMakeLists.txt~:
-
-     Issue the following command to build and run tests: ~mkdir build; cd build; cmake ..; make; ctest~. If all goes well, the exectuable will be available as ~build/bin/{elphbolt, superconda}~.
-** Docker
-To build a docker image, say
-
-      #+BEGIN_SRC bash
-      docker build - < Dockerfile
-      #+END_SRC
-The docker build uses ~cmake~ internally.
-
 ** Examples
 
 A full example for cubic silicon is provided. More examples will be added over time.
