@@ -409,7 +409,7 @@ contains
     !!
     !! This subroutine is adapted from ShengBTE.
     use params, only: lookup_periodic_table 
-    use m_isotopes, only: isotopes
+    use isotopes_module, only: isotopes
     
     character(len=3), intent(in) :: elements(:)
     real(r64), intent(out) :: m(:), g(:)

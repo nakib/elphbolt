@@ -1,4 +1,4 @@
-module m_isotopes
+module isotopes_module
   
   use precision, only: r64
   
@@ -20,13 +20,13 @@ module m_isotopes
   end type isotopes
 
   interface isotopes
+     !! Create new collection of isotopes 
      module procedure :: constructor
   end interface isotopes
        
 contains
   
   function constructor(masses, abundances) result(this)
-    real(r64), intent(in) :: masses(:), abundances(:)
     type(isotopes) :: this
 
     this%numisotopes = size(masses)
@@ -34,4 +34,4 @@ contains
     this%masses = masses
     this%abundances = abundances
   end function constructor
-end module m_isotopes
+end module isotopes_module

@@ -19,7 +19,7 @@ module params
 
   use precision
   use fhash, only: fhash_tbl_t, key => fhash_key
-  use m_isotopes, only: isotopes
+  use isotopes_module, only: isotopes
 
   implicit none
 
