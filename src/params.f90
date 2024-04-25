@@ -77,7 +77,7 @@ contains
          periodic_table_exists = .true.
       end if
 
-      call periodic_table%get_raw(key(element), raw_data)
+      call periodic_table%get_raw(key(trim(element)), raw_data)
 
       select type (raw_data)
       type is (isotopes)
