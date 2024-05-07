@@ -31,8 +31,7 @@ program elphbolt
   use phonon_module, only: phonon
   use wannier_module, only: wannier
   use bte_module, only: bte
-  use bz_sums, only: calculate_dos, calculate_qTF, calculate_el_dos_fermi, calculate_el_Ws, &
-       calculate_RPA_dielectric_3d_G0_qpath
+  use bz_sums, only: calculate_dos, calculate_qTF, calculate_el_dos_fermi, calculate_el_Ws
   use interactions, only: calculate_gReq, calculate_gkRp, calculate_3ph_interaction, &
        calculate_eph_interaction_ibzq, calculate_eph_interaction_ibzk, &
        calculate_echimp_interaction_ibzk, calculate_coarse_grained_3ph_vertex, &
