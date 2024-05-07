@@ -58,7 +58,7 @@ The source is heavily commented and can be auto-documented with ~FORD~ (https://
 
     You need an MPI implementation. It could be MPICH or OpenMPI. The first is preferred.
 
-*** 3. Get Fortran package manager (~fpm~)
+*** 3. Get Fortran package manager (~fpm~ [v>=0.7])
     Follow the instructions here: https://fpm.fortran-lang.org/install/index.html#install to install ~fpm~. I, personally, like to build from source, as described here: https://fpm.fortran-lang.org/install/index.html#building-from-source.
 
 *** 4. Get ~OpenCoarrays~
@@ -75,34 +75,33 @@ The source is heavily commented and can be auto-documented with ~FORD~ (https://
 Carefully read the output on the screen and add the paths to ~caf~ and ~cafrun~ to your ~$PATH~.
 
 *** 5. Build ~elphbolt~
-**** Using ~fpm~ [v>=0.7]
-***** Standard (no gpu)
-     For a cpu-only build and test with Fortran Package Manager (https://fpm.fortran-lang.org/), first say
+**** Standard (no gpu)
+    For a cpu-only build and test with Fortran Package Manager (https://fpm.fortran-lang.org/), first say
+
+    #+BEGIN_SRC bash
+       sh install_blas+lapack.sh
+     #+END_SRC
+
+     This will build ~blas~ and ~lapack~ using a local copy of https://github.com/gha3mi/forblas and  https://github.com/gha3mi/forlapack. You need to do this just once. The libraries will be placed in ~$HOME/.local/lib/~.
+    
+     #+BEGIN_SRC bash
+       source fpm_config_caf.sh; fpm install
+       fpm test test_*
+       fpm test bte_regression --runner="sh test/3C-SiC/fpm_run_bte_caf.sh"
+     #+END_SRC
+
+    The ~elphbolt~ and ~superconda~ apps will be available in your ~$HOME/.local/bin~ directory. They should both be directly callable from your shell. If not, add the above directory to our path.
+
+    Modify the fpm manifest file, ~fpm.toml~, to suit your system. I'd appreciate any feedback.
+
+**** Experimental method (with gpu)
+     For a cpu+gpu build with OpenACC (https://www.openacc.org/), the only difference from the above is that you need to source a different file before the install:
 
      #+BEGIN_SRC bash
-        sh install_blas+lapack.sh
-      #+END_SRC
-
-      This will build ~blas~ and ~lapack~ using a local copy of https://github.com/gha3mi/forblas and  https://github.com/gha3mi/forlapack. You need to do this just once. The libraries will be placed in ~$HOME/.local/lib/~.
-    
-      #+BEGIN_SRC bash
-	source fpm_config_caf.sh; fpm install
-	fpm test test_*
-	fpm test bte_regression --runner="sh test/3C-SiC/fpm_run_bte_caf.sh"
-      #+END_SRC
-
-     The ~elphbolt~ and ~superconda~ apps will be available in your ~$HOME/.local/bin~ directory. They should both be directly callable from your shell. If not, add the above directory to our path.
-
-     Modify the fpm manifest file, ~fpm.toml~, to suit your system. I'd appreciate any feedback.
-
-***** Experimental method (with gpu)
-      For a cpu+gpu build with OpenACC (https://www.openacc.org/), the only difference from the above is that you need to source a different file before the install:
-
-      #+BEGIN_SRC bash
-	source fpm_config_caf_openacc.sh; fpm install
-      #+END_SRC
+       source fpm_config_caf_openacc.sh; fpm install
+     #+END_SRC
      
-      Here I have assumed that you have already done ~blas~ and ~lapack~ building step. The testing commands are the same as before.
+     Here I have assumed that you have already done ~blas~ and ~lapack~ building step. The testing commands are the same as before.
 ** Examples
 
 A full example for cubic silicon is provided. More examples will be added over time.
