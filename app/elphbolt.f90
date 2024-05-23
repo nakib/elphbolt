@@ -38,6 +38,8 @@ program elphbolt
        calculate_W_fromcgV2
   use phonon_defect_module, only: phonon_defect
   use Green_function, only: calculate_retarded_phonon_D0
+  use nano_module, only: nanostructure
+  use bte_nano_module, only: bte_nano
   
   implicit none
   
@@ -48,8 +50,10 @@ program elphbolt
   type(electron) :: el
   type(phonon) :: ph
   type(bte) :: bt
+  type(bte_nano) :: bt_nano
   type(phonon_defect) :: ph_def
   type(timer) :: t_all, t_event
+  type(nanostructure) :: nano
   
   !Print banner and other information
   call welcome
@@ -99,7 +103,14 @@ program elphbolt
 
   !Create phonon defect
   if(num%phdef_Tmat) call ph_def%initialize(ph, crys)
-  
+
+  ! Initialize nanostructures
+  if (num%solve_nano) then
+     call nano%initialize()
+     ! Print geometrical information into a file
+     call nano%print_nanogeominfo()
+  end if 
+    
   select case(num%runlevel)
   case(1) !BTE workflow     
      call t_event%start_timer('Density of states and one-particle scattering rates')
@@ -123,6 +134,10 @@ program elphbolt
      !they belong -- interactions.f90 -- soon.
      call calculate_dos(ph, crys, num%tetrahedra, bt%ph_rta_rates_iso_ibz, bt%ph_rta_rates_subs_ibz, &
              num%phiso, num%phiso_1B_theory, num%phsubs, num%phiso_Tmat)
+     if(num%solve_nano) then
+        allocate(bt_nano%ph_rta_rates_iso_ibz, source=bt%ph_rta_rates_iso_ibz)
+        allocate(bt_nano%ph_rta_rates_subs_ibz, source=bt%ph_rta_rates_subs_ibz)
+     end if
      
      call t_event%end_timer('Density of states and one-particle scattering rates')
      
@@ -269,11 +284,30 @@ program elphbolt
      end if
      
      !Solve BTEs
-     if(num%onlyphbte .and. .not. num%phe) then
-        call bt%solve_bte(num, crys, sym, ph)
-     else
-        call bt%solve_bte(num, crys, sym, ph, el)
+     if(num%solve_bulk) then
+        if(num%onlyphbte .and. .not. num%phe) then
+           call bt%solve_bte(num, crys, sym, ph)
+        else
+           call bt%solve_bte(num, crys, sym, ph, el)
+        end if
      end if
+
+     ! Solve BTE for nanostructures  
+     if(num%solve_nano) then 
+        
+        ! Initialize the group velocities in the unbounded (selected) direction for each nanostructure
+        if (.not. num%onlyebte)  call nano%compute_transport_vg('ph', ph=ph)
+        if (.not. num%onlyphbte) call nano%compute_transport_vg('el', el=el)
+
+        ! Solve the BTE for the nanostructures
+        if(num%onlyphbte .and. .not. num%phe) then
+           call bt_nano%solve_bte(num, crys, sym, nano, ph)
+        else
+           call bt_nano%solve_bte(num, crys, sym, nano, ph, el)
+        end if
+
+     end if
+
   case(2) !BTE Post-processing case
      call subtitle("Post-processing...")
         

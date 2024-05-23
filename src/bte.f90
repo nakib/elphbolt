@@ -158,7 +158,7 @@ contains
     !Local variables
     character(1024) :: tag, Tdir
 
-    call subtitle("Calculating transport...")
+    call subtitle("Calculating transport (bulk)...")
 
     call print_message("Only the trace-averaged transport coefficients are printed below:")
 

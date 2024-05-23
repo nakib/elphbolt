@@ -185,8 +185,7 @@ For the ~elphbolt~ app, there are 5 Namelists in the ~input.nml~ file: ~allocati
 | ~subs_masses~     | Real array of size ~numelements~      |       0.0 | Masses of substitution atoms in amu. This is needed if ~phsubs~ is .True. See table of keys for Namelist ~numerics~.                                                                                                                       |
 | ~subs_conc~       | Real array of size ~numelements~      |       0.0 | Concentration of the substitutional atoms in cm^{-3} (or cm^{-2} if ~twod~ is .True.). This is needed if ~phsubs~ is .True. See table of keys for Namelist ~numerics~.                                                                     |
 | ~bound_length~    | Real                                  |   1e12 mm | Characteristic sample length for boundary scattering. This is needed if ~phbound~ or ~elbound~ is .True. See table of keys for Namelist ~numerics~.                                                                                        |
-| ~nano~            | Logical                               |   .False. | Do you want to compute effective thermoelectric properties for highly symmetric nanostructure? See description of ~nano~ block. 
-|
+
 *** ~electrons~
 | key              | Type                         |       Default | Description                                                                                                                                                               |
 |--------------------+------------------------------+---------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -247,7 +246,9 @@ For the ~elphbolt~ app, there are 5 Namelists in the ~input.nml~ file: ~allocati
     | ~el_en_num~         | Integer                 | 100      | Number of equidistant electron energy mesh points. Only needed for ~runlevel~ 2.                                                                                                                                                                                                                                                                                                                                                                  |
     | ~ph_mfp_npts~       | Integer                 | 100      | Number of equidistant mean-free-path points for cumulative transport coefficients.                                                                                                                                                                                                                                                                                                                                                                |
     | ~ph_abs_q_npts~     | Integer                 | 100      | Number of equidistant absolute wave vector points for cumulative transport coefficients.                                                                                                                                                                                                                                                                                                                                                          |
-    | ~use_Wannier_ifc2s~ | Logical                 | .False.  | Use 2nd order force constants from the Wannierized data?                                                                                                                                                                                                                                                                                                                                                                                          |
+    | ~use_Wannier_ifc2s~ | Logical                 | .False.  | Use 2nd order force constants from the Wannierized data?  
+    | ~solve_bulk~        | Logical                 | .True.   | Do you want to solve the BTE for the bulk-system, i.e. not using nanostructures algorithm.
+    | ~solve_nano~        | Logical                 | .False.  | Do you want to compute effective thermoelectric properties for highly symmetric nanostructure? See description of ~nano~ block.                                                                                                                                                                                                                                                                                                                                                                                         |
 
 
 *** ~wannier~
@@ -336,15 +337,26 @@ Below I(F)BZ = irreducible (full) Brillouin zone; RTA = relaxation time approxim
 | ~iso_quasiparticle_Delta.T*~       | ~./~                 | eV                | Isotropic superconducting gap on the equidistant electronic quasiparticle energy mesh.                                                                                                                           |
 | ~aniso_quasiparticle_Delta_FS.T~   | ~./~                 | eV                | Anisotropic superconducting gap on the Fermi surface for each IBZ electronic state within the Fermi window. The first column gives the number of FBZ images of the IBZ point.                                    |
 
-Note: When computing the effective properties for the nanostructures, the tensors are reshaped so that each columnn refers to the respective nanostructure from input.
+
 
 *** Nanostructure data 
-| File name                        | Directory         | Units                | Description                                                                                                                                    |
-|----------------------------------+-------------------+----------------------+------------------------------------------------------------------------------------------------------------------------------------------------|
-| ~nano_info~                      | ~./~              | -/nm/-/-/-/-/-/-                | Nanostructure information tag(i)/limit(i)/taxis(i,:)/naxis(i,:)                                                                     |
-| ~Sph~                            | ~./~              | eV/Kms^{-1}/Kms^{-1}/Kms^{-1}/- | Nanostructure suppression factor for phonons in FBZ energy(i,ib)/vg(i,ib,:)/Sph(i,ib,:)                                             |
-| ~Sel~                            | ~./~              | eV/Kms^{-1}/Kms^{-1}/Kms^{-1}/- | Nanostructure suppression factor for electrons in FBZ energy(i,ib)/vg(i,ib,:)/Sel(i,ib,:)                                           |
-           
+| File name                               | Directory         | Units                           | Description                                                                                                                                                |
+|-----------------------------------------+-------------------+---------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| ~nano_info~                             | ~./~              | -/nm/-/-/-/-/-/-                | Nanostructure information tag(i)/limit(i)/taxis(i,:)/naxis(i,:)                                                                                            |
+| ~Sph~                                   | ~./~              | eV/Kms^{-1}/Kms^{-1}/Kms^{-1}/- | Nanostructure suppression factor for phonons in FBZ energy(i,ib)/vg(i,ib,:)/Sph(i,ib,:)                                                                    |
+| ~Sel~                                   | ~./~              | eV/Kms^{-1}/Kms^{-1}/Kms^{-1}/- | Nanostructure suppression factor for electrons in FBZ energy(i,ib)/vg(i,ib,:)/Sel(i,ib,:)                                                                  |
+| ~nano_drag[nodrag]_el_sigma_*~          | ~./T*/~           | \Omega^{-1}m^{-1}               | Band resolved (~_<integer>~) and total (~_tot~) charge conductivity tensor at every iteration step.                                                       |
+| ~nano_drag[nodrag]_el_alphabyT_*~       | ~./T*/~           | Am^{-1}K^{-1}                   | Band resolved (~_<integer>~) and total (~_tot~) electronic Peltier(-ish) coefficient tensor at every iteration step.                                       |
+| ~nano_drag[nodrag]_el_kappa0_*~         | ~./T*/~           | Wm^{-1}K^{-1}                   | Band resolved (~_<integer>~) and total (~_tot~) electronic thermal conductivity (zero E-field) tensor at every iteration step.                             |
+| ~nano_drag[nodrag]_el_sigmaS_*~         | ~./T*/~           | Am^{-1}K^{-1}                   | Band resolved (~_<integer>~) and total (~_tot~) electronic thermopower times conductivity tensor at every iteration step.                                  |
+| ~nano_drag_ph_alphabyT_*~               | ~./T*/~           | Am^{-1}K^{-1}                   | Branch resolved (~_<integer>~) and total (~_tot~) phonon Peltier(-ish) coefficient tensor at every iteration step.                                         |
+| ~nano_drag[nodrag]_ph_kappa_*~          | ~./T*/~           | Wm^{-1}K^{-1}                   | Branch resolved (~_<integer>~) and total (~_tot~) phonon thermal conductivity tensor at every iteration step.                                              |
+| ~nano_RTA{nodrag}(partdcpl)[drag]_I0_*~ | ~./T*/~           | nmeVK^{-1}                      | Band resolved (~_<integer>~) and total (~_tot~) electronic response function to \nabla T-field in the RTA {dragless} (partially decoupled) [drag] theory.  |
+| ~nano_RTA{nodrag}(partdcpl)[drag]_J0_*~ | ~./T*/~           | nmC                             | Band resolved (~_<integer>~) and total (~_tot~) electronic response function to E-field in the RTA {dragless} (partially decoupled) [drag] theory.         |
+| ~nano_RTA{nodrag}[drag]_F0_*~           | ~./T*/~           | nmeVK^{-1}                      | Branch resolved (~_<integer>~) and total (~_tot~) phononic response function to \nabla T-field in the RTA {dragless} [fully coupled] theory.               |
+| ~nano_drag_G0_*~                        | ~./T*/~           | nmC                             | Branch resolved (~_<integer>~) and total (~_tot~) phononic response function to E-field in fully coupled theory.                                           |           
+
+Note: For the temperature dependent quantites each columnn refers to the respective nanostructure from input.
 
 *** Postprocessing (runlevel 2)
 
