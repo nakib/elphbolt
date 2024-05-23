@@ -688,7 +688,18 @@ contains
     KO_dev = 100.0_r64*abs(&
          (el_sigmaS_scalar - tot_alphabyT_scalar)/tot_alphabyT_scalar)
 
-    !Append RTA coefficients in drag files
+    ! We need to compute the RTA values again (that is relatively cheap)
+    call calculate_transport_coeff('ph', 'T', crys%T, 1_i64, 0.0_r64, ph%ens, ph%vels, &
+         crys%volume, ph%wvmesh, self%ph_response_T, sym, trans%ph_kappa, trans%dummy)
+    call calculate_transport_coeff('ph', 'E', crys%T, 1_i64, 0.0_r64, ph%ens,  ph%vels, &
+         crys%volume, ph%wvmesh, self%ph_response_E, sym, trans%ph_alphabyT, trans%dummy)
+   call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, el%ens, &
+         el%vels, crys%volume, el%wvmesh, self%el_response_T, sym, trans%el_kappa0, trans%el_sigmaS)
+    call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, el%ens, el%vels, &
+         crys%volume, el%wvmesh, self%el_response_E, sym, trans%el_alphabyT, trans%el_sigma)
+    trans%el_alphabyT = trans%el_alphabyT/crys%T
+    trans%ph_alphabyT = trans%ph_alphabyT/crys%T
+    
     ! Change to data output directory
     call chdir(trim(adjustl(Tdir)))
     call append2file_transport_tensor('drag_ph_kappa_', 0, trans%ph_kappa)
