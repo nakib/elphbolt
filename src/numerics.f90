@@ -138,6 +138,10 @@ module numerics_module
      !! (Re)calculate W+ and W- on-the-fly. That is, no disk I/O for these quantities.
      logical :: Y_OTF
      !! (Re)calculate Y on-the-fly. That is, no disk I/O for these quantities. 
+     logical :: solve_bulk
+     !! Solve the BTE for bulk materials
+     logical :: solve_nano 
+     !! Solve the BTE for nanostructures using bulk properties but appropriate boundary conditions
    contains
 
      procedure :: initialize=>read_input_and_setup, create_chempot_dirs
@@ -166,7 +170,7 @@ contains
     logical :: read_gq2, read_gk2, read_V, read_W, tetrahedra, phe, phiso, phsubs, &
          phbound, phdef_Tmat, onlyphbte, onlyebte, elchimp, elbound, drag, plot_along_path, &
          phthinfilm, phthinfilm_ballistic, fourph, use_Wannier_ifc2s, phiso_Tmat, Bfield_on, &
-         W_OTF, Y_OTF
+         W_OTF, Y_OTF, solve_bulk, solve_nano
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
          read_V, read_W, tetrahedra, phe, phiso, phsubs, onlyphbte, onlyebte, maxiter, &
@@ -174,7 +178,8 @@ contains
          ph_en_num, el_en_min, el_en_max, el_en_num, phbound, elbound, phdef_Tmat, &
          ph_mfp_npts, ph_abs_q_npts, phthinfilm, phthinfilm_ballistic, &
          fourph, fourph_mesh_ref, use_Wannier_ifc2s, &
-         phiso_Tmat, phiso_1B_theory, Bfield_on, Bfield, W_OTF, Y_OTF
+         phiso_Tmat, phiso_1B_theory, Bfield_on, Bfield, W_OTF, Y_OTF, &
+         solve_bulk, solve_nano
 
     call subtitle("Reading numerics information...")
     
@@ -224,6 +229,8 @@ contains
     ph_abs_q_npts = 100
     W_OTF = .true.
     Y_OTF = .true.
+    solve_bulk = .true.
+    solve_nano = .false.
     read(1, nml = numerics)
 
     if(read_W .and. W_OTF) &
@@ -311,6 +318,8 @@ contains
        self%elbound = elbound
        self%drag = drag
        self%Y_OTF = Y_OTF
+       self%solve_bulk = solve_bulk
+       self%solve_nano = solve_nano
     else
        self%mesh_ref = 1 !Enforce this for superconductivity mode
     end if
@@ -476,6 +485,8 @@ contains
           end if
           write(*, "(A, L)") "Include el-charged impurity interaction: ", self%elchimp
           write(*, "(A, L)") "Include el-boundary interaction: ", self%elbound
+          write(*, "(A, L)") "Solve bulk-BTE: ", self%solve_bulk
+          write(*, "(A, L)") "Solve nano-BTE: ", self%solve_nano
           if(self%elbound) then
              write(*,"(A,(1E16.8,x),A)") 'Characteristic length for el-boundary scattering =', &
                   crys%bound_length, 'mm'

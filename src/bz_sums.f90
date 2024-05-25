@@ -482,7 +482,7 @@ contains
   end subroutine calculate_ph_dos_iso
 
   subroutine calculate_transport_coeff(species_prefix, field, T, deg, chempot, ens, vels, &
-       volume, mesh, response, sym, trans_coeff_hc, trans_coeff_cc, Bfield)
+       volume, mesh, response, sym, trans_coeff_hc, trans_coeff_cc, Bfield, symmetrize)
     !! Subroutine to calculate transport coefficients.
     !!
     !! species_prefix Prefix of particle type
@@ -505,12 +505,16 @@ contains
     real(r64), intent(in) :: T, chempot, ens(:,:), vels(:,:,:), volume, response(:,:,:)
     type(symmetry), intent(in) :: sym
     real(r64), optional, intent(in) :: Bfield(3)
+    logical, optional, intent(in)   :: symmetrize
     real(r64), intent(out) :: trans_coeff_hc(:,:,:), trans_coeff_cc(:,:,:)
     ! Above, h(c)c = heat(charge) current
     
     !Local variables
-    integer(i64) :: ik, ib, icart, nk, nbands, pow_hc, pow_cc
+    integer(i64) :: ik, ib, j, l, nk, nbands, pow_hc, pow_cc
     real(r64) :: dist_factor, e, v, fac, A_hc, A_cc
+    logical :: symmetrize_local = .true.
+
+    if (present(symmetrize)) symmetrize_local = symmetrize
     
     nk = size(ens(:,1))
     nbands = size(ens(1,:))
@@ -557,6 +561,7 @@ contains
     
     trans_coeff_hc = 0.0_r64
     trans_coeff_cc = 0.0_r64
+
     do ik = 1, nk
        do ib = 1, nbands
           e = ens(ik, ib)
@@ -568,12 +573,12 @@ contains
              dist_factor = Fermi(e, chempot, T)
              dist_factor = dist_factor*(1.0_r64 - dist_factor)
           end if
-          do icart = 1, 3
-             v = vels(ik, ib, icart)
-             trans_coeff_hc(ib, icart, :) = trans_coeff_hc(ib, icart, :) + &
+          do j = 1, size(trans_coeff_hc,2)
+             v = vels(ik, ib, j)
+             trans_coeff_hc(ib, j, :) = trans_coeff_hc(ib, j, :) + &
                   (e - chempot)**pow_hc*dist_factor*v*response(ik, ib, :)
              if(A_cc /= 0.0_r64) then
-                trans_coeff_cc(ib, icart, :) = trans_coeff_cc(ib, icart, :) + &
+                trans_coeff_cc(ib, j, :) = trans_coeff_cc(ib, j, :) + &
                      (e - chempot)**pow_cc*dist_factor*v*response(ik, ib, :)
              end if
           end do
@@ -589,18 +594,20 @@ contains
 
     !TODO The following has to be generalized in the presence of a B-field
     !Symmetrize transport tensor
-    do ib = 1, nbands
-       !Note that fortran does not short-circuit logical expression chains
-       if(present(Bfield)) then
-          if(any(Bfield /= 0.0_r64)) then
-             call symmetrize_3x3_tensor_noTR(trans_coeff_hc(ib, :, :), sym%crotations, Bfield)
-             if(A_cc /= 0.0_r64) call symmetrize_3x3_tensor_noTR(trans_coeff_cc(ib, :, :), sym%crotations, Bfield)
-          end if
-       else
-          call symmetrize_3x3_tensor(trans_coeff_hc(ib, :, :), sym%crotations)
-          if(A_cc /= 0.0_r64) call symmetrize_3x3_tensor(trans_coeff_cc(ib, :, :), sym%crotations)
-       end if
-    end do
+    if (symmetrize_local) then
+      do ib = 1, nbands
+         !Note that fortran does not short-circuit logical expression chains
+         if(present(Bfield)) then
+            if(any(Bfield /= 0.0_r64)) then
+               call symmetrize_3x3_tensor_noTR(trans_coeff_hc(ib, :, :), sym%crotations, Bfield)
+               if(A_cc /= 0.0_r64) call symmetrize_3x3_tensor_noTR(trans_coeff_cc(ib, :, :), sym%crotations, Bfield)
+            end if
+         else
+            call symmetrize_3x3_tensor(trans_coeff_hc(ib, :, :), sym%crotations)
+            if(A_cc /= 0.0_r64) call symmetrize_3x3_tensor(trans_coeff_cc(ib, :, :), sym%crotations)
+         end if
+      end do
+    end if
   end subroutine calculate_transport_coeff
   
   subroutine calculate_spectral_transport_coeff(species, field, T, deg, chempot, &
