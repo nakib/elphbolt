@@ -1756,15 +1756,14 @@ contains
        
        do ib = 1, ph%numbands
           do ik = 1, ph%nwv
-             if(all(ph%vels(ik, ib, :) /= 0.0_r64)) then
-                ph_scalar_mfps(ik, ib) = &
-                     dot_product(self%ph_response_T(ik, ib, :), ph%vels(ik, ib, :)) &
-                     /twonorm(ph%vels(ik, ib, :))
-             end if
+             ph_scalar_mfps(ik, ib) = &
+                  dot_product(self%ph_response_T(ik, ib, :), ph%vels(ik, ib, :)) &
+                  /twonorm(ph%vels(ik, ib, :))
           end do
        end do
        ph_scalar_mfps = ph_scalar_mfps/kB !nm
-
+       ph_scalar_mfps(1, :) = 0.0_r64 !handle gamma point modes 
+       
        !  Print out IBZ mfps
        if(this_image() == 1) then
           write(numcols, "(I0)") ph%numbands
@@ -1791,11 +1790,6 @@ contains
 
        !  Allocate cumulative kappa wrt |q|
        allocate(ph_kappa_cumulative_q(ph%numbands, 3, 3, num%ph_abs_q_npts))
-
-       !  Calculate culumative phonon kappa vs scalar mean-free-path (mfp)
-!!$       call calculate_mfp_cumulative_transport_coeff(ph%prefix, 'T', crys%T, 1_i64, 0.0_r64, &
-!!$            ph%ens, ph%vels, ph%wvmesh, crys%volume, self%ph_response_T, ph_mfp_sampling_grid, &
-!!$            ph_scalar_mfps, sym, ph_kappa_cumulative_mfp)!, dummy)
 
        call calculate_cumulative_transport_coeff(ph%prefix, 'T', crys%T, 1_i64, 0.0_r64, &
             ph%ens, ph%vels, ph%wvmesh, crys%volume, self%ph_response_T, &
