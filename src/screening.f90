@@ -1,12 +1,12 @@
 module screening_module
 
   use precision, only: r64, i64
-  use params, only: kB, qe, perm0
+  use params, only: kB, qe, perm0, pi
   use electron_module, only: electron
   use crystal_module, only: crystal
   use numerics_module, only: numerics
   use misc, only: linspace, mux_vector, binsearch, Fermi, print_message
-  use Green_function, only: resolvent
+  use delta, only: delta_fn, get_delta_fn_pointer
 
   implicit none
 
@@ -53,8 +53,26 @@ contains
        end if
     end if
   end subroutine calculate_qTF
+
+  pure real(r64) function finite_element(w, w_stencil)
+    !! Triangular finite elements.
+    !!
+    !! w Continuous sampling variable
+    !! w_stencil 3-point stencil
+
+    real(r64), intent(in) :: w
+    real(r64), intent(in) :: w_stencil(3)
+    
+    if(w_stencil(1) <= w .and. w <= w_stencil(2)) then
+       finite_element = (w - w_stencil(1))/(w_stencil(2) - w_stencil(1))
+    else if(w_stencil(2) <= w .and. w <= w_stencil(3)) then
+       finite_element = (w_stencil(3) - w)/(w_stencil(3) - w_stencil(2))
+    else
+       finite_element = 0.0_r64
+    end if
+  end function finite_element
   
-  complex(r64) function Im_polarizability_3d(Omega, q_indvec, el, pcell_vol, T)
+  real(r64) function Im_polarizability_3d(Omega, q_indvec, el, pcell_vol, T)
     !! Imaginary part of bare polarizability of the 3d Kohn-Sham system using
     !! Eq. 18 of Shishkin and Kresse Phys. Rev. B 74, 035101 (2006).
     !!
@@ -74,10 +92,13 @@ contains
     !Locals
     integer(i64) :: m, n, ik, ikp, ikp_window, k_indvec(3), kp_indvec(3)
     real(r64) :: overlap, ek, ekp
-    complex(r64) :: aux
+    procedure(delta_fn), pointer :: delta_fn_ptr => null()
+    
+    !Associate delta function procedure pointer
+    delta_fn_ptr => get_delta_fn_pointer(tetrahedra = .true.)
 
     !Below, we will sum out m, n, and k, accumulating the result into aux.
-    aux = 0.0
+    Im_polarizability_3d = 0.0
     do m = 1, el%numbands
        do ik = 1, el%nwv
           ek = el%ens(ik, m)
@@ -98,28 +119,29 @@ contains
 
           do n = 1, el%numbands
              ekp = el%ens(ikp_window, n)
-
+             
              !Apply energy window to final electron
              if(abs(ekp - el%enref) > el%fsthick) cycle
 
              !This is |U(k')U^\dagger(k)|_nm squared
              !(Recall that U^\dagger(k) is the diagonalizer of the electronic hamiltonian.)
              overlap = (abs(dot_product(el%evecs(ikp_window, n, :), el%evecs(ik, m, :))))**2
-
-             aux = aux + &
+             
+             Im_polarizability_3d = Im_polarizability_3d + &
                   (Fermi(ek, el%chempot, T) - &
-                  Fermi(ekp, el%chempot, T))* &
-                  resolvent(el, m, ik, ekp - Omega)*overlap
+                  Fermi(ekp, el%chempot, T))*overlap* &
+                  delta_fn_ptr(ekp - Omega, ik, m, &
+                  el%wvmesh, el%simplex_map, &
+                  el%simplex_count, el%simplex_evals)
           end do
        end do
     end do
     !Recall that the resolvent is already normalized in the full wave vector mesh.
     !As such, the 1/product(el%wvmesh) is not needed in the expression below.
-    aux = aux*sign(1.0_r64, omega)*el%spindeg/pcell_vol
+    Im_polarizability_3d = Im_polarizability_3d*pi*sign(1.0_r64, omega)*el%spindeg/pcell_vol
 
     !Zero out extremely small numbers
-    Im_polarizability_3d = imag(aux)
-    if(abs(Im_polarizability_3d) < 1.0e-30) Im_polarizability_3d = 0.0_r64
+    if(abs(Im_polarizability_3d) < 1.0e-30_r64) Im_polarizability_3d = 0.0_r64
   end function Im_polarizability_3d
 
 !!$  subroutine calculate_RPA_dielectric_3d(el, crys, num)
