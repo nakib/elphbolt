@@ -5,7 +5,8 @@ module screening_module
   use electron_module, only: electron
   use crystal_module, only: crystal
   use numerics_module, only: numerics
-  use misc, only: linspace, mux_vector, binsearch, Fermi, print_message
+  use misc, only: linspace, mux_vector, binsearch, Fermi, print_message, &
+       compsimps
   use delta, only: delta_fn, get_delta_fn_pointer
 
   implicit none
@@ -54,23 +55,59 @@ contains
     end if
   end subroutine calculate_qTF
 
-  pure real(r64) function finite_element(w, w_stencil)
+  pure elemental real(r64) function finite_element(w, wl, w0, wr)
     !! Triangular finite elements.
     !!
     !! w Continuous sampling variable
     !! w_stencil 3-point stencil
 
     real(r64), intent(in) :: w
-    real(r64), intent(in) :: w_stencil(3)
+    real(r64), intent(in) :: wl, w0, wr
     
-    if(w_stencil(1) <= w .and. w <= w_stencil(2)) then
-       finite_element = (w - w_stencil(1))/(w_stencil(2) - w_stencil(1))
-    else if(w_stencil(2) <= w .and. w <= w_stencil(3)) then
-       finite_element = (w_stencil(3) - w)/(w_stencil(3) - w_stencil(2))
+    if(wl <= w .and. w <= w0) then
+       finite_element = (w - wl)/(w0 - wl)
+    else if(w0 <= w .and. w <= wr) then
+       finite_element = (wr - w)/(wr - w0)
     else
        finite_element = 0.0_r64
     end if
   end function finite_element
+
+  subroutine calculate_Hilbert_weights(w_disc, w_cont, eps, Hilbert_weights)
+    !! Calculator of the weights for the Hilbert-Kramers-Kronig transform.
+    !!
+    !! w_disc Discrete sampling points
+    !! w_cont Continuous sampling variable
+    !! eps A small positive number
+    !! Hilbert_weights The Hilbert weights
+
+    real(r64), intent(in) :: w_disc(:), w_cont(:), eps
+    real(r64), allocatable, intent(out) :: Hilbert_weights(:, :)
+
+    !Locals
+    integer :: n_disc, n_cont, i, j
+    real(r64) :: phi_i(size(w_cont)), integrand(size(w_cont)), dw
+
+    n_disc = size(w_disc)
+    n_cont = size(w_cont)
+
+    allocate(Hilbert_weights(n_disc, n_disc))
+
+    !Grid spacing of "continuous" variable
+    dw = w_cont(2) - w_cont(1)
+    
+    do i = 2, n_disc - 1
+       Phi_i = finite_element(w_cont, w_disc(i - 1), w_disc(i), w_disc(i + 1))
+       do j = 1, n_disc
+          integrand = Phi_i*(&
+               (w_disc(j) - w_cont)/((w_disc(j) - w_cont)**2 + eps) - &
+               (w_disc(j) + w_cont)/((w_disc(j) + w_cont)**2 + eps))
+          !TODO Would be nice to have a compsimps function instead of
+          !a subroutine.
+          call compsimps(integrand, dw, Hilbert_weights(i, j))
+       end do
+    end do
+  end subroutine calculate_Hilbert_weights
   
   real(r64) function Im_polarizability_3d(Omega, q_indvec, el, pcell_vol, T)
     !! Imaginary part of bare polarizability of the 3d Kohn-Sham system using
