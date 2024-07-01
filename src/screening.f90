@@ -59,7 +59,7 @@ contains
     !! Triangular finite elements.
     !!
     !! w Continuous sampling variable
-    !! w_stencil 3-point stencil
+    !! wl, w0, wr 3-point stencil left, center, respectively
 
     real(r64), intent(in) :: w
     real(r64), intent(in) :: wl, w0, wr
@@ -95,7 +95,8 @@ contains
 
     !Grid spacing of "continuous" variable
     dw = w_cont(2) - w_cont(1)
-    
+
+    !TODO Need to handle the edges
     do i = 2, n_disc - 1
        Phi_i = finite_element(w_cont, w_disc(i - 1), w_disc(i), w_disc(i + 1))
        do j = 1, n_disc
@@ -104,82 +105,117 @@ contains
                (w_disc(j) + w_cont)/((w_disc(j) + w_cont)**2 + eps))
           !TODO Would be nice to have a compsimps function instead of
           !a subroutine.
-          call compsimps(integrand, dw, Hilbert_weights(i, j))
+          call compsimps(integrand, dw, Hilbert_weights(j, i))
        end do
     end do
   end subroutine calculate_Hilbert_weights
+
+  subroutine Re_head_polarizability_3d_T(Reeps_T, Omegas, Im_part_T, Hilbert_weights_T)
+    !! Real part of the head of the bare polarizability of the 3d Kohn-Sham system using
+    !! Hilbert transform for a given set of temperature-dependent quantities.
+    !!
+    !! Here we calculate the diagonal in G-G' space. Moreover,
+    !! we use the approximation G.r -> 0.
+    !!
+    !! Reeps_T Real part of bare polarizability
+    !! Omega Energy of excitation in the electron gas
+    !! Imeps_T Imaginary part of bare polarizability
+    !! Hilbert_weights_T Hilbert transform weights
+    
+    real(r64), allocatable, intent(out) :: Reeps_T(:)
+    real(r64), intent(in) :: Omegas(:)
+    real(r64), intent(in) :: Im_part_T(:)
+    real(r64), intent(in) :: Hilbert_weights_T(:, :)
+
+    allocate(Reeps_T(size(Omegas)))
+    
+    !TODO Can optimize this sum with blas
+    Reeps_T = matmul(Hilbert_weights_T, Im_part_T)
+  end subroutine Re_head_polarizability_3d_T
   
-  real(r64) function Im_polarizability_3d(Omega, q_indvec, el, pcell_vol, T)
-    !! Imaginary part of bare polarizability of the 3d Kohn-Sham system using
+  subroutine Im_head_polarizability_3d(Imeps, Omegas, q_indvec, el, pcell_vol, T)
+    !! Imaginary part of the head of the bare polarizability of the 3d Kohn-Sham system using
     !! Eq. 18 of Shishkin and Kresse Phys. Rev. B 74, 035101 (2006).
     !!
     !! Here we calculate the diagonal in G-G' space. Moreover,
     !! we use the approximation G.r -> 0.
     !!
+    !! Imeps Imaginart part of bare polarizability
     !! Omega Energy of excitation in the electron gas
     !! q_indvec Wave vector of excitation in the electron gas (0-based integer triplet)
     !! el Electron data type
     !! pcell_vol Primitive unit cell volume
     !! T Temperature (K)
 
-    real(r64), intent(in) :: Omega, pcell_vol, T
+    real(r64), intent(in) :: Omegas(:), pcell_vol, T
     integer(i64), intent(in) :: q_indvec(3)
     type(electron), intent(in) :: el
-
+    real(r64), allocatable, intent(out) :: Imeps(:)
+    
     !Locals
-    integer(i64) :: m, n, ik, ikp, ikp_window, k_indvec(3), kp_indvec(3)
+    integer(i64) :: m, n, ik, ikp, ikp_window, iOmega, nOmegas, k_indvec(3), kp_indvec(3)
     real(r64) :: overlap, ek, ekp
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
+
+    nOmegas = size(Omegas)
+
+    allocate(Imeps(nOmegas))
     
     !Associate delta function procedure pointer
     delta_fn_ptr => get_delta_fn_pointer(tetrahedra = .true.)
+    
+    Imeps = 0.0
+    do iOmega = 1, nOmegas
+       !Below, we will sum out m, n, and k
+       do m = 1, el%numbands
+          do ik = 1, el%nwv
+             ek = el%ens(ik, m)
 
-    !Below, we will sum out m, n, and k, accumulating the result into aux.
-    Im_polarizability_3d = 0.0
-    do m = 1, el%numbands
-       do ik = 1, el%nwv
-          ek = el%ens(ik, m)
+             !Apply energy window to initial electron
+             if(abs(ek - el%enref) > el%fsthick) cycle
 
-          !Apply energy window to initial electron
-          if(abs(ek - el%enref) > el%fsthick) cycle
+             !Calculate index vector of final electron: k' = k + q
+             k_indvec = nint(el%wavevecs(ik, :)*el%wvmesh)
+             kp_indvec = modulo(k_indvec + q_indvec, el%wvmesh) !0-based index vector
 
-          !Calculate index vector of final electron: k' = k + q
-          k_indvec = nint(el%wavevecs(ik, :)*el%wvmesh)
-          kp_indvec = modulo(k_indvec + q_indvec, el%wvmesh) !0-based index vector
+             !Multiplex kp_indvec
+             ikp = mux_vector(kp_indvec, el%wvmesh, 0_i64)
 
-          !Multiplex kp_indvec
-          ikp = mux_vector(kp_indvec, el%wvmesh, 0_i64)
+             !Check if final electron wave vector is within FBZ blocks
+             call binsearch(el%indexlist, ikp, ikp_window)
+             if(ikp_window < 0) cycle
 
-          !Check if final electron wave vector is within FBZ blocks
-          call binsearch(el%indexlist, ikp, ikp_window)
-          if(ikp_window < 0) cycle
+             do n = 1, el%numbands
+                ekp = el%ens(ikp_window, n)
 
-          do n = 1, el%numbands
-             ekp = el%ens(ikp_window, n)
-             
-             !Apply energy window to final electron
-             if(abs(ekp - el%enref) > el%fsthick) cycle
+                !Apply energy window to final electron
+                if(abs(ekp - el%enref) > el%fsthick) cycle
 
-             !This is |U(k')U^\dagger(k)|_nm squared
-             !(Recall that U^\dagger(k) is the diagonalizer of the electronic hamiltonian.)
-             overlap = (abs(dot_product(el%evecs(ikp_window, n, :), el%evecs(ik, m, :))))**2
-             
-             Im_polarizability_3d = Im_polarizability_3d + &
-                  (Fermi(ek, el%chempot, T) - &
-                  Fermi(ekp, el%chempot, T))*overlap* &
-                  delta_fn_ptr(ekp - Omega, ik, m, &
-                  el%wvmesh, el%simplex_map, &
-                  el%simplex_count, el%simplex_evals)
+                !This is |U(k')U^\dagger(k)|_nm squared
+                !(Recall that U^\dagger(k) is the diagonalizer of the electronic hamiltonian.)
+                overlap = (abs(dot_product(el%evecs(ikp_window, n, :), el%evecs(ik, m, :))))**2
+
+                Imeps(iOmega) = Imeps(iOmega) + &
+                     (Fermi(ek, el%chempot, T) - &
+                     Fermi(ekp, el%chempot, T))*overlap* &
+                     delta_fn_ptr(ekp - Omegas(iOmega), ik, m, &
+                     el%wvmesh, el%simplex_map, &
+                     el%simplex_count, el%simplex_evals)
+             end do
           end do
        end do
     end do
-    !Recall that the resolvent is already normalized in the full wave vector mesh.
-    !As such, the 1/product(el%wvmesh) is not needed in the expression below.
-    Im_polarizability_3d = Im_polarizability_3d*pi*sign(1.0_r64, omega)*el%spindeg/pcell_vol
 
-    !Zero out extremely small numbers
-    if(abs(Im_polarizability_3d) < 1.0e-30_r64) Im_polarizability_3d = 0.0_r64
-  end function Im_polarizability_3d
+    do iOmega = 1, nOmegas
+       !Recall that the resolvent is already normalized in the full wave vector mesh.
+       !As such, the 1/product(el%wvmesh) is not needed in the expression below.
+       Imeps(iOmega) = &
+            Imeps(iOmega)*pi*sign(1.0_r64, Omegas(iOmega))*el%spindeg/pcell_vol
+
+       !Zero out extremely small numbers
+       if(abs(Imeps(iOmega)) < 1.0e-30_r64) Imeps(iOmega) = 0.0_r64
+    end do
+  end subroutine Im_head_polarizability_3d
 
 !!$  subroutine calculate_RPA_dielectric_3d(el, crys, num)
 !!$    !! Dielectric function of the 3d Kohn-Sham system in the
