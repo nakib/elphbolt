@@ -1,18 +1,19 @@
 module screening_module
 
   use precision, only: r64, i64
-  use params, only: kB, qe, perm0, pi
+  use params, only: kB, qe, perm0, pi, oneI
   use electron_module, only: electron
   use crystal_module, only: crystal
   use numerics_module, only: numerics
   use misc, only: linspace, mux_vector, binsearch, Fermi, print_message, &
-       compsimps
+       compsimps, twonorm, write2file_rank2_real, write2file_rank1_real, &
+       distribute_points
   use delta, only: delta_fn, get_delta_fn_pointer
 
   implicit none
 
   private
-  public calculate_qTF
+  public calculate_qTF, calculate_RPA_dielectric_3d_G0_qpath
   
 contains
   
@@ -59,7 +60,7 @@ contains
     !! Triangular finite elements.
     !!
     !! w Continuous sampling variable
-    !! wl, w0, wr 3-point stencil left, center, respectively
+    !! wl, w0, wr 3-point stencil left, center, right, respectively
 
     real(r64), intent(in) :: w
     real(r64), intent(in) :: wl, w0, wr
@@ -160,7 +161,10 @@ contains
     nOmegas = size(Omegas)
 
     allocate(Imeps(nOmegas))
-    
+
+    !TODO don't have to use tetrahedron since I only need the imag part.
+    !May use triangles also.
+    !
     !Associate delta function procedure pointer
     delta_fn_ptr => get_delta_fn_pointer(tetrahedra = .true.)
     
@@ -210,13 +214,100 @@ contains
        !Recall that the resolvent is already normalized in the full wave vector mesh.
        !As such, the 1/product(el%wvmesh) is not needed in the expression below.
        Imeps(iOmega) = &
-            Imeps(iOmega)*pi*sign(1.0_r64, Omegas(iOmega))*el%spindeg/pcell_vol
+            -Imeps(iOmega)*pi*sign(1.0_r64, Omegas(iOmega))*el%spindeg/pcell_vol
 
        !Zero out extremely small numbers
        if(abs(Imeps(iOmega)) < 1.0e-30_r64) Imeps(iOmega) = 0.0_r64
     end do
+
+    if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
   end subroutine Im_head_polarizability_3d
 
+  !DEBUG/TEST
+  subroutine calculate_RPA_dielectric_3d_G0_qpath(el, crys, num)
+    !! ??
+    !!
+    !! el Electron data type
+    !! crys Crystal data type
+    !! num Numerics data type
+
+    type(electron), intent(in) :: el
+    type(crystal), intent(in) :: crys
+    type(numerics), intent(in) :: num
+
+    !Locals
+    real(r64), allocatable :: energylist(:), qlist(:, :), qmaglist(:)
+    real(r64) :: qcrys(3)
+    integer(i64) :: iq, iOmega, numomega, numq, &
+         start, end, chunk, num_active_images, qxmesh
+    real(r64), allocatable :: Imeps(:)
+    complex(r64), allocatable :: diel(:, :)
+    character(len = 1024) :: filename
+    real(r64) :: a0, eps0_q0_prefac, omega_plasma
+
+    !a0 = 1.0e-9_r64*bohr2nm !Bohr radius in m
+    !eps0_q0_prefac = (4.0_r64/9.0_r64/pi)/a0* &
+    !     (3.0_r64*abs(sum(el%conc))*1.0e6_r64)**(-1.0_r64/3.0_r64) !
+    omega_plasma = 0.5025125628E-01 !eV
+
+    !TEST
+    !Material: Si
+    !Uniform energy mesh from 0-6.0 eV with uniform q-vecs in Gamma-Gamma along x
+    numomega = 100
+    numq = 30
+    qxmesh = 30
+    !Create qlist in crystal coordinates
+    allocate(qlist(numq, 3), qmaglist(numq))
+    do iq = 1, numq
+       qlist(iq, :) = [(iq - 1.0_r64)/qxmesh, 0.0_r64, 0.0_r64]
+       qmaglist(iq) = twonorm(matmul(crys%reclattvecs, qlist(iq, :)))
+    end do
+
+    !Create energy grid
+    allocate(energylist(numomega))
+    call linspace(energylist, 0.0_r64, 6.0_r64, numomega)
+
+    !Allocate diel_ik to hold maximum possible Omega
+    allocate(diel(numq, numomega))
+    diel = 0.0_r64
+
+    !Allocate polarizability
+    allocate(Imeps(numomega))
+    
+    !Distribute points among images
+    call distribute_points(numq, chunk, start, end, num_active_images)
+
+    if(this_image() == 1) then
+       write(*, "(A, I10)") " #q-vecs = ", numq
+       write(*, "(A, I10)") " #q-vecs/image <= ", chunk
+    end if
+
+    do iq = start, end !Over IBZ k points
+       qcrys = qlist(iq, :) !crystal coordinates
+
+       if(all(qcrys == 0.0_r64)) then
+          diel(iq, :) = 1.0_r64 - (omega_plasma/energylist)**2
+       else
+          call Im_head_polarizability_3d(Imeps, energylist, nint(qcrys*numq)+0_i64, el, crys%volume, crys%T)
+
+          !DBG For now real part of polarizability is set to 0
+          !Calculate RPA dielectric (diagonal in G-G' space)
+          diel(iq, :) = 1.0_r64 - &
+               (1.0_r64/twonorm(matmul(crys%reclattvecs, qcrys)))**2* &
+                  (oneI*Imeps)/perm0*qe*1.0e9_r64
+       end if
+    end do
+
+    call co_sum(diel)
+
+    !Print to file
+    call write2file_rank2_real("RPA_dielectric_3D_G0_qpath", qlist)
+    call write2file_rank1_real("RPA_dielectric_3D_G0_qmagpath", qmaglist)
+    call write2file_rank1_real("RPA_dielectric_3D_G0_Omega", energylist)
+    !call write2file_rank2_real("RPA_dielectric_3D_G0_real", real(diel))
+    call write2file_rank2_real("RPA_dielectric_3D_G0_imag", imag(diel))
+  end subroutine calculate_RPA_dielectric_3d_G0_qpath
+  
 !!$  subroutine calculate_RPA_dielectric_3d(el, crys, num)
 !!$    !! Dielectric function of the 3d Kohn-Sham system in the
 !!$    !! random-phase approximation (RPA) using Eq. B1 and B2
