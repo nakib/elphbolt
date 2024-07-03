@@ -20,6 +20,7 @@ module SEPE_module
 
   use precision, only: r64, i64
   use params, only: qe, kB, hbar_eVps
+  use misc, only: Bose
 !!$  use misc, only: print_message, exit_with_message, write2file_rank2_real, &
 !!$       distribute_points, demux_state, binsearch, interpolate, demux_vector, mux_vector, &
 !!$       trace, subtitle, append2file_transport_tensor, write2file_response, &
@@ -29,8 +30,8 @@ module SEPE_module
   use numerics_module, only: numerics
   use crystal_module, only: crystal
 !!$  use nano_module, only: nanostructure
-!!$  use symmetry_module, only: symmetry
-!!$  use phonon_module, only: phonon
+  use symmetry_module, only: symmetry
+  use phonon_module, only: phonon
   use electron_module, only: electron
 !!$  use interactions, only: calculate_ph_rta_rates, read_transition_probs_e, &
 !!$       calculate_el_rta_rates, calculate_bound_scatt_rates, calculate_thinfilm_scatt_rates, &
@@ -93,7 +94,7 @@ contains
     !! ph Phonon object
     !! el Electron object
 
-    class(bte), intent(inout) :: self
+    class(sepe), intent(inout) :: self
     type(numerics), intent(in) :: num
     type(crystal), intent(in) :: crys
     type(symmetry), intent(in) :: sym
@@ -120,59 +121,70 @@ contains
 !!$         call dragless_el_eqn(Tdir, self, num, crys, sym, el, ph)
   end subroutine sepe_driver
 
-!!$  subroutine dragless_el_eqn(Tdir, self, num, crys, sym, el)
-!!$    !! Electron transport equation with phonons at equilibrium
-!!$    
-!!$    class(bte), intent(inout) :: self !Mutation alert!
-!!$    type(numerics), intent(in) :: num
-!!$    type(crystal), intent(in) :: crys
-!!$    type(symmetry), intent(in) :: sym
-!!$    type(electron), intent(in) :: el
-!!$    character(*), intent(in) :: Tdir
-!!$
-!!$    !Locals
-!!$    real(r64) :: el_kappa0_scalar, el_kappa0_scalar_old, el_alphabyT_scalar, el_alphabyT_scalar_old, &
-!!$         el_sigma_scalar, el_sigma_scalar_old, el_sigmaS_scalar, el_sigmaS_scalar_old
+  subroutine dragless_el_eqn(Tdir, self, num, crys, sym, el, ph)
+    !! Electron transport equation with phonons at equilibrium
+    
+    class(sepe), intent(inout) :: self !Mutation alert!
+    type(numerics), intent(in) :: num
+    type(crystal), intent(in) :: crys
+    type(symmetry), intent(in) :: sym
+    type(electron), intent(in) :: el
+    type(phonon), intent(in) :: ph
+    character(*), intent(in) :: Tdir
+
+    !Locals
+    real(r64) :: el_kappa0_scalar, el_kappa0_scalar_old, el_alphabyT_scalar, el_alphabyT_scalar_old, &
+         el_sigma_scalar, el_sigma_scalar_old, el_sigmaS_scalar, el_sigmaS_scalar_old, &
+         sepe_term(ph%nwv, ph%numbands)
 !!$    type(timer) :: t
-!!$    integer :: it_el, icart
+    integer :: it_el, icart, s, iq
 !!$    type(transport_coeffs) :: trans
-!!$
+
 !!$    call trans%initialize_el(el%numbands)
 !!$
 !!$    call t%start_timer('Iterative dragless electron transport')
-!!$
-!!$    call print_message("Dragless electron transport:")
-!!$    call print_message("-----------------------------")
-!!$
-!!$    !Restart with RTA solution
-!!$    self%el_response_T = self%el_field_term_T
-!!$    self%el_response_E = self%el_field_term_E
-!!$
+
+    call print_message("Dragless electron transport:")
+    call print_message("-----------------------------")
+
+    !Restart with RTA solution
+    self%el_response_T = self%el_field_term_T
+    self%el_response_E = self%el_field_term_E
+
+    !Calculate the "sepe term": 1 + theta/n0
+    do s = 1, ph%numbands
+       do iq = 1, ph%nwv
+          sepe_term(iq, s) = 1.0_r64 + &
+               self%ph_coherence(iq, s)/Bose(ph%ens(iq, s), crys%T)
+       end do
+    end do
+
 !!$    if(this_image() == 1) then
 !!$       write(*,*) "iter    k0_el[W/m/K]        sigmaS[A/m/K]", &
 !!$            "         sigma[1/Ohm/m]      alpha_el/T[A/m/K]"
 !!$    end if
-!!$
-!!$    do it_el = 1, num%maxiter
-!!$       !E field:
-!!$       call iterate_el_eqn(num, el, crys, &
-!!$            self%el_rta_rates_ibz, self%el_field_term_E, self%el_response_E)
-!!$
+
+    do it_el = 1, num%maxiter
+       !E field:
+       call iterate_el_eqn(num, el, crys, &
+            self%el_rta_rates_ibz, self%el_field_term_E, self%el_response_E, sepe_term)
+
 !!$       !Calculate electron transport coefficients
 !!$       call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, &
 !!$            el%ens, el%vels, crys%volume, el%wvmesh, self%el_response_E, sym, &
 !!$            trans%el_alphabyT, trans%el_sigma, Bfield = num%Bfield)
 !!$       trans%el_alphabyT = trans%el_alphabyT/crys%T
-!!$
-!!$       !delT field:
-!!$       call iterate_el_eqn(num, el, crys, &
-!!$            self%el_rta_rates_ibz, self%el_field_term_T, self%el_response_T)
-!!$       !Enforce Kelvin-Onsager relation
-!!$       do icart = 1, 3
-!!$          self%el_response_T(:,:,icart) = (el%ens(:,:) - el%chempot)/qe/crys%T*&
-!!$               self%el_response_E(:,:,icart)
-!!$       end do
-!!$
+
+       !delT field:
+       call iterate_el_eqn(num, el, crys, &
+            self%el_rta_rates_ibz, self%el_field_term_T, self%el_response_T, sepe_term)
+
+       !Enforce Kelvin-Onsager relation
+       do icart = 1, 3
+          self%el_response_T(:,:,icart) = (el%ens(:,:) - el%chempot)/qe/crys%T*&
+               self%el_response_E(:,:,icart)
+       end do
+
 !!$       call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
 !!$            el%ens, el%vels, crys%volume, el%wvmesh, self%el_response_T, sym, &
 !!$            trans%el_kappa0, trans%el_sigmaS, Bfield = num%Bfield)
@@ -219,13 +231,13 @@ contains
 !!$          el_sigma_scalar_old = el_sigma_scalar
 !!$          el_alphabyT_scalar_old = el_alphabyT_scalar
 !!$       end if
-!!$    end do
+    end do
 !!$
 !!$    call t%end_timer('Iterative dragless electron transport')
-!!$
-!!$    sync all
-!!$  end subroutine dragless_el_eqn
-!!$
+
+    sync all
+  end subroutine dragless_el_eqn
+
   subroutine iterate_el_eqn(num, el, crys, rta_rates_ibz, field_term, &
        response_el, sepe_term)
     !! Subroutine to calculate the Fan-Migdal term
@@ -300,7 +312,7 @@ contains
           call read_transition_probs_e(trim(adjustl(filepath_Xplus)), nprocs, Xplus, &
                istate_el, istate_ph)
 
-          !X+ -> X+(1 - theta_q/n0_q)
+          !X+ -> X+(1 + theta_q/n0_q)
           Xplus = Xplus*sepe_term
 
           !Set X- filename
@@ -310,7 +322,7 @@ contains
           !Read X- from file
           call read_transition_probs_e(trim(adjustl(filepath_Xminus)), nprocs, Xminus)
 
-          !X- -> X-(1 - theta_q/n0_q)
+          !X- -> X-(1 + theta_q/n0_q)
           Xminus = Xminus*sepe_term
 
           !Sum over the number of equivalent k-points of the IBZ point

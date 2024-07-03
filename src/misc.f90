@@ -966,7 +966,7 @@ contains
     ik = int((m - 1)/nbands) + 1
   end subroutine demux_state
 
-  pure real(r64) function Bose(e, T)
+  pure elemental real(r64) function Bose(e, T)
     !! e Energy in eV
     !! T temperature in K
 
@@ -975,7 +975,7 @@ contains
     Bose = 1.0_r64/expm1(e/kB/T)
   end function Bose
 
-  pure real(r64) function Fermi(e, chempot, T)
+  pure elemental real(r64) function Fermi(e, chempot, T)
     !! e Energy in eV
     !! chempot Chemical potential in eV
     !! T temperature in K
