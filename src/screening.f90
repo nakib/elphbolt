@@ -74,15 +74,15 @@ contains
     end if
   end function finite_element
 
-  subroutine calculate_Hilbert_weights(w_disc, w_cont, eps, Hilbert_weights)
+  subroutine calculate_Hilbert_weights(w_disc, w_cont, zeroplus, Hilbert_weights)
     !! Calculator of the weights for the Hilbert-Kramers-Kronig transform.
     !!
     !! w_disc Discrete sampling points
     !! w_cont Continuous sampling variable
-    !! eps A small positive number
+    !! zeroplus A small positive number
     !! Hilbert_weights The Hilbert weights
 
-    real(r64), intent(in) :: w_disc(:), w_cont(:), eps
+    real(r64), intent(in) :: w_disc(:), w_cont(:), zeroplus
     real(r64), allocatable, intent(out) :: Hilbert_weights(:, :)
 
     !Locals
@@ -102,8 +102,8 @@ contains
        Phi_i = finite_element(w_cont, w_disc(i - 1), w_disc(i), w_disc(i + 1))
        do j = 1, n_disc
           integrand = Phi_i*(&
-               (w_disc(j) - w_cont)/((w_disc(j) - w_cont)**2 + eps) - &
-               (w_disc(j) + w_cont)/((w_disc(j) + w_cont)**2 + eps))
+               (w_disc(j) - w_cont)/((w_disc(j) - w_cont)**2 + zeroplus) - &
+               (w_disc(j) + w_cont)/((w_disc(j) + w_cont)**2 + zeroplus))
           !TODO Would be nice to have a compsimps function instead of
           !a subroutine.
           call compsimps(integrand, dw, Hilbert_weights(j, i))
@@ -111,7 +111,7 @@ contains
     end do
   end subroutine calculate_Hilbert_weights
 
-  subroutine Re_head_polarizability_3d_T(Reeps_T, Omegas, Im_part_T, Hilbert_weights_T)
+  subroutine Re_head_polarizability_3d_T(Reeps_T, Omegas, Imeps_T, Hilbert_weights_T)
     !! Real part of the head of the bare polarizability of the 3d Kohn-Sham system using
     !! Hilbert transform for a given set of temperature-dependent quantities.
     !!
@@ -125,13 +125,13 @@ contains
     
     real(r64), allocatable, intent(out) :: Reeps_T(:)
     real(r64), intent(in) :: Omegas(:)
-    real(r64), intent(in) :: Im_part_T(:)
+    real(r64), intent(in) :: Imeps_T(:)
     real(r64), intent(in) :: Hilbert_weights_T(:, :)
 
     allocate(Reeps_T(size(Omegas)))
     
     !TODO Can optimize this sum with blas
-    Reeps_T = matmul(Hilbert_weights_T, Im_part_T)
+    Reeps_T = matmul(Hilbert_weights_T, Imeps_T)
   end subroutine Re_head_polarizability_3d_T
   
   subroutine Im_head_polarizability_3d(Imeps, Omegas, q_indvec, el, pcell_vol, T)
@@ -240,7 +240,7 @@ contains
     real(r64) :: qcrys(3)
     integer(i64) :: iq, iOmega, numomega, numq, &
          start, end, chunk, num_active_images, qxmesh
-    real(r64), allocatable :: Imeps(:)
+    real(r64), allocatable :: Imeps(:), Reeps(:), Hilbert_weights(:, :)
     complex(r64), allocatable :: diel(:, :)
     character(len = 1024) :: filename
     real(r64) :: a0, eps0_q0_prefac, omega_plasma
@@ -252,27 +252,29 @@ contains
 
     !TEST
     !Material: Si
-    !Uniform energy mesh from 0-6.0 eV with uniform q-vecs in Gamma-Gamma along x
-    numomega = 100
-    numq = 30
-    qxmesh = 30
+    numomega = 200
+    numq = 100
+    qxmesh = numq
     !Create qlist in crystal coordinates
     allocate(qlist(numq, 3), qmaglist(numq))
     do iq = 1, numq
-       qlist(iq, :) = [(iq - 1.0_r64)/qxmesh, 0.0_r64, 0.0_r64]
+       qlist(iq, :) = [(iq - 1.0_r64)/2/qxmesh, 0.0_r64, 0.0_r64]
        qmaglist(iq) = twonorm(matmul(crys%reclattvecs, qlist(iq, :)))
     end do
 
     !Create energy grid
     allocate(energylist(numomega))
-    call linspace(energylist, 0.0_r64, 6.0_r64, numomega)
+    call linspace(energylist, 0.0_r64, 1.0_r64, numomega)
 
     !Allocate diel_ik to hold maximum possible Omega
     allocate(diel(numq, numomega))
     diel = 0.0_r64
 
     !Allocate polarizability
-    allocate(Imeps(numomega))
+    allocate(Imeps(numomega), Reeps(numomega))
+
+    !Allocate the Hilbert weights
+    allocate(Hilbert_weights(numomega, numomega))
     
     !Distribute points among images
     call distribute_points(numq, chunk, start, end, num_active_images)
@@ -290,11 +292,18 @@ contains
        else
           call Im_head_polarizability_3d(Imeps, energylist, nint(qcrys*numq)+0_i64, el, crys%volume, crys%T)
 
-          !DBG For now real part of polarizability is set to 0
+          !Calculate re_eps with Hilbert-Kramers-Kronig transform
+          call calculate_Hilbert_weights(w_disc = energylist, &
+               w_cont = energylist, &
+               zeroplus = 1.0e-6_r64, &
+               Hilbert_weights = Hilbert_weights)
+
+          call Re_head_polarizability_3d_T(Reeps, energylist, Imeps, Hilbert_weights)
+          
           !Calculate RPA dielectric (diagonal in G-G' space)
           diel(iq, :) = 1.0_r64 - &
                (1.0_r64/twonorm(matmul(crys%reclattvecs, qcrys)))**2* &
-                  (oneI*Imeps)/perm0*qe*1.0e9_r64
+                  (Reeps + oneI*Imeps)/perm0*qe*1.0e9_r64
        end if
     end do
 
@@ -304,7 +313,7 @@ contains
     call write2file_rank2_real("RPA_dielectric_3D_G0_qpath", qlist)
     call write2file_rank1_real("RPA_dielectric_3D_G0_qmagpath", qmaglist)
     call write2file_rank1_real("RPA_dielectric_3D_G0_Omega", energylist)
-    !call write2file_rank2_real("RPA_dielectric_3D_G0_real", real(diel))
+    call write2file_rank2_real("RPA_dielectric_3D_G0_real", real(diel))
     call write2file_rank2_real("RPA_dielectric_3D_G0_imag", imag(diel))
   end subroutine calculate_RPA_dielectric_3d_G0_qpath
   
