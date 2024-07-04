@@ -1,7 +1,7 @@
 module screening_module
 
   use precision, only: r64, i64
-  use params, only: kB, qe, perm0, pi, oneI
+  use params, only: kB, qe, pi, perm0, oneI, hbar, me
   use electron_module, only: electron
   use crystal_module, only: crystal
   use numerics_module, only: numerics
@@ -248,23 +248,30 @@ contains
     !a0 = 1.0e-9_r64*bohr2nm !Bohr radius in m
     !eps0_q0_prefac = (4.0_r64/9.0_r64/pi)/a0* &
     !     (3.0_r64*abs(sum(el%conc))*1.0e6_r64)**(-1.0_r64/3.0_r64) !
-    omega_plasma = 0.5025125628E-01 !eV
+    !omega_plasma = 0.5025125628E-01 !eV
+    !omega_plasma = 0.25 !eV
+
+    omega_plasma = 1.0e3_r64*1.0e-12*hbar*sqrt(el%conc_el/perm0/crys%epsilon0/(0.26*me)) !eV
+    
+    if(this_image() == 1) then
+       print*, "plasmon energy = ", omega_plasma
+    end if
 
     !TEST
     !Material: Si
-    numomega = 200
-    numq = 100
+    numomega = 100
+    numq = el%wvmesh(1)
     qxmesh = numq
     !Create qlist in crystal coordinates
     allocate(qlist(numq, 3), qmaglist(numq))
     do iq = 1, numq
-       qlist(iq, :) = [(iq - 1.0_r64)/2/qxmesh, 0.0_r64, 0.0_r64]
+       qlist(iq, :) = [(iq - 1.0_r64)/2/qxmesh, (iq - 1.0_r64)/2/qxmesh, 0.0_r64]
        qmaglist(iq) = twonorm(matmul(crys%reclattvecs, qlist(iq, :)))
     end do
 
     !Create energy grid
     allocate(energylist(numomega))
-    call linspace(energylist, 0.0_r64, 1.0_r64, numomega)
+    call linspace(energylist, 0.0_r64, 3.0_r64, numomega)
 
     !Allocate diel_ik to hold maximum possible Omega
     allocate(diel(numq, numomega))
@@ -295,7 +302,7 @@ contains
           !Calculate re_eps with Hilbert-Kramers-Kronig transform
           call calculate_Hilbert_weights(w_disc = energylist, &
                w_cont = energylist, &
-               zeroplus = 1.0e-6_r64, &
+               zeroplus = 1.0e-8_r64, &
                Hilbert_weights = Hilbert_weights)
 
           call Re_head_polarizability_3d_T(Reeps, energylist, Imeps, Hilbert_weights)
