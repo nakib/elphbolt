@@ -116,9 +116,8 @@ contains
     end if
     sync all
     
-!!$    !Electron RTA
-!!$    if(.not. num%onlyphbte) &
-!!$         call dragless_el_eqn(Tdir, self, num, crys, sym, el, ph)
+    !Electron RTA
+    call dragless_el_eqn(Tdir, self, num, crys, sym, el, ph)
   end subroutine sepe_driver
 
   subroutine dragless_el_eqn(Tdir, self, num, crys, sym, el, ph)
@@ -141,8 +140,8 @@ contains
 !!$    type(transport_coeffs) :: trans
 
 !!$    call trans%initialize_el(el%numbands)
-!!$
-!!$    call t%start_timer('Iterative dragless electron transport')
+
+    call t%start_timer('Iterative electron sector of SEPE')
 
     call print_message("Dragless electron transport:")
     call print_message("-----------------------------")
@@ -355,4 +354,8 @@ contains
     call co_sum(response_el_reduce)
     response_el = response_el_reduce
   end subroutine iterate_el_eqn
+
+!!$  !TODO Here set the phonon coherence
+!!$  subroutine calculate_ph_coherenece
+!!$  end subroutine calculate_ph_coherenece
 end module SEPE_module

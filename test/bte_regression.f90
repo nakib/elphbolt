@@ -30,7 +30,7 @@ program bte_regression
   type(bte) :: bt
   type(timer) :: t_all, t_event
 
-  character(:), allocatable :: datalink, curl_arg, workdir, datadir, inputdir
+  !character(:), allocatable :: datalink, curl_arg, workdir, datadir, inputdir
 
   if(this_image() == 1) then
      write(*, '(A)')  'Regression test on 3C-SiC'
