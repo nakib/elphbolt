@@ -50,6 +50,12 @@ name="superconda"
 source-dir="app"
 main="superconda.f90"
 
+[[executable]]
+name = "screening_comparison"
+source-dir="test"
+main = "screening_comparison.f90"
+
+
 [[test]]
 name = "test_misc"
 source-dir="test"
@@ -69,3 +75,8 @@ main = "test_periodictable.f90"
 name = "bte_regression"
 source-dir="test"
 main = "bte_regression.f90"
+
+#[[test]]
+#name = "screening_comparison"
+#source-dir="test"
+#main = "screening_comparison.f90"
