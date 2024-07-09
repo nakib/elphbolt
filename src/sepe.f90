@@ -43,18 +43,18 @@ module SEPE_module
   type sepe
      !! Data and procedures related to the BTE.
 
-     real(r64), allocatable :: ph_rta_rates_phe_ibz(:,:)
-     !! Phonon RTA scattering rates on the IBZ due to ph-e interactions.
-     real(r64), allocatable :: ph_rta_rates_ibz(:,:)
-     !! Phonon RTA scattering rates on the IBZ.
-     real(r64), allocatable :: ph_field_term_T(:,:,:)
-     !! Phonon field coupling term for gradT field on the FBZ.
-     real(r64), allocatable :: ph_response_T(:,:,:)
-     !! Phonon response function for gradT field on the FBZ.
-     real(r64), allocatable :: ph_field_term_E(:,:,:)
-     !! Phonon field coupling term for E field on the FBZ.
-     real(r64), allocatable :: ph_response_E(:,:,:)
-     !! Phonon response function for E field on the FBZ.
+!!$     real(r64), allocatable :: ph_rta_rates_phe_ibz(:,:)
+!!$     !! Phonon RTA scattering rates on the IBZ due to ph-e interactions.
+!!$     real(r64), allocatable :: ph_rta_rates_ibz(:,:)
+!!$     !! Phonon RTA scattering rates on the IBZ.
+!!$     real(r64), allocatable :: ph_field_term_T(:,:,:)
+!!$     !! Phonon field coupling term for gradT field on the FBZ.
+!!$     real(r64), allocatable :: ph_response_T(:,:,:)
+!!$     !! Phonon response function for gradT field on the FBZ.
+!!$     real(r64), allocatable :: ph_field_term_E(:,:,:)
+!!$     !! Phonon field coupling term for E field on the FBZ.
+!!$     real(r64), allocatable :: ph_response_E(:,:,:)
+!!$     !! Phonon response function for E field on the FBZ.
      real(r64), allocatable :: ph_coherence(:, :)
      !! Phonon coherence
      

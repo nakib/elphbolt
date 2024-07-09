@@ -2,7 +2,7 @@ program screening_comparison
   !! Test for the screening stuff
 
   use precision, only: r64, i64
-  use params, only: hbar, hbar_eVps, me, pi, kB, qe
+  use params, only: hbar, hbar_eVps, me, pi, kB, qe, bohr2nm
   use misc, only: qdist, linspace, compsimps
   use numerics_module, only: numerics
   use crystal_module, only: crystal
@@ -72,7 +72,6 @@ program screening_comparison
 
   !Calculate chemical potential for model band to match carrier conc.
   mu = chempot(el%conc_el, m_eff, 1.0_r64/kB/crys%T)
-  print*, 'Chemical potential = ', mu, ' eV'
 
   call exit
   !Calculate Fermi wave vector for model band
@@ -106,21 +105,22 @@ contains
     real(r64), intent(in) :: beta
 
     integer :: i
-    integer, parameter :: maxiter = 1000
-    real(r64) :: a, b, tmp, aux
+    integer, parameter :: maxiter = 100
+    real(r64) :: a, b, tmp, aux, thresh
 
     a = -5.0 !eV, "Safe" lower bound
     b = 5.0 !eV, "Safe" upper bound
 
-    !TODO Check units
+    thresh = 1.0e-12_r64
+    
     tmp = 2.0_r64*(0.5_r64*m_eff/hbar_eVps**2/beta/pi/qe)**1.5_r64*1.0e30_r64 !cm^-3
-    print*, 'tmp = ', tmp
 
     do i = 1, maxiter
        chempot = 0.5*(a + b)
-       
+
        aux = tmp*fdi(0.5_r64, chempot*beta)
-       if(abs(aux - conc)/conc < 1e-12_r64) then
+       
+       if(abs(aux - conc)/conc < thresh) then
           exit
        else if(aux < conc) then
           a = chempot
@@ -128,31 +128,77 @@ contains
           b = chempot
        end if
     end do
-    !print'(A,E16.8,A)', 'calculated ne =', aux*1d-6, ' 1/cm^3'
-    !print'(A,E16.8,A)', 'calculated chempot =', chempot, ' J'
-    print*,'calculated ne = ', aux, ' cm^-3'
-    print*,'calculated chem. pot. = ', chempot, ' eV'
+    write(*, "(A, 1E16.8, A)") 'requested ne = ', conc, ' cm^-3'
+    write(*, "(A, 1E16.8, A)") 'calculated ne in parabolic model = ', aux, ' cm^-3'
+    write(*, "(A, 1E16.8, A)") 'calculated chem. pot. in parabolic model = ', chempot, ' eV'
   end function chempot
 
-  !TODO Remove all "magic" parameters in the function below
   real(r64) function fdi(j, x)
     !! Fermi-Dirac integral
     
     real(r64), intent(in) :: j, x
 
-    integer(i64), parameter :: ngrid = 1000_i64
+    integer(i64), parameter :: ngrid = 10000_i64
     real(r64), allocatable :: t(:)
     real(r64) :: dt
 
-    call linspace(t, 0.0_r64, 5.0_r64, ngrid)
+    !Here 10 is infinity...
+    call linspace(t, 0.0_r64, 10.0_r64, ngrid)
 
     dt = t(2) - t(1)
     call compsimps(t**j/(exp(t - x) + 1.0_r64), dt, fdi)
     fdi = fdi/gamma(j + 1.0_r64)    
   end function fdi
+
+  subroutine calculate_Imeps(kmags, ens, chempot, m_eff, eF, kF, beta, Imeps)
+
+    real(r64), intent(in) :: kmags(:), ens(:), chempot, m_eff, eF, kF, beta
+    real(r64), allocatable :: Imeps(:, :)
+
+    !Locals
+    integer :: ik
+    real(r64), allocatable :: u(:, :)
+    real(r64), parameter :: bohr = bohr2nm*1e-9_r64 !m
+    
+    allocate(u(size(kmags), size(ens)))
+    allocate(Imeps(size(ens), size(kmags)))
+    
+    call outer(0.5_r64/kmags/kF, ens, u)
+    
+    do ik = 1, size(ens)
+       Imeps(:, ik) = &
+            real(log((1.0_r64 + &
+                exp(beta*(chempot - eF*(u(:, ik) - kmags(:)/kF/2.0_r64)**2)))/ &
+                (1.0_r64 + exp(beta*(chempot - eF*(u(:, ik) + &
+                           kmags(:)/kF/2.0_r64)**2)))))/(kmags(:)/kF)**3
+    end do
+
+    Imeps = (m_eff/me/bohr/kF/eF/beta)*Imeps
+  end subroutine calculate_Imeps
+
 !!$  subroutine calculate_Reeps
 !!$  end subroutine calculate_Reeps
-!!$
-!!$  subroutine calculate_Imeps
-!!$  end subroutine calculate_Imeps
+
+  subroutine outer(a, b, c)
+    !! Outer product
+    !!
+    !! c_ij = a_i.b_j 
+    
+    real(r64), intent(out) :: c(:, :)
+    real(r64), intent(in) :: a(:), b(:)
+
+    integer :: j, len_a, len_b
+
+    len_a = size(a)
+    len_b = size(b)
+    if(len_a /= size(c, 1) &
+         .and. len_b /= size(c, 2)) then
+       print *, 'Dimension mismatch. Exiting.'
+       call exit
+    end if
+
+    do j = 1, len_b
+       c(:, j) = a(:)*b(j)
+    end do
+  end subroutine outer
 end program screening_comparison
