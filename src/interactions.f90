@@ -2806,6 +2806,8 @@ contains
              close(1)
           end if
 
+          !TODO: Below we are saving the same istate_el and istate_ph data in two files.
+          !Need to change this wasteful behavior.
           if(key == 'X') then
              !Multiply constant factor, unit factor, etc.
              Xplus_istate(1:count) = const*Xplus_istate(1:count) !THz

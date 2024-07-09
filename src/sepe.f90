@@ -16,7 +16,7 @@
 
 module SEPE_module
   !! Module containing type and procedures related to the solution of the
-  !! Semiconductor Electron-Phonon Equation (SEPE) a la Stefanucci & Perfetto.
+  !! Semiconductor Electron-Phonon Equations (SEPE) a la Stefanucci & Perfetto.
 
   use precision, only: r64, i64
   use params, only: qe, kB, hbar_eVps
@@ -33,9 +33,7 @@ module SEPE_module
   use symmetry_module, only: symmetry
   use phonon_module, only: phonon
   use electron_module, only: electron
-!!$  use interactions, only: calculate_ph_rta_rates, read_transition_probs_e, &
-!!$       calculate_el_rta_rates, calculate_bound_scatt_rates, calculate_thinfilm_scatt_rates, &
-!!$       calculate_4ph_rta_rates, calculate_W3ph_OTF, calculate_Y_OTF
+  use interactions, only: read_transition_probs_e
 
   implicit none
   
@@ -60,10 +58,6 @@ module SEPE_module
      real(r64), allocatable :: ph_coherence(:, :)
      !! Phonon coherence
      
-     real(r64), allocatable :: el_rta_rates_echimp_ibz(:,:)
-     !! Electron RTA scattering rates on the IBZ due to charged impurity scattering.
-     real(r64), allocatable :: el_rta_rates_bound_ibz(:,:)
-     !! Electron RTA scattering rates on the IBZ due to boundary scattering.
      real(r64), allocatable :: el_rta_rates_eph_ibz(:,:)
      !! Electron RTA scattering rates on the IBZ due to e-ph interactions.
      real(r64), allocatable :: el_rta_rates_ibz(:,:)
@@ -106,8 +100,6 @@ contains
 
     call subtitle("Calculating SEPEs...")
 
-    !call print_message("Only the trace-averaged transport coefficients are printed below:")
-
     !Create output folder tagged by temperature and create it
     write(tag, "(E9.3)") crys%T
     Tdir = trim(adjustl(num%cwd))//'/T'//trim(adjustl(tag))
@@ -132,119 +124,46 @@ contains
     character(*), intent(in) :: Tdir
 
     !Locals
-    real(r64) :: el_kappa0_scalar, el_kappa0_scalar_old, el_alphabyT_scalar, el_alphabyT_scalar_old, &
-         el_sigma_scalar, el_sigma_scalar_old, el_sigmaS_scalar, el_sigmaS_scalar_old, &
-         sepe_term(ph%nwv, ph%numbands)
-!!$    type(timer) :: t
-    integer :: it_el, icart, s, iq
-!!$    type(transport_coeffs) :: trans
+    real(r64) :: sepe_term(ph%nwv, ph%numbands)
+    integer :: it_el, s
 
-!!$    call trans%initialize_el(el%numbands)
-
-    call t%start_timer('Iterative electron sector of SEPE')
-
-    call print_message("Dragless electron transport:")
-    call print_message("-----------------------------")
+!!$    call t%start_timer('Iterative electron sector of SEPE')
+!!$
+!!$    call print_message("Dragless electron transport:")
+!!$    call print_message("-----------------------------")
 
     !Restart with RTA solution
-    self%el_response_T = self%el_field_term_T
     self%el_response_E = self%el_field_term_E
 
-    !Calculate the "sepe term": 1 + theta/n0
-    do s = 1, ph%numbands
-       do iq = 1, ph%nwv
-          sepe_term(iq, s) = 1.0_r64 + &
-               self%ph_coherence(iq, s)/Bose(ph%ens(iq, s), crys%T)
-       end do
-    end do
+    do it_coh = 1, num%maxiter
+       call calculate_ph_coherenece(self%el_response_E, self%ph_coherence)
 
-!!$    if(this_image() == 1) then
-!!$       write(*,*) "iter    k0_el[W/m/K]        sigmaS[A/m/K]", &
-!!$            "         sigma[1/Ohm/m]      alpha_el/T[A/m/K]"
-!!$    end if
-
-    do it_el = 1, num%maxiter
-       !E field:
-       call iterate_el_eqn(num, el, crys, &
-            self%el_rta_rates_ibz, self%el_field_term_E, self%el_response_E, sepe_term)
-
-!!$       !Calculate electron transport coefficients
-!!$       call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, &
-!!$            el%ens, el%vels, crys%volume, el%wvmesh, self%el_response_E, sym, &
-!!$            trans%el_alphabyT, trans%el_sigma, Bfield = num%Bfield)
-!!$       trans%el_alphabyT = trans%el_alphabyT/crys%T
-
-       !delT field:
-       call iterate_el_eqn(num, el, crys, &
-            self%el_rta_rates_ibz, self%el_field_term_T, self%el_response_T, sepe_term)
-
-       !Enforce Kelvin-Onsager relation
-       do icart = 1, 3
-          self%el_response_T(:,:,icart) = (el%ens(:,:) - el%chempot)/qe/crys%T*&
-               self%el_response_E(:,:,icart)
+       !Calculate the "sepe term": 1 + theta/n0
+       do s = 1, ph%numbands
+          sepe_term(:, s) = 1.0_r64 + &
+               self%ph_coherence(:, s)/Bose(ph%ens(:, s), crys%T)
        end do
 
-!!$       call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
-!!$            el%ens, el%vels, crys%volume, el%wvmesh, self%el_response_T, sym, &
-!!$            trans%el_kappa0, trans%el_sigmaS, Bfield = num%Bfield)
-!!$
-!!$       !Calculate and print electron transport scalars
-!!$       el_kappa0_scalar = trace(sum(trans%el_kappa0, dim = 1))/crys%dim
-!!$       el_sigmaS_scalar = trace(sum(trans%el_sigmaS, dim = 1))/crys%dim
-!!$       el_sigma_scalar = trace(sum(trans%el_sigma, dim = 1))/crys%dim
-!!$       el_alphabyT_scalar = trace(sum(trans%el_alphabyT, dim = 1))/crys%dim
-!!$       if(this_image() == 1) then
-!!$          write(*,"(I3, A, 1E16.8, A, 1E16.8, A, 1E16.8, A, 1E16.8)") it_el, &
-!!$               "    ", el_kappa0_scalar, "     ", el_sigmaS_scalar, &
-!!$               "     ", el_sigma_scalar, "     ", el_alphabyT_scalar
-!!$       end if
-!!$
-!!$       !Print out band resolved transport coefficients
-!!$       ! Change to data output directory
-!!$       call chdir(trim(adjustl(Tdir)))
-!!$       call append2file_transport_tensor('nodrag_el_sigmaS_', it_el, trans%el_sigmaS, el%bandlist)
-!!$       call append2file_transport_tensor('nodrag_el_sigma_', it_el, trans%el_sigma, el%bandlist)
-!!$       call append2file_transport_tensor('nodrag_el_alphabyT_', it_el, trans%el_alphabyT, el%bandlist)
-!!$       call append2file_transport_tensor('nodrag_el_kappa0_', it_el, trans%el_kappa0, el%bandlist)
-!!$       ! Change back to cwd
-!!$       call chdir(trim(adjustl(num%cwd)))
-!!$
-!!$       !Check convergence
-!!$       if(converged(el_kappa0_scalar_old, el_kappa0_scalar, num%conv_thres) .and. &
-!!$            converged(el_sigmaS_scalar_old, el_sigmaS_scalar, num%conv_thres) .and. &
-!!$            converged(el_sigma_scalar_old, el_sigma_scalar, num%conv_thres) .and. &
-!!$            converged(el_alphabyT_scalar_old, el_alphabyT_scalar, num%conv_thres)) then
-!!$
-!!$          !Print converged band resolved response functions
-!!$          ! Change to data output directory
-!!$          call chdir(trim(adjustl(Tdir)))
-!!$          call write2file_response('nodrag_I0_', self%el_response_T, el%bandlist) !gradT, el
-!!$          call write2file_response('nodrag_J0_', self%el_response_E, el%bandlist) !E, el
-!!$          ! Change back to cwd
-!!$          call chdir(trim(adjustl(num%cwd)))
-!!$
-!!$          exit
-!!$       else
-!!$          el_kappa0_scalar_old = el_kappa0_scalar
-!!$          el_sigmaS_scalar_old = el_sigmaS_scalar
-!!$          el_sigma_scalar_old = el_sigma_scalar
-!!$          el_alphabyT_scalar_old = el_alphabyT_scalar
-!!$       end if
-    end do
-!!$
-!!$    call t%end_timer('Iterative dragless electron transport')
+       do it_el = 1, num%maxiter
+          !E field:
+          call iterate_el_eqn(num, el, crys, &
+               self%el_rta_rates_ibz, self%el_field_term_E, sepe_term, self%el_response_E)
+
+          !TODO Set up convergence criterion to exit iteration loop
+       end do !electron iterator
+
+       !TODO Set up convergence criterion to exit iteration loop
+    end do !phonon coherence iterator
 
     sync all
   end subroutine dragless_el_eqn
 
   subroutine iterate_el_eqn(num, el, crys, rta_rates_ibz, field_term, &
-       response_el, sepe_term)
+       sepe_term, response_el)
     !! Subroutine to calculate the Fan-Migdal term
     !! 
-    !! T Temperature in K
-    !! drag Is drag included?
-    !! el Electron object
     !! num Numerics object
+    !! el Electron object
     !! crys Crystal object
     !! rta_rates_ibz Electron RTA scattering rates
     !! field_term Electron field coupling term
@@ -254,35 +173,38 @@ contains
     type(electron), intent(in) :: el
     type(numerics), intent(in) :: num
     type(crystal), intent(in) :: crys
-    real(r64), intent(in) :: rta_rates_ibz(:,:), field_term(:,:,:)
-    real(r64), intent(in) :: sepe_term(:,:,:)
-    real(r64), intent(inout) :: response_el(:,:,:)
+    real(r64), intent(in) :: rta_rates_ibz(:, :), field_term(:, :, :)
+    real(r64), intent(in) :: sepe_term(:, :)
+    real(r64), intent(inout) :: response_el(:, :, :)
 
     !Local variables
     integer(i64) :: nstates_irred, nprocs, chunk, istate, numbands, numbranches, &
          ik_ibz, m, ieq, ik_sym, ik_fbz, iproc, ikp, n, nk, num_active_images, aux, &
-         start, end, neg_ik_fbz
+         start, end, neg_ik_fbz, iq
     integer :: i, j
-    integer(i64), allocatable :: istate_el(:), istate_ph(:), istate_el_echimp(:)
+    integer(i64), allocatable :: istate_el(:), istate_ph(:)
     real(r64) :: tau_ibz
-    real(r64), allocatable :: Xplus(:), Xminus(:),  Xchimp(:), response_el_reduce(:,:,:)
+    real(r64), allocatable :: Xplus(:), Xminus(:),  response_el_reduce(:, :, :)
     character(1024) :: filepath_Xminus, filepath_Xplus, tag
     
     !Set output directory of transition probilities
     write(tag, "(E9.3)") crys%T
     
     !Number of electron bands
-    numbands = size(rta_rates_ibz(1,:))
-
+    numbands = size(rta_rates_ibz(1, :))
+  
     !Number of in-window FBZ wave vectors
-    nk = size(field_term(:,1,1))
+    nk = size(field_term(:, 1, 1))
 
     !Total number of IBZ states
-    nstates_irred = size(rta_rates_ibz(:,1))*numbands
+    nstates_irred = size(rta_rates_ibz(:, 1))*numbands
+
+    !Number of phonon branches
+    numbranches = crys%numatoms*3
     
     !Allocate and initialize response reduction array
     allocate(response_el_reduce(nk, numbands, 3))
-    response_el_reduce(:,:,:) = 0.0_r64
+    response_el_reduce(:, :, :) = 0.0_r64
     
     !Divide electron states among images
     call distribute_points(nstates_irred, chunk, start, end, num_active_images)
@@ -311,8 +233,12 @@ contains
           call read_transition_probs_e(trim(adjustl(filepath_Xplus)), nprocs, Xplus, &
                istate_el, istate_ph)
 
+          !Get interacting phonon state
+          call demux_state(istate_ph, numbranches, s, iq) 
+          
           !X+ -> X+(1 + theta_q/n0_q)
-          Xplus = Xplus*sepe_term
+          !DEBUG there is a dimensional mismatch below!!
+          !Xplus = Xplus*sepe_term
 
           !Set X- filename
           write(tag, '(I9)') istate
@@ -322,7 +248,8 @@ contains
           call read_transition_probs_e(trim(adjustl(filepath_Xminus)), nprocs, Xminus)
 
           !X- -> X-(1 + theta_q/n0_q)
-          Xminus = Xminus*sepe_term
+          !DEBUG there is a dimensional mismatch below!!
+          !Xminus = Xminus*sepe_term
 
           !Sum over the number of equivalent k-points of the IBZ point
           do ieq = 1, el%nequiv(ik_ibz)
@@ -355,7 +282,15 @@ contains
     response_el = response_el_reduce
   end subroutine iterate_el_eqn
 
-!!$  !TODO Here set the phonon coherence
-!!$  subroutine calculate_ph_coherenece
-!!$  end subroutine calculate_ph_coherenece
+  subroutine calculate_ph_coherenece(el_response, ph_coherence)
+    !! Computes the phonon coherence.
+    !!
+    !! el_response Electron response function
+    !! ph_coherence Phonon coherence
+    
+    real(r64), intent(in) :: el_response(:, :, :)
+    real(r64), intent(inout) :: ph_coherence(:, :)
+    
+    !TODO
+  end subroutine calculate_ph_coherenece
 end module SEPE_module
