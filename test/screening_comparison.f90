@@ -3,7 +3,8 @@ program screening_comparison
 
   use precision, only: r64, i64
   use params, only: hbar, hbar_eVps, me, pi, kB, qe, bohr2nm
-  use misc, only: qdist, linspace, compsimps
+  use misc, only: qdist, linspace, compsimps, &
+       write2file_rank2_real, write2file_rank1_real
   use numerics_module, only: numerics
   use crystal_module, only: crystal
   use symmetry_module, only: symmetry
@@ -24,9 +25,10 @@ program screening_comparison
   !type(timer) :: t_all, t_event
 
   integer :: ik
-  real(r64) :: mu
+  real(r64) :: mu, eF, kF, beta
   real(r64), allocatable :: el_ens_parabolic(:), kmags(:)
   real(r64), parameter :: m_eff = 0.267*me
+  real(r64), allocatable :: imeps(:, :)
   
   if(this_image() == 1) then
      write(*, '(A)')  'Screening test'
@@ -58,6 +60,9 @@ program screening_comparison
   !Calculate electrons
   call el%initialize(wann, crys, sym, num)
 
+  !Set inverse temperature energy
+  beta = 1.0_r64/kB/crys%T
+  
   !Create grid of |k|
   allocate(kmags(el%nwv_irred))
   do ik = 1, el%nwv_irred
@@ -67,18 +72,26 @@ program screening_comparison
   !Calculate parabolic dispersion 
   allocate(el_ens_parabolic(el%nwv_irred))  
   el_ens_parabolic = energy_parabolic(kmags, m_eff)
-  print*, kmags(1:10)
-  print*, el_ens_parabolic(1:10)
+  call write2file_rank1_real("model_el_ens_parabolic", el_ens_parabolic)
+  
+  !print*, kmags(1:10)
+  !print*, el_ens_parabolic(1:10)
 
   !Calculate chemical potential for model band to match carrier conc.
-  mu = chempot(el%conc_el, m_eff, 1.0_r64/kB/crys%T)
+  mu = chempot(el%conc_el, m_eff, beta)
+  
+  !Calculate Fermi wave vector for model band (degenerate limit)
+  kF = (3.0_r64*pi**2*el%conc_el)**(1.0_r64/3.0_r64)*1.0e-7_r64 !nm^-1
+  print*, 'Fermi wave vector = ', kF, ' nm^-1'
 
-  call exit
-  !Calculate Fermi wave vector for model band
-  !TODO
+  !Calculate Fermi energy for model band (degenerate limit)
+  eF =  energy_parabolic(kF, m_eff)
+  print*, 'Fermi energy = ', eF, ' eV'
   
-  !TODO Calculate analytic RPA dielectric function
-  
+  !Calculate analytic RPA dielectric function
+  call calculate_Imeps(kmags, el_ens_parabolic, mu, m_eff, eF, kF, beta, Imeps)
+
+  call write2file_rank2_real("model_RPA_dielectric_3D_imag", Imeps)
 contains
   
   pure real(r64) elemental function energy_parabolic(k, m_eff)
@@ -151,29 +164,38 @@ contains
   end function fdi
 
   subroutine calculate_Imeps(kmags, ens, chempot, m_eff, eF, kF, beta, Imeps)
+    !! Imaginary part of RPA dielectric for the isotropic band model.
+    !!
+    !! kmags Magnitude of probe wave vectors in nm^-1
+    !! ens Probe energies in eV
+    !! chempot Chemical potential in eV
+    !! m_eff Effective mass of model band in Kg
+    !! eF Fermi energy (degenerate limit => 0K) in eV
+    !! kF Fermi wave vector (degenerate limit => 0K) in nm^-1
+    !! beta Inverse temperature energy in eV^-1
+    !! Imeps Imaginary part of RPA dielectric for the isotropic band model
 
     real(r64), intent(in) :: kmags(:), ens(:), chempot, m_eff, eF, kF, beta
     real(r64), allocatable :: Imeps(:, :)
 
     !Locals
-    integer :: ik
+    integer :: iOmega
     real(r64), allocatable :: u(:, :)
-    real(r64), parameter :: bohr = bohr2nm*1e-9_r64 !m
     
     allocate(u(size(kmags), size(ens)))
     allocate(Imeps(size(ens), size(kmags)))
     
     call outer(0.5_r64/kmags/kF, ens, u)
     
-    do ik = 1, size(ens)
-       Imeps(:, ik) = &
+    do iOmega = 1, size(ens)
+       Imeps(:, iOmega) = &
             real(log((1.0_r64 + &
-                exp(beta*(chempot - eF*(u(:, ik) - kmags(:)/kF/2.0_r64)**2)))/ &
-                (1.0_r64 + exp(beta*(chempot - eF*(u(:, ik) + &
+                exp(beta*(chempot - eF*(u(:, iOmega) - kmags(:)/kF/2.0_r64)**2)))/ &
+                (1.0_r64 + exp(beta*(chempot - eF*(u(:, iOmega) + &
                            kmags(:)/kF/2.0_r64)**2)))))/(kmags(:)/kF)**3
     end do
 
-    Imeps = (m_eff/me/bohr/kF/eF/beta)*Imeps
+    Imeps = (m_eff/me/bohr2nm/kF/eF/beta)*Imeps
   end subroutine calculate_Imeps
 
 !!$  subroutine calculate_Reeps
