@@ -562,6 +562,29 @@ contains
     end if
   end function kronecker
   
+  subroutine outer(A, B, C)
+    !! Outer product of A and B
+    !!
+    !! C_ij = A_i.B_j 
+
+    real(r64), intent(in) :: A(:), B(:)
+    real(r64), intent(out) :: C(:, :)
+
+    integer :: j, len_a, len_b
+
+    len_a = size(A)
+    len_b = size(B)
+    if(len_a /= size(C, 1) &
+         .and. len_b /= size(C, 2)) then
+       print *, 'Dimension mismatch. Exiting.'
+       call exit
+    end if
+
+    do j = 1, len_b
+       C(:, j) = A(:)*B(j)
+    end do
+  end subroutine outer
+  
   pure complex(r64) function expi(x)
     !! Calculate exp(i*x) = cos(x) + isin(x)
 

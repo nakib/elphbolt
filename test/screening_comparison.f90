@@ -2,9 +2,9 @@ program screening_comparison
   !! Test for the screening stuff
 
   use precision, only: r64, i64
-  use params, only: hbar, hbar_eVps, me, pi, kB, qe, bohr2nm
-  use misc, only: qdist, linspace, compsimps, &
-       write2file_rank2_real, write2file_rank1_real
+  use params, only: hbar, hbar_eVps, me, twopi, pi, kB, qe, bohr2nm
+  use misc, only: qdist, linspace, compsimps, outer, sort, &
+       write2file_rank2_real, write2file_rank1_real, twonorm
   use numerics_module, only: numerics
   use crystal_module, only: crystal
   use symmetry_module, only: symmetry
@@ -24,19 +24,16 @@ program screening_comparison
   type(electron) :: el
   !type(timer) :: t_all, t_event
 
-  integer :: ik
+  integer(i64) :: ik, numomega, numq
   real(r64) :: mu, eF, kF, beta
-  real(r64), allocatable :: el_ens_parabolic(:), kmags(:)
+  real(r64), allocatable :: el_ens_parabolic(:), qmags(:)
   real(r64), parameter :: m_eff = 0.267*me
-  real(r64), allocatable :: imeps(:, :)
+  real(r64), allocatable :: imeps(:, :), reeps(:, :), Omegas(:)
   
   if(this_image() == 1) then
      write(*, '(A)')  'Screening test'
      write(*, '(A, I5)') 'Number of coarray images = ', num_images()
   end if 
-
-  !Set effective mass of model band
-  !m_eff = 0.267*me
   
   !Test counter
   !itest = 0
@@ -63,18 +60,23 @@ program screening_comparison
   !Set inverse temperature energy
   beta = 1.0_r64/kB/crys%T
   
-  !Create grid of |k|
-  allocate(kmags(el%nwv_irred))
-  do ik = 1, el%nwv_irred
-     kmags(ik) = qdist(el%wavevecs_irred(ik, :), crys%reclattvecs)
-  end do
+  !Create grid of probe |q|
+  allocate(qmags(el%nwv_irred))
+!!$  do ik = 1, el%nwv_irred
+!!$     qmags(ik) = qdist(el%wavevecs_irred(ik, :), crys%reclattvecs)
+!!$  end do
+!!$  call sort(qmags)
+  numq = 200
+  call linspace(qmags, 0.0_r64, twopi/twonorm(crys%lattvecs(:, 1)), numq)
+  call write2file_rank1_real("RPA_test_qmags", qmags)
 
   !Calculate parabolic dispersion 
-  allocate(el_ens_parabolic(el%nwv_irred))  
-  el_ens_parabolic = energy_parabolic(kmags, m_eff)
-  call write2file_rank1_real("model_el_ens_parabolic", el_ens_parabolic)
+  !allocate(el_ens_parabolic(el%nwv_irred))
+  !allocate(el_ens_parabolic(numq))  
+  !el_ens_parabolic = energy_parabolic(qmags, m_eff)
+  !call write2file_rank1_real("model_el_ens_parabolic", el_ens_parabolic)
   
-  !print*, kmags(1:10)
+  !print*, qmags(1:10)
   !print*, el_ens_parabolic(1:10)
 
   !Calculate chemical potential for model band to match carrier conc.
@@ -87,11 +89,20 @@ program screening_comparison
   !Calculate Fermi energy for model band (degenerate limit)
   eF =  energy_parabolic(kF, m_eff)
   print*, 'Fermi energy = ', eF, ' eV'
-  
-  !Calculate analytic RPA dielectric function
-  call calculate_Imeps(kmags, el_ens_parabolic, mu, m_eff, eF, kF, beta, Imeps)
 
+  !Create bosonic energy mesh
+  numomega = 100
+  call linspace(Omegas, 0.0_r64, 1.0_r64, numomega)
+  call write2file_rank1_real("RPA_test_Omegas", Omegas)
+  
+  !Calculate analytic Im RPA dielectric function
+  call calculate_Imeps(qmags, Omegas, mu, m_eff, eF, kF, beta, Imeps)
   call write2file_rank2_real("model_RPA_dielectric_3D_imag", Imeps)
+  
+  !Calculate analytic Re RPA dielectric function
+  call calculate_Reeps(qmags, Omegas, mu, m_eff, eF, kF, beta, Reeps)
+  call write2file_rank2_real("model_RPA_dielectric_3D_real", Reeps)
+  
 contains
   
   pure real(r64) elemental function energy_parabolic(k, m_eff)
@@ -163,10 +174,10 @@ contains
     fdi = fdi/gamma(j + 1.0_r64)    
   end function fdi
 
-  subroutine calculate_Imeps(kmags, ens, chempot, m_eff, eF, kF, beta, Imeps)
+  subroutine calculate_Imeps(qmags, ens, chempot, m_eff, eF, kF, beta, Imeps)
     !! Imaginary part of RPA dielectric for the isotropic band model.
     !!
-    !! kmags Magnitude of probe wave vectors in nm^-1
+    !! qmags Magnitude of probe wave vectors in nm^-1
     !! ens Probe energies in eV
     !! chempot Chemical potential in eV
     !! m_eff Effective mass of model band in Kg
@@ -175,52 +186,85 @@ contains
     !! beta Inverse temperature energy in eV^-1
     !! Imeps Imaginary part of RPA dielectric for the isotropic band model
 
-    real(r64), intent(in) :: kmags(:), ens(:), chempot, m_eff, eF, kF, beta
+    real(r64), intent(in) :: qmags(:), ens(:), chempot, m_eff, eF, kF, beta
     real(r64), allocatable :: Imeps(:, :)
 
     !Locals
     integer :: iOmega
-    real(r64), allocatable :: u(:, :)
+    real(r64) :: u(size(qmags), size(ens))
     
-    allocate(u(size(kmags), size(ens)))
-    allocate(Imeps(size(ens), size(kmags)))
+    allocate(Imeps(size(qmags), size(ens)))
     
-    call outer(0.5_r64/kmags/kF, ens, u)
-    
+    call outer(0.5_r64/qmags/kF, ens/eF, u)
+
     do iOmega = 1, size(ens)
        Imeps(:, iOmega) = &
             real(log((1.0_r64 + &
-                exp(beta*(chempot - eF*(u(:, iOmega) - kmags(:)/kF/2.0_r64)**2)))/ &
+                exp(beta*(chempot - eF*(u(:, iOmega) - qmags(:)/kF/2.0_r64)**2)))/ &
                 (1.0_r64 + exp(beta*(chempot - eF*(u(:, iOmega) + &
-                           kmags(:)/kF/2.0_r64)**2)))))/(kmags(:)/kF)**3
+                           qmags(:)/kF/2.0_r64)**2)))))/(qmags(:)/kF)**3
     end do
-
+    Imeps(1, :) = 0.0_r64
     Imeps = (m_eff/me/bohr2nm/kF/eF/beta)*Imeps
   end subroutine calculate_Imeps
 
-!!$  subroutine calculate_Reeps
-!!$  end subroutine calculate_Reeps
-
-  subroutine outer(a, b, c)
-    !! Outer product
+  subroutine calculate_Reeps(qmags, ens, chempot, m_eff, eF, kF, beta, Reeps)
+    !! Real part of RPA dielectric for the isotropic band model.
     !!
-    !! c_ij = a_i.b_j 
+    !! qmags Magnitude of probe wave vectors in nm^-1
+    !! ens Probe energies in eV
+    !! chempot Chemical potential in eV
+    !! m_eff Effective mass of model band in Kg
+    !! kF Fermi wave vector (degenerate limit => 0K) in nm^-1
+    !! beta Inverse temperature energy in eV^-1
+    !! Reeps Real part of RPA dielectric for the isotropic band model.
+
+    real(r64), intent(in) :: qmags(:), ens(:), chempot, m_eff, eF, kF, beta
+    real(r64), allocatable :: Reeps(:, :)
     
-    real(r64), intent(out) :: c(:, :)
-    real(r64), intent(in) :: a(:), b(:)
+    !Locals
+    integer(i64) :: iOmega, iq, ngrid
+    real(r64) :: ymax, dy, aux0, aux1, aux2, D, x, eta
+    real(r64) :: u(size(qmags), size(ens)), z(size(qmags))
+    real(r64), allocatable :: y(:), I0(:)
+    
+    !Here I use pra 29 1471.
+    !Note that in the paper above the Bohr radius is renormalized.
+    !Here we need an extra factor of ms/me.
 
-    integer :: j, len_a, len_b
+    !Magic numbers?
+    ngrid = 200
+    ymax = 10.0_r64
 
-    len_a = size(a)
-    len_b = size(b)
-    if(len_a /= size(c, 1) &
-         .and. len_b /= size(c, 2)) then
-       print *, 'Dimension mismatch. Exiting.'
-       call exit
-    end if
+    allocate(y(ngrid), I0(ngrid), Reeps(size(qmags), size(ens)))
+    
+    call linspace(y, 0.0_r64, ymax, ngrid)
 
-    do j = 1, len_b
-       c(:, j) = a(:)*b(j)
+    dy = y(2) - y(1)
+    D = ef*beta
+    eta = chempot*beta
+    I0 = y/(exp(D*y**2 - eta) + 1.0_r64)
+
+    z = 0.5_r64*qmags/kF
+
+    call outer(0.5_r64/qmags/kF, ens/eF, u)
+    
+    Reeps = 0.0_r64
+    do iOmega = 2, size(ens)
+       do iq = 2, size(qmags)
+          aux0 = 1.0_r64/z(iq)**3
+
+          x = u(iq, iOmega) + z(iq)
+          call compsimps(I0*real(log(abs((x + y)/(x - y)))), dy, aux1)
+
+          x = u(iq, iOmega) - z(iq)
+          call compsimps(I0*real(log(abs((x + y)/(x - y)))), dy, aux2)
+
+          Reeps(iq, iOmega) = aux0*(aux1 - aux2)
+       end do
     end do
-  end subroutine outer
+    
+    Reeps = 1.0_r64 + (0.25_r64/pi/kF/bohr2nm*m_eff/me)*Reeps
+  end subroutine calculate_Reeps
+
 end program screening_comparison
