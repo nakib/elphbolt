@@ -482,6 +482,7 @@ contains
           if(self%phthinfilm) then
              write(*,"(A,(1E16.8,x),A,A,A)") 'Height for ph-thin-film scattering =', &
                   crys%thinfilm_height, 'mm along the ', crys%thinfilm_normal, ' direction'
+             write(*,"(A,1E16.8)") 'Specularity factor =', crys%specfac
           end if
           write(*, "(A, L)") "Include el-charged impurity interaction: ", self%elchimp
           write(*, "(A, L)") "Include el-boundary interaction: ", self%elbound

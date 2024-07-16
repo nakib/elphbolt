@@ -3391,13 +3391,14 @@ contains
     call write2file_rank2_real(prefix // '.W_rta_'//prefix//'bound', scatt_rates)
   end subroutine calculate_bound_scatt_rates
 
-  subroutine calculate_thinfilm_scatt_rates(prefix, finite_crys, ballistic_limit, &
+  subroutine calculate_thinfilm_scatt_rates(prefix, finite_crys, ballistic_limit, specfac, &
        height, normal, vels_fbz, indexlist_irred, other_scatt_rates, thin_film_scatt_rates)
     !! Subroutine to calculate the phonon/electron-thin-film scattering rates.
     !!
     !! prefix Type of particle
     !! finite_crys Is the crystal finite?
     !! ballistic_limit Use ballistic limit of Fuchs-Sondheimer theory?
+    !! specfun Specularity factor
     !! height Height of thin-film in mm
     !! normal Normal direction to thin-film
     !! vels Velocities on the FBZ
@@ -3408,31 +3409,33 @@ contains
     character(len = 2), intent(in) :: prefix
     logical, intent(in) :: finite_crys
     logical, intent(in) :: ballistic_limit
+    real(r64), intent(in) :: specfac
     real(r64), intent(in) :: height
     character(1), intent(in) :: normal
-    real(r64), intent(in) :: vels_fbz(:,:,:)
+    real(r64), intent(in) :: vels_fbz(:, :, :)
     integer(i64), intent(in) :: indexlist_irred(:)
-    real(r64), allocatable, intent(in) :: other_scatt_rates(:,:)
-    real(r64), allocatable, intent(out) :: thin_film_scatt_rates(:,:)
+    real(r64), allocatable, intent(in) :: other_scatt_rates(:, :)
+    real(r64), allocatable, intent(out) :: thin_film_scatt_rates(:, :)
 
     !Local variables
-    integer(i64) :: ik, ib, nk_irred, nb, dir
+    integer(i64) :: ik, ib, nk_irred, nb
+    integer :: dir
     real(r64), allocatable :: Knudsen(:, :), suppression_FS(:, :)
 
     !Number of IBZ wave vectors and bands
     nk_irred = size(indexlist_irred(:))
-    nb = size(vels_fbz(1,:,1))
+    nb = size(vels_fbz(1, :, 1))
 
     !Allocate boundary scattering rates and initialize to infinite crystal values
     allocate(thin_film_scatt_rates(nk_irred, nb))
     thin_film_scatt_rates = 0.0_r64
 
     if(normal == 'x') then
-       dir = 1_i64
+       dir = 1
     else if(normal == 'y') then
-       dir = 2_i64
+       dir = 2
     else if(normal == 'z') then
-       dir = 3_i64
+       dir = 3
     else
        call exit_with_message("Bad thin-film normal direction in calculate_thinfilm_scattrates. Exiting.")
     end if
@@ -3440,13 +3443,13 @@ contains
     !Check finiteness of crystal
     if(finite_crys) then
        if(ballistic_limit) then !Large Knudsen number limit
-          do ik = 1, nk_irred
-             do ib = 1, nb
+          do ib = 1, nb
+             do ik = 1, nk_irred
                 thin_film_scatt_rates(ik, ib) = abs(vels_fbz(indexlist_irred(ik), ib, dir)) &
                      /height*1.e-6_r64 !THz
              end do
           end do
-          thin_film_scatt_rates = 2.0_r64*thin_film_scatt_rates
+          thin_film_scatt_rates = 2.0_r64*(1.0_r64 - specfac)/(1.0_r64 + specfac)*thin_film_scatt_rates
        else
           allocate(Knudsen(nk_irred, nb), suppression_FS(nk_irred, nb))
 

@@ -100,6 +100,8 @@ module crystal_module
      !! Characteristic boundary scattering length in mm
      real(r64) :: thinfilm_height
      !! Height of thin-film in mm
+     real(r64) :: specfac
+     !! Specularity factor
      character(1) :: thinfilm_normal
      !! Normal direction of the thin-film: 'x', 'y', or 'z'.
      
@@ -121,7 +123,7 @@ contains
     real(r64), allocatable :: masses(:), born(:,:,:), basis(:,:), &
          basis_cart(:,:), subs_perc(:), subs_masses(:), subs_conc(:), &
          dopant_masses(:, :), dopant_conc(:, :)
-    real(r64) :: epsilon(3,3), lattvecs(3,3), T, &
+    real(r64) :: epsilon(3,3), lattvecs(3,3), T, specfac, &
          epsilon0, epsiloninf, subs_mavg, bound_length, thinfilm_height
     character(len=3), allocatable :: elements(:)
     character(len=100) :: name
@@ -133,7 +135,7 @@ contains
          polar, born, epsilon, read_epsiloninf, epsilon0, epsiloninf, &
          masses, T, VCA, DIB, twod, subs_masses, subs_conc, bound_length, &
          numdopants_types, dopant_masses, dopant_conc, thinfilm_height, &
-         thinfilm_normal
+         thinfilm_normal, specfac
 
     call subtitle("Setting up crystal...")
 
@@ -187,6 +189,7 @@ contains
     bound_length = 1.e12_r64 !mm, practically inifinity
     thinfilm_height = 1.e12_r64 !mm, practically inifinity
     thinfilm_normal = 'z'
+    specfac = 0.0_r64 !Diffusive scattering by default
     numdopants_types = [1, 1]
     dopant_masses = 0.0_r64
     dopant_conc = 0.0_r64
@@ -236,6 +239,7 @@ contains
     self%bound_length = bound_length
     self%thinfilm_height = thinfilm_height
     self%thinfilm_normal = thinfilm_normal
+    self%specfac = specfac
     self%numdopants_types = numdopants_types
     
     if(product(numdopants_types) <= 0) then

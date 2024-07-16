@@ -61,7 +61,7 @@ program screening_comparison
   beta = 1.0_r64/kB/crys%T
   
   !Create grid of probe |q|
-  allocate(qmags(el%nwv_irred))
+!!$  allocate(qmags(el%nwv_irred))
 !!$  do ik = 1, el%nwv_irred
 !!$     qmags(ik) = qdist(el%wavevecs_irred(ik, :), crys%reclattvecs)
 !!$  end do
@@ -92,7 +92,7 @@ program screening_comparison
 
   !Create bosonic energy mesh
   numomega = 100
-  call linspace(Omegas, 0.0_r64, 1.0_r64, numomega)
+  call linspace(Omegas, 0.0_r64, 10.0_r64*eF, numomega)
   call write2file_rank1_real("RPA_test_Omegas", Omegas)
   
   !Calculate analytic Im RPA dielectric function
@@ -199,10 +199,10 @@ contains
 
     do iOmega = 1, size(ens)
        Imeps(:, iOmega) = &
-            real(log((1.0_r64 + &
-                exp(beta*(chempot - eF*(u(:, iOmega) - qmags(:)/kF/2.0_r64)**2)))/ &
-                (1.0_r64 + exp(beta*(chempot - eF*(u(:, iOmega) + &
-                           qmags(:)/kF/2.0_r64)**2)))))/(qmags(:)/kF)**3
+            real(log(&
+            (1.0_r64 + exp(beta*(chempot - eF*(u(:, iOmega) - qmags(:)/kF/2.0_r64)**2)))/ &
+            (1.0_r64 + exp(beta*(chempot - eF*(u(:, iOmega) + qmags(:)/kF/2.0_r64)**2)))))/ &
+            (qmags(:)/kF)**3
     end do
     Imeps(1, :) = 0.0_r64
     Imeps = (m_eff/me/bohr2nm/kF/eF/beta)*Imeps
