@@ -2,7 +2,7 @@ program screening_comparison
   !! Test for the screening stuff
 
   use precision, only: r64, i64
-  use params, only: hbar, hbar_eVps, me, twopi, pi, kB, qe, bohr2nm
+  use params, only: hbar, hbar_eVps, me, twopi, pi, kB, qe, bohr2nm, perm0
   use misc, only: qdist, linspace, compsimps, outer, sort, &
        write2file_rank2_real, write2file_rank1_real, twonorm
   use numerics_module, only: numerics
@@ -25,7 +25,7 @@ program screening_comparison
   !type(timer) :: t_all, t_event
 
   integer(i64) :: ik, numomega, numq
-  real(r64) :: mu, eF, kF, beta
+  real(r64) :: mu, eF, kF, kTF, beta, en_plasmon
   real(r64), allocatable :: el_ens_parabolic(:), qmags(:)
   real(r64), parameter :: m_eff = 0.267*me
   real(r64), allocatable :: imeps(:, :), reeps(:, :), Omegas(:)
@@ -66,9 +66,7 @@ program screening_comparison
 !!$     qmags(ik) = qdist(el%wavevecs_irred(ik, :), crys%reclattvecs)
 !!$  end do
 !!$  call sort(qmags)
-  numq = 200
-  call linspace(qmags, 0.0_r64, twopi/twonorm(crys%lattvecs(:, 1)), numq)
-  call write2file_rank1_real("RPA_test_qmags", qmags)
+
 
   !Calculate parabolic dispersion 
   !allocate(el_ens_parabolic(el%nwv_irred))
@@ -90,9 +88,22 @@ program screening_comparison
   eF =  energy_parabolic(kF, m_eff)
   print*, 'Fermi energy = ', eF, ' eV'
 
+  !Calculate Plasmon energy
+  en_plasmon = 1.0e-9_r64*hbar_evps*qe*sqrt(el%conc_el/perm0/me) !eV
+  print*, 'Plasmon energy = ', en_plasmon, ' eV'
+
+  !Calculate Thomas-Fermi screening wave vector
+  kTF = 1.0e-7_r64*qe*sqrt(1.5_r64*el%conc_el/perm0/eF/qe)
+  print*, 'Thomas-Fermi screening wave vector = ', kTF, ' nm^-1'
+
+  !Create wave vector mesh
+  numq = 400
+  call linspace(qmags, 0.0_r64, 5.0_r64*kF, numq)
+  call write2file_rank1_real("RPA_test_qmags", qmags)
+  
   !Create bosonic energy mesh
-  numomega = 100
-  call linspace(Omegas, 0.0_r64, 10.0_r64*eF, numomega)
+  numomega = 200
+  call linspace(Omegas, 0.0_r64, 5.0_r64*eF, numomega)
   call write2file_rank1_real("RPA_test_Omegas", Omegas)
   
   !Calculate analytic Im RPA dielectric function
@@ -100,7 +111,8 @@ program screening_comparison
   call write2file_rank2_real("model_RPA_dielectric_3D_imag", Imeps)
   
   !Calculate analytic Re RPA dielectric function
-  call calculate_Reeps(qmags, Omegas, mu, m_eff, eF, kF, beta, Reeps)
+  call calculate_Reeps(qmags, Omegas, mu, m_eff, eF, en_plasmon, &
+       kF, kTF, beta, Reeps)
   call write2file_rank2_real("model_RPA_dielectric_3D_real", Reeps)
   
 contains
@@ -157,22 +169,44 @@ contains
     write(*, "(A, 1E16.8, A)") 'calculated chem. pot. in parabolic model = ', chempot, ' eV'
   end function chempot
 
-  real(r64) function fdi(j, x)
-    !! Fermi-Dirac integral
+  real(r64) function fdi(j, eta)
+    !! Fermi-Dirac integral for positive j
     
-    real(r64), intent(in) :: j, x
+    real(r64), intent(in) :: j, eta
 
     integer(i64), parameter :: ngrid = 10000_i64
-    real(r64), allocatable :: t(:)
-    real(r64) :: dt
-
+    real(r64), allocatable :: x(:)
+    real(r64) :: dx
+    
     !Here 10 is infinity...
-    call linspace(t, 0.0_r64, 10.0_r64, ngrid)
+    call linspace(x, 0.0_r64, 10.0_r64, ngrid)
 
-    dt = t(2) - t(1)
-    call compsimps(t**j/(exp(t - x) + 1.0_r64), dt, fdi)
-    fdi = fdi/gamma(j + 1.0_r64)    
+    dx = x(2) - x(1)
+    call compsimps(x**j/(exp(x - eta) + 1.0_r64), dx, fdi)
+    fdi = fdi/gamma(j + 1.0_r64)
   end function fdi
+
+  real(r64) function fdi_minus1half(eta)
+    !! Fermi-Dirac integral j = -1/2
+    !! Source: Frank G. Lether
+    !! Journal of Scientific Computing, Vol. 15, No. 4, 2000
+    
+    real(r64), intent(in) :: eta
+
+    integer :: k
+    real(r64) :: last_term, aux
+
+    last_term = 0.0_r64
+    do k = 1, 20
+       aux = sqrt(eta**2 + (2.0_r64*k - 1.0_r64)**2*pi**2)
+       last_term = last_term + sqrt(aux - eta)/aux
+    end do
+    
+    fdi_minus1half = 8220.0_r64/919 + 3923.0_r64/110242*eta + &
+         27.0_r64/381503*eta**2 - eta**3/3553038.0_r64 - &
+         eta**4/714900621.0_r64 - eta**5/128458636383.0_r64 - &
+         sqrt(twopi)*last_term
+  end function fdi_minus1half
 
   subroutine calculate_Imeps(qmags, ens, chempot, m_eff, eF, kF, beta, Imeps)
     !! Imaginary part of RPA dielectric for the isotropic band model.
@@ -205,26 +239,33 @@ contains
             (qmags(:)/kF)**3
     end do
     Imeps(1, :) = 0.0_r64
-    Imeps = (m_eff/me/bohr2nm/kF/eF/beta)*Imeps
+    !Imeps = (m_eff/me/bohr2nm/kF/eF/beta)*Imeps
+    Imeps = (m_eff/me/bohr2nm/kF/eF/beta)*Imeps/pi*0.25
   end subroutine calculate_Imeps
 
-  subroutine calculate_Reeps(qmags, ens, chempot, m_eff, eF, kF, beta, Reeps)
+  subroutine calculate_Reeps(qmags, ens, chempot, m_eff, eF, eplasmon, &
+       kF, kTF, &
+       beta, Reeps)
     !! Real part of RPA dielectric for the isotropic band model.
     !!
     !! qmags Magnitude of probe wave vectors in nm^-1
     !! ens Probe energies in eV
     !! chempot Chemical potential in eV
     !! m_eff Effective mass of model band in Kg
+    !! eF Fermi energy in eV
+    !! eplasmon Plasmon energy in eV
     !! kF Fermi wave vector (degenerate limit => 0K) in nm^-1
+    !! kTF Thomas-Fermi wave vector in nm^-1
     !! beta Inverse temperature energy in eV^-1
     !! Reeps Real part of RPA dielectric for the isotropic band model.
 
-    real(r64), intent(in) :: qmags(:), ens(:), chempot, m_eff, eF, kF, beta
+    real(r64), intent(in) :: qmags(:), ens(:), chempot, m_eff, eF, kF, kTF, &
+         beta, eplasmon
     real(r64), allocatable :: Reeps(:, :)
     
     !Locals
     integer(i64) :: iOmega, iq, ngrid
-    real(r64) :: ymax, dy, aux0, aux1, aux2, D, x, eta
+    real(r64) :: ymax, dy, aux0, aux1, aux2, D, x, eta, ks_squared
     real(r64) :: u(size(qmags), size(ens)), z(size(qmags))
     real(r64), allocatable :: y(:), I0(:)
     
@@ -248,8 +289,12 @@ contains
     z = 0.5_r64*qmags/kF
 
     call outer(0.5_r64/qmags/kF, ens/eF, u)
-    
-    Reeps = 0.0_r64
+        
+    !Calculate screening wave vector (squared)
+    ks_squared = 0.5_r64*kTF**2*sqrt(1.0_r64/D)*fdi_minus1half(eta)
+    print*, 'ks = ', sqrt(ks_squared), ' nm^-1'
+
+    !The rest
     do iOmega = 2, size(ens)
        do iq = 2, size(qmags)
           aux0 = 1.0_r64/z(iq)**3
@@ -263,8 +308,18 @@ contains
           Reeps(iq, iOmega) = aux0*(aux1 - aux2)
        end do
     end do
+    !Reeps = 1.0_r64 + (0.25_r64/pi/kF/bohr2nm*m_eff/me)*Reeps
+    Reeps = 1.0_r64 + (0.25_r64/pi/kF/bohr2nm*m_eff/me)*Reeps/pi*0.25
     
-    Reeps = 1.0_r64 + (0.25_r64/pi/kF/bohr2nm*m_eff/me)*Reeps
+    !Omega -> 0 limit
+    Reeps(2:size(qmags), 1) = 1.0_r64 + ks_squared/qmags(2:size(qmags))**2
+
+    !q -> limit
+    Reeps(1, :) = 1.0_r64 - (eplasmon/ens)**2
+
+    do iOmega = 1, size(ens)
+       if(abs(Reeps(1, iOmega)) <= 1.0e-1) print*, ens(iOmega), ' eV'
+    end do
   end subroutine calculate_Reeps
 
 end program screening_comparison
