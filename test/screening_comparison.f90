@@ -4,7 +4,7 @@ program screening_comparison
   use precision, only: r64, i64
   use params, only: hbar, hbar_eVps, me, twopi, pi, kB, qe, bohr2nm, perm0
   use misc, only: qdist, linspace, compsimps, outer, sort, &
-       write2file_rank2_real, write2file_rank1_real, twonorm
+       write2file_rank2_real, write2file_rank1_real, twonorm, exit_with_message
   use numerics_module, only: numerics
   use crystal_module, only: crystal
   use symmetry_module, only: symmetry
@@ -27,11 +27,12 @@ program screening_comparison
   integer(i64) :: ik, numomega, numq
   real(r64) :: mu, eF, kF, kTF, beta, en_plasmon
   real(r64), allocatable :: el_ens_parabolic(:), qmags(:)
-  real(r64), parameter :: m_eff = 0.267*me
+  !real(r64), parameter :: m_eff = 0.267*me
+  real(r64), parameter :: m_eff = 0.2*me
   real(r64), allocatable :: imeps(:, :), reeps(:, :), Omegas(:)
   
   if(this_image() == 1) then
-     write(*, '(A)')  'Screening test'
+     write(*, '(A)')  'Screening test for wGaN'
      write(*, '(A, I5)') 'Number of coarray images = ', num_images()
   end if 
   
@@ -59,23 +60,6 @@ program screening_comparison
 
   !Set inverse temperature energy
   beta = 1.0_r64/kB/crys%T
-  
-  !Create grid of probe |q|
-!!$  allocate(qmags(el%nwv_irred))
-!!$  do ik = 1, el%nwv_irred
-!!$     qmags(ik) = qdist(el%wavevecs_irred(ik, :), crys%reclattvecs)
-!!$  end do
-!!$  call sort(qmags)
-
-
-  !Calculate parabolic dispersion 
-  !allocate(el_ens_parabolic(el%nwv_irred))
-  !allocate(el_ens_parabolic(numq))  
-  !el_ens_parabolic = energy_parabolic(qmags, m_eff)
-  !call write2file_rank1_real("model_el_ens_parabolic", el_ens_parabolic)
-  
-  !print*, qmags(1:10)
-  !print*, el_ens_parabolic(1:10)
 
   !Calculate chemical potential for model band to match carrier conc.
   mu = chempot(el%conc_el, m_eff, beta)
@@ -89,11 +73,15 @@ program screening_comparison
   print*, 'Fermi energy = ', eF, ' eV'
 
   !Calculate Plasmon energy
-  en_plasmon = 1.0e-9_r64*hbar_evps*qe*sqrt(el%conc_el/perm0/me) !eV
+  !en_plasmon = 1.0e-9_r64*hbar_evps*qe*sqrt(el%conc_el/perm0/crys%epsilon0/m_eff) !eV
+
+  en_plasmon = 1.0e-9_r64*hbar_evps*qe*sqrt(el%conc_el/perm0/crys%epsiloninf/m_eff) !eV
   print*, 'Plasmon energy = ', en_plasmon, ' eV'
 
-  !Calculate Thomas-Fermi screening wave vector
-  kTF = 1.0e-7_r64*qe*sqrt(1.5_r64*el%conc_el/perm0/eF/qe)
+  !Calculate Thomas-Fermi screening wave vector (T << T_F limit)
+  !TODO Replace it with the more general expression involving
+  !energy integral over f0(1 - f0).
+  kTF = 1.0/kF/bohr2nm/pi**2
   print*, 'Thomas-Fermi screening wave vector = ', kTF, ' nm^-1'
 
   !Create wave vector mesh
@@ -112,7 +100,7 @@ program screening_comparison
   
   !Calculate analytic Re RPA dielectric function
   call calculate_Reeps(qmags, Omegas, mu, m_eff, eF, en_plasmon, &
-       kF, kTF, beta, Reeps)
+       kF, kTF, crys%epsiloninf, beta, Reeps)
   call write2file_rank2_real("model_RPA_dielectric_3D_real", Reeps)
   
 contains
@@ -177,6 +165,8 @@ contains
     integer(i64), parameter :: ngrid = 10000_i64
     real(r64), allocatable :: x(:)
     real(r64) :: dx
+
+    if(j < 0.0_r64) call exit_with_message("Negative j is not allowed. Exiting.")
     
     !Here 10 is infinity...
     call linspace(x, 0.0_r64, 10.0_r64, ngrid)
@@ -229,7 +219,7 @@ contains
     
     allocate(Imeps(size(qmags), size(ens)))
     
-    call outer(0.5_r64/qmags/kF, ens/eF, u)
+    call outer(0.5_r64*kF/qmags, ens/eF, u)
 
     do iOmega = 1, size(ens)
        Imeps(:, iOmega) = &
@@ -239,13 +229,11 @@ contains
             (qmags(:)/kF)**3
     end do
     Imeps(1, :) = 0.0_r64
-    !Imeps = (m_eff/me/bohr2nm/kF/eF/beta)*Imeps
-    Imeps = (m_eff/me/bohr2nm/kF/eF/beta)*Imeps/pi*0.25
+    Imeps = (m_eff/me/bohr2nm/kF/eF/beta)*Imeps
   end subroutine calculate_Imeps
 
   subroutine calculate_Reeps(qmags, ens, chempot, m_eff, eF, eplasmon, &
-       kF, kTF, &
-       beta, Reeps)
+       kF, kTF, epsinf, beta, Reeps)
     !! Real part of RPA dielectric for the isotropic band model.
     !!
     !! qmags Magnitude of probe wave vectors in nm^-1
@@ -259,8 +247,8 @@ contains
     !! beta Inverse temperature energy in eV^-1
     !! Reeps Real part of RPA dielectric for the isotropic band model.
 
-    real(r64), intent(in) :: qmags(:), ens(:), chempot, m_eff, eF, kF, kTF, &
-         beta, eplasmon
+    real(r64), intent(in) :: qmags(:), ens(:), chempot, m_eff, eF, kF, &
+         kTF, epsinf, beta, eplasmon
     real(r64), allocatable :: Reeps(:, :)
     
     !Locals
@@ -274,7 +262,7 @@ contains
     !Here we need an extra factor of ms/me.
 
     !Magic numbers?
-    ngrid = 200
+    ngrid = 500
     ymax = 10.0_r64
 
     allocate(y(ngrid), I0(ngrid), Reeps(size(qmags), size(ens)))
@@ -288,14 +276,14 @@ contains
 
     z = 0.5_r64*qmags/kF
 
-    call outer(0.5_r64/qmags/kF, ens/eF, u)
+    call outer(0.5_r64*kF/qmags, ens/eF, u)
         
     !Calculate screening wave vector (squared)
-    ks_squared = 0.5_r64*kTF**2*sqrt(1.0_r64/D)*fdi_minus1half(eta)
-    print*, 'ks = ', sqrt(ks_squared), ' nm^-1'
+    !ks_squared = 0.5_r64*kTF**2*sqrt(1.0_r64/D)*fdi_minus1half(eta)
+    !print*, 'ks = ', sqrt(ks_squared), ' nm^-1'
 
-    !The rest
-    do iOmega = 2, size(ens)
+    !Non-zero energy and momentum
+    do iOmega = 1, size(ens)
        do iq = 2, size(qmags)
           aux0 = 1.0_r64/z(iq)**3
 
@@ -308,18 +296,20 @@ contains
           Reeps(iq, iOmega) = aux0*(aux1 - aux2)
        end do
     end do
-    !Reeps = 1.0_r64 + (0.25_r64/pi/kF/bohr2nm*m_eff/me)*Reeps
-    Reeps = 1.0_r64 + (0.25_r64/pi/kF/bohr2nm*m_eff/me)*Reeps/pi*0.25
+    
+    Reeps = epsinf + (0.25_r64/pi/kF/bohr2nm*m_eff/me)*Reeps
     
     !Omega -> 0 limit
-    Reeps(2:size(qmags), 1) = 1.0_r64 + ks_squared/qmags(2:size(qmags))**2
+    !Reeps(2:size(qmags), 1) = epsinf*&
+    !     (1.0_r64 + ks_squared/qmags(2:size(qmags))**2)
 
     !q -> limit
-    Reeps(1, :) = 1.0_r64 - (eplasmon/ens)**2
+    Reeps(1, :) = epsinf*(1.0_r64 - (eplasmon/ens)**2)
 
-    do iOmega = 1, size(ens)
-       if(abs(Reeps(1, iOmega)) <= 1.0e-1) print*, ens(iOmega), ' eV'
-    end do
+!!$    !Check where the plasmon mode is at the Gamma point
+!!$    do iOmega = 1, size(ens)
+!!$       if(abs(Reeps(1, iOmega)) <= 1.0e-1) print*, ens(iOmega), ' eV'
+!!$    end do
   end subroutine calculate_Reeps
 
 end program screening_comparison
