@@ -498,7 +498,7 @@ contains
     real(r64), allocatable :: Vm2_1(:), Vm2_2(:), Wm(:), Wp(:)
     integer(i64), allocatable :: istate2_plus(:), istate3_plus(:), istate2_minus(:), istate3_minus(:)
     integer(i64), allocatable :: chunk[:], start[:], end[:]
-    complex(r64) :: phases_q1(ph%numtriplets, ph%nwv)
+    complex(r64) :: phases(ph%numtriplets) !phases_q1(ph%numtriplets, ph%nwv)
     character(len = 1024) :: filename, filename_Wm, filename_Wp
     logical :: tetrahedra_gpu
     logical, allocatable :: minus_mask(:), plus_mask(:)
@@ -667,7 +667,10 @@ contains
                   q2_cart = matmul(reclattvecs, q2)
                   q3_minus_cart = matmul(reclattvecs, q3_minus)
                   do it = 1, ntrips_gpu
-                     phases_q1(it, iq2) = &
+!!$                     phases_q1(it, iq2) = &
+!!$                          expi(-dot_product(q2_cart, (R_j(:, it))) &
+!!$                          -dot_product(q3_minus_cart, (R_k(:, it))))
+                     phases(it) = &
                           expi(-dot_product(q2_cart, (R_j(:, it))) &
                                -dot_product(q3_minus_cart, (R_k(:, it))))
                   end do
@@ -712,11 +715,17 @@ contains
 
                      if(en1*en2*en3 == 0.0_r64) cycle
 
+!!$                     if(delta_minus > 0.0_r64 .or. delta_plus > 0.0_r64) &
+!!$                          aux = Vm2_3ph(evecs(iq1, s1, :), &
+!!$                          evecs(iq2, s2, :), evecs(iq3_minus, s3, :), &
+!!$                          Index_i(:), Index_j(:), Index_k(:), ifc3(:,:,:,:), &
+!!$                          phases_q1(:, iq2), ntrips_gpu, nbands_gpu)
+
                      if(delta_minus > 0.0_r64 .or. delta_plus > 0.0_r64) &
                           aux = Vm2_3ph(evecs(iq1, s1, :), &
                           evecs(iq2, s2, :), evecs(iq3_minus, s3, :), &
                           Index_i(:), Index_j(:), Index_k(:), ifc3(:,:,:,:), &
-                          phases_q1(:, iq2), ntrips_gpu, nbands_gpu)
+                          phases(:), ntrips_gpu, nbands_gpu)
 
                      if(delta_minus > 0.0_r64) then
                         !Record energetically available minus process
