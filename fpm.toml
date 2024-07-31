@@ -50,11 +50,10 @@ name="superconda"
 source-dir="app"
 main="superconda.f90"
 
-[[executable]]
-name = "screening_comparison"
-source-dir="test"
-main = "screening_comparison.f90"
-
+#[[executable]]
+#name = "screening_comparison"
+#source-dir="test"
+#main = "screening_comparison.f90"
 
 [[test]]
 name = "test_misc"

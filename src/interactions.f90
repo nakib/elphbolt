@@ -2806,8 +2806,6 @@ contains
              close(1)
           end if
 
-          !TODO: Below we are saving the same istate_el and istate_ph data in two files.
-          !Need to change this wasteful behavior.
           if(key == 'X') then
              !Multiply constant factor, unit factor, etc.
              Xplus_istate(1:count) = const*Xplus_istate(1:count) !THz
@@ -3473,6 +3471,86 @@ contains
     !Write to file
     call write2file_rank2_real(prefix // '.W_rta_'//prefix//'thinfilm', thin_film_scatt_rates)
   end subroutine calculate_thinfilm_scatt_rates
+  
+!!$  subroutine calculate_thinfilm_scatt_rates(prefix, finite_crys, ballistic_limit, &
+!!$       height, normal, vels_fbz, indexlist_irred, other_scatt_rates, thin_film_scatt_rates)
+!!$    !! Subroutine to calculate the phonon/electron-thin-film scattering rates.
+!!$    !!
+!!$    !! prefix Type of particle
+!!$    !! finite_crys Is the crystal finite?
+!!$    !! ballistic_limit Use ballistic limit of Fuchs-Sondheimer theory?
+!!$    !! height Height of thin-film in mm
+!!$    !! normal Normal direction to thin-film
+!!$    !! vels Velocities on the FBZ
+!!$    !! indexlist_irred List of muxed indices of the IBZ wedge
+!!$    !! other_scatt_rates Sum of the non-thin-film scattering rates on the IBZ
+!!$    !! thin_film_scatt_rates Thin-film scattering rates on the IBZ
+!!$
+!!$    character(len = 2), intent(in) :: prefix
+!!$    logical, intent(in) :: finite_crys
+!!$    logical, intent(in) :: ballistic_limit
+!!$    real(r64), intent(in) :: height
+!!$    character(1), intent(in) :: normal
+!!$    real(r64), intent(in) :: vels_fbz(:,:,:)
+!!$    integer(i64), intent(in) :: indexlist_irred(:)
+!!$    real(r64), allocatable, intent(in) :: other_scatt_rates(:,:)
+!!$    real(r64), allocatable, intent(out) :: thin_film_scatt_rates(:,:)
+!!$
+!!$    !Local variables
+!!$    integer(i64) :: ik, ib, nk_irred, nb, dir
+!!$    real(r64), allocatable :: Knudsen(:, :), suppression_FS(:, :)
+!!$
+!!$    !Number of IBZ wave vectors and bands
+!!$    nk_irred = size(indexlist_irred(:))
+!!$    nb = size(vels_fbz(1,:,1))
+!!$
+!!$    !Allocate boundary scattering rates and initialize to infinite crystal values
+!!$    allocate(thin_film_scatt_rates(nk_irred, nb))
+!!$    thin_film_scatt_rates = 0.0_r64
+!!$
+!!$    if(normal == 'x') then
+!!$       dir = 1_i64
+!!$    else if(normal == 'y') then
+!!$       dir = 2_i64
+!!$    else if(normal == 'z') then
+!!$       dir = 3_i64
+!!$    else
+!!$       call exit_with_message("Bad thin-film normal direction in calculate_thinfilm_scattrates. Exiting.")
+!!$    end if
+!!$
+!!$    !Check finiteness of crystal
+!!$    if(finite_crys) then
+!!$       if(ballistic_limit) then !Large Knudsen number limit
+!!$          do ik = 1, nk_irred
+!!$             do ib = 1, nb
+!!$                thin_film_scatt_rates(ik, ib) = abs(vels_fbz(indexlist_irred(ik), ib, dir)) &
+!!$                     /height*1.e-6_r64 !THz
+!!$             end do
+!!$          end do
+!!$          thin_film_scatt_rates = 2.0_r64*thin_film_scatt_rates
+!!$       else
+!!$          allocate(Knudsen(nk_irred, nb), suppression_FS(nk_irred, nb))
+!!$
+!!$          !Knudsen number
+!!$          do ib = 1, nb
+!!$             do ik = 1, nk_irred
+!!$                Knudsen(ik, ib) = abs(vels_fbz(indexlist_irred(ik), ib, dir)) &
+!!$                     /other_scatt_rates(ik, ib)/height*1.e-6_r64 !THz
+!!$             end do
+!!$          end do
+!!$          Knudsen(1, 1:3) = 0.0_r64 !Deal with Gamma point acoustic phonons
+!!$
+!!$          !Fuchs-Sondheimer supression function
+!!$          suppression_FS = 1.0_r64 + expm1(-1.0_r64/Knudsen)*Knudsen
+!!$
+!!$          thin_film_scatt_rates = other_scatt_rates/suppression_FS - other_scatt_rates
+!!$          thin_film_scatt_rates(1, 1:3) = 0.0_r64 !Deal with Gamma point acoustic phonons
+!!$       end if
+!!$    end if
+!!$
+!!$    !Write to file
+!!$    call write2file_rank2_real(prefix // '.W_rta_'//prefix//'thinfilm', thin_film_scatt_rates)
+!!$  end subroutine calculate_thinfilm_scatt_rates
 
 !!$  subroutine calculate_defect_scatt_rates(prefix, def_frac, indexlist_ibz, ens_fbz, diagT)!, scatt_rates)
 !!$    !! Subroutine to calculate the phonon-defect scattering rate given
