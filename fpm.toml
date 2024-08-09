@@ -71,6 +71,11 @@ source-dir="test"
 main = "test_periodictable.f90"
 
 [[test]]
+name = "check_interactions_symmetries"
+source-dir="test"
+main = "check_interactions_symmetries.f90"
+
+[[test]]
 name = "bte_regression"
 source-dir="test"
 main = "bte_regression.f90"

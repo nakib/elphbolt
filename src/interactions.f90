@@ -47,7 +47,8 @@ module interactions
        calculate_echimp_interaction_ibzk, calculate_el_rta_rates, &
        calculate_bound_scatt_rates, calculate_thinfilm_scatt_rates, &
        calculate_4ph_rta_rates, calculate_coarse_grained_3ph_vertex, &
-       calculate_W_fromcgV2, calculate_W3ph_OTF, calculate_Y_OTF
+       calculate_W_fromcgV2, calculate_W3ph_OTF, calculate_Y_OTF, &
+       Vm2_3ph
 
   !external chdir, system
 

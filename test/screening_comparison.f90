@@ -297,14 +297,19 @@ contains
        end do
     end do
     
-    Reeps = epsinf + (0.25_r64/pi/kF/bohr2nm*m_eff/me)*Reeps
+    !Reeps = epsinf + (0.25_r64/pi/kF/bohr2nm*m_eff/me)*Reeps
+
+    !DBG
+    Reeps = 1.0_r64 + (0.25_r64/pi/kF/bohr2nm*m_eff/me)*Reeps
     
     !Omega -> 0 limit
     !Reeps(2:size(qmags), 1) = epsinf*&
     !     (1.0_r64 + ks_squared/qmags(2:size(qmags))**2)
 
     !q -> limit
-    Reeps(1, :) = epsinf*(1.0_r64 - (eplasmon/ens)**2)
+    !Reeps(1, :) = epsinf*(1.0_r64 - (eplasmon/ens)**2)
+    !DBG
+    Reeps(1, :) = 1.0_r64 - (eplasmon/ens)**2
 
 !!$    !Check where the plasmon mode is at the Gamma point
 !!$    do iOmega = 1, size(ens)
