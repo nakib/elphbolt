@@ -71,6 +71,11 @@ source-dir="test"
 main = "test_periodictable.f90"
 
 [[test]]
+name = "test_vector_allreps"
+source-dir="test"
+main = "test_vector_allreps.f90"
+
+[[test]]
 name = "check_interactions_symmetries"
 source-dir="test"
 main = "check_interactions_symmetries.f90"

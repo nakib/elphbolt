@@ -280,8 +280,8 @@ contains
     !Silicon
     !omega_plasma = 1.0e-9*hbar*sqrt(el%conc_el/perm0/crys%epsilon0/(0.267*me)) !eV
     !wGaN
-    !omega_plasma = 1.0e-9*hbar*sqrt(el%conc_el/perm0/crys%epsilon0/(0.2*me)) !eV
-    omega_plasma = 1.0e-9*hbar*sqrt(el%conc_el/perm0/crys%epsiloninf/(0.2*me)) !eV
+    omega_plasma = 1.0e-9*hbar*sqrt(el%conc_el/perm0/crys%epsilon0/(0.2*me)) !eV
+    !omega_plasma = 1.0e-9*hbar*sqrt(el%conc_el/perm0/crys%epsiloninf/(0.2*me)) !eV
     
     if(this_image() == 1) then
        print*, "plasmon energy = ", omega_plasma
@@ -356,7 +356,7 @@ contains
           call calculate_Hilbert_weights(&
                w_disc = energylist, &
                w_cont = energylist, &
-               zeroplus = 1.0e-6_r64, &
+               zeroplus = 1.0e-6_r64, & !Can this magic "small" number be removed?
                Hilbert_weights = Hilbert_weights)
 
           !call Re_head_polarizability_3d_T(Reeps, energylist, Imeps, Hilbert_weights)
@@ -376,11 +376,11 @@ contains
 !!$               (real(eps) + oneI*pi*spec_eps)/perm0*qe*1.0e9_r64
 
        if(all(qcrys == 0.0_r64)) then
-          diel(iq, 1) = 0.0_r64
-          !DEBUG: This is not the correct limit. Just leaving it here
-          !to get the plasmon peak in the loss function.
-          diel(iq, 2:numomega) = 1.0_r64 - &
-               (omega_plasma/energylist(2:numomega))**2 + oneI*1.0e-9
+          !DEBUG: This is not a generally computable limit since the plasmon
+          !energy expression requires a single effective mass.
+          !Just leaving it here for now to get the plasmon peak in the loss function.
+          diel(iq, 1:numomega) = 1.0_r64 - &
+               (omega_plasma/energylist(1:numomega))**2 + oneI*1.0e-9
        else
           !DBG
           diel(iq, :) = 1.0_r64 - &
@@ -392,8 +392,7 @@ contains
     call co_sum(diel)
 
     !Handle Omega = 0 case
-    !diel(2:numq, 1) = crys%epsilon0*&
-    !     (1.0_r64 + (crys%qTF/qmaglist(2:numq))**2)
+    diel(:, 1) = 1.0_r64 + (crys%qTF/qmaglist(:))**2
     
     !Print to file
     call write2file_rank2_real("RPA_dielectric_3D_G0_qpath", qlist)

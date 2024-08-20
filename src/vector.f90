@@ -1,0 +1,90 @@
+module vector_allreps_module
+
+  use precision, only: i64, r64
+  use misc, only: mux_vector, demux_vector
+  
+  implicit none
+
+  private
+  public :: vector_allreps, &
+       vector_allreps_add, vector_allreps_sub, &
+       vector_allreps_print
+  
+  type vector_allreps
+     !! A container for a (3-)vector and relevant arithmetic operations.
+     !! It is convenient to use under certain circumstances, for example,
+     !! when low level vector arithmetic is repetitive and error prone.
+     !! However, the low level method will be more performant.
+     
+     integer(i64) :: muxed_index = -1
+     integer(i64) :: int(3) = 0
+     real(r64) :: frac(3) = 0.0
+     real(r64) :: cart(3) = 0.0
+  end type vector_allreps
+
+  interface vector_allreps
+     module procedure create
+  end interface vector_allreps
+
+contains
+  
+  function create(ind, grid, primitive_vecs) result(vector_obj)
+    integer(i64), intent(in) :: ind, grid(3)
+    real(r64), intent(in) :: primitive_vecs(3, 3)
+    type(vector_allreps) :: vector_obj
+
+    !vector_obj%grid = grid
+
+    !vector_obj%primitive_vecs = primitive_vecs
+    
+    vector_obj%muxed_index = ind
+
+    call demux_vector(ind, vector_obj%int, &
+         grid, 0_i64)
+    
+    vector_obj%frac = dble(vector_obj%int)/grid
+    
+    vector_obj%cart = matmul(primitive_vecs, vector_obj%frac)
+  end function create
+
+  subroutine vector_allreps_print(v)
+    !! Printer
+    
+    type(vector_allreps), intent(in) :: v
+
+    print*, v%muxed_index
+    print*, v%int
+    print*, v%frac
+    print*, v%cart
+  end subroutine vector_allreps_print
+  
+  pure function vector_allreps_add(v1, v2, grid, primitive_vecs) result(v3)
+    !! Adder
+    
+    type(vector_allreps), intent(in) :: v1
+    type(vector_allreps), intent(in) :: v2
+    integer(i64), intent(in) :: grid(3)
+    real(r64), intent(in) :: primitive_vecs(3, 3)
+    type(vector_allreps) :: v3
+    
+    v3%int = modulo(v1%int + v2%int, grid)
+    v3%muxed_index = mux_vector(v3%int, grid, 0_i64)
+    v3%frac = dble(v3%int)/grid
+    v3%cart = matmul(primitive_vecs, v3%frac)
+  end function vector_allreps_add
+
+  pure function vector_allreps_sub(v1, v2, grid, primitive_vecs) result(v3)
+    !! Subtracter
+    
+    type(vector_allreps), intent(in) :: v1
+    type(vector_allreps), intent(in) :: v2
+    integer(i64), intent(in) :: grid(3)
+    real(r64), intent(in) :: primitive_vecs(3, 3)
+    type(vector_allreps) :: v3
+
+    v3%int = modulo(v1%int - v2%int, grid)
+    v3%muxed_index = mux_vector(v3%int, grid, 0_i64)
+    v3%frac = dble(v3%int)/grid
+    v3%cart = matmul(primitive_vecs, v3%frac)
+  end function vector_allreps_sub
+end module vector_allreps_module
