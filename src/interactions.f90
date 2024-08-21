@@ -35,6 +35,8 @@ module interactions
   use electron_module, only: electron
   use phonon_module, only: phonon
   use numerics_module, only: numerics
+  use vector_allreps_module, only: vec=>vector_allreps, &
+       vec_add=>vector_allreps_add, vec_sub=>vector_allreps_sub
   use delta, only: delta_fn, get_delta_fn_pointer, &
        delta_fn_tetra, delta_fn_triang
   
@@ -832,7 +834,7 @@ contains
              !Muxed index of wave vector from the IBZ index list.
              !This will be used to access IBZ information from the FBZ quantities.
              iq1 = ph%indexlist_irred(iq1_ibz)
-
+             
              !Energy of phonon 1
              en1 = ph%ens(iq1, s1)
 
@@ -1578,16 +1580,16 @@ contains
     character(len = 1), intent(in) :: key
     
     !Local variables
-    integer(i64) :: nstates_irred, istate, m, iq, iq_fbz, n, ik, ikp, s, &
-         ikp_window, start, end, chunk, k_indvec(3), kp_indvec(3), &
-         q_indvec(3), nprocs, count, num_active_images
+    integer(i64) :: nstates_irred, istate, m, iq, iq_fbz, n, ik, s, &
+         ikp_window, start, end, chunk, nprocs, count, num_active_images
     integer(i64), allocatable :: istate1(:), istate2(:)
-    real(r64) :: k(3), q(3), en_ph, en_el, en_elp, const, delta, &
+    real(r64) :: en_ph, en_el, en_elp, const, delta, &
          invboseplus1, fermi1, fermi2, occup_fac
     real(r64), allocatable :: g2_istate(:), Y_istate(:)
     complex(r64), allocatable :: gReq_iq(:,:,:,:)
     character(len = 1024) :: filename
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
+    type(vec) :: q_vec, k_vec, kp_vec
     
     if(key /= 'g' .and. key /= 'Y') then
        call exit_with_message(&
@@ -1646,9 +1648,12 @@ contains
 
           !Get the muxed index of FBZ wave vector from the IBZ blocks index list
           iq_fbz = ph%indexlist_irred(iq)
-
+          
           !Energy of phonon
           en_ph = ph%ens(iq_fbz, s)
+         
+          !Create phonon wave vector
+          q_vec = vec(iq_fbz, ph%wvmesh, crys%reclattvecs)
 
           !1/(1 + Bose factor) for phonon
           if(key == 'Y') then
@@ -1658,12 +1663,6 @@ contains
                 invboseplus1 = 0.0_r64
              end if
           end if
-
-          !Initial (IBZ blocks) wave vector (crystal coords.)
-          q = ph%wavevecs(iq_fbz, :)
-
-          !Convert from crystal to 0-based index vector
-          q_indvec = nint(q*ph%wvmesh)
 
           !Load g2_istate from disk for scattering rates calculation
           if(key == 'Y') then
@@ -1697,23 +1696,17 @@ contains
           !Run over initial (in-window, FBZ blocks) electron wave vectors
           do ik = 1, el%nwv
              !Initial wave vector (crystal coords.)
-             k = el%wavevecs(ik, :)
-
-             !Convert from crystal to 0-based index vector
-             k_indvec = nint(k*el%wvmesh)
+             k_vec = vec(el%indexlist(ik), el%wvmesh, crys%reclattvecs)
 
              !Find final electron wave vector
-             kp_indvec = modulo(k_indvec + el%mesh_ref_array*q_indvec, el%wvmesh) !0-based index vector
-
-             !Muxed index of kp
-             ikp = mux_vector(kp_indvec, el%wvmesh, 0_i64)
-
+             kp_vec = vec_add(k_vec, q_vec, el%wvmesh, crys%reclattvecs) 
+             
              !Check if final electron wave vector is within energy window
-             call binsearch(el%indexlist, ikp, ikp_window)
+             call binsearch(el%indexlist, kp_vec%muxed_index, ikp_window)
              if(ikp_window < 0) cycle
 
              !Run over initial electron bands
-             do m = 1, el%numbands
+             do m = 1, el%numbands                
                 !Energy of initial electron
                 en_el = el%ens(ik, m)
 
@@ -1739,8 +1732,10 @@ contains
 
                    if(key == 'g') then
                       !Calculate |g_mns(k,<q>)|^2
-                      g2_istate(count) = wann%g2(crys, k, q, el%evecs(ik, m, :), &
-                           el%evecs(ikp_window, n, :), ph%evecs(iq_fbz, s, :), &
+                      g2_istate(count) = wann%g2(crys, &
+                           k_vec%frac, q_vec%frac, &
+                           el%evecs(ik, m, :), el%evecs(ikp_window, n, :), &
+                           ph%evecs(iq_fbz, s, :), &
                            ph%ens(iq_fbz, s), gReq_iq, 'el')
                    end if
 
@@ -1748,8 +1743,8 @@ contains
                       !Calculate Y:
 
                       !Evaluate delta function
-                      delta = delta_fn_ptr(en_elp - en_ph, ik, m, el%wvmesh, el%simplex_map, &
-                           el%simplex_count, el%simplex_evals)
+                      delta = delta_fn_ptr(en_elp - en_ph, ik, m, el%wvmesh, &
+                           el%simplex_map, el%simplex_count, el%simplex_evals)
 
                       !Temperature dependent occupation factor
                       occup_fac = fermi1*(1.0_r64 - fermi2)*invboseplus1

@@ -1,7 +1,7 @@
 module vector_allreps_module
 
   use precision, only: i64, r64
-  use misc, only: mux_vector, demux_vector
+  use misc, only: mux_vector, demux_vector, operator(.umklapp.)
   
   implicit none
 
@@ -57,7 +57,7 @@ contains
     print*, v%frac
     print*, v%cart
   end subroutine vector_allreps_print
-  
+
   pure function vector_allreps_add(v1, v2, grid, primitive_vecs) result(v3)
     !! Adder
     
@@ -66,11 +66,14 @@ contains
     integer(i64), intent(in) :: grid(3)
     real(r64), intent(in) :: primitive_vecs(3, 3)
     type(vector_allreps) :: v3
-    
-    v3%int = modulo(v1%int + v2%int, grid)
-    v3%muxed_index = mux_vector(v3%int, grid, 0_i64)
-    v3%frac = dble(v3%int)/grid
+
+    !This arithmetic is independent of mesh density
+    v3%frac = v1%frac .umklapp. v2%frac
     v3%cart = matmul(primitive_vecs, v3%frac)
+
+    !This bit is depedent on the mesh density
+    v3%int = nint(v3%frac*grid)
+    v3%muxed_index = mux_vector(v3%int, grid, 0_i64)
   end function vector_allreps_add
 
   pure function vector_allreps_sub(v1, v2, grid, primitive_vecs) result(v3)
@@ -82,9 +85,12 @@ contains
     real(r64), intent(in) :: primitive_vecs(3, 3)
     type(vector_allreps) :: v3
 
-    v3%int = modulo(v1%int - v2%int, grid)
-    v3%muxed_index = mux_vector(v3%int, grid, 0_i64)
-    v3%frac = dble(v3%int)/grid
+    !This arithmetic is independent of mesh density
+    v3%frac = v1%frac .umklapp. -v2%frac
     v3%cart = matmul(primitive_vecs, v3%frac)
+
+    !This bit is depedent on the mesh density
+    v3%int = nint(v3%frac*grid)
+    v3%muxed_index = mux_vector(v3%int, grid, 0_i64)
   end function vector_allreps_sub
 end module vector_allreps_module
