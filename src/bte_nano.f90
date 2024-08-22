@@ -665,7 +665,7 @@ contains
     end if
 
     do it_ph = 1, num%maxiter
-       call iterate_bte_ph(crys%T, num, ph, el, self%ph_rta_rates_ibz, &
+       call iterate_bte_ph(crys%T, num, crys, ph, el, self%ph_rta_rates_ibz, &
             self%ph_field_term_T, nano%Sph, self%ph_response_T)
 
        !Calculate phonon transport coefficients
@@ -792,9 +792,9 @@ contains
        !Scheme: for each step of phonon response, fully iterate the electron response.
 
        !Iterate phonon response once          
-       call iterate_bte_ph(crys%T, num, ph, el, self%ph_rta_rates_ibz, &
+       call iterate_bte_ph(crys%T, num, crys, ph, el, self%ph_rta_rates_ibz, &
             self%ph_field_term_T, nano%Sph, self%ph_response_T, self%el_response_T)
-       call iterate_bte_ph(crys%T, num, ph, el, self%ph_rta_rates_ibz, &
+       call iterate_bte_ph(crys%T, num, crys, ph, el, self%ph_rta_rates_ibz, &
             self%ph_field_term_E, nano%Sph, self%ph_response_E, self%el_response_E)
 
        !Calculate phonon transport coefficients
@@ -1062,12 +1062,13 @@ contains
     end if
   end subroutine calculate_field_term
 
-  subroutine iterate_bte_ph(T, num, ph, el, rta_rates_ibz, &
+  subroutine iterate_bte_ph(T, num, crys, ph, el, rta_rates_ibz, &
        field_term, suppression_factor, response_ph, response_el)
     !! Subroutine to iterate the phonon BTE one step.
-    !! 
+    !!
     !! T Temperature in K
-    !! drag Is drag included?
+    !! num Numerics object
+    !! crys Crystal object
     !! ph Phonon object
     !! rta_rates_ibz Phonon RTA scattering rates
     !! field_term Phonon field coupling term
@@ -1077,7 +1078,7 @@ contains
     type(phonon), intent(in) :: ph
     type(electron), intent(in) :: el
     type(numerics), intent(in) :: num
-    !logical, intent(in) :: drag
+    type(crystal), intent(in) :: crys
     real(r64), intent(in) :: T, rta_rates_ibz(:,:), field_term(:,:,:)
     real(r64), intent(in), optional :: response_el(:,:,:)
     real(r64), intent(inout) :: response_ph(:,:,:)
@@ -1195,7 +1196,7 @@ contains
           
           if(present(response_el)) then
              if(num%Y_OTF) then
-                call calculate_Y_OTF(el, ph, num, istate1, T, Y, istate_el1, istate_el2)
+                call calculate_Y_OTF(el, ph, num, crys, istate1, T, Y, istate_el1, istate_el2)
                 nprocs_phe = size(Y)
              else
                 !Set Y filename
