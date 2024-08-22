@@ -1817,7 +1817,7 @@ contains
     sync all
   end subroutine calculate_eph_interaction_ibzq
 
-  subroutine calculate_Y_OTF(el, ph, num, istate, T, &
+  subroutine calculate_Y_OTF(el, ph, num, crys, istate, T, &
        Y_istate, istate_el1, istate_el2)
     !! On-the-fly (OTF), serial calcualator of the ph-e transition probability
     !! for all IBZ phonon wave vectors. This subroutine calculates
@@ -1827,6 +1827,7 @@ contains
     type(electron), intent(in) :: el
     type(phonon), intent(in) :: ph
     type(numerics), intent(in) :: num
+    type(crystal), intent(in) :: crys
     real(r64), intent(in) :: T
     real(r64), intent(out), allocatable :: Y_istate(:)
     integer(i64), intent(out), allocatable, optional :: istate_el1(:), istate_el2(:)
@@ -1841,6 +1842,7 @@ contains
     character(len = 1024) :: filename
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
     logical :: keep_interaction_tally
+    type(vec) :: q_vec, k_vec, kp_vec
     
     !Do I need to keep a tally of the all the interacting states?
     keep_interaction_tally = present(istate_el1) .and. present(istate_el2)
@@ -1875,18 +1877,15 @@ contains
     !Energy of phonon
     en_ph = ph%ens(iq_fbz, s)
 
+    !Create phonon wave vector
+    q_vec = vec(iq_fbz, ph%wvmesh, crys%reclattvecs)
+    
     !1/(1 + Bose factor) for phonon
     if(en_ph /= 0.0_r64) then
        invboseplus1 = 1.0_r64/(1.0_r64 + Bose(en_ph, T))
     else
        invboseplus1 = 0.0_r64
     end if
-
-    !Initial (IBZ blocks) wave vector (crystal coords.)
-    q = ph%wavevecs(iq_fbz, :)
-
-    !Convert from crystal to 0-based index vector
-    q_indvec = nint(q*ph%wvmesh)
 
     !Load g2_istate from disk for scattering rates calculation
     !Change to data output directory
@@ -1911,19 +1910,13 @@ contains
     !Run over initial (in-window, FBZ blocks) electron wave vectors
     do ik = 1, el%nwv
        !Initial wave vector (crystal coords.)
-       k = el%wavevecs(ik, :)
-
-       !Convert from crystal to 0-based index vector
-       k_indvec = nint(k*el%wvmesh)
+       k_vec = vec(el%indexlist(ik), el%wvmesh, crys%reclattvecs)
 
        !Find final electron wave vector
-       kp_indvec = modulo(k_indvec + el%mesh_ref_array*q_indvec, el%wvmesh) !0-based index vector
-
-       !Muxed index of kp
-       ikp = mux_vector(kp_indvec, el%wvmesh, 0_i64)
+       kp_vec = vec_add(k_vec, q_vec, el%wvmesh, crys%reclattvecs)
 
        !Check if final electron wave vector is within energy window
-       call binsearch(el%indexlist, ikp, ikp_window)
+       call binsearch(el%indexlist, kp_vec%muxed_index, ikp_window)
        if(ikp_window < 0) cycle
 
        !Run over initial electron bands
@@ -2506,7 +2499,7 @@ contains
 
           if(present(el)) then
              if(num%Y_OTF) then
-                call calculate_Y_OTF(el, ph, num, istate, crys%T, Y)
+                call calculate_Y_OTF(el, ph, num, crys, istate, crys%T, Y)
              else
                 !Set Y filename
                 filepath_Y = trim(adjustl(num%Ydir))//'/Y.istate'//trim(adjustl(tag))
