@@ -5,11 +5,6 @@ program screening_comparison
   use params, only: hbar, hbar_eVps, me, twopi, pi, kB, qe, bohr2nm, perm0
   use misc, only: qdist, linspace, compsimps, outer, sort, &
        write2file_rank2_real, write2file_rank1_real, twonorm, exit_with_message
-  use numerics_module, only: numerics
-  use crystal_module, only: crystal
-  use symmetry_module, only: symmetry
-  use electron_module, only: electron
-  use wannier_module, only: wannier
 
   implicit none
 
@@ -17,65 +12,51 @@ program screening_comparison
   !integer, parameter :: num_tests = 1
   !type(testify) :: test_array(num_tests), tests_all
 
-  type(numerics) :: num
-  type(crystal) :: crys
-  type(symmetry) :: sym
-  type(wannier) :: wann
-  type(electron) :: el
-  !type(timer) :: t_all, t_event
-
   integer(i64) :: ik, numomega, numq
   real(r64) :: mu, eF, kF, kTF, beta, en_plasmon
   real(r64), allocatable :: el_ens_parabolic(:), qmags(:)
-  !real(r64), parameter :: m_eff = 0.267*me
-  real(r64), parameter :: m_eff = 0.2*me
+
+  !concentration and temperature
+  real(r64), parameter :: conc = 1.0e18 !cm^-3
+  real(r64), parameter :: T = 0.9
+
+  !real(r64), parameter :: m_eff = 0.267*me !Si
+  !real(r64), parameter :: m_eff = 0.2*me !wGaN
+
+  !GaAs
+  real(r64), parameter :: m_eff = 0.07*me
+  real(r64), parameter :: epsiloninf = 11.1
+  !real(r64), parameter :: epsilon0 = 12.9
+  
   real(r64), allocatable :: imeps(:, :), reeps(:, :), Omegas(:)
   
   if(this_image() == 1) then
-     write(*, '(A)')  'Screening test for wGaN'
+     !write(*, '(A)')  'Screening test for wGaN'
+     write(*, '(A)')  'Screening test for GaAs'
      write(*, '(A, I5)') 'Number of coarray images = ', num_images()
   end if 
   
   !Test counter
   !itest = 0
 
-  !call t_all%start_timer('elphbolt: BTE')
-
-  !call t_event%start_timer('Initialization')
-
-  !Set up crystal
-  call crys%initialize
-
-  !Set up numerics data
-  call num%initialize(crys)
-
-  !Calculate crystal and BZ symmetries
-  call sym%calculate_symmetries(crys, num%qmesh)
-
-  !Read EPW Wannier data
-  call wann%read(num)
-
-  !Calculate electrons
-  call el%initialize(wann, crys, sym, num)
-
   !Set inverse temperature energy
-  beta = 1.0_r64/kB/crys%T
+  beta = 1.0_r64/kB/T
 
-  !Calculate chemical potential for model band to match carrier conc.
-  mu = chempot(el%conc_el, m_eff, beta)
-  
   !Calculate Fermi wave vector for model band (degenerate limit)
-  kF = (3.0_r64*pi**2*el%conc_el)**(1.0_r64/3.0_r64)*1.0e-7_r64 !nm^-1
+  kF = (3.0_r64*pi**2*conc)**(1.0_r64/3.0_r64)*1.0e-7_r64 !nm^-1
   print*, 'Fermi wave vector = ', kF, ' nm^-1'
 
   !Calculate Fermi energy for model band (degenerate limit)
   eF =  energy_parabolic(kF, m_eff)
   print*, 'Fermi energy = ', eF, ' eV'
-
+  
+  !Calculate chemical potential for model band to match carrier conc.
+  mu = chempot(conc, m_eff, beta, eF)
+  
   !Calculate Plasmon energy
-  !en_plasmon = 1.0e-9_r64*hbar_evps*qe*sqrt(el%conc_el/perm0/crys%epsilon0/m_eff) !eV
+  !en_plasmon = 1.0e-9_r64*hbar_evps*qe*sqrt(conc/perm0/epsilon0/m_eff) !eV
 
-  en_plasmon = 1.0e-9_r64*hbar_evps*qe*sqrt(el%conc_el/perm0/crys%epsiloninf/m_eff) !eV
+  en_plasmon = 1.0e-9_r64*hbar_evps*qe*sqrt(conc/perm0/epsiloninf/m_eff) !eV
   print*, 'Plasmon energy = ', en_plasmon, ' eV'
 
   !Calculate Thomas-Fermi screening wave vector (T << T_F limit)
@@ -86,12 +67,12 @@ program screening_comparison
 
   !Create wave vector mesh
   numq = 400
-  call linspace(qmags, 0.0_r64, 5.0_r64*kF, numq)
+  call linspace(qmags, 0.0_r64, 2.0_r64*kF, numq)
   call write2file_rank1_real("RPA_test_qmags", qmags)
   
   !Create bosonic energy mesh
-  numomega = 200
-  call linspace(Omegas, 0.0_r64, 5.0_r64*eF, numomega)
+  numomega = 400
+  call linspace(Omegas, 0.0_r64, 2.0_r64*eF, numomega)
   call write2file_rank1_real("RPA_test_Omegas", Omegas)
   
   !Calculate analytic Im RPA dielectric function
@@ -100,7 +81,7 @@ program screening_comparison
   
   !Calculate analytic Re RPA dielectric function
   call calculate_Reeps(qmags, Omegas, mu, m_eff, eF, en_plasmon, &
-       kF, kTF, crys%epsiloninf, beta, Reeps)
+       kF, kTF, epsiloninf, beta, Reeps)
   call write2file_rank2_real("model_RPA_dielectric_3D_real", Reeps)
   
 contains
@@ -116,7 +97,7 @@ contains
     energy_parabolic = 0.5_r64*(hbar*k)**2/m_eff*1.0e-6_r64/qe !eV
   end function energy_parabolic
   
-  real(r64) function chempot(conc, m_eff, beta)
+  real(r64) function chempot(conc, m_eff, beta, eF)
     !!Use bisection method to find chemical potential
     !!for a given carrier concentration
     !!
@@ -126,12 +107,14 @@ contains
 
     real(r64), intent(in) :: conc
     real(r64), intent(in) :: m_eff
-    real(r64), intent(in) :: beta
+    real(r64), intent(in) :: beta, eF
 
     integer :: i
     integer, parameter :: maxiter = 100
-    real(r64) :: a, b, tmp, aux, thresh
+    real(r64) :: a, b, tmp, aux, thresh, upper
 
+    upper = eF*beta + 15.0 !to be used as inifinity of Fermi integral
+    
     a = -5.0 !eV, "Safe" lower bound
     b = 5.0 !eV, "Safe" upper bound
 
@@ -142,7 +125,7 @@ contains
     do i = 1, maxiter
        chempot = 0.5*(a + b)
 
-       aux = tmp*fdi(0.5_r64, chempot*beta)
+       aux = tmp*fdi(0.5_r64, chempot*beta, upper)
        
        if(abs(aux - conc)/conc < thresh) then
           exit
@@ -157,19 +140,18 @@ contains
     write(*, "(A, 1E16.8, A)") 'calculated chem. pot. in parabolic model = ', chempot, ' eV'
   end function chempot
 
-  real(r64) function fdi(j, eta)
+  real(r64) function fdi(j, eta, upper)
     !! Fermi-Dirac integral for positive j
     
-    real(r64), intent(in) :: j, eta
+    real(r64), intent(in) :: j, eta, upper
 
-    integer(i64), parameter :: ngrid = 10000_i64
+    integer(i64), parameter :: ngrid = 100000_i64
     real(r64), allocatable :: x(:)
     real(r64) :: dx
-
+    
     if(j < 0.0_r64) call exit_with_message("Negative j is not allowed. Exiting.")
     
-    !Here 10 is infinity...
-    call linspace(x, 0.0_r64, 10.0_r64, ngrid)
+    call linspace(x, 0.0_r64, upper, ngrid)
 
     dx = x(2) - x(1)
     call compsimps(x**j/(exp(x - eta) + 1.0_r64), dx, fdi)
@@ -213,23 +195,46 @@ contains
     real(r64), intent(in) :: qmags(:), ens(:), chempot, m_eff, eF, kF, beta
     real(r64), allocatable :: Imeps(:, :)
 
+!!$    !Locals
+!!$    integer :: iOmega
+!!$    real(r64) :: u(size(qmags), size(ens))
+!!$    
+!!$    allocate(Imeps(size(qmags), size(ens)))
+!!$    
+!!$    call outer(0.5_r64*kF/qmags, ens/eF, u)
+!!$
+!!$    do iOmega = 1, size(ens)
+!!$       Imeps(:, iOmega) = &
+!!$            real(log(&
+!!$            (1.0_r64 + exp(beta*(chempot - eF*(u(:, iOmega) - qmags(:)/kF/2.0_r64)**2)))/ &
+!!$            (1.0_r64 + exp(beta*(chempot - eF*(u(:, iOmega) + qmags(:)/kF/2.0_r64)**2)))))/ &
+!!$            (qmags(:)/kF)**3
+!!$    end do
+!!$    Imeps(1, :) = 0.0_r64
+!!$    Imeps = (m_eff/me/bohr2nm/kF/eF/beta)*Imeps
+    
     !Locals
-    integer :: iOmega
-    real(r64) :: u(size(qmags), size(ens))
-    
+    integer :: iOmega, iq
+    real(r64) :: E1(size(qmags), size(ens)), E2(size(qmags), size(ens)), Eq(size(qmags))
+
     allocate(Imeps(size(qmags), size(ens)))
-    
-    call outer(0.5_r64*kF/qmags, ens/eF, u)
+
+    Eq = energy_parabolic(qmags, m_eff)
+
+    do iq = 1, size(qmags)
+       E1(iq, :) = (ens - Eq)**2/4.0/Eq
+       E2(iq, :) = (ens + Eq)**2/4.0/Eq
+    end do
 
     do iOmega = 1, size(ens)
        Imeps(:, iOmega) = &
             real(log(&
-            (1.0_r64 + exp(beta*(chempot - eF*(u(:, iOmega) - qmags(:)/kF/2.0_r64)**2)))/ &
-            (1.0_r64 + exp(beta*(chempot - eF*(u(:, iOmega) + qmags(:)/kF/2.0_r64)**2)))))/ &
-            (qmags(:)/kF)**3
+            (1.0_r64 + exp(beta*(chempot - E1(:, iOmega))))/ &
+            (1.0_r64 + exp(beta*(chempot - E2(:, iOmega))))))/ &
+            (qmags(:))**3
     end do
-    Imeps(1, :) = 0.0_r64
-    Imeps = (m_eff/me/bohr2nm/kF/eF/beta)*Imeps
+    !Imeps(1, :) = 0.0_r64
+    Imeps = 2.0*me/bohr2nm/(beta*hbar*hbar_eVps)*1.0e6*Imeps
   end subroutine calculate_Imeps
 
   subroutine calculate_Reeps(qmags, ens, chempot, m_eff, eF, eplasmon, &

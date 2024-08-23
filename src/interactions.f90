@@ -36,7 +36,8 @@ module interactions
   use phonon_module, only: phonon
   use numerics_module, only: numerics
   use vector_allreps_module, only: vec=>vector_allreps, &
-       vec_add=>vector_allreps_add, vec_sub=>vector_allreps_sub
+       vec_add=>vector_allreps_add, vec_sub=>vector_allreps_sub, &
+       vec_change_grid=>vector_allreps_change_grid
   use delta, only: delta_fn, get_delta_fn_pointer, &
        delta_fn_tetra, delta_fn_triang
   
@@ -1646,7 +1647,7 @@ contains
              call chdir(num%cwd)
           end if
 
-          !Get the muxed index of FBZ wave vector from the IBZ blocks index list
+          !Get the muxed index of FBZ wave vector from the IBZ index list
           iq_fbz = ph%indexlist_irred(iq)
           
           !Energy of phonon
@@ -1834,9 +1835,9 @@ contains
     
     !Local variables
     integer(i64) :: nstates_irred, istate, m, iq, iq_fbz, n, ik, ikp, s, &
-         ikp_window, start, end, chunk, k_indvec(3), kp_indvec(3), &
-         q_indvec(3), nprocs, count, num_active_images
-    real(r64) :: k(3), q(3), en_ph, en_el, en_elp, const, delta_val, &
+         ikp_window, start, end, chunk, &
+         nprocs, count, num_active_images
+    real(r64) :: en_ph, en_el, en_elp, const, delta_val, &
          invboseplus1, fermi1, fermi2, occup_fac
     real(r64), allocatable :: g2_istate(:)
     character(len = 1024) :: filename
@@ -2002,10 +2003,9 @@ contains
     character(len = 1), intent(in) :: key
     
     !Local variables
-    integer(i64) :: nstates_irred, istate, m, ik, n, ikp, s, &
-         iq, start, end, chunk, k_indvec(3), kp_indvec(3), &
-         q_indvec(3), count, nprocs, num_active_images
-    real(r64) :: k(3), kp(3), q(3), ph_ens_iq(1, ph%numbands), qlist(1, 3), &
+    integer(i64) :: nstates_irred, istate, m, ik, ik_fbz, n, ikp, s, &
+         iq, start, end, chunk, count, nprocs, num_active_images
+    real(r64) :: ph_ens_iq(1, ph%numbands), qlist(1, 3), &
          const, bosefac, fermi_minus_fac, fermi_plus_fac, en_ph, en_el, delta, occup_fac
     real(r64), allocatable :: g2_istate(:), Xplus_istate(:), Xminus_istate(:)
     integer(i64), allocatable :: istate_el(:), istate_ph(:)
@@ -2014,6 +2014,7 @@ contains
     character(len = 1024) :: filename
     logical :: needfinephon
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
+    type(vec) :: k_vec, kp_vec, q_vec, q_vec_coarse
     
     if(key /= 'g' .and. key /= 'X') then
        call exit_with_message(&
@@ -2069,18 +2070,18 @@ contains
              call chdir(num%cwd)
           end if
 
+          !Get the muxed index of FBZ wave vector from the IBZ index list
+          ik_fbz = el%indexlist(ik)
+          
           !Electron energy
           en_el = el%ens_irred(ik, m)
 
           !Apply energy window to initial (IBZ blocks) electron
           if(abs(en_el - el%enref) > el%fsthick) cycle
 
-          !Initial (IBZ blocks) wave vector (crystal coords.)
-          k = el%wavevecs_irred(ik, :)
-
-          !Convert from crystal to 0-based index vector
-          k_indvec = nint(k*el%wvmesh)
-
+          !Create initial electron wave vector
+          k_vec = vec(ik_fbz, el%wvmesh, crys%reclattvecs)
+          
           !Load g2_istate from disk for scattering rates calculation
           if(key == 'X') then
              !Change to data output directory
@@ -2114,33 +2115,28 @@ contains
 
           !Run over final (FBZ blocks) electron wave vectors
           do ikp = 1, el%nwv
-             !Final wave vector (crystal coords.)
-             kp = el%wavevecs(ikp, :)
+             !Create final electron wave vector
+             kp_vec = vec(ikp, el%wvmesh, crys%reclattvecs)
 
-             !Convert from crystal to 0-based index vector
-             kp_indvec = nint(kp*el%wvmesh)
+             !Find interacting phonon wave vector.
+             !This is represented with respect to the electronic mesh.
+             q_vec = vec_sub(kp_vec, k_vec, el%wvmesh, crys%reclattvecs)
 
-             !Find interacting phonon wave vector
-             !Note that q, k, and k' are all on the same mesh
-             q_indvec = kp_indvec - k_indvec
+             !Note that q, k, and k' are all on the same mesh.
+             !However, there are some common q vector on which the
+             !phonon quantities have already been computer. Here, compute
+             !only the new k' - k quantities.
              needfinephon = .false.
-             if(any(mod(q_indvec(:), el%mesh_ref_array) /= 0_i64)) then
+             if(any(mod(q_vec%int(:), el%mesh_ref_array) /= 0_i64)) then
                 needfinephon = .true.
-                q_indvec = modulo(q_indvec, el%wvmesh) !0-based index vector
-                q = q_indvec/dble(el%wvmesh) !crystal coords.
-                !Muxed index of q
-                iq = mux_vector(q_indvec, el%wvmesh, 0_i64)
-
+                
                 !Calculate the fine mesh phonon.
-                qlist(1, :) = q
+                qlist(1, :) = q_vec%frac
                 call wann%ph_wann(crys, 1_i64, qlist, ph_ens_iq, ph_evecs_iq)
-             else !Original (coarser) mesh phonon
-                q_indvec = modulo(q_indvec/el%mesh_ref_array, ph%wvmesh) !0-based index vector
-                q = q_indvec/dble(ph%wvmesh) !crystal coords.
-                !Muxed index of q
-                iq = mux_vector(q_indvec, ph%wvmesh, 0_i64)
+             else !Get the q vector represented in the phonon mesh
+                q_vec_coarse = vec_change_grid(q_vec, ph%wvmesh)
              end if
-
+            
              !Run over final electron bands
              do n = 1, wann%numwannbands
                 !Apply energy window to final electron
@@ -2154,13 +2150,15 @@ contains
                    if(key == 'g') then
                       !Calculate |g_mns(<k>,q)|^2
                       if(needfinephon) then
-                         g2_istate(count) = wann%g2(crys, k, q, el%evecs_irred(ik, m, :), &
-                              el%evecs(ikp, n, :), ph_evecs_iq(1, s, :), &
-                              ph_ens_iq(1, s), gkRp_ik, 'ph')
+                         g2_istate(count) = wann%g2(crys, k_vec%frac, q_vec%frac, &
+                              el%evecs_irred(ik, m, :), el%evecs(ikp, n, :), &
+                              ph_evecs_iq(1, s, :), ph_ens_iq(1, s), &
+                              gkRp_ik, 'ph')
                       else
-                         g2_istate(count) = wann%g2(crys, k, q, el%evecs_irred(ik, m, :), &
-                              el%evecs(ikp, n, :), ph%evecs(iq, s, :), &
-                              ph%ens(iq, s), gkRp_ik, 'ph')
+                         g2_istate(count) = wann%g2(crys, k_vec%frac, q_vec_coarse%frac, &
+                              el%evecs_irred(ik, m, :), el%evecs(ikp, n, :), &
+                              ph%evecs(iq, s, :), ph%ens(iq, s), &
+                              gkRp_ik, 'ph')
                       end if
                    end if
 
