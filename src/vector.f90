@@ -102,7 +102,9 @@ contains
   end function vector_allreps_sub
 
   pure function vector_allreps_change_grid(vin, grid) result(vout)
-    !! Change grid
+    !! Change grid.
+    !! Beware, this is only well-defined is the vector is representable
+    !! in both original and the new grids.
 
     type(vector_allreps), intent(in) :: vin
     integer(i64), intent(in) :: grid(3)

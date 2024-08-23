@@ -4,18 +4,18 @@ program test_vector_allreps
   use testify_m, only : testify
   use vector_allreps_module, only : &
        vector_allreps, vector_allreps_add, vector_allreps_sub, &
-       vector_allreps_print
+       vector_allreps_print, vector_allreps_change_grid
 
   implicit none
   
   integer :: itest
-  integer, parameter :: num_tests = 17
+  integer, parameter :: num_tests = 25 !17
   type(testify) :: test_array(num_tests), tests_all
 
-  integer(i64) :: imuxed, grid(3)
+  integer(i64) :: imuxed, grid(3), another_grid(3)
   real(r64) :: primitive_vecs(3, 3)
   !integer(i64), parameter :: N = 3
-  type(vector_allreps) :: v0, v1, v2, v3
+  type(vector_allreps) :: v0, v1, v2, v3, v0p, v1p, v2p
 
   print*, '<<module vector_allreps unit tests>>'
 
@@ -137,7 +137,61 @@ program test_vector_allreps
   call test_array(itest)%assert(&
        v3%cart, &
        [-3.0, 2.0, 3.0]/8.0_r64)
-      
+
+  !Test grid change
+  another_grid = [12, 12, 12] !3x first grid
+
+  ! zero vector, everything should be unchanged
+  v0p = vector_allreps_change_grid(v0, another_grid)
+
+  itest = itest + 1
+  test_array(itest) = testify("grid change null vector, muxed index")
+  call test_array(itest)%assert(v0p%muxed_index, 1_i64)
+  
+  itest = itest + 1
+  test_array(itest) = testify("grid change null vector, integer rep")
+  call test_array(itest)%assert(&
+       v0p%int, &
+       [0, 0, 0]*1_i64)
+
+  itest = itest + 1
+  test_array(itest) = testify("grid change null vector, fractional rep")
+  call test_array(itest)%assert(&
+       v0p%frac, &
+       [0.0, 0.0, 0.0]*1.0_r64)
+
+  itest = itest + 1
+  test_array(itest) = testify("grid change null vector, Cartesian rep")
+  call test_array(itest)%assert(&
+       v0p%cart, &
+       [0.0, 0.0, 0.0]*1.0_r64)
+  
+  ! test the last vector of original grid
+  v1 = vector_allreps(product(grid), grid, primitive_vecs)
+  v1p = vector_allreps_change_grid(v1, another_grid)
+
+  itest = itest + 1
+  test_array(itest) = testify("grid change last vector, muxed index")
+  call test_array(itest)%assert(v1p%muxed_index, 1414_i64)
+  
+  itest = itest + 1
+  test_array(itest) = testify("grid change last vector, integer rep")
+  call test_array(itest)%assert(&
+       v1p%int, &
+       [9, 9, 9]*1_i64)
+
+  itest = itest + 1
+  test_array(itest) = testify("grid change last vector, fractional rep")
+  call test_array(itest)%assert(&
+       v1p%frac, &
+       v1%frac)
+
+  itest = itest + 1
+  test_array(itest) = testify("grid change last vector, Cartesian rep")
+  call test_array(itest)%assert(&
+       v1p%cart, &
+       v1%cart)
+  
   tests_all = testify(test_array)
   call tests_all%report
 
