@@ -67,12 +67,12 @@ program screening_comparison
 
   !Create wave vector mesh
   numq = 400
-  call linspace(qmags, 0.0_r64, 2.0_r64*kF, numq)
+  call linspace(qmags, 0.0_r64, 3.0_r64*kF, numq)
   call write2file_rank1_real("RPA_test_qmags", qmags)
   
   !Create bosonic energy mesh
   numomega = 400
-  call linspace(Omegas, 0.0_r64, 2.0_r64*eF, numomega)
+  call linspace(Omegas, 0.0_r64, 3.0_r64*eF, numomega)
   call write2file_rank1_real("RPA_test_Omegas", Omegas)
   
   !Calculate analytic Im RPA dielectric function
@@ -212,7 +212,8 @@ contains
     end do
     Imeps(1, :) = 0.0_r64
     Imeps = (m_eff/me/bohr2nm/kF/eF/beta)*Imeps
-    
+
+!!$    !This gives the same result as the expression above:
 !!$    !Locals
 !!$    integer :: iOmega, iq
 !!$    real(r64) :: E1(size(qmags), size(ens)), E2(size(qmags), size(ens)), Eq(size(qmags))
@@ -222,8 +223,8 @@ contains
 !!$    Eq = energy_parabolic(qmags, m_eff)
 !!$
 !!$    do iq = 1, size(qmags)
-!!$       E1(iq, :) = (ens - Eq)**2/4.0/Eq
-!!$       E2(iq, :) = (ens + Eq)**2/4.0/Eq
+!!$       E1(iq, :) = (ens(:) - Eq(iq))**2/4.0/Eq(iq)
+!!$       E2(iq, :) = (ens(:) + Eq(iq))**2/4.0/Eq(iq)
 !!$    end do    
 !!$
 !!$    do iOmega = 1, size(ens)
@@ -267,8 +268,8 @@ contains
     !Here we need an extra factor of ms/me.
 
     !Magic numbers?
-    ngrid = 10000
-    ymax = 20.0_r64
+    ngrid = 1000
+    ymax = 10.0!20.0_r64
 
     allocate(y(ngrid), I0(ngrid), Reeps(size(qmags), size(ens)))
     
@@ -301,19 +302,15 @@ contains
           Reeps(iq, iOmega) = aux0*(aux1 - aux2)
        end do
     end do
-    
-    !Reeps = epsinf + (0.25_r64/pi/kF/bohr2nm*m_eff/me)*Reeps
 
-    !DBG
-    Reeps = 1.0_r64 + (0.25_r64/pi/kF/bohr2nm*m_eff/me)*Reeps
-    
+    !       valence band contribution + electronic contribution
+    Reeps = epsinf + (0.25_r64/pi/kF/bohr2nm*m_eff/me)*Reeps
+
     !Omega -> 0 limit
     !Reeps(2:size(qmags), 1) = epsinf*&
     !     (1.0_r64 + ks_squared/qmags(2:size(qmags))**2)
 
     !q -> limit
-    !Reeps(1, :) = epsinf*(1.0_r64 - (eplasmon/ens)**2)
-    !DBG
     Reeps(1, :) = 1.0_r64 - (eplasmon/ens)**2
 
 !!$    !Check where the plasmon mode is at the Gamma point

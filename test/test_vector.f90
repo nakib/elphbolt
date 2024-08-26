@@ -1,4 +1,4 @@
-program test_vector_allreps
+program test_vector
 
   use precision, only : r64, i64
   use testify_m, only : testify
@@ -196,4 +196,4 @@ program test_vector_allreps
   call tests_all%report
 
   if(tests_all%get_status() .eqv. .false.) error stop -1
-end program test_vector_allreps
+end program test_vector
