@@ -18,7 +18,7 @@ program screening_comparison
 
   !concentration and temperature
   real(r64), parameter :: conc = 1.0e18 !cm^-3
-  real(r64), parameter :: T = 0.9
+  real(r64), parameter :: T = 1.0
 
   !real(r64), parameter :: m_eff = 0.267*me !Si
   !real(r64), parameter :: m_eff = 0.2*me !wGaN
@@ -195,46 +195,46 @@ contains
     real(r64), intent(in) :: qmags(:), ens(:), chempot, m_eff, eF, kF, beta
     real(r64), allocatable :: Imeps(:, :)
 
-!!$    !Locals
-!!$    integer :: iOmega
-!!$    real(r64) :: u(size(qmags), size(ens))
-!!$    
-!!$    allocate(Imeps(size(qmags), size(ens)))
-!!$    
-!!$    call outer(0.5_r64*kF/qmags, ens/eF, u)
-!!$
-!!$    do iOmega = 1, size(ens)
-!!$       Imeps(:, iOmega) = &
-!!$            real(log(&
-!!$            (1.0_r64 + exp(beta*(chempot - eF*(u(:, iOmega) - qmags(:)/kF/2.0_r64)**2)))/ &
-!!$            (1.0_r64 + exp(beta*(chempot - eF*(u(:, iOmega) + qmags(:)/kF/2.0_r64)**2)))))/ &
-!!$            (qmags(:)/kF)**3
-!!$    end do
-!!$    Imeps(1, :) = 0.0_r64
-!!$    Imeps = (m_eff/me/bohr2nm/kF/eF/beta)*Imeps
-    
     !Locals
-    integer :: iOmega, iq
-    real(r64) :: E1(size(qmags), size(ens)), E2(size(qmags), size(ens)), Eq(size(qmags))
-
+    integer :: iOmega
+    real(r64) :: u(size(qmags), size(ens))
+    
     allocate(Imeps(size(qmags), size(ens)))
-
-    Eq = energy_parabolic(qmags, m_eff)
-
-    do iq = 1, size(qmags)
-       E1(iq, :) = (ens - Eq)**2/4.0/Eq
-       E2(iq, :) = (ens + Eq)**2/4.0/Eq
-    end do
+    
+    call outer(0.5_r64*kF/qmags, ens/eF, u)
 
     do iOmega = 1, size(ens)
        Imeps(:, iOmega) = &
             real(log(&
-            (1.0_r64 + exp(beta*(chempot - E1(:, iOmega))))/ &
-            (1.0_r64 + exp(beta*(chempot - E2(:, iOmega))))))/ &
-            (qmags(:))**3
+            (1.0_r64 + exp(beta*(chempot - eF*(u(:, iOmega) - qmags(:)/kF/2.0_r64)**2)))/ &
+            (1.0_r64 + exp(beta*(chempot - eF*(u(:, iOmega) + qmags(:)/kF/2.0_r64)**2)))))/ &
+            (qmags(:)/kF)**3
     end do
-    !Imeps(1, :) = 0.0_r64
-    Imeps = 2.0*me/bohr2nm/(beta*hbar*hbar_eVps)*1.0e6*Imeps
+    Imeps(1, :) = 0.0_r64
+    Imeps = (m_eff/me/bohr2nm/kF/eF/beta)*Imeps
+    
+!!$    !Locals
+!!$    integer :: iOmega, iq
+!!$    real(r64) :: E1(size(qmags), size(ens)), E2(size(qmags), size(ens)), Eq(size(qmags))
+!!$
+!!$    allocate(Imeps(size(qmags), size(ens)))
+!!$
+!!$    Eq = energy_parabolic(qmags, m_eff)
+!!$
+!!$    do iq = 1, size(qmags)
+!!$       E1(iq, :) = (ens - Eq)**2/4.0/Eq
+!!$       E2(iq, :) = (ens + Eq)**2/4.0/Eq
+!!$    end do    
+!!$
+!!$    do iOmega = 1, size(ens)
+!!$       Imeps(:, iOmega) = &
+!!$            log(&
+!!$            (1.0_r64 + exp(beta*(chempot - E1(:, iOmega))))/ &
+!!$            (1.0_r64 + exp(beta*(chempot - E2(:, iOmega)))))/ &
+!!$            (qmags(:))**3
+!!$    end do
+!!$    !Imeps(1, :) = 0.0_r64
+!!$    Imeps = 2.0*m_eff**2/(me*bohr2nm*beta*hbar**2)*1.0e6*qe*Imeps
   end subroutine calculate_Imeps
 
   subroutine calculate_Reeps(qmags, ens, chempot, m_eff, eF, eplasmon, &
@@ -267,8 +267,8 @@ contains
     !Here we need an extra factor of ms/me.
 
     !Magic numbers?
-    ngrid = 500
-    ymax = 10.0_r64
+    ngrid = 10000
+    ymax = 20.0_r64
 
     allocate(y(ngrid), I0(ngrid), Reeps(size(qmags), size(ens)))
     

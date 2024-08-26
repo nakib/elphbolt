@@ -103,7 +103,7 @@ contains
 
   pure function vector_allreps_change_grid(vin, grid) result(vout)
     !! Change grid.
-    !! Beware, this is only well-defined is the vector is representable
+    !! Beware, this is only well-defined if the vector is representable
     !! in both original and the new grids.
 
     type(vector_allreps), intent(in) :: vin

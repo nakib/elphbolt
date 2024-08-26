@@ -2004,7 +2004,7 @@ contains
     
     !Local variables
     integer(i64) :: nstates_irred, istate, m, ik, ik_fbz, n, ikp, s, &
-         iq, start, end, chunk, count, nprocs, num_active_images
+         iq_fine, iq_coarse, start, end, chunk, count, nprocs, num_active_images
     real(r64) :: ph_ens_iq(1, ph%numbands), qlist(1, 3), &
          const, bosefac, fermi_minus_fac, fermi_plus_fac, en_ph, en_el, delta, occup_fac
     real(r64), allocatable :: g2_istate(:), Xplus_istate(:), Xminus_istate(:)
@@ -2071,7 +2071,7 @@ contains
           end if
 
           !Get the muxed index of FBZ wave vector from the IBZ index list
-          ik_fbz = el%indexlist(ik)
+          ik_fbz = el%indexlist_irred(ik)
           
           !Electron energy
           en_el = el%ens_irred(ik, m)
@@ -2116,15 +2116,16 @@ contains
           !Run over final (FBZ blocks) electron wave vectors
           do ikp = 1, el%nwv
              !Create final electron wave vector
-             kp_vec = vec(ikp, el%wvmesh, crys%reclattvecs)
+             kp_vec = vec(el%indexlist(ikp), el%wvmesh, crys%reclattvecs)
 
              !Find interacting phonon wave vector.
              !This is represented with respect to the electronic mesh.
              q_vec = vec_sub(kp_vec, k_vec, el%wvmesh, crys%reclattvecs)
-
+             iq_fine = q_vec%muxed_index
+             
              !Note that q, k, and k' are all on the same mesh.
              !However, there are some common q vector on which the
-             !phonon quantities have already been computer. Here, compute
+             !phonon quantities have already been computed. Here, compute
              !only the new k' - k quantities.
              needfinephon = .false.
              if(any(mod(q_vec%int(:), el%mesh_ref_array) /= 0_i64)) then
@@ -2133,8 +2134,9 @@ contains
                 !Calculate the fine mesh phonon.
                 qlist(1, :) = q_vec%frac
                 call wann%ph_wann(crys, 1_i64, qlist, ph_ens_iq, ph_evecs_iq)
-             else !Get the q vector represented in the phonon mesh
+             else !Get the q vector represented in the (coarser) phonon mesh
                 q_vec_coarse = vec_change_grid(q_vec, ph%wvmesh)
+                iq_coarse = q_vec_coarse%muxed_index
              end if
             
              !Run over final electron bands
@@ -2157,7 +2159,7 @@ contains
                       else
                          g2_istate(count) = wann%g2(crys, k_vec%frac, q_vec_coarse%frac, &
                               el%evecs_irred(ik, m, :), el%evecs(ikp, n, :), &
-                              ph%evecs(iq, s, :), ph%ens(iq, s), &
+                              ph%evecs(iq_coarse, s, :), ph%ens(iq_coarse, s), &
                               gkRp_ik, 'ph')
                       end if
                    end if
@@ -2167,7 +2169,7 @@ contains
                       if(needfinephon) then
                          en_ph = ph_ens_iq(1, s)
                       else
-                         en_ph = ph%ens(iq, s)
+                         en_ph = ph%ens(iq_coarse, s)
                       end if
 
                       !Bose and Fermi factors
@@ -2212,9 +2214,9 @@ contains
                       if(needfinephon) then
                          !Write fine phonon index as negative so that the iterator
                          !knows to interpolate phonon quantities at this wave vector.
-                         istate_ph(count) = -mux_state(ph%numbands, s, iq)
+                         istate_ph(count) = -mux_state(ph%numbands, s, iq_fine)
                       else
-                         istate_ph(count) = mux_state(ph%numbands, s, iq)
+                         istate_ph(count) = mux_state(ph%numbands, s, iq_coarse)
                       end if
                    end if
                 end do !s
