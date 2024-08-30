@@ -117,9 +117,14 @@ contains
 
 !!$          integrand = Phi_i/(w_disc(j)**2 - w_cont**2)
 
+!!$          integrand = Phi_i*(&
+!!$               1.0_r64/(w_disc(j) - w_cont - oneI*zeroplus) - &
+!!$               1.0_r64/(w_disc(j) + w_cont + oneI*zeroplus))
+
+          !DBG
           integrand = Phi_i*(&
-               1.0_r64/(w_disc(j) - w_cont - oneI*zeroplus) - &
-               1.0_r64/(w_disc(j) + w_cont + oneI*zeroplus))
+               1.0_r64/(-w_disc(j) + w_cont - oneI*zeroplus) - &
+               1.0_r64/(-w_disc(j) - w_cont + oneI*zeroplus))
           
           !TODO Would be nice to have a compsimps function instead of
           !a subroutine.
@@ -176,18 +181,22 @@ contains
     
     !Locals
     integer(i64) :: m, n, ik, ikp, ikp_window, iOmega, nOmegas, k_indvec(3), kp_indvec(3)
-    real(r64) :: overlap, ek, ekp
+    real(r64) :: overlap, ek, ekp, dOmega, delta, Omega_l, Omega_r
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
 
     nOmegas = size(Omegas)
 
+    dOmega = Omegas(2) - Omegas(1)
+    
     allocate(spec_eps(nOmegas))
 
     !TODO don't have to use tetrahedron since I only need the imag part.
     !May use triangles also => easily extensible to the 2D case
     !
     !Associate delta function procedure pointer
-    delta_fn_ptr => get_delta_fn_pointer(tetrahedra = .true.)
+    !delta_fn_ptr => get_delta_fn_pointer(tetrahedra = .true.)
+    !delta_fn_ptr => get_delta_fn_pointer(tetrahedra = .false.)
+    !Comment: The delta-fn methods above are giving very different numbers.
     
     spec_eps = 0.0
     do iOmega = 1, nOmegas
@@ -222,13 +231,38 @@ contains
                 !This is |U(k')U^\dagger(k)|_nm squared
                 !(Recall that U^\dagger(k) is the diagonalizer of the electronic hamiltonian.)
                 overlap = (abs(dot_product(el%evecs(ikp_window, n, :), el%evecs(ik, m, :))))**2
+                !overlap = 1.0
 
+!!$                spec_eps(iOmega) = spec_eps(iOmega) + &
+!!$                     (Fermi(ek, el%chempot, T) - &
+!!$                     Fermi(ekp, el%chempot, T))*overlap* &
+!!$                     delta_fn_ptr(ekp - Omegas(iOmega), ik, m, &
+!!$                     el%wvmesh, el%simplex_map, &
+!!$                     el%simplex_count, el%simplex_evals)
+                
+                
+                !DBG
+                Omega_l = Omegas(iOmega) - dOmega
+                Omega_r = Omegas(iOmega) + dOmega
+                
+                if(Omega_l < ekp - ek .and. ekp - ek < Omega_r) continue
+                
+                delta = finite_element(ekp - ek, &
+                     Omega_l, Omegas(iOmega), Omega_r)
+!!$                
+!!$                if(iOmega == 1) then
+!!$                   delta = finite_element(ekp - ek, &
+!!$                        Omegas_l, Omegas(iOmega), Omegas(iOmega + 1))
+!!$                else if(iOmega == nOmegas) then
+!!$                   delta = finite_element(ekp - ek, &
+!!$                        Omegas(iOmega - 1), Omegas(iOmega), Omegas(iOmega) + dOmega)
+!!$                else
+!!$                   delta = finite_element(ekp - ek, &
+!!$                        Omegas(iOmega - 1), Omegas(iOmega), Omegas(iOmega + 1))
+!!$                end if
                 spec_eps(iOmega) = spec_eps(iOmega) + &
                      (Fermi(ek, el%chempot, T) - &
-                     Fermi(ekp, el%chempot, T))*overlap* &
-                     delta_fn_ptr(ekp - Omegas(iOmega), ik, m, &
-                     el%wvmesh, el%simplex_map, &
-                     el%simplex_count, el%simplex_evals)
+                     Fermi(ekp, el%chempot, T))*overlap*delta/product(el%wvmesh)
              end do
           end do
        end do
@@ -241,11 +275,7 @@ contains
 !!$            -spec_eps(iOmega)*pi*sign(1.0_r64, Omegas(iOmega))*el%spindeg/pcell_vol
 
        spec_eps(iOmega) = &
-            spec_eps(iOmega)*sign(1.0_r64, Omegas(iOmega))*el%spindeg/pcell_vol
-
-!!$       !DBG
-!!$       spec_eps(iOmega) = &
-!!$            spec_eps(iOmega)*sign(1.0_r64, Omegas(iOmega))*el%spindeg/pcell_vol
+            -spec_eps(iOmega)*sign(1.0_r64, Omegas(iOmega))*el%spindeg/pcell_vol
 
        !Zero out extremely small numbers !TODO What is small? In what units?
        !if(abs(spec_eps(iOmega)) < 1.0e-30_r64) spec_eps(iOmega) = 0.0_r64
@@ -269,7 +299,7 @@ contains
 
     !Locals
     real(r64), allocatable :: energylist(:), qlist(:, :), qmaglist(:)
-    real(r64) :: qcrys(3)
+    real(r64) :: qcrys(3), zeroplus
     integer(i64) :: iq, iOmega, numomega, numq, &
          start, end, chunk, num_active_images, qxmesh
     real(r64), allocatable :: spec_eps(:)
@@ -279,9 +309,9 @@ contains
 
     !Silicon
     !omega_plasma = 1.0e-9*hbar*sqrt(el%conc_el/perm0/crys%epsilon0/(0.267*me)) !eV
+
     !wGaN
-    omega_plasma = 1.0e-9*hbar*sqrt(el%conc_el/perm0/crys%epsilon0/(0.2*me)) !eV
-    !omega_plasma = 1.0e-9*hbar*sqrt(el%conc_el/perm0/crys%epsiloninf/(0.2*me)) !eV
+    omega_plasma = 1.0e-9*hbar*sqrt(el%conc_el/perm0/crys%epsiloninf/(0.22*me)) !eV
     
     if(this_image() == 1) then
        print*, "plasmon energy = ", omega_plasma
@@ -316,15 +346,18 @@ contains
     allocate(qlist(numq, 3), qmaglist(numq))
     do iq = 1, numq
        qlist(iq, :) = el%wavevecs_irred(iq, :)
-       !qmaglist(iq) = twonorm(matmul(crys%reclattvecs, qlist(iq, :)))
-       qmaglist(iq) = qdist(qlist(iq, :), crys%reclattvecs)
+       qmaglist(iq) = twonorm(matmul(crys%reclattvecs, qlist(iq, :)))
+       !qmaglist(iq) = qdist(qlist(iq, :), crys%reclattvecs)
     end do
 
     !Create energy grid
-    numomega = 500
+    numomega = 200
     allocate(energylist(numomega))
-    call linspace(energylist, 0.0_r64, 0.4_r64, numomega)
+    call linspace(energylist, 0.0_r64, 0.2_r64, numomega)
 
+    !Small number
+    zeroplus = (energylist(2) - energylist(1))*0.1
+    
     !Allocate diel_ik to hold maximum possible Omega
     allocate(diel(numq, numomega))
     diel = 0.0_r64
@@ -356,7 +389,7 @@ contains
           call calculate_Hilbert_weights(&
                w_disc = energylist, &
                w_cont = energylist, &
-               zeroplus = 1.0e-6_r64, & !Can this magic "small" number be removed?
+               zeroplus = zeroplus, & !Can this magic "small" number be removed?
                Hilbert_weights = Hilbert_weights)
 
           !call Re_head_polarizability_3d_T(Reeps, energylist, Imeps, Hilbert_weights)
@@ -380,19 +413,22 @@ contains
           !energy expression requires a single effective mass.
           !Just leaving it here for now to get the plasmon peak in the loss function.
           diel(iq, 1:numomega) = 1.0_r64 - &
-               (omega_plasma/energylist(1:numomega))**2 + oneI*1.0e-9
+               (omega_plasma/energylist(1:numomega))**2 !+ oneI*1.0e-9
        else
           !DBG
-          diel(iq, :) = 1.0_r64 - &
+          diel(iq, :) = crys%epsiloninf - &
                1.0_r64/qmaglist(iq)**2* &
-               (real(eps) + oneI*pi*(-spec_eps))/perm0*qe*1.0e9_r64
+               (real(eps) + oneI*pi*(spec_eps))/perm0*qe*1.0e9_r64
+!!$          
+!!$          diel(iq, :) = crys%epsiloninf - &
+!!$               1.0_r64/qmaglist(iq)**2*eps/perm0*qe*1.0e9_r64
        end if
     end do
 
     call co_sum(diel)
 
     !Handle Omega = 0 case
-    diel(:, 1) = 1.0_r64 + (crys%qTF/qmaglist(:))**2
+    !diel(:, 1) = 1.0_r64 + (crys%qTF/qmaglist(:))**2
     
     !Print to file
     call write2file_rank2_real("RPA_dielectric_3D_G0_qpath", qlist)

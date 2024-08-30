@@ -17,22 +17,27 @@ program screening_comparison
   real(r64), allocatable :: el_ens_parabolic(:), qmags(:)
 
   !concentration and temperature
-  real(r64), parameter :: conc = 1.0e18 !cm^-3
-  real(r64), parameter :: T = 1.0
+  real(r64), parameter :: conc = 0.39115390E+19 !cm^-3
+  real(r64), parameter :: T = 300.0 !1.0 !K
 
   !real(r64), parameter :: m_eff = 0.267*me !Si
-  !real(r64), parameter :: m_eff = 0.2*me !wGaN
 
+  !wGaN
+  !real(r64), parameter :: m_eff = 0.2*me
+  real(r64), parameter :: m_eff = 0.22*me
+  real(r64), parameter :: epsiloninf = 5.8968
+  !real(r64), parameter :: epsilon0 = ?
+  
   !GaAs
-  real(r64), parameter :: m_eff = 0.07*me
-  real(r64), parameter :: epsiloninf = 11.1
+  !real(r64), parameter :: m_eff = 0.07*me
+  !real(r64), parameter :: epsiloninf = 11.1
   !real(r64), parameter :: epsilon0 = 12.9
   
   real(r64), allocatable :: imeps(:, :), reeps(:, :), Omegas(:)
   
   if(this_image() == 1) then
-     !write(*, '(A)')  'Screening test for wGaN'
-     write(*, '(A)')  'Screening test for GaAs'
+     write(*, '(A)')  'Screening test for wGaN'
+     !write(*, '(A)')  'Screening test for GaAs'
      write(*, '(A, I5)') 'Number of coarray images = ', num_images()
   end if 
   
@@ -72,7 +77,7 @@ program screening_comparison
   
   !Create bosonic energy mesh
   numomega = 400
-  call linspace(Omegas, 0.0_r64, 3.0_r64*eF, numomega)
+  call linspace(Omegas, 0.0_r64, 5.0_r64*eF, numomega)
   call write2file_rank1_real("RPA_test_Omegas", Omegas)
   
   !Calculate analytic Im RPA dielectric function
@@ -290,7 +295,7 @@ contains
 
     !Non-zero energy and momentum
     do iOmega = 1, size(ens)
-       do iq = 2, size(qmags)
+       do iq = 1, size(qmags) !2, size(qmags)
           aux0 = 1.0_r64/z(iq)**3
 
           x = u(iq, iOmega) + z(iq)
@@ -311,7 +316,7 @@ contains
     !     (1.0_r64 + ks_squared/qmags(2:size(qmags))**2)
 
     !q -> limit
-    Reeps(1, :) = 1.0_r64 - (eplasmon/ens)**2
+    Reeps(1, :) = 1.0_r64 - (eplasmon/ens(:))**2
 
 !!$    !Check where the plasmon mode is at the Gamma point
 !!$    do iOmega = 1, size(ens)

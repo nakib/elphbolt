@@ -22,7 +22,7 @@ module interactions
 #endif
   
   use precision, only: i64, r64
-  use params, only: pi, twopi, amu, qe, hbar_eVps, perm0, oneI
+  use params, only: pi, twopi, amu, qe, hbar_eVps, perm0, oneI, kB
   use misc, only: exit_with_message, print_message, distribute_points, &
        demux_state, mux_vector, mux_state, expi, Bose, binsearch, Fermi, &
        twonorm, write2file_rank2_real, demux_vector, interpolate, expm1, &
@@ -114,6 +114,31 @@ contains
 
     gchimp2 = prefac*overlap*Gsum !ev^2
   end function gchimp2
+
+  pure real(r64) function gCoul2(el, crys, qcrys, evec_k, evec_kp)
+    !! Function to calculate the Thomas-Fermi screened
+    !! squared electron-electron vertex.
+
+    type(crystal), intent(in) :: crys
+    type(electron), intent(in) :: el
+    real(r64), intent(in) :: qcrys(3)
+    complex(r64),intent(in) :: evec_k(:), evec_kp(:)
+    
+    real(r64) :: qcart(3), prefac, overlap, qmag
+
+    prefac = 1.0e18_r64*crys%volume**3
+
+    !Magnitude of q-vector
+    qmag = twonorm(matmul(crys%reclattvecs, qcrys))
+
+    !This is [U(k')U^\dagger(k)]_nm squared
+    !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
+    overlap = (abs(dot_product(evec_kp, evec_k)))**2
+    
+    !For G, G' = 0
+    gCoul2 = prefac*overlap* &
+         (qe**2/perm0/crys%epsilon0/(qmag**2 + crys%qTF**2))**2 !eV^2/nm^3
+  end function gCoul2
   
   pure real(r64) function Vm2_3ph(ev1_s1, ev2_s2, ev3_s3, &
     Index_i, Index_j, Index_k, ifc3, phases_q2q3, ntrip, nb)
@@ -1285,9 +1310,9 @@ contains
   
   subroutine calculate_W3ph_OTF(ph, num, istate1, T, &
        Wm, Wp, istate2_plus, istate3_plus, istate2_minus, istate3_minus)
-    !! On-the-fly (OTF), serial calcualator of the 3-ph transition probability
-    !! for all IBZ phonon wave vectors. This subroutine calculates
-    !! W-(s2q2,s3q3) and W+(s2q2,s3q3) for a given irreducible phonon state s1q1.
+    !! On-the-fly (OTF), serial calcualator of the 3-ph transition probability.
+    !! This subroutine calculates W-(s2q2,s3q3) and W+(s2q2,s3q3)
+    !! for a given irreducible phonon state s1q1.
     !! The interaction vertex for the given state is read from disk.
 
     type(phonon), intent(in) :: ph
@@ -2287,6 +2312,147 @@ contains
     end if
     sync all
   end subroutine calculate_eph_interaction_ibzk
+
+  subroutine calculate_Xee_OTF(el, num, istate1, T, crys, X)
+    !! On-the-fly serial calculator of the e-e transition probability.
+    !! for a given IBZ electron states within the transport window.
+
+    type(electron), intent(in) :: el
+    type(numerics), intent(in) :: num
+    type(crystal), intent(in) :: crys
+    real(r64), intent(in) :: T
+    integer(i64), intent(in) :: istate1
+    real(r64), intent(out), allocatable :: X(:)
+    
+    !Local variables
+    integer(i64) :: nstates_irred, istate, &
+         n1, ik1, n2, ik2, n3, ik3, n4, ik4, &
+         count, nprocs
+    real(r64) :: const, beta, fermi2, fermi3, fermi4, &
+         delta_val, occup_fac, en1, en2, en3, en4, g2
+    !integer(i64), allocatable :: istate_el(:), istate_ph(:)
+    character(len = 1024) :: filename
+    procedure(delta_fn), pointer :: delta_fn_ptr => null()
+    type(vec) :: k1_vec, k2_vec, k3_vec, k4_vec, q_vec
+
+    !Inverse temperature energy
+    beta = 1.0_r64/T/kB
+    
+    !Associate delta function procedure pointer
+    delta_fn_ptr => get_delta_fn_pointer(num%tetrahedra)
+    
+    !Constant factor in transition probability expression
+    const = twopi/hbar_eVps
+
+    !Total number of IBZ blocks states
+    nstates_irred = el%nwv_irred*el%numbands
+
+    !Maxium possible length of transition rates
+    !Nk**3*Nbands**2
+    nprocs = el%nstates_inwindow**2*el%numbands
+
+    !Allocate transition rates
+    allocate(X(nprocs))
+
+    !Initialize X and and the process tallies
+    X(:) = 0.0_r64
+
+    !Demux state index into band (m) and wave vector (ik) indices
+    call demux_state(istate1, el%numbands, n1, ik1)
+
+    !Electron 1 energy
+    en1 = el%ens_irred(ik1, n1)
+
+    !Initialize process counter for the state (k1, n1)
+    count = 0
+    
+    !Apply energy window to electron 1
+    if(abs(en1 - el%enref) <= el%fsthick) then
+
+       !Create initial electron wave vector
+       k1_vec = vec(el%indexlist_irred(ik1), el%wvmesh, crys%reclattvecs)
+
+       !Run over electrons states 3 to 4, eliminating the k4 sum with the
+       !delta(k1 - k3 + k2 - k4)
+       do ik3 = 1, el%nwv       
+          !Create 3rd electron wave vector
+          k3_vec = vec(el%indexlist(ik3), el%wvmesh, crys%reclattvecs)
+
+          !q \equiv k1 - k3
+          q_vec = vec_add(k1_vec, k3_vec, el%wvmesh, crys%reclattvecs)
+
+          do n3 = 1, el%numbands
+             !Electron 3 energy
+             en3 = el%ens(ik3, n3)
+
+             !Apply energy window to electron 3
+             if(abs(en3 - el%enref) > el%fsthick) cycle
+
+             !Fermi function of electron 3
+             fermi3 = Fermi(en3, el%chempot, T)
+
+             !Squared matrix element
+             g2 = gCoul2(el, crys, q_vec%frac, &
+                  el%evecs_irred(ik1, n1, :), el%evecs(ik2, n2, :))
+
+             do ik2 = 1, el%nwv       
+                !Create 2nd electron wave vector
+                k2_vec = vec(el%indexlist(ik2), el%wvmesh, crys%reclattvecs)
+
+                !Create final electron wave vector
+                !delta(q + k2 - k4)
+                k4_vec = vec_add(q_vec, k2_vec, el%wvmesh, crys%reclattvecs)
+
+                do n2 = 1, el%numbands
+                   !Electron 2 energy
+                   en2 = el%ens(ik2, n2)
+
+                   !Apply energy window to electron 2
+                   if(abs(en2 - el%enref) > el%fsthick) cycle
+
+                   !Fermi function of electron 2
+                   fermi2 = Fermi(en2, el%chempot, T)
+
+                   do n4 = 1, el%numbands
+                      !Electron 4 energy
+                      en4 = el%ens(ik4, n4)
+
+                      !Apply energy window to electron 4
+                      if(abs(en4 - el%enref) > el%fsthick) cycle
+
+                      !Increase viable process counter
+                      count = count + 1
+
+                      !Fermi function of electron 4
+                      fermi4 = Fermi(en4, el%chempot, T)
+
+                      !Evaulate delta function
+                      delta_val = delta_fn_ptr(en4 + en3 - en1, &
+                           ik2, n2, el%wvmesh, el%simplex_map, &
+                           el%simplex_count, el%simplex_evals)
+
+                      !Temperature dependent occupation factor
+                      !f1.f2.(1 - f3)(1 - f4)/[f1(1 - f1)]
+                      occup_fac = fermi2*(1.0_r64 - fermi3*exp(beta*(en3 - en1)))* &
+                           (1.0_r64 - fermi4)
+
+                      !Save transition rate
+                      X(count) = g2*occup_fac*delta_val
+                   end do
+                end do
+             end do
+          end do
+       end do
+    end if
+
+    if(count > 0) then
+       !Shrink X
+       call shrink(X, count)
+       
+       !Multiply constant/units factor, etc.
+       X = const*X
+    end if
+  end subroutine calculate_Xee_OTF
 
   subroutine calculate_echimp_interaction_ibzk(crys, el, num)
     !! Parallel driver of |g_e-chimp(k,k')|^2 over IBZ electron states.
