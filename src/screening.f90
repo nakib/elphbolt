@@ -1,7 +1,7 @@
 module screening_module
 
   use precision, only: r64, i64
-  use params, only: kB, qe, pi, perm0, oneI, hbar, me
+  use params, only: kB, qe, pi, perm0, oneI, hbar, hbar_evps, me
   use electron_module, only: electron
   use crystal_module, only: crystal
   use numerics_module, only: numerics
@@ -84,11 +84,12 @@ contains
     !! Hilbert_weights The Hilbert weights
 
     real(r64), intent(in) :: w_disc(:), w_cont(:), zeroplus
-    complex(r64), allocatable, intent(out) :: Hilbert_weights(:, :)
+    !complex(r64), allocatable, intent(out) :: Hilbert_weights(:, :)
+    real(r64), allocatable, intent(out) :: Hilbert_weights(:, :)
 
     !Locals
     integer :: n_disc, n_cont, i, j
-    real(r64) :: phi_i(size(w_cont)), dw, realpart, imagpart
+    real(r64) :: phi_i(size(w_cont)), dw, w_l, w_r, realpart, imagpart
     complex(r64) :: integrand(size(w_cont))
 
     n_disc = size(w_disc)
@@ -98,69 +99,99 @@ contains
 
     !Grid spacing of "continuous" variable
     dw = w_cont(2) - w_cont(1)    
-
-    do i = 1, n_disc - 1
-       if(i == 1) then
-          Phi_i = finite_element(w_cont, w_disc(i) - dw, w_disc(i), w_disc(i + 1))
-       else if(i == n_disc) then
-          Phi_i = finite_element(w_cont, w_disc(i - 1), w_disc(i), w_disc(i) + dw)
-       else
-          Phi_i = finite_element(w_cont, w_disc(i - 1), w_disc(i), w_disc(i + 1))
-       end if
+    
+    do i = 1, n_disc       
+       w_l = w_disc(i) - dw
+       w_r = w_disc(i) + dw
+       Phi_i = finite_element(w_cont, w_l, w_disc(i), w_r)
        do j = 1, n_disc
-!!$          integrand = Phi_i*(&
-!!$               (w_disc(j) - w_cont)/((w_disc(j) - w_cont)**2 + zeroplus) - &
-!!$               (w_disc(j) + w_cont)/((w_disc(j) + w_cont)**2 + zeroplus))
-
+          integrand = Phi_i*(&
+               (w_disc(j) - w_cont + oneI*zeroplus)/((w_disc(j) - w_cont)**2 + zeroplus**2) - &
+               (w_disc(j) + w_cont - oneI*zeroplus)/((w_disc(j) + w_cont)**2 + zeroplus**2))
+!!$
 !!$          integrand = Phi_i*2.0_r64*w_cont/&
 !!$               (w_disc(j)**2 - w_cont**2 - 2.0_r64*w_cont*oneI*zeroplus)
-
-!!$          integrand = Phi_i/(w_disc(j)**2 - w_cont**2)
-
+!!$
 !!$          integrand = Phi_i*(&
 !!$               1.0_r64/(w_disc(j) - w_cont - oneI*zeroplus) - &
 !!$               1.0_r64/(w_disc(j) + w_cont + oneI*zeroplus))
-
-          !DBG
-          integrand = Phi_i*(&
-               1.0_r64/(-w_disc(j) + w_cont - oneI*zeroplus) - &
-               1.0_r64/(-w_disc(j) - w_cont + oneI*zeroplus))
           
           !TODO Would be nice to have a compsimps function instead of
           !a subroutine.
           !call compsimps(integrand, dw, Hilbert_weights(j, i))
           call compsimps(real(integrand), dw, realpart)
-          call compsimps(imag(integrand), dw, imagpart)
-          Hilbert_weights(j, i) = realpart + oneI*imagpart
+
+          Hilbert_weights(j, i) = realpart
        end do
     end do
   end subroutine calculate_Hilbert_weights
 
-  subroutine head_polarizability_3d_T(eps_T, Omegas, spec_eps_T, Hilbert_weights_T)
-    !! Head of the bare polarizability of the 3d Kohn-Sham system using
+  subroutine head_polarizability_real_3d_T(Reeps_T, Omegas, spec_eps_T, Hilbert_weights_T)
+    !! Head of the bare real polarizability of the 3d Kohn-Sham system using
     !! Hilbert transform for a given set of temperature-dependent quantities.
     !!
     !! Here we calculate the diagonal in G-G' space. Moreover,
     !! we use the approximation G.r -> 0.
     !!
-    !! eps_T Real part of bare polarizability
+    !! Reeps_T Real part of bare polarizability
     !! Omega Energy of excitation in the electron gas
     !! spec_eps_T Spectral head of bare polarizability
     !! Hilbert_weights_T Hilbert transform weights
     
-    complex(r64), allocatable, intent(out) :: eps_T(:)
+    real(r64), allocatable, intent(out) :: Reeps_T(:)
     real(r64), intent(in) :: Omegas(:)
     real(r64), intent(in) :: spec_eps_T(:)
-    complex(r64), intent(in) :: Hilbert_weights_T(:, :)
-
-    allocate(eps_T(size(Omegas)))
+    real(r64), intent(in) :: Hilbert_weights_T(:, :)
+    
+    allocate(Reeps_T(size(Omegas)))
     
     !TODO Can optimize this sum with blas
-    eps_T = matmul(Hilbert_weights_T, spec_eps_T)
-  end subroutine head_polarizability_3d_T
+    Reeps_T = matmul(Hilbert_weights_T, spec_eps_T)
+  end subroutine head_polarizability_real_3d_T
+
+  subroutine head_polarizability_imag_3d_T(Imeps_T, Omegas_samp, Omegas_cont, spec_eps_T)
+    !! Head of the bare Imagniary polarizability of the 3d Kohn-Sham system using
+    !! linear interpolation from the same evaluated in a fine, continuous mesh.
+    !!
+    !! Here we calculate the diagonal in G-G' space. Moreover,
+    !! we use the approximation G.r -> 0.
+    !!
+    !! Imeps_T Imaginary part of bare polarizability
+    !! Omegas_samp Sampling energies of excitation in the electron gas
+    !! Omegas_cont Continous energies of excitation in the electron gas
+    !! spec_eps_T Spectral head of bare polarizability
+    
+    real(r64), intent(in) :: Omegas_samp(:), Omegas_cont(:)
+    real(r64), intent(in) :: spec_eps_T(:)
+    real(r64), allocatable, intent(out) :: Imeps_T(:)
+
+    integer :: isamp, ncont, nsamp, ileft, iright
+    real(r64) :: dOmega, w
+
+    ncont = size(Omegas_cont)
+    nsamp = size(Omegas_samp)
+    
+    allocate(Imeps_T(nsamp))
+
+    dOmega = Omegas_cont(2) - Omegas_cont(1)
+    
+    do isamp = 1, nsamp
+       w = Omegas_samp(isamp)
+       ileft = minloc(abs(Omegas_cont - w), dim = 1)
+       if(ileft == ncont) then
+          Imeps_T(isamp) = spec_eps_T(ileft)
+       else
+          iright = ileft + 1
+          Imeps_T(isamp) = ((Omegas_cont(iright) - w)*spec_eps_T(ileft) + &
+               (w - Omegas_cont(ileft))*spec_eps_T(iright))/dOmega
+       end if
+    end do
+
+    Imeps_T = -pi*Imeps_T
+  end subroutine head_polarizability_imag_3d_T
   
   !subroutine Im_head_polarizability_3d(Imeps, Omegas, q_indvec, el, pcell_vol, T)
-  subroutine spectral_head_polarizability_3d(spec_eps, Omegas, q_indvec, el, pcell_vol, T)
+  subroutine spectral_head_polarizability_3d(spec_eps, Omegas, q_indvec, el, pcell_vol, T, tetrahedra)
     !! Spectral head of the bare polarizability of the 3d Kohn-Sham system using
     !! Eq. 16 of Shishkin and Kresse Phys. Rev. B 74, 035101 (2006).
     !!
@@ -178,6 +209,7 @@ contains
     integer(i64), intent(in) :: q_indvec(3)
     type(electron), intent(in) :: el
     real(r64), allocatable, intent(out) :: spec_eps(:)
+    logical, intent(in) :: tetrahedra
     
     !Locals
     integer(i64) :: m, n, ik, ikp, ikp_window, iOmega, nOmegas, k_indvec(3), kp_indvec(3)
@@ -190,13 +222,8 @@ contains
     
     allocate(spec_eps(nOmegas))
 
-    !TODO don't have to use tetrahedron since I only need the imag part.
-    !May use triangles also => easily extensible to the 2D case
-    !
     !Associate delta function procedure pointer
-    !delta_fn_ptr => get_delta_fn_pointer(tetrahedra = .true.)
-    !delta_fn_ptr => get_delta_fn_pointer(tetrahedra = .false.)
-    !Comment: The delta-fn methods above are giving very different numbers.
+    delta_fn_ptr => get_delta_fn_pointer(tetrahedra)
     
     spec_eps = 0.0
     do iOmega = 1, nOmegas
@@ -211,9 +238,6 @@ contains
              !Calculate index vector of final electron: k' = k + q
              k_indvec = nint(el%wavevecs(ik, :)*el%wvmesh)    
              kp_indvec = modulo(k_indvec + q_indvec, el%wvmesh) !0-based index vector
-
-             !DEBUG: Disallow Umklapp
-             !if(any(k_indvec/el%wvmesh >= 1.0)) cycle
              
              !Multiplex kp_indvec
              ikp = mux_vector(kp_indvec, el%wvmesh, 0_i64)
@@ -231,38 +255,26 @@ contains
                 !This is |U(k')U^\dagger(k)|_nm squared
                 !(Recall that U^\dagger(k) is the diagonalizer of the electronic hamiltonian.)
                 overlap = (abs(dot_product(el%evecs(ikp_window, n, :), el%evecs(ik, m, :))))**2
-                !overlap = 1.0
 
-!!$                spec_eps(iOmega) = spec_eps(iOmega) + &
-!!$                     (Fermi(ek, el%chempot, T) - &
-!!$                     Fermi(ekp, el%chempot, T))*overlap* &
-!!$                     delta_fn_ptr(ekp - Omegas(iOmega), ik, m, &
-!!$                     el%wvmesh, el%simplex_map, &
-!!$                     el%simplex_count, el%simplex_evals)
-                
-                
-                !DBG
-                Omega_l = Omegas(iOmega) - dOmega
-                Omega_r = Omegas(iOmega) + dOmega
-                
-                if(Omega_l < ekp - ek .and. ekp - ek < Omega_r) continue
-                
-                delta = finite_element(ekp - ek, &
-                     Omega_l, Omegas(iOmega), Omega_r)
-!!$                
-!!$                if(iOmega == 1) then
-!!$                   delta = finite_element(ekp - ek, &
-!!$                        Omegas_l, Omegas(iOmega), Omegas(iOmega + 1))
-!!$                else if(iOmega == nOmegas) then
-!!$                   delta = finite_element(ekp - ek, &
-!!$                        Omegas(iOmega - 1), Omegas(iOmega), Omegas(iOmega) + dOmega)
-!!$                else
-!!$                   delta = finite_element(ekp - ek, &
-!!$                        Omegas(iOmega - 1), Omegas(iOmega), Omegas(iOmega + 1))
-!!$                end if
                 spec_eps(iOmega) = spec_eps(iOmega) + &
                      (Fermi(ek, el%chempot, T) - &
-                     Fermi(ekp, el%chempot, T))*overlap*delta/product(el%wvmesh)
+                     Fermi(ek + Omegas(iOmega) , el%chempot, T))*overlap* &
+                     delta_fn_ptr(ekp - Omegas(iOmega), ik, m, &
+                     el%wvmesh, el%simplex_map, &
+                     el%simplex_count, el%simplex_evals)
+                
+!!$                !DBG
+!!$                Omega_l = Omegas(iOmega) - dOmega
+!!$                Omega_r = Omegas(iOmega) + dOmega
+!!$                
+!!$                if(Omega_l < ekp - ek .and. ekp - ek < Omega_r) continue
+!!$                
+!!$                delta = finite_element(ekp - ek, &
+!!$                     Omega_l, Omegas(iOmega), Omega_r)/dOmega
+!!$
+!!$                spec_eps(iOmega) = spec_eps(iOmega) + &
+!!$                     (Fermi(ek, el%chempot, T) - &
+!!$                     Fermi(ek + Omegas(iOmega), el%chempot, T))*overlap*delta/product(el%wvmesh)
              end do
           end do
        end do
@@ -271,14 +283,8 @@ contains
     do iOmega = 1, nOmegas
        !Recall that the resolvent is already normalized in the full wave vector mesh.
        !As such, the 1/product(el%wvmesh) is not needed in the expression below.
-!!$       spec_eps(iOmega) = &
-!!$            -spec_eps(iOmega)*pi*sign(1.0_r64, Omegas(iOmega))*el%spindeg/pcell_vol
-
        spec_eps(iOmega) = &
-            -spec_eps(iOmega)*sign(1.0_r64, Omegas(iOmega))*el%spindeg/pcell_vol
-
-       !Zero out extremely small numbers !TODO What is small? In what units?
-       !if(abs(spec_eps(iOmega)) < 1.0e-30_r64) spec_eps(iOmega) = 0.0_r64
+            spec_eps(iOmega)*sign(1.0_r64, Omegas(iOmega))*el%spindeg/pcell_vol
     end do
     !At this point [spec_eps] = nm^-3.eV^-1
 
@@ -302,17 +308,17 @@ contains
     real(r64) :: qcrys(3), zeroplus
     integer(i64) :: iq, iOmega, numomega, numq, &
          start, end, chunk, num_active_images, qxmesh
-    real(r64), allocatable :: spec_eps(:)
-    complex(r64), allocatable :: diel(:, :), eps(:), Hilbert_weights(:, :)
+    real(r64), allocatable :: spec_eps(:), Imeps(:), Reeps(:), Hilbert_weights(:, :)
+    complex(r64), allocatable :: diel(:, :)
     character(len = 1024) :: filename
-    real(r64) :: eps0_q0_prefac, omega_plasma
+    real(r64) :: omega_plasma
 
     !Silicon
-    !omega_plasma = 1.0e-9*hbar*sqrt(el%conc_el/perm0/crys%epsilon0/(0.267*me)) !eV
+    !omega_plasma = 1.0e-9_r64*hbar*sqrt(el%conc_el/perm0/crys%epsilon0/(0.267*me)) !eV
 
     !wGaN
-    omega_plasma = 1.0e-9*hbar*sqrt(el%conc_el/perm0/crys%epsiloninf/(0.22*me)) !eV
-    
+    omega_plasma = 1.0e-9_r64*hbar*sqrt(el%conc_el/perm0/crys%epsiloninf/(0.22_r64*me)) !eV
+        
     if(this_image() == 1) then
        print*, "plasmon energy = ", omega_plasma
     end if
@@ -341,29 +347,28 @@ contains
 !!$    end do
 !!$    call sort(qmaglist)
 
-    numq = 2
+    numq = 12
     !Create qlist in crystal coordinates
     allocate(qlist(numq, 3), qmaglist(numq))
     do iq = 1, numq
-       qlist(iq, :) = el%wavevecs_irred(iq, :)
+       qlist(iq, :) = el%wavevecs(iq, :)
        qmaglist(iq) = twonorm(matmul(crys%reclattvecs, qlist(iq, :)))
-       !qmaglist(iq) = qdist(qlist(iq, :), crys%reclattvecs)
     end do
 
     !Create energy grid
-    numomega = 200
+    numomega = 300
     allocate(energylist(numomega))
     call linspace(energylist, 0.0_r64, 0.2_r64, numomega)
 
     !Small number
-    zeroplus = (energylist(2) - energylist(1))*0.1
+    zeroplus = (energylist(2) - energylist(1))*1.0e-12
     
     !Allocate diel_ik to hold maximum possible Omega
     allocate(diel(numq, numomega))
     diel = 0.0_r64
 
     !Allocate polarizability
-    allocate(spec_eps(numomega), eps(numomega))
+    allocate(spec_eps(numomega))
 
     !Allocate the Hilbert weights
     allocate(Hilbert_weights(numomega, numomega))
@@ -383,8 +388,9 @@ contains
        !1. q -> 0
        !2. Omega -> 0
           call spectral_head_polarizability_3d(&
-               spec_eps, energylist, nint(qcrys*el%wvmesh)+0_i64, el, crys%volume, crys%T)
-
+               spec_eps, energylist, nint(qcrys*el%wvmesh)+0_i64, el, crys%volume, crys%T, &
+               num%tetrahedra)
+          
           !Calculate re_eps with Hilbert-Kramers-Kronig transform
           call calculate_Hilbert_weights(&
                w_disc = energylist, &
@@ -392,8 +398,9 @@ contains
                zeroplus = zeroplus, & !Can this magic "small" number be removed?
                Hilbert_weights = Hilbert_weights)
 
-          !call Re_head_polarizability_3d_T(Reeps, energylist, Imeps, Hilbert_weights)
-          call head_polarizability_3d_T(eps, energylist, spec_eps, Hilbert_weights)
+          call head_polarizability_real_3d_T(Reeps, energylist, spec_eps, Hilbert_weights)
+
+          call head_polarizability_imag_3d_T(Imeps, energylist, energylist, spec_eps)
           
           !Calculate RPA dielectric (diagonal in G-G' space)
 !!$          diel(iq, :) = 1.0_r64 - &
@@ -413,22 +420,24 @@ contains
           !energy expression requires a single effective mass.
           !Just leaving it here for now to get the plasmon peak in the loss function.
           diel(iq, 1:numomega) = 1.0_r64 - &
-               (omega_plasma/energylist(1:numomega))**2 !+ oneI*1.0e-9
+               (omega_plasma/energylist(1:numomega))**2
        else
-          !DBG
+
           diel(iq, :) = crys%epsiloninf - &
                1.0_r64/qmaglist(iq)**2* &
-               (real(eps) + oneI*pi*(spec_eps))/perm0*qe*1.0e9_r64
-!!$          
-!!$          diel(iq, :) = crys%epsiloninf - &
-!!$               1.0_r64/qmaglist(iq)**2*eps/perm0*qe*1.0e9_r64
+               (Reeps + oneI*Imeps)/perm0*qe*1.0e9_r64
+          
+!!$          diel(iq, :) = 1.0_r64 - &
+!!$               1.0_r64/qmaglist(iq)**2*eps/perm0/crys%epsiloninf*qe*1.0e9_r64
        end if
     end do
 
     call co_sum(diel)
 
     !Handle Omega = 0 case
-    !diel(:, 1) = 1.0_r64 + (crys%qTF/qmaglist(:))**2
+    !Thomas-Fermi limit
+    !Is this complete? Where's the eigenvectors overlap factor?
+!!$    diel(:, 1) = crys%epsiloninf*(1.0_r64 + (crys%qTF/qmaglist(:))**2)
     
     !Print to file
     call write2file_rank2_real("RPA_dielectric_3D_G0_qpath", qlist)

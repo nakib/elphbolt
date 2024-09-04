@@ -17,7 +17,7 @@ program screening_comparison
   real(r64), allocatable :: el_ens_parabolic(:), qmags(:)
 
   !concentration and temperature
-  real(r64), parameter :: conc = 0.39115390E+19 !cm^-3
+  real(r64), parameter :: conc = 0.39054925E+19!0.39115390E+19 !cm^-3
   real(r64), parameter :: T = 300.0 !1.0 !K
 
   !real(r64), parameter :: m_eff = 0.267*me !Si
@@ -61,7 +61,7 @@ program screening_comparison
   !Calculate Plasmon energy
   !en_plasmon = 1.0e-9_r64*hbar_evps*qe*sqrt(conc/perm0/epsilon0/m_eff) !eV
 
-  en_plasmon = 1.0e-9_r64*hbar_evps*qe*sqrt(conc/perm0/epsiloninf/m_eff) !eV
+  en_plasmon = 1.0e-9_r64*hbar*sqrt(conc/perm0/epsiloninf/m_eff) !eV
   print*, 'Plasmon energy = ', en_plasmon, ' eV'
 
   !Calculate Thomas-Fermi screening wave vector (T << T_F limit)
