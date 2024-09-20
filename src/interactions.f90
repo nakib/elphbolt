@@ -2877,14 +2877,14 @@ contains
           !Apply energy window to initial (IBZ blocks) electron
           if(abs(el%ens_irred(ik, m) - el%enref) > el%fsthick) cycle
 
-          !TODO e-e scattering rates (OTF only at the mo)
-          !if(num%elel) then
-          call calculate_Xee_OTF(el, num, istate, crys, X)
-          do iproc = 1, size(X)
-             rta_rates_ee(ik, m) = rta_rates_ee(ik, m) + X(iproc)
-          end do
-          !end if
-          !
+!!$          !TODO e-e scattering rates (OTF only at the mo)
+!!$          !if(num%elel) then
+!!$          call calculate_Xee_OTF(el, num, istate, crys, X)
+!!$          do iproc = 1, size(X)
+!!$             rta_rates_ee(ik, m) = rta_rates_ee(ik, m) + X(iproc)
+!!$          end do
+!!$          !end if
+!!$          !
           
           !Set X+ filename
           write(tag, '(I9)') istate
