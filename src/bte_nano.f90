@@ -81,6 +81,8 @@ module bte_nano_module
      !! Electron RTA scattering rates on the IBZ due to boundary scattering.
      real(r64), allocatable :: el_rta_rates_eph_ibz(:,:)
      !! Electron RTA scattering rates on the IBZ due to e-ph interactions.
+     real(r64), allocatable :: el_rta_rates_ee_ibz(:,:)
+     !! Electron RTA scattering rates on the IBZ due to e-e interactions.
      real(r64), allocatable :: el_rta_rates_ibz(:,:)
      !! Electron RTA scattering rates on the IBZ.
      real(r64), allocatable :: el_field_term_T(:,:,:)
@@ -299,13 +301,15 @@ contains
 
     !Calculate RTA scattering rates
     ! e-ph and e-impurity
-    call calculate_el_rta_rates(self%el_rta_rates_eph_ibz, self%el_rta_rates_echimp_ibz, num, crys, el)
+    call calculate_el_rta_rates(self%el_rta_rates_eph_ibz, self%el_rta_rates_echimp_ibz, &
+         self%el_rta_rates_ee_ibz, num, crys, el)
 
     !Allocate total RTA scattering rates
     allocate(self%el_rta_rates_ibz(el%nwv_irred, el%numbands))
 
     !Matthiessen's rule
-    self%el_rta_rates_ibz = self%el_rta_rates_eph_ibz + self%el_rta_rates_echimp_ibz
+    self%el_rta_rates_ibz = self%el_rta_rates_eph_ibz + self%el_rta_rates_ee_ibz + &
+         self%el_rta_rates_echimp_ibz
 
     !Compute suppresion factor for the several nanostructures
     call nano%compute_suppression('el', sym, self%el_rta_rates_ibz, ph, el)
@@ -345,6 +349,9 @@ contains
 
     !Write RTA scattering rates to file
     call write2file_rank2_real('el.W_rta_eph', self%el_rta_rates_eph_ibz)
+
+    !Write e-e RTA scattering rates to file
+    call write2file_rank2_real('el.W_rta_ee', self%el_rta_rates_ee_ibz)
 
     !Write e-chimp RTA scattering rates to file
     call write2file_rank2_real('el.W_rta_echimp', self%el_rta_rates_echimp_ibz)

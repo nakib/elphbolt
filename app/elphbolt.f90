@@ -39,7 +39,7 @@ program elphbolt
   use Green_function, only: calculate_retarded_phonon_D0
   use nano_module, only: nanostructure
   use bte_nano_module, only: bte_nano
-  use screening_module, only: calculate_RPA_dielectric_3d_G0_qpath
+  use screening_module, only: calculate_RPA_dielectric_3d_G0_scratch
   
   implicit none
   
@@ -157,7 +157,8 @@ program elphbolt
 !!$     !TEST/DUBUG
 !!$     !Calculate RPA dielectric for q over Gamma-Gamma along x over a uniform boson energy mesh
 !!$     call t_event%start_timer('RPA dielectric')
-!!$     call calculate_RPA_dielectric_3d_G0_qpath(el, crys, num)
+!!$     !call calculate_RPA_dielectric_3d_G0_scratch(el, crys, num, wann)
+!!$     call calculate_RPA_dielectric_3d_G0_scratch(el, crys, num, wann)
 !!$     call t_event%end_timer('RPA dielectric')
 !!$     call exit
 !!$     !!
@@ -244,10 +245,11 @@ program elphbolt
         end if
      end if
 
-     if(num%onlyebte .or. num%drag .or. num%phe) then
-        !After this point the electron eigenvectors are not needed
-        call el%deallocate_eigenvecs
-     end if
+     !TODO Need to revisit this
+!!$     if(num%onlyebte .or. num%drag .or. num%phe) then
+!!$        !After this point the electron eigenvectors are not needed
+!!$        call el%deallocate_eigenvecs
+!!$     end if
      
      if(num%onlyphbte .or. num%drag) then
         if(.not. num%read_V) then

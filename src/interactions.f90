@@ -115,6 +115,7 @@ contains
     gchimp2 = prefac*overlap*Gsum !ev^2
   end function gchimp2
 
+  !TODO Might need to do this for G, G' /= 0
   pure real(r64) function gCoul2(el, crys, qcrys, evec_k, evec_kp)
     !! Function to calculate the Thomas-Fermi screened
     !! squared electron-electron vertex.
@@ -122,11 +123,11 @@ contains
     type(crystal), intent(in) :: crys
     type(electron), intent(in) :: el
     real(r64), intent(in) :: qcrys(3)
-    complex(r64),intent(in) :: evec_k(:), evec_kp(:)
+    complex(r64), intent(in) :: evec_k(:), evec_kp(:)
     
     real(r64) :: qcart(3), prefac, overlap, qmag
 
-    prefac = 1.0e18_r64*crys%volume**3
+    prefac = 1.0e18_r64/crys%volume**2/qe**2
 
     !Magnitude of q-vector
     qmag = twonorm(matmul(crys%reclattvecs, qcrys))
@@ -135,9 +136,8 @@ contains
     !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
     overlap = (abs(dot_product(evec_kp, evec_k)))**2
     
-    !For G, G' = 0
     gCoul2 = prefac*overlap* &
-         (qe**2/perm0/crys%epsilon0/(qmag**2 + crys%qTF**2))**2 !eV^2/nm^3
+         (qe**2/perm0/crys%epsilon0/(qmag**2 + crys%qTF**2))**2 !eV^2
   end function gCoul2
   
   pure real(r64) function Vm2_3ph(ev1_s1, ev2_s2, ev3_s3, &
@@ -2313,22 +2313,21 @@ contains
     sync all
   end subroutine calculate_eph_interaction_ibzk
 
-  subroutine calculate_Xee_OTF(el, num, istate1, T, crys, X)
+  subroutine calculate_Xee_OTF(el, num, istate1, crys, X)
     !! On-the-fly serial calculator of the e-e transition probability.
     !! for a given IBZ electron states within the transport window.
 
     type(electron), intent(in) :: el
     type(numerics), intent(in) :: num
     type(crystal), intent(in) :: crys
-    real(r64), intent(in) :: T
     integer(i64), intent(in) :: istate1
     real(r64), intent(out), allocatable :: X(:)
     
     !Local variables
-    integer(i64) :: nstates_irred, istate, &
+    integer(i64) :: istate, &
          n1, ik1, n2, ik2, n3, ik3, n4, ik4, &
          count, nprocs
-    real(r64) :: const, beta, fermi2, fermi3, fermi4, &
+    real(r64) :: const, beta, fermi1, fermi2, fermi3, fermi4, &
          delta_val, occup_fac, en1, en2, en3, en4, g2
     !integer(i64), allocatable :: istate_el(:), istate_ph(:)
     character(len = 1024) :: filename
@@ -2336,16 +2335,16 @@ contains
     type(vec) :: k1_vec, k2_vec, k3_vec, k4_vec, q_vec
 
     !Inverse temperature energy
-    beta = 1.0_r64/T/kB
+    beta = 1.0_r64/crys%T/kB
     
     !Associate delta function procedure pointer
     delta_fn_ptr => get_delta_fn_pointer(num%tetrahedra)
     
     !Constant factor in transition probability expression
-    const = twopi/hbar_eVps
+    const = 2.0_r64*twopi/hbar_eVps/product(el%wvmesh)
 
     !Total number of IBZ blocks states
-    nstates_irred = el%nwv_irred*el%numbands
+    !nstates_irred = el%nwv_irred*el%numbands
 
     !Maxium possible length of transition rates
     !Nk**3*Nbands**2
@@ -2354,14 +2353,17 @@ contains
     !Allocate transition rates
     allocate(X(nprocs))
 
-    !Initialize X and and the process tallies
+    !Initialize X !TODO and the process tallies
     X(:) = 0.0_r64
 
-    !Demux state index into band (m) and wave vector (ik) indices
+    !Demux state index into band (n1) and wave vector (ik1) indices
     call demux_state(istate1, el%numbands, n1, ik1)
 
     !Electron 1 energy
     en1 = el%ens_irred(ik1, n1)
+
+    !Fermi function of electron 1
+    fermi1 = Fermi(en1, el%chempot, crys%T)
 
     !Initialize process counter for the state (k1, n1)
     count = 0
@@ -2389,19 +2391,19 @@ contains
              if(abs(en3 - el%enref) > el%fsthick) cycle
 
              !Fermi function of electron 3
-             fermi3 = Fermi(en3, el%chempot, T)
+             fermi3 = Fermi(en3, el%chempot, crys%T)
 
-             !Squared matrix element
-             g2 = gCoul2(el, crys, q_vec%frac, &
-                  el%evecs_irred(ik1, n1, :), el%evecs(ik2, n2, :))
-
-             do ik2 = 1, el%nwv       
+             do ik2 = 1, el%nwv
                 !Create 2nd electron wave vector
                 k2_vec = vec(el%indexlist(ik2), el%wvmesh, crys%reclattvecs)
 
                 !Create final electron wave vector
                 !delta(q + k2 - k4)
                 k4_vec = vec_add(q_vec, k2_vec, el%wvmesh, crys%reclattvecs)
+
+                !Is k4 within the transport window restricted BZ?
+                call binsearch(el%indexlist, k4_vec%muxed_index, ik4)
+                if(ik4 < 0) cycle
 
                 do n2 = 1, el%numbands
                    !Electron 2 energy
@@ -2410,8 +2412,12 @@ contains
                    !Apply energy window to electron 2
                    if(abs(en2 - el%enref) > el%fsthick) cycle
 
+                   !Squared matrix element
+                   g2 = gCoul2(el, crys, q_vec%frac, &
+                        el%evecs_irred(ik1, n1, :), el%evecs(ik2, n2, :))
+                   
                    !Fermi function of electron 2
-                   fermi2 = Fermi(en2, el%chempot, T)
+                   fermi2 = Fermi(en2, el%chempot, crys%T)
 
                    do n4 = 1, el%numbands
                       !Electron 4 energy
@@ -2424,17 +2430,21 @@ contains
                       count = count + 1
 
                       !Fermi function of electron 4
-                      fermi4 = Fermi(en4, el%chempot, T)
+                      fermi4 = Fermi(en4, el%chempot, crys%T)
 
                       !Evaulate delta function
                       delta_val = delta_fn_ptr(en4 + en3 - en1, &
                            ik2, n2, el%wvmesh, el%simplex_map, &
                            el%simplex_count, el%simplex_evals)
 
-                      !Temperature dependent occupation factor
-                      !f1.f2.(1 - f3)(1 - f4)/[f1(1 - f1)]
-                      occup_fac = fermi2*(1.0_r64 - fermi3*exp(beta*(en3 - en1)))* &
-                           (1.0_r64 - fermi4)
+!!$                      !Temperature dependent occupation factor
+!!$                      !f1.f2.(1 - f3)(1 - f4)/[f1(1 - f1)]
+!!$                      occup_fac = fermi2*(1.0_r64 - &
+!!$                           fermi3*(1.0_r64 - exp(beta*(en3 - en1))))* &
+!!$                           (1.0_r64 - fermi4)
+
+                      occup_fac = fermi2*(1.0_r64 - fermi3)*(1.0_r64 - fermi4)/ &
+                           (1.0_r64 - fermi1)
 
                       !Save transition rate
                       X(count) = g2*occup_fac*delta_val
@@ -2821,12 +2831,14 @@ contains
     end if
   end subroutine calculate_4ph_rta_rates
   
-  subroutine calculate_el_rta_rates(rta_rates_eph, rta_rates_echimp, num, crys, el)
+  subroutine calculate_el_rta_rates(rta_rates_eph, rta_rates_echimp, rta_rates_ee, &
+       num, crys, el)
     !! Subroutine for parallel reading of the e-ph transition probabilities
     !! from disk and calculating the relaxation time approximation (RTA)
     !! scattering rates for the e-ph channel.
 
-    real(r64), allocatable, intent(out) :: rta_rates_eph(:,:), rta_rates_echimp(:,:)
+    real(r64), allocatable, intent(out) :: rta_rates_eph(:,:), &
+         rta_rates_echimp(:,:), rta_rates_ee(:,:)
     type(numerics), intent(in) :: num
     type(crystal), intent(in) :: crys
     type(electron), intent(in) :: el
@@ -2851,6 +2863,8 @@ contains
     !Allocate and initialize scattering rates
     allocate(rta_rates_eph(el%nwv_irred, el%numbands))
     rta_rates_eph(:, :) = 0.0_r64
+    allocate(rta_rates_ee(el%nwv_irred, el%numbands))
+    rta_rates_ee(:, :) = 0.0_r64
     allocate(rta_rates_echimp(el%nwv_irred, el%numbands))
     rta_rates_echimp(:, :) = 0.0_r64
 
@@ -2863,6 +2877,15 @@ contains
           !Apply energy window to initial (IBZ blocks) electron
           if(abs(el%ens_irred(ik, m) - el%enref) > el%fsthick) cycle
 
+          !TODO e-e scattering rates (OTF only at the mo)
+          !if(num%elel) then
+          call calculate_Xee_OTF(el, num, istate, crys, X)
+          do iproc = 1, size(X)
+             rta_rates_ee(ik, m) = rta_rates_ee(ik, m) + X(iproc)
+          end do
+          !end if
+          !
+          
           !Set X+ filename
           write(tag, '(I9)') istate
           filepath_Xp = trim(adjustl(num%Xdir))//'/Xplus.istate'//trim(adjustl(tag))
@@ -2905,14 +2928,15 @@ contains
     end if
 
     !Reduce partial sums
-    sync all
     call co_sum(rta_rates_eph)
-    sync all
+    
     if(num%elchimp) then
-       sync all
        call co_sum(rta_rates_echimp)
-       sync all
-    end if    
+    end if
+
+    !if(num%elel) then
+       call co_sum(rta_rates_ee)
+    !end if
   end subroutine calculate_el_rta_rates
   
   subroutine read_transition_probs_e(filepath, N, TP, istate1, istate2)

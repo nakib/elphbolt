@@ -79,6 +79,8 @@ module bte_module
      !! Electron RTA scattering rates on the IBZ due to boundary scattering.
      real(r64), allocatable :: el_rta_rates_eph_ibz(:,:)
      !! Electron RTA scattering rates on the IBZ due to e-ph interactions.
+     real(r64), allocatable :: el_rta_rates_ee_ibz(:,:)
+     !! Electron RTA scattering rates on the IBZ due to e-e interactions.
      real(r64), allocatable :: el_rta_rates_ibz(:,:)
      !! Electron RTA scattering rates on the IBZ.
      real(r64), allocatable :: el_field_term_T(:,:,:)
@@ -217,7 +219,8 @@ contains
 
     !Calculate RTA scattering rates
     ! e-ph and e-impurity
-    call calculate_el_rta_rates(self%el_rta_rates_eph_ibz, self%el_rta_rates_echimp_ibz, num, crys, el)
+    call calculate_el_rta_rates(self%el_rta_rates_eph_ibz, self%el_rta_rates_echimp_ibz, &
+         self%el_rta_rates_ee_ibz, num, crys, el)
 
     ! e-boundary
     call calculate_bound_scatt_rates(el%prefix, num%elbound, crys%bound_length, &
@@ -228,7 +231,7 @@ contains
 
     !Matthiessen's rule
     self%el_rta_rates_ibz = self%el_rta_rates_eph_ibz + self%el_rta_rates_echimp_ibz + &
-         self%el_rta_rates_bound_ibz
+         self%el_rta_rates_ee_ibz + self%el_rta_rates_bound_ibz
 
     !gradT field:
     ! Calculate field term (gradT=>I0)
@@ -275,8 +278,11 @@ contains
     !Change to data output directory
     call chdir(trim(adjustl(Tdir)))
 
-    !Write RTA scattering rates to file
+    !Write e-ph RTA scattering rates to file
     call write2file_rank2_real('el.W_rta_eph', self%el_rta_rates_eph_ibz)
+
+    !Write e-e RTA scattering rates to file
+    call write2file_rank2_real('el.W_rta_ee', self%el_rta_rates_ee_ibz)
 
     !Write e-chimp RTA scattering rates to file
     call write2file_rank2_real('el.W_rta_echimp', self%el_rta_rates_echimp_ibz)
