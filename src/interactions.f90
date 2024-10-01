@@ -135,7 +135,8 @@ contains
     !This is [U(k')U^\dagger(k)]_nm squared
     !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
     overlap = (abs(dot_product(evec_kp, evec_k)))**2
-    
+
+    !TODO: Shouldn't I use crys%epsiloninf instead using Sanborn's prescription?
     gCoul2 = prefac*overlap* &
          (qe**2/perm0/crys%epsilon0/(qmag**2 + crys%qTF**2))**2 !eV^2
   end function gCoul2
@@ -2328,7 +2329,7 @@ contains
          n1, ik1, n2, ik2, n3, ik3, n4, ik4, &
          count, nprocs
     real(r64) :: const, beta, fermi1, fermi2, fermi3, fermi4, &
-         delta_val, occup_fac, en1, en2, en3, en4, g2
+         delta_val, occup_fac, en1, en2, en3, en4, g2, q_frac_noU(3)
     !integer(i64), allocatable :: istate_el(:), istate_ph(:)
     character(len = 1024) :: filename
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
@@ -2342,9 +2343,6 @@ contains
     
     !Constant factor in transition probability expression
     const = 2.0_r64*twopi/hbar_eVps/product(el%wvmesh)
-
-    !Total number of IBZ blocks states
-    !nstates_irred = el%nwv_irred*el%numbands
 
     !Maxium possible length of transition rates
     !Nk**3*Nbands**2
@@ -2373,15 +2371,18 @@ contains
 
        !Create initial electron wave vector
        k1_vec = vec(el%indexlist_irred(ik1), el%wvmesh, crys%reclattvecs)
-
-       !Run over electrons states 3 to 4, eliminating the k4 sum with the
+       
+       !Run over electrons states 2, 3, and 4, eliminating the k4 sum with the
        !delta(k1 - k3 + k2 - k4)
        do ik3 = 1, el%nwv       
           !Create 3rd electron wave vector
           k3_vec = vec(el%indexlist(ik3), el%wvmesh, crys%reclattvecs)
 
           !q \equiv k1 - k3
-          q_vec = vec_add(k1_vec, k3_vec, el%wvmesh, crys%reclattvecs)
+          q_vec = vec_sub(k1_vec, k3_vec, el%wvmesh, crys%reclattvecs)
+
+!!$          !q = \equiv k1 - k3, without Umklapp, fractional units
+!!$          q_frac_noU = k1_vec%frac - k3_vec%frac
 
           do n3 = 1, el%numbands
              !Electron 3 energy
@@ -2400,6 +2401,10 @@ contains
                 !Create final electron wave vector
                 !delta(q + k2 - k4)
                 k4_vec = vec_add(q_vec, k2_vec, el%wvmesh, crys%reclattvecs)
+!!$                !DBG Don't use q_vec
+!!$                k4_vec = vec_add(&
+!!$                     vec_sub(k1_vec, k3_vec, el%wvmesh, crys%reclattvecs), &
+!!$                     k2_vec, el%wvmesh, crys%reclattvecs)
 
                 !Is k4 within the transport window restricted BZ?
                 call binsearch(el%indexlist, k4_vec%muxed_index, ik4)
@@ -2414,7 +2419,9 @@ contains
 
                    !Squared matrix element
                    g2 = gCoul2(el, crys, q_vec%frac, &
-                        el%evecs_irred(ik1, n1, :), el%evecs(ik2, n2, :))
+                        el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :))
+!!$                   g2 = gCoul2(el, crys, q_frac_noU, &
+!!$                        el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :))
                    
                    !Fermi function of electron 2
                    fermi2 = Fermi(en2, el%chempot, crys%T)
@@ -2430,21 +2437,23 @@ contains
                       count = count + 1
 
                       !Fermi function of electron 4
-                      fermi4 = Fermi(en4, el%chempot, crys%T)
-
+!!$                      fermi4 = Fermi(en4, el%chempot, crys%T)
+                      !DBG
+                      fermi4 = Fermi(en1 + en2 - en3, el%chempot, crys%T)
+                      
                       !Evaulate delta function
                       delta_val = delta_fn_ptr(en4 + en3 - en1, &
                            ik2, n2, el%wvmesh, el%simplex_map, &
                            el%simplex_count, el%simplex_evals)
 
-!!$                      !Temperature dependent occupation factor
-!!$                      !f1.f2.(1 - f3)(1 - f4)/[f1(1 - f1)]
-!!$                      occup_fac = fermi2*(1.0_r64 - &
-!!$                           fermi3*(1.0_r64 - exp(beta*(en3 - en1))))* &
-!!$                           (1.0_r64 - fermi4)
-
-                      occup_fac = fermi2*(1.0_r64 - fermi3)*(1.0_r64 - fermi4)/ &
-                           (1.0_r64 - fermi1)
+                      !Temperature dependent occupation factor
+                      !f1.f2.(1 - f3)(1 - f4)/[f1(1 - f1)]
+                      occup_fac = fermi2*(1.0_r64 - &
+                           fermi3*(1.0_r64 - exp(beta*(en3 - en1))))* &
+                           (1.0_r64 - fermi4)
+!!$
+!!$                      occup_fac = fermi2*(1.0_r64 - fermi3)*(1.0_r64 - fermi4) &
+!!$                           /(1.0_r64 - fermi1)
 
                       !Save transition rate
                       X(count) = g2*occup_fac*delta_val
@@ -2462,6 +2471,8 @@ contains
        !Multiply constant/units factor, etc.
        X = const*X
     end if
+
+    if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
   end subroutine calculate_Xee_OTF
 
   subroutine calculate_echimp_interaction_ibzk(crys, el, num)
@@ -2877,14 +2888,13 @@ contains
           !Apply energy window to initial (IBZ blocks) electron
           if(abs(el%ens_irred(ik, m) - el%enref) > el%fsthick) cycle
 
-!!$          !TODO e-e scattering rates (OTF only at the mo)
-!!$          !if(num%elel) then
-!!$          call calculate_Xee_OTF(el, num, istate, crys, X)
-!!$          do iproc = 1, size(X)
-!!$             rta_rates_ee(ik, m) = rta_rates_ee(ik, m) + X(iproc)
-!!$          end do
-!!$          !end if
-!!$          !
+          !e-e scattering rates (OTF only at the mo)
+          if(num%elel) then
+             call calculate_Xee_OTF(el, num, istate, crys, X)
+             do iproc = 1, size(X)
+                rta_rates_ee(ik, m) = rta_rates_ee(ik, m) + X(iproc)
+             end do
+          end if
           
           !Set X+ filename
           write(tag, '(I9)') istate

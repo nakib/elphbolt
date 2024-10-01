@@ -104,6 +104,8 @@ module numerics_module
      !! Choose if electron BTE will be solved.
      logical :: elchimp
      !! Use electron-charged impurity scattering?
+     logical :: elel
+     !! Use electron-electron scattering?
      logical :: elbound
      !! Use electron-boundary scattering?
      logical :: drag
@@ -170,14 +172,14 @@ contains
     logical :: read_gq2, read_gk2, read_V, read_W, tetrahedra, phe, phiso, phsubs, &
          phbound, phdef_Tmat, onlyphbte, onlyebte, elchimp, elbound, drag, plot_along_path, &
          phthinfilm, phthinfilm_ballistic, fourph, use_Wannier_ifc2s, phiso_Tmat, Bfield_on, &
-         W_OTF, Y_OTF, solve_bulk, solve_nano
+         W_OTF, Y_OTF, solve_bulk, solve_nano, elel
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
          read_V, read_W, tetrahedra, phe, phiso, phsubs, onlyphbte, onlyebte, maxiter, &
          conv_thres, drag, elchimp, plot_along_path, runlevel, ph_en_min, ph_en_max, &
          ph_en_num, el_en_min, el_en_max, el_en_num, phbound, elbound, phdef_Tmat, &
          ph_mfp_npts, ph_abs_q_npts, phthinfilm, phthinfilm_ballistic, &
-         fourph, fourph_mesh_ref, use_Wannier_ifc2s, &
+         fourph, fourph_mesh_ref, use_Wannier_ifc2s, elel, &
          phiso_Tmat, phiso_1B_theory, Bfield_on, Bfield, W_OTF, Y_OTF, &
          solve_bulk, solve_nano
 
@@ -210,6 +212,7 @@ contains
     onlyphbte = .false.
     onlyebte = .false.
     elchimp = .false.
+    elel = .false.
     elbound = .false.
     drag = .true.
     use_Wannier_ifc2s = .false.
@@ -315,6 +318,7 @@ contains
        self%onlyphbte = onlyphbte
        self%onlyebte = onlyebte
        self%elchimp = elchimp
+       self%elel = elel
        self%elbound = elbound
        self%drag = drag
        self%Y_OTF = Y_OTF
@@ -485,6 +489,7 @@ contains
              write(*,"(A,1E16.8)") 'Specularity factor =', crys%specfac
           end if
           write(*, "(A, L)") "Include el-charged impurity interaction: ", self%elchimp
+          write(*, "(A, L)") "Include el-el interaction: ", self%elel
           write(*, "(A, L)") "Include el-boundary interaction: ", self%elbound
           write(*, "(A, L)") "Solve bulk-BTE: ", self%solve_bulk
           write(*, "(A, L)") "Solve nano-BTE: ", self%solve_nano
