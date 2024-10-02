@@ -51,7 +51,7 @@ module interactions
        calculate_bound_scatt_rates, calculate_thinfilm_scatt_rates, &
        calculate_4ph_rta_rates, calculate_coarse_grained_3ph_vertex, &
        calculate_W_fromcgV2, calculate_W3ph_OTF, calculate_Y_OTF, &
-       Vm2_3ph
+       Vm2_3ph, calculate_Xee_OTF
 
   !external chdir, system
 
@@ -1883,7 +1883,7 @@ contains
     !Maximum length of g2_istate
     nprocs = el%nstates_inwindow*ph%numbands
 
-    !Allocate and initialize quantities related to transition probabilities
+    !Allocate quantities related to transition probabilities
     allocate(Y_istate(nprocs))
     if(keep_interaction_tally) &
          allocate(istate_el1(nprocs), istate_el2(nprocs))
@@ -2000,7 +2000,7 @@ contains
     
     !Shrink process tallies
     if(keep_interaction_tally) then
-       call shrink(istate_el2, count)
+       call shrink(istate_el1, count)
        call shrink(istate_el2, count)
     end if
 
@@ -2314,7 +2314,8 @@ contains
     sync all
   end subroutine calculate_eph_interaction_ibzk
 
-  subroutine calculate_Xee_OTF(el, num, istate1, crys, X)
+  subroutine calculate_Xee_OTF(el, num, istate1, crys, X, &
+       istate_el2, istate_el3, istate_el4)
     !! On-the-fly serial calculator of the e-e transition probability.
     !! for a given IBZ electron states within the transport window.
 
@@ -2323,6 +2324,8 @@ contains
     type(crystal), intent(in) :: crys
     integer(i64), intent(in) :: istate1
     real(r64), intent(out), allocatable :: X(:)
+    integer(i64), intent(out), allocatable, optional :: &
+         istate_el2(:), istate_el3(:), istate_el4(:)
     
     !Local variables
     integer(i64) :: istate, &
@@ -2330,11 +2333,15 @@ contains
          count, nprocs
     real(r64) :: const, beta, fermi1, fermi2, fermi3, fermi4, &
          delta_val, occup_fac, en1, en2, en3, en4, g2, q_frac_noU(3)
-    !integer(i64), allocatable :: istate_el(:), istate_ph(:)
     character(len = 1024) :: filename
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
     type(vec) :: k1_vec, k2_vec, k3_vec, k4_vec, q_vec
+    logical :: keep_interaction_tally
 
+    !Do I need to keep a tally of the all the interacting states?
+    keep_interaction_tally = present(istate_el2) .and. present(istate_el3) &
+         .and. present(istate_el4)
+    
     !Inverse temperature energy
     beta = 1.0_r64/crys%T/kB
     
@@ -2347,12 +2354,19 @@ contains
     !Maxium possible length of transition rates
     !Nk**3*Nbands**2
     nprocs = el%nstates_inwindow**2*el%numbands
-
-    !Allocate transition rates
+    
+    !Allocate quantities related to transition probabilities
     allocate(X(nprocs))
+    if(keep_interaction_tally) &
+         allocate(istate_el2(nprocs), istate_el3(nprocs), istate_el4(nprocs))
 
-    !Initialize X !TODO and the process tallies
+    !Initialize X, and if needed, the process tallies
     X(:) = 0.0_r64
+    if(keep_interaction_tally) then
+       istate_el2(:) = -1_i64
+       istate_el3(:) = -1_i64
+       istate_el4(:) = -1_i64
+    end if
 
     !Demux state index into band (n1) and wave vector (ik1) indices
     call demux_state(istate1, el%numbands, n1, ik1)
@@ -2457,6 +2471,13 @@ contains
 
                       !Save transition rate
                       X(count) = g2*occup_fac*delta_val
+
+                      !Save initial and final electron states
+                      if(keep_interaction_tally) then
+                         istate_el2(count) = mux_state(el%numbands, n2, ik2)
+                         istate_el3(count) = mux_state(el%numbands, n3, ik3)
+                         istate_el4(count) = mux_state(el%numbands, n4, ik4)
+                      end if
                    end do
                 end do
              end do
@@ -2470,6 +2491,13 @@ contains
        
        !Multiply constant/units factor, etc.
        X = const*X
+
+       !Shrink process tallies
+       if(keep_interaction_tally) then
+          call shrink(istate_el2, count)
+          call shrink(istate_el3, count)
+          call shrink(istate_el4, count)
+       end if
     end if
 
     if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)

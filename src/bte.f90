@@ -34,7 +34,7 @@ module bte_module
   use electron_module, only: electron
   use interactions, only: calculate_ph_rta_rates, read_transition_probs_e, &
        calculate_el_rta_rates, calculate_bound_scatt_rates, calculate_thinfilm_scatt_rates, &
-       calculate_4ph_rta_rates, calculate_W3ph_OTF, calculate_Y_OTF
+       calculate_4ph_rta_rates, calculate_W3ph_OTF, calculate_Y_OTF, calculate_Xee_OTF
   use bz_sums, only: calculate_transport_coeff, calculate_spectral_transport_coeff, &
        calculate_cumulative_transport_coeff
 
@@ -1247,14 +1247,17 @@ contains
 
     !Local variables
     integer(i64) :: nstates_irred, nprocs, chunk, istate, numbands, numbranches, &
-         ik_ibz, m, ieq, ik_sym, ik_fbz, iproc, ikp, n, nk, num_active_images, aux, &
-         start, end, nprocs_echimp, neg_ik_fbz
+         ik_ibz, m, ieq, ik_sym, ik_fbz, iproc, ikp, n, nk, num_active_images, &
+         aux, aux2, aux3, aux4, start, end, nprocs_echimp, neg_ik_fbz, nprocs_ee, &
+         n2, n3, n4, ik2, ik3, ik4
     integer :: i, j
-    integer(i64), allocatable :: istate_el(:), istate_ph(:), istate_el_echimp(:)
+    integer(i64), allocatable :: istate_el(:), istate_ph(:), istate_el_echimp(:), &
+         istate_el_ee2(:), istate_el_ee3(:), istate_el_ee4(:)
+         
     real(r64) :: tau_ibz, Bfield_unit_factor, eps
-    real(r64), allocatable :: Xplus(:), Xminus(:),  Xchimp(:), response_el_reduce(:,:,:), &
-         Delk_response(:, :, :, :), scratch(:, :)
-    character(1024) :: filepath_Xminus, filepath_Xplus, filepath_Xechimp, tag
+    real(r64), allocatable :: Xphplus(:), Xphminus(:),  Xchimp(:), Xee(:), &
+         response_el_reduce(:,:,:), Delk_response(:, :, :, :), scratch(:, :)
+    character(1024) :: filepath_Xphminus, filepath_Xphplus, filepath_Xechimp, tag
 
     !Factor to make B-field term have units of
     !C.nm for the E-field BTE and
@@ -1305,7 +1308,7 @@ contains
        do istate = start, end
           !Demux state index into band (m) and wave vector (ik_ibz) indices
           call demux_state(istate, numbands, m, ik_ibz)
-
+          
           !Apply energy window to initial (IBZ blocks) electron
           if(abs(el%ens_irred(ik_ibz, m) - el%enref) > el%fsthick) cycle
 
@@ -1317,28 +1320,35 @@ contains
           
           !Set X+ filename
           write(tag, '(I9)') istate
-          filepath_Xplus = trim(adjustl(num%Xdir))//'/Xplus.istate'//trim(adjustl(tag))
+          filepath_Xphplus = trim(adjustl(num%Xdir))//'/Xplus.istate'//trim(adjustl(tag))
 
           !Read X+ from file
-          call read_transition_probs_e(trim(adjustl(filepath_Xplus)), nprocs, Xplus, &
+          call read_transition_probs_e(trim(adjustl(filepath_Xphplus)), nprocs, Xphplus, &
                istate_el, istate_ph)
 
           !Set X- filename
           write(tag, '(I9)') istate
-          filepath_Xminus = trim(adjustl(num%Xdir))//'/Xminus.istate'//trim(adjustl(tag))
+          filepath_Xphminus = trim(adjustl(num%Xdir))//'/Xminus.istate'//trim(adjustl(tag))
 
           !Read X- from file
-          call read_transition_probs_e(trim(adjustl(filepath_Xminus)), nprocs, Xminus)
+          call read_transition_probs_e(trim(adjustl(filepath_Xphminus)), nprocs, Xphminus)
 
           !Read Xchimp from file
           if(num%elchimp) then
-               !Set Xchimp filename
-               write(tag, '(I9)') istate
-               filepath_Xechimp = trim(adjustl(num%Xdir))//'/Xchimp.istate'//trim(adjustl(tag))
-               call read_transition_probs_e(trim(adjustl(filepath_Xechimp)), nprocs_echimp, Xchimp, &
-                    istate_el_echimp)
+             !Set Xchimp filename
+             write(tag, '(I9)') istate
+             filepath_Xechimp = trim(adjustl(num%Xdir))//'/Xchimp.istate'//trim(adjustl(tag))
+             call read_transition_probs_e(trim(adjustl(filepath_Xechimp)), nprocs_echimp, Xchimp, &
+                  istate_el_echimp)
           end if
-
+          
+          !Electron-electron transition rates (for now on-the-fly computation)
+          if(num%elel) then
+             call calculate_Xee_OTF(el, num, istate, crys, Xee, &
+                  istate_el_ee2, istate_el_ee3, istate_el_ee4)
+             nprocs_ee = size(Xee)
+          end if
+          
           !Sum over the number of equivalent k-points of the IBZ point
           do ieq = 1, el%nequiv(ik_ibz)
              ik_sym = el%ibz2fbz_map(ieq, ik_ibz, 1) !symmetry
@@ -1355,7 +1365,7 @@ contains
                 call binsearch(el%indexlist, el%equiv_map(ik_sym, ikp), aux)
 
                 response_el_reduce(ik_fbz, m, :) = response_el_reduce(ik_fbz, m, :) + &
-                     response_el(aux, n, :)*(Xplus(iproc) + Xminus(iproc))
+                     response_el(aux, n, :)*(Xphplus(iproc) + Xphminus(iproc))
              end do
              
              !Add charged impurity contribution to the self consistent term
@@ -1370,6 +1380,30 @@ contains
                    
                    response_el_reduce(ik_fbz, m, :) = response_el_reduce(ik_fbz, m, :) + &
                         response_el(aux, n, :) * Xchimp(iproc)
+                end do
+             end if
+
+             !Add electron-electron scattering contribution to the self consistent term
+             if(num%elel) then
+                do iproc = 1, nprocs_ee
+                   !Electron 2
+                   call demux_state(istate_el_ee2(iproc), numbands, n2, ik2)
+                   !Find image of k2 due to the current symmetry
+                   call binsearch(el%indexlist, el%equiv_map(ik_sym, ik2), aux2)
+
+                   !Electron 3
+                   call demux_state(istate_el_ee3(iproc), numbands, n3, ik3)
+                   !Find image of k3 due to the current symmetry
+                   call binsearch(el%indexlist, el%equiv_map(ik_sym, ik3), aux3)
+
+                   !Electron 4
+                   call demux_state(istate_el_ee4(iproc), numbands, n4, ik4)
+                   !Find image of k4 due to the current symmetry
+                   call binsearch(el%indexlist, el%equiv_map(ik_sym, ik4), aux4)
+                   
+                   response_el_reduce(ik_fbz, m, :) = response_el_reduce(ik_fbz, m, :) + &
+                        Xee(iproc)*(-response_el(aux2, n2, :) + response_el(aux3, n3, :) + &
+                                     response_el(aux4, n4, :))
                 end do
              end if
 
