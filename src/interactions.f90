@@ -177,6 +177,88 @@ contains
 
     Vm2_3ph = abs(aux1)**2
   end function Vm2_3ph
+
+  pure function dVm(ev1_s1, ev2_s2, ev3_s3, R_n, n, &
+    Index_i, Index_j, Index_k, ifc3, phases_q2q3, ntrip, nb) result(dV)
+
+    !$acc routine seq
+
+    integer, intent(in) :: n
+    integer(i64), intent(in) :: ntrip, Index_i(ntrip), Index_j(ntrip), Index_k(ntrip), nb
+    complex(r64), intent(in) :: phases_q2q3(ntrip), ev1_s1(nb), ev2_s2(nb), ev3_s3(nb)
+    real(r64), intent(in) :: R_n(3, ntrip), ifc3(3, 3, 3, ntrip)
+    
+    !Local variables
+    integer(i64) :: it, i, j, k, i_ind, j_ind, k_ind
+    complex(r64) :: accum(3), aux2(3), aux3(3), dV(3)
+    
+    accum(:) = (0.0_r64, 0.0_r64)
+
+    !TODO: A lot of code repetition to avoid conditional inside loops
+    !Have to think of a better method.
+    
+    select case(n)
+    case(1)
+       do it = 1, ntrip
+          k_ind = 3*(Index_k(it) - 1)
+          j_ind = 3*(Index_j(it) - 1)
+          i_ind = 3*(Index_i(it) - 1)
+          dV(:) = (0.0_r64, 0.0_r64)
+          do k = 1, 3
+             aux2 = conjg(ev3_s3(k + k_ind))
+             do j = 1, 3
+                aux3 = aux2*conjg(ev2_s2(j + j_ind))
+                do i = 1, 3
+                   if(ifc3(i, j, k, it) /= 0.0_r64) then
+                      dV(:) = dV(:) + oneI*R_n(:, it)*ifc3(i, j, k, it)*ev1_s1(i + i_ind)*aux3
+                   end if
+                end do
+             end do
+          end do
+          accum = accum + dV*phases_q2q3(it)
+       end do
+    case(2)
+       do it = 1, ntrip
+          k_ind = 3*(Index_k(it) - 1)
+          j_ind = 3*(Index_j(it) - 1)
+          i_ind = 3*(Index_i(it) - 1)
+          dV(:) = (0.0_r64, 0.0_r64)
+          do k = 1, 3
+             aux2 = conjg(ev3_s3(k + k_ind))
+             do j = 1, 3
+                aux3 = aux2*conjg(ev2_s2(j + j_ind))*(-oneI*R_n(:, it))
+                do i = 1, 3
+                   if(ifc3(i, j, k, it) /= 0.0_r64) then
+                      dV(:) = dV(:) + ifc3(i, j, k, it)*ev1_s1(i + i_ind)*aux3
+                   end if
+                end do
+             end do
+          end do
+          accum = accum + dV*phases_q2q3(it)
+       end do
+    case(3)
+       do it = 1, ntrip
+          k_ind = 3*(Index_k(it) - 1)
+          j_ind = 3*(Index_j(it) - 1)
+          i_ind = 3*(Index_i(it) - 1)
+          dV(:) = (0.0_r64, 0.0_r64)
+          do k = 1, 3
+             aux2 = conjg(ev3_s3(k + k_ind))*(-oneI*R_n(:, it))
+             do j = 1, 3
+                aux3 = aux2*conjg(ev2_s2(j + j_ind))
+                do i = 1, 3
+                   if(ifc3(i, j, k, it) /= 0.0_r64) then
+                      dV(:) = dV(:) + ifc3(i, j, k, it)*ev1_s1(i + i_ind)*aux3
+                   end if
+                end do
+             end do
+          end do
+          accum = accum + dV*phases_q2q3(it)
+       end do
+    end select
+
+    dV = accum
+  end function dVm
   
   subroutine calculate_coarse_grained_3ph_vertex(ph, crys, num)
     !! TODO
@@ -635,7 +717,8 @@ contains
          !$acc             atomtypes, R_j, R_k, ens, evecs, ifc3, &
          !$acc             tetrahedra_gpu, simplex_map, simplex_count, simplex_evals, &
          !$acc             Index_i, Index_j, Index_k, nbands_gpu, delta_fn_ptr, &
-         !$acc             phase_q_dot_Rj, phase_q_dot_Rk)
+         !$acc             phases)
+         !!$acc             phase_q_dot_Rj, phase_q_dot_Rk)
          
          if(compute_resource%gpu_manager) &
               print*, 'image ', this_image(), &
@@ -697,12 +780,14 @@ contains
                   q2_cart = matmul(reclattvecs, q2)
                   q3_minus_cart = matmul(reclattvecs, q3_minus)
                   do it = 1, ntrips_gpu
-!!$                     phases_q1(it, iq2) = &
+!!$                     phases(it) = &
 !!$                          expi(-dot_product(q2_cart, (R_j(:, it))) &
 !!$                          -dot_product(q3_minus_cart, (R_k(:, it))))
-                     phases(it) = &
-                          expi(-dot_product(q2_cart, (R_j(:, it))) &
-                               -dot_product(q3_minus_cart, (R_k(:, it))))
+
+                     !Note: expi won't work on the accelerator
+                     phases(it) = exp((0.0_r64, -1.0_r64)* &
+                          (dot_product(q2_cart, (R_j(:, it))) + &
+                           dot_product(q3_minus_cart, (R_k(:, it)))))
                   end do
 
                   !Combined loop over the 2nd and 3rd phonon bands

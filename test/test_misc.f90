@@ -1,5 +1,5 @@
 program test_misc
-
+  
   use iso_fortran_env, only : r64 => real64, i64 => int64
   use testify_m, only : testify
   use params, only: pi, kB, oneI
@@ -36,7 +36,7 @@ program test_misc
   test_array(itest) = testify("int_div 5/2")
   call int_div(5_i64, 2_i64, quotient, remainder)
   call test_array(itest)%assert([quotient, remainder], [2_i64, 1_i64])
-
+  
   itest = itest + 1
   test_array(itest) = testify("int_div 9/3")
   call int_div(9_i64, 3_i64, quotient, remainder)

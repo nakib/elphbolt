@@ -495,7 +495,7 @@ contains
 
   subroutine int_div(num, denom, q, r)
     !! Quotient(q) and remainder(r) of the integer division num/denom.
-
+    
     integer(i64), intent(in) :: num, denom
     integer(i64), intent(out) :: q, r
 

@@ -23,7 +23,6 @@ fhash = { git = "https://github.com/LKedward/fhash.git" }
 spglib = {path = "thirdparty/spglib"}
 
 [build]
-#[build]
 #By default, I will use try to use the forlapack and forblas builds from ~/.local/lib/
 #These will have been put there by the configuration step.
 link = ["forlapack", "forblas"]
