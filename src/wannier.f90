@@ -156,6 +156,9 @@ contains
     case("epw")
        if(this_image() == 1) write(*, '(A)') "Wannier data from EPW will be read."
        call self%read_epw_Wannier(num)
+    case("epw_wigner")
+       if(this_image() == 1) write(*, '(A)') "Wannier data from EPW_Wigner will be read."
+       call self%read_EPW_Wannier_newwigner(num)
     case default
        write(*, '(A, A)') "Error: Unknown Wannier engine for Wannier data: ", &
             self%Wannier_engine_name
@@ -590,6 +593,9 @@ contains
     end if
 
     sync all
+
+    ! Testing the new data parser
+    
   end subroutine read_EPW_Wannier_newwigner
 
   subroutine el_wann(self, crys, nk, kvecs, energies, velocities, evecs, scissor)
