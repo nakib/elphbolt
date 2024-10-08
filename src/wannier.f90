@@ -89,18 +89,18 @@ module wannier_module
      !integer(i64), allocatable :: rcells_g(:, :)
      integer(i64), allocatable :: rcells_g_nw(:, :)[:]
      !! Real space cell locations for electron-phonon vertex.     
-     integer(i64), allocatable :: elwsdeg_nw(:)
+     integer(i64), allocatable :: elwsdeg_nw(:,:,:)
      !! Real space cell multiplicity for electrons.
-     integer(i64), allocatable :: phwsdeg_nw(:)
+     integer(i64), allocatable :: phwsdeg_nw(:,:,:)
      !! Real space cell multiplicity for phonons.
      !integer(i64), allocatable :: gwsdeg(:)
-     integer(i64), allocatable :: gwsdeg_nw(:)[:]
+     integer(i64), allocatable :: gwsdeg_nw(:,:,:)[:]
      !! Read parameters from wigner.fmt
      integer(i64) :: wigparam(5)
      !! Wslen from wigner.fmt
      real(r64), allocatable :: wslen_k(:)
      real(r64), allocatable :: wslen_q(:)
-     real(r64), allocatable :: wslen_g(:)
+     real(r64), allocatable :: wslen_g(:)[:]
 
      ! -------------------------------------------
 
@@ -461,7 +461,7 @@ contains
     type(numerics), intent(in) :: num
     
     !Local variables
-    integer(i64) :: iuc, ib, jb, image
+    integer(i64) :: iuc, juc, ib, jb, image
     real(r64) :: ef
     real(r64), allocatable :: dummy(:)
     complex(r64), allocatable :: gwann_aux(:, :, :, :, :)
@@ -558,9 +558,9 @@ contains
     allocate(self%phwsdeg_nw(self%nwsq,self%wigparam(5),self%wigparam(5)))
     allocate(self%wslen_q(self%nwsq))
     do iuc = 1,self%nwsq
-       read(1, *) self%rcells_q(:,iuc), self%wslen_q(iuc)
+       read(1, *) self%rcells_q_nw(:,iuc), self%wslen_q(iuc)
        do juc = 1,self%wigparam(5)
-           read(1, *) self%phwsdeg(iuc,juc,:)
+           read(1, *) self%phwsdeg_nw(iuc,juc,:)
        end do
     end do
 
