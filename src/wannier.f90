@@ -571,7 +571,7 @@ contains
     allocate(self%rcells_g_nw(3,self%gwann_distrib_chunk[1])[*])
     allocate(self%gwsdeg_nw(self%wigparam(4),self%gwann_distrib_chunk[1],self%wigparam(5))[*])
     allocate(self%wslen_g(self%gwann_distrib_chunk[1])[*])
-    self%gwsdeg = 0
+    self%gwsdeg_nw = 0
     
     if(this_image() == 1) then
        allocate(rcells_g_aux_nw(3,self%gwann_distrib_chunk[1])) !chunk for the 1st image is the largest 
