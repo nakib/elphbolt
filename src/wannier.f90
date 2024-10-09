@@ -113,7 +113,7 @@ module wannier_module
 
      procedure :: read, el_wann, ph_wann, gkRp, gReq, g2, &
           plot_along_path, reshape_gwann_for_gkRp, deallocate_wannier
-     procedure, private :: read_epw_Wannier, read_exciting_Wannier
+     procedure, private :: read_epw_Wannier, read_EPW_Wannier_newwigner,read_exciting_Wannier
   end type Wannier
 
 contains
@@ -593,31 +593,31 @@ contains
     end if
 
     sync all
-
-    ! Testing the new data parser
-    print *,"Testing the new wigner parser::"
-    print *,"--K points--"
-    print *,rcells_k_nw(:,1), wslen_k(1)
-    print *,elwsdeg_nw(1,1,:)
-    print *,elwsdeg_nw(1,2,:)
-    print *,"Next Row:"
-    print *,elwsdeg_nw(2,1,:)
-    print *,elwsdeg_nw(2,2,:)
-    print *,"--Q points--"
-    print *,rcells_q_nw(:,1), wslen_q(1)
-    print *,phwsdeg_nw(1,1,:)
-    print *,phwsdeg_nw(1,2,:)
-    print *,"Next Row:"
-    print *,phwsdeg_nw(2,1,:)
-    print *,phwsdeg_nw(2,2,:)
-    print *,"--G points--"
-    print *,rcells_g_nw(:,1), wslen_q(1)
-    print *,gwsdeg_nw(1,1,:)
-    print *,gwsdeg_nw(1,2,:)
-    print *,"Next Row:"
-    print *,gwsdeg_nw(2,1,:)
-    print *,gwsdeg_nw(2,2,:)
-
+    if (this_image() == 1) then
+         ! Testing the new data parser
+         print *,"Testing the new wigner parser::"
+         print *,"--K points--"
+         print *,self%rcells_k_nw(:,1), self%wslen_k(1)
+         print *,self%elwsdeg_nw(1,1,:)
+         print *,self%elwsdeg_nw(1,2,:)
+         print *,"Next Row:"
+         print *,self%elwsdeg_nw(2,1,:)
+         print *,self%elwsdeg_nw(2,2,:)
+         print *,"--Q points--"
+         print *,self%rcells_q_nw(:,1), self%wslen_q(1)
+         print *,self%phwsdeg_nw(1,1,:)
+         print *,self%phwsdeg_nw(1,2,:)
+         print *,"Next Row:"
+         print *,self%phwsdeg_nw(2,1,:)
+         print *,self%phwsdeg_nw(2,2,:)
+         print *,"--G points--"
+         print *,self%rcells_g_nw(:,1), self%wslen_q(1)
+         print *,self%gwsdeg_nw(1,1,:)
+         print *,self%gwsdeg_nw(1,2,:)
+         print *,"Next Row:"
+         print *,self%gwsdeg_nw(2,1,:)
+         print *,self%gwsdeg_nw(2,2,:)
+     end if
 
   end subroutine read_EPW_Wannier_newwigner
 
