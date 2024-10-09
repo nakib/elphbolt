@@ -595,7 +595,30 @@ contains
     sync all
 
     ! Testing the new data parser
-    
+    print *,"Testing the new wigner parser::"
+    print *,"--K points--"
+    print *,rcells_k_nw(:,1), wslen_k(1)
+    print *,elwsdeg_nw(1,1,:)
+    print *,elwsdeg_nw(1,2,:)
+    print *,"Next Row:"
+    print *,elwsdeg_nw(2,1,:)
+    print *,elwsdeg_nw(2,2,:)
+    print *,"--Q points--"
+    print *,rcells_q_nw(:,1), wslen_q(1)
+    print *,phwsdeg_nw(1,1,:)
+    print *,phwsdeg_nw(1,2,:)
+    print *,"Next Row:"
+    print *,phwsdeg_nw(2,1,:)
+    print *,phwsdeg_nw(2,2,:)
+    print *,"--G points--"
+    print *,rcells_g_nw(:,1), wslen_q(1)
+    print *,gwsdeg_nw(1,1,:)
+    print *,gwsdeg_nw(1,2,:)
+    print *,"Next Row:"
+    print *,gwsdeg_nw(2,1,:)
+    print *,gwsdeg_nw(2,2,:)
+
+
   end subroutine read_EPW_Wannier_newwigner
 
   subroutine el_wann(self, crys, nk, kvecs, energies, velocities, evecs, scissor)
