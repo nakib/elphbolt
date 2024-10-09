@@ -135,11 +135,11 @@ contains
     
     !Open input file
     open(1, file = 'input.nml', status = 'old')
-    print *,"Reading from input.nml"
+
     coarse_qmesh = [0, 0, 0]
-    Wannier_engine_name = 'epw_wigner'
+    Wannier_engine_name = 'epw'  ! epw_wigner for wigner.fmt
     read(1, nml = wannier)
-    print *,"Wannier is read"
+
     if(any(coarse_qmesh <= 0)) then
        call exit_with_message('Bad input(s) in wannier.')
     end if
@@ -576,7 +576,7 @@ contains
     if(this_image() == 1) then
        allocate(rcells_g_aux_nw(3,self%gwann_distrib_chunk[1])) !chunk for the 1st image is the largest 
        allocate(gwsdeg_aux_nw(self%wigparam(4),self%gwann_distrib_chunk[1],self%wigparam(5)))
-       allocate(self%wslen_g_aux(self%gwann_distrib_chunk[1])[*])
+       allocate(wslen_g_aux(self%gwann_distrib_chunk[1]))
        
        do image = 1, self%gwann_distrib_num_active_images
           do iuc = 1, self%gwann_distrib_chunk[image]
@@ -595,31 +595,31 @@ contains
     end if
 
     sync all
-    if (this_image() == 1) then
-         ! Testing the new data parser
-         print *,"Testing the new wigner parser::"
-         print *,"--K points--"
-         print *,self%rcells_k_nw(:,1), self%wslen_k(1)
-         print *,self%elwsdeg_nw(1,1,:)
-         print *,self%elwsdeg_nw(1,2,:)
-         print *,"Next Row:"
-         print *,self%elwsdeg_nw(2,1,:)
-         print *,self%elwsdeg_nw(2,2,:)
-         print *,"--Q points--"
-         print *,self%rcells_q_nw(:,1), self%wslen_q(1)
-         print *,self%phwsdeg_nw(1,1,:)
-         print *,self%phwsdeg_nw(1,2,:)
-         print *,"Next Row:"
-         print *,self%phwsdeg_nw(2,1,:)
-         print *,self%phwsdeg_nw(2,2,:)
-         print *,"--G points--"
-         print *,self%rcells_g_nw(:,1), self%wslen_q(1)
-         print *,self%gwsdeg_nw(1,1,:)
-         print *,self%gwsdeg_nw(1,2,:)
-         print *,"Next Row:"
-         print *,self%gwsdeg_nw(2,1,:)
-         print *,self%gwsdeg_nw(2,2,:)
-     end if
+    ! ! Testing the new data parser
+    !if (this_image() == 1) then
+    !     print *,"Testing the new wigner parser::"
+    !     print *,"--K points--"
+    !     print *,self%rcells_k_nw(:,1), self%wslen_k(1)
+    !     print *,self%elwsdeg_nw(1,1,:)
+    !     print *,self%elwsdeg_nw(1,2,:)
+    !     print *,"Next Row:"
+    !     print *,self%elwsdeg_nw(2,1,:)
+    !     print *,self%elwsdeg_nw(2,2,:)
+    !     print *,"--Q points--"
+    !     print *,self%rcells_q_nw(:,1), self%wslen_q(1)
+    !     print *,self%phwsdeg_nw(1,1,:)
+    !     print *,self%phwsdeg_nw(1,2,:)
+    !     print *,"Next Row:"
+    !     print *,self%phwsdeg_nw(2,1,:)
+    !     print *,self%phwsdeg_nw(2,2,:)
+    !     print *,"--G points--"
+    !     print *,self%rcells_g_nw(:,1), self%wslen_q(1)
+    !     print *,self%gwsdeg_nw(1,1,:)
+    !     print *,self%gwsdeg_nw(1,2,:)
+    !     print *,"Next Row:"
+    !     print *,self%gwsdeg_nw(2,1,:)
+    !     print *,self%gwsdeg_nw(2,2,:)
+    !end if
 
   end subroutine read_EPW_Wannier_newwigner
 
