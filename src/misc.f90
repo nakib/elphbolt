@@ -17,6 +17,10 @@
 module misc
   !! Module containing miscellaneous math and numerics related functions and subroutines.
 
+#ifdef _OPENACC
+  use openacc
+#endif
+  
   use precision, only: r128, r64, i64
   use params, only: kB, twopi
   

@@ -194,11 +194,11 @@ contains
     
     accum(:) = (0.0_r64, 0.0_r64)
 
-    !TODO: A lot of code repetition to avoid conditional inside loops
-    !Have to think of a better method.
-    
-    select case(n)
-    case(1)
+    if(n == 1) then !R1 is always the origin
+       !In fact, might as well not call this function for this trivial case.
+       !But in case one does:
+       dV(:) = (0.0_r64, 0.0_r64)
+    else
        do it = 1, ntrip
           k_ind = 3*(Index_k(it) - 1)
           j_ind = 3*(Index_j(it) - 1)
@@ -210,54 +210,17 @@ contains
                 aux3 = aux2*conjg(ev2_s2(j + j_ind))
                 do i = 1, 3
                    if(ifc3(i, j, k, it) /= 0.0_r64) then
-                      dV(:) = dV(:) + oneI*R_n(:, it)*ifc3(i, j, k, it)*ev1_s1(i + i_ind)*aux3
+                      dV(:) = dV(:) - &
+                           oneI*R_n(:, it)*ifc3(i, j, k, it)*ev1_s1(i + i_ind)*aux3
                    end if
                 end do
              end do
           end do
           accum = accum + dV*phases_q2q3(it)
        end do
-    case(2)
-       do it = 1, ntrip
-          k_ind = 3*(Index_k(it) - 1)
-          j_ind = 3*(Index_j(it) - 1)
-          i_ind = 3*(Index_i(it) - 1)
-          dV(:) = (0.0_r64, 0.0_r64)
-          do k = 1, 3
-             aux2 = conjg(ev3_s3(k + k_ind))
-             do j = 1, 3
-                aux3 = aux2*conjg(ev2_s2(j + j_ind))*(-oneI*R_n(:, it))
-                do i = 1, 3
-                   if(ifc3(i, j, k, it) /= 0.0_r64) then
-                      dV(:) = dV(:) + ifc3(i, j, k, it)*ev1_s1(i + i_ind)*aux3
-                   end if
-                end do
-             end do
-          end do
-          accum = accum + dV*phases_q2q3(it)
-       end do
-    case(3)
-       do it = 1, ntrip
-          k_ind = 3*(Index_k(it) - 1)
-          j_ind = 3*(Index_j(it) - 1)
-          i_ind = 3*(Index_i(it) - 1)
-          dV(:) = (0.0_r64, 0.0_r64)
-          do k = 1, 3
-             aux2 = conjg(ev3_s3(k + k_ind))*(-oneI*R_n(:, it))
-             do j = 1, 3
-                aux3 = aux2*conjg(ev2_s2(j + j_ind))
-                do i = 1, 3
-                   if(ifc3(i, j, k, it) /= 0.0_r64) then
-                      dV(:) = dV(:) + ifc3(i, j, k, it)*ev1_s1(i + i_ind)*aux3
-                   end if
-                end do
-             end do
-          end do
-          accum = accum + dV*phases_q2q3(it)
-       end do
-    end select
 
-    dV = accum
+       dV = accum
+    end if
   end function dVm
   
   subroutine calculate_coarse_grained_3ph_vertex(ph, crys, num)

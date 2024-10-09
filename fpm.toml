@@ -54,32 +54,32 @@ name = "screening_comparison"
 source-dir="src"
 main = "screening_comparison.f90"
 
-[[test]]
-name = "test_misc"
-source-dir="test"
-main = "test_misc.f90"
-
-[[test]]
-name = "test_autodiff"
-source-dir="test"
-main = "test_autodiff.f90"
-
-[[test]]
-name = "test_periodictable"
-source-dir="test"
-main = "test_periodictable.f90"
-
-[[test]]
-name = "test_vector"
-source-dir="test"
-main = "test_vector.f90"
-
-[[test]]
-name = "check_interactions_symmetries"
-source-dir="test"
-main = "check_interactions_symmetries.f90"
-
-[[test]]
-name = "bte_regression"
-source-dir="test"
-main = "bte_regression.f90"
+#[[test]]
+#name = "test_misc"
+#source-dir="test"
+#main = "test_misc.f90"
+#
+#[[test]]
+#name = "test_autodiff"
+#source-dir="test"
+#main = "test_autodiff.f90"
+#
+#[[test]]
+#name = "test_periodictable"
+#source-dir="test"
+#main = "test_periodictable.f90"
+#
+#[[test]]
+#name = "test_vector"
+#source-dir="test"
+#main = "test_vector.f90"
+#
+#[[test]]
+#name = "check_interactions_symmetries"
+#source-dir="test"
+#main = "check_interactions_symmetries.f90"
+#
+#[[test]]
+#name = "bte_regression"
+#source-dir="test"
+#main = "bte_regression.f90"

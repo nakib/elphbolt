@@ -5,7 +5,7 @@ program screening_comparison
   use params, only: hbar, hbar_eVps, me, twopi, pi, kB, qe, bohr2nm, perm0
   use misc, only: qdist, linspace, compsimps, outer, sort, &
        write2file_rank2_real, write2file_rank1_real, twonorm, exit_with_message
-
+  
   implicit none
 
   !integer :: itest
