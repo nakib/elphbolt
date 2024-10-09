@@ -137,7 +137,7 @@ contains
     open(1, file = 'input.nml', status = 'old')
     print *,"Reading from input.nml"
     coarse_qmesh = [0, 0, 0]
-    Wannier_engine_name = 'epw'
+    Wannier_engine_name = 'epw_wigner'
     read(1, nml = wannier)
     print *,"Wannier is read"
     if(any(coarse_qmesh <= 0)) then
