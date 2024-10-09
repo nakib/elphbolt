@@ -576,7 +576,8 @@ contains
     if(this_image() == 1) then
        allocate(rcells_g_aux_nw(3,self%gwann_distrib_chunk[1])) !chunk for the 1st image is the largest 
        allocate(gwsdeg_aux_nw(self%wigparam(4),self%gwann_distrib_chunk[1],self%wigparam(5)))
-
+       allocate(self%wslen_g_aux(self%gwann_distrib_chunk[1])[*])
+       
        do image = 1, self%gwann_distrib_num_active_images
           do iuc = 1, self%gwann_distrib_chunk[image]
              read(1, *) rcells_g_aux_nw(:,iuc),wslen_g_aux(iuc)
