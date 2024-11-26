@@ -156,6 +156,47 @@ contains
     gCoul2 = Gsum*prefac*overlap
   end function gCoul2
   
+  pure real(r64) function gCoul2_RPA(el, crys, qcrys, evec_k, evec_kp)
+    !! Function to calculate the Thomas-Fermi screened
+    !! squared electron-electron vertex.
+
+    type(crystal), intent(in) :: crys
+    type(electron), intent(in) :: el
+    real(r64), intent(in) :: qcrys(3)
+    complex(r64), intent(in) :: evec_k(:), evec_kp(:)
+
+    real(r64) :: qcart(3), prefac, overlap
+    real(r64) :: Gsum, Gplusq(3)
+    integer :: ik1, ik2, ik3
+
+    !TODO: Shouldn't I use crys%epsiloninf instead using Sanborn's prescription?
+    prefac = 1.0e18_r64/crys%volume**2*qe**2/(perm0*crys%epsilon0)**2
+
+    !Transfer wave vector in Cartesian coordinates
+    qcart = matmul(crys%reclattvecs, qcrys)
+    
+    !This is [U(k')U^\dagger(k)]_nm squared
+    !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
+    overlap = (abs(dot_product(evec_kp, evec_k)))**2
+
+    Gsum = 0.0_r64
+    !Use a safe range for the G vector sums
+    do ik1 = -3, 3
+       do ik2 = -3, 3
+          do ik3 = -3, 3
+             Gplusq = (  ik1*crys%reclattvecs(:, 1) &
+                  + ik2*crys%reclattvecs(:, 2) &
+                  + ik3*crys%reclattvecs(:, 3)  ) + qcart
+             
+             Gsum = Gsum + &
+                  1.0_r64/(twonorm(Gplusq)**2 + crys%qTF**2)**2 !eV^2
+          end do
+       end do
+    end do
+
+    gCoul2_RPA = Gsum*prefac*overlap
+  end function gCoul2_RPA
+  
   pure real(r64) function Vm2_3ph(ev1_s1, ev2_s2, ev3_s3, &
     Index_i, Index_j, Index_k, ifc3, phases_q2q3, ntrip, nb)
     !! Function to calculate the squared 3-ph interaction vertex |V-|^2.
