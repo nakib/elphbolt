@@ -14,6 +14,6 @@ module precision
 
    ! Integer precisions
    integer, parameter :: i64 = int64
-   !! 64-bit integer (single)
+   !! 64-bit integer
 
 end module precision

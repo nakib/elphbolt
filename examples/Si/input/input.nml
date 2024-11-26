@@ -23,8 +23,8 @@
 	indhighband = 6 !Highest transport band
 	indlowconduction = 5 !Lowest conduction band
 	numbands = 8 !Total wannier bands
-	enref = 6.70035 !eV, CBM
-	chempot = 6.70035 !eV, CBM
+	enref = 6.70035 !eV, Conduction band minimum
+	chempot = 6.70035 !eV 
 /
 
 &numerics

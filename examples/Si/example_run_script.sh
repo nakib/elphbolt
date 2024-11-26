@@ -1,6 +1,6 @@
 #!/bin/bash
 
-workdir="./Si_6r4_300K_CBM_gcc/"
+workdir="./Si_10r3_300K_CBM/"
 inputdir="./input"
 
 mkdir $workdir
@@ -23,7 +23,7 @@ ln -s ../$inputdir/espresso.ifc2 .
 
 #gcc+opencoarrays
 #Call elphbolt, for example, like this to run with 6 coarray images:
-cafrun -n 6 elphbolt
+cafrun -n 8 elphbolt
 ##
 
 cd ..
