@@ -123,6 +123,46 @@ contains
     Imeps_T = -pi*Imeps_T
   end subroutine head_polarizability_imag_3d_T
   
+  subroutine head_polarizability_real_3d_T(Reeps_samp, Omegas_samp, Omegas_cont, Reeps_cont)
+    !! Head of the bare Real polarizability of the 3d Kohn-Sham system using
+    !! linear interpolation from the same evaluated on a fine, continuous mesh.
+    !!
+    !! Here we calculate the diagonal in G-G' space. Moreover,
+    !! we use the approximation G.r -> 0.
+    !!
+    !! Reeps_samp Real part of bare polarizability on sample mesh
+    !! Omegas_samp Sampling energies of excitation in the electron gas
+    !! Omegas_cont Continous energies of excitation in the electron gas
+    !! Reeps_cont Real part of bare polarizability on continuous mesh
+    
+    real(r64), intent(in) :: Omegas_samp(:), Omegas_cont(:)
+    real(r64), intent(in) :: Reeps_cont(:)
+    real(r64), allocatable, intent(out) :: Reeps_samp(:)
+
+    integer :: isamp, ncont, nsamp, ileft, iright
+    real(r64) :: dOmega, w
+
+    ncont = size(Omegas_cont)
+    nsamp = size(Omegas_samp)
+    
+    allocate(Reeps_samp(nsamp))
+
+    dOmega = Omegas_cont(2) - Omegas_cont(1)
+    
+    do isamp = 1, nsamp
+       w = Omegas_samp(isamp)
+       ileft = minloc(abs(Omegas_cont - w), dim = 1)
+       if(ileft == ncont) then
+          Reeps_samp(isamp) = Reeps_cont(ileft)
+       else
+          iright = ileft + 1
+          Reeps_samp(isamp) = ((Omegas_cont(iright) - w)*Reeps_cont(ileft) + &
+               (w - Omegas_cont(ileft))*Reeps_cont(iright))/dOmega
+       end if
+    end do
+
+  end subroutine head_polarizability_real_3d_T
+  
   subroutine spectral_head_polarizability_3d_qpath(spec_eps, Omegas, qcrys, &
        el, wann, crys, tetrahedra)
     !! Spectral head of the bare polarizability of the 3d Kohn-Sham system using
