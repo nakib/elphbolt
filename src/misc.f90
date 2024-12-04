@@ -1694,4 +1694,35 @@ contains
        Hfx(k + 1) = -(fx(k + 2) - fx(k) + term2 + term3)/pi
     end do
   end subroutine Hilbert_transform
+
+  pure function interpolator_1d(samp, cont, res_cont) result(res_samp)
+    !! linear interpolation from 1d array evaluated on a fine, continuous mesh.
+    !! to a sample mesh
+    
+    real(r64), intent(in) :: samp(:), cont(:)
+    real(r64), intent(in) :: res_cont(:)
+    real(r64), allocatable :: res_samp(:)
+
+    integer :: isamp, ncont, nsamp, ileft, iright
+    real(r64) :: dcont, w
+
+    ncont = size(cont)
+    nsamp = size(samp)
+    
+    allocate(res_samp(nsamp))
+
+    dcont = cont(2) - cont(1)
+    
+    do isamp = 1, nsamp
+       w = samp(isamp)
+       ileft = minloc(abs(cont - w), dim = 1)
+       if(ileft == ncont) then
+          res_samp(isamp) = res_cont(ileft)
+       else
+          iright = ileft + 1
+          res_samp(isamp) = ((cont(iright) - w)*res_cont(ileft) + &
+               (w - cont(ileft))*res_cont(iright))/dcont
+       end if
+    end do
+  end function interpolator_1d
 end module misc

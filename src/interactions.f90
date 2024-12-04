@@ -27,10 +27,9 @@ module interactions
        demux_state, mux_vector, mux_state, expi, Bose, binsearch, Fermi, &
        twonorm, write2file_rank2_real, demux_vector, interpolate, expm1, &
        precompute_interpolation_corners_and_weights, interpolate_using_precomputed, &
-       create_set, coarse_grain, timer, eye, shrink, Hilbert_transform
-  use screening, only: head_polarizability_imag_3d_T, head_polarizability_real_3d_T, &
-       spectral_head_polarizability_3d_qpath  ! TODO: Discuss keeping these as public
+       create_set, coarse_grain, timer, eye, shrink, hilbert_transform, interpolator_1d
   use resource_module, only: resource
+  use screening_module, only: spectral_head_polarizability_3d_qpath
   
   use wannier_module, only: wannier
   use crystal_module, only: crystal
@@ -157,87 +156,34 @@ contains
 
     gCoul2 = Gsum*prefac*overlap
   end function gCoul2
-  
-  subroutine electron_energylist_gen(el, en_el)
-    !! Generate energy list for all states within
-    !! the given Fermi energy window
-    type(electron), intent(in) :: el
-    real(r64), allocatable, intent(out) :: en_el(:)
-
-    !Locals
-    integer(i64) :: ik, nb, count
-    real(r64), allocatable :: ien, temp_en(:)
-
-    count = 0
-    allocate(temp_en(el%numbands*el%nwv))
-    do ik = 1, el%nwv
-       do nb = 1, el%numbands
-          !Electron energy
-          ien = el%ens(ik, nb)
-          if(abs(ien - el%enref) <= el%fsthick) then
-             count = count + 1
-             temp_en(count) = ien
-          end if
-       end do
-    end do
-
-    allocate(en_el(count))
-    en_el = temp_en(1:count)
-  end subroutine electron_energylist_gen 
 
 
-  pure real(r64) function gCoul2_RPA(el, crys, qcrys, Omegas_samp)!! evec_k, evec_kp)
+  pure real(r64) function gCoul2_RPA(el, crys, qcrys, X0_qw)
     !! Function to calculate the RPA screened
     !! squared electron-electron vertex.
     !!
-    !!X0_q is the bare polarizability for a q-point
 
     type(crystal), intent(in) :: crys
     type(electron), intent(in) :: el
     real(r64), intent(in) :: qcrys(3)
+    complex(r64), intent(in) :: X0_qw
     !! complex(r64), intent(in) :: evec_k(:), evec_kp(:)
 
-    real(r64) :: qcart(3), prefac, overlap
-    complex(r64) :: diel_q, W_q
-    real(r64), allocatable :: G_sum, G_plusq(3)
-    real(r64), allocatable :: Gp_sum, Gp_plusq(3)
+    real(r64) :: qcart(3), prefac !overlap
+    complex(r64) :: diel_qw, W_qw
+    real(r64) :: G_plusq(3), Gp_plusq(3)
     integer(i64) :: ik1, ik2, ik3, ikp1, ikp2, ikp3
 
-    !! Samp mesh
-    real(r64) :: ImX0_samp(:), ReX0_samp(:),  Omegas_samp(:)
-    complex(r64) :: X0_samp(:)
-
-    !! cont mesh
-    real(r64), allocatable :: Omegas_cont(:)
-    real(r64), allocatable :: spec_X0_cont(:), ImX0_cont(:), ReX0_cont(:)
-
     ! Prefac: Need to check correctness
-    prefac = 1.0e9_r64/crys%volume**2*qe/(perm0*crys%epsilon0)
-
-    !! Constructing bare polarizability on continuous Omegas mesh
-    allocate(Omegas_cont(600))
-    call linspace(Omegas_cont, -0.5_r64, 0.5_r64, numomega) !! The ranges to be tested
-    ! TODO:
-    ! wan%numbands?? or el%numbands is enough??
-    call spectral_head_polarizability_3d_qpath(&
-            spec_X0_cont, Omegas_cont, qcrys, el, wann, crys, num%tetrahedra) 
-    ImX0_cont = -pi*spec_X0
-    call hilbert_transform(-ImX0_cont, ReX0_cont)
-    call head_polarizability_imag_3d_T(ImX0_samp, Omegas_samp, Omegas_cont, spec_X0)
-    ! TODO:
-    call head_polarizability_real_3d_T(ReX0_samp, Omegas_samp, Omegas_cont, ReX0_cont) 
-    
-    ! bare polarisability on sample mesh
-    X0_samp = ReX0 + oneI*ImX0
+    prefac = 1.0e9_r64/crys%volume**2*qe/perm0/crys%epsilon0
 
     !Transfer wave vector in Cartesian coordinates
     qcart = matmul(crys%reclattvecs, qcrys)
-    
+
     !This is [U(k')U^\dagger(k)]_nm squared
     !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
-    overlap = (abs(dot_product(evec_kp, evec_k)))**2
+    !overlap = (abs(dot_product(evec_kp, evec_k)))**2
 
-    Gsum = 0.0_r64
     !Use a safe range for the G vector sums
     do ik1 = -3, 3
        do ik2 = -3, 3
@@ -253,10 +199,11 @@ contains
                             + ikp2*crys%reclattvecs(:, 2) &
                             + ikp3*crys%reclattvecs(:, 3)  ) + qcart
                       if (all(G_plusq==Gp_plusq)) then
-                         diel_q = 1 - prefac*X0_samp/twonorm(G_plusq)/twonorm(Gp_plusq)
-                      else 
-                         diel_q = - prefac*X0_samp/twonorm(G_plusq)/twonorm(Gp_plusq)
-                      W_qw = W_qw + prefac/diel_qw/twonorm(G_plusq)/twonorm(Gp_plusq)
+                         diel_qw = 1 - prefac*X0_qw/twonorm(G_plusq)/twonorm(Gp_plusq)
+                      else
+                         diel_qw = - prefac*X0_qw/twonorm(G_plusq)/twonorm(Gp_plusq)
+                      end if
+                      W_qw = W_qw + 1.0_r64/diel_qw/twonorm(G_plusq)/twonorm(Gp_plusq)
                    end do
                 end do
              end do
@@ -264,7 +211,7 @@ contains
        end do
     end do
 
-    gCoul2_RPA = W_qw*overlap  ! ?? Not sure
+    gCoul2_RPA = (prefac*abs(W_qw))**2  ! ?? Not sure
   end function gCoul2_RPA
   
   pure real(r64) function Vm2_3ph(ev1_s1, ev2_s2, ev3_s3, &

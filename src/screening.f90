@@ -15,7 +15,8 @@ module screening_module
   implicit none
 
   private
-  public calculate_qTF, calculate_RPA_dielectric_3d_G0_scratch
+  public calculate_qTF, calculate_RPA_dielectric_3d_G0_scratch, &
+     spectral_head_polarizability_3d_qpath
   
 contains
   
