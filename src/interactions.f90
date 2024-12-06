@@ -176,7 +176,7 @@ contains
     integer(i64) :: ik1, ik2, ik3, ikp1, ikp2, ikp3
 
     ! Prefac: Need to check correctness
-    prefac = 1.0e9_r64/crys%volume**2*qe/perm0/crys%epsilon0
+    prefac = 1.0e18_r64*qe**2/(perm0*crys%epsilon0)**2
 
     !Transfer wave vector in Cartesian coordinates
     qcart = matmul(crys%reclattvecs, qcrys)
@@ -212,7 +212,7 @@ contains
        end do
     end do
 
-    gCoul2_RPA = (prefac*abs(W_qw))**2  ! ?? Not sure
+    gCoul2_RPA = prefac*abs(W_qw)**2  ! ?? Not sure
   end function gCoul2_RPA
   
   pure real(r64) function Vm2_3ph(ev1_s1, ev2_s2, ev3_s3, &
@@ -2950,8 +2950,6 @@ contains
          istate_el2(:), istate_el3(:), istate_el4(:)
     
     !Local variables
-       !$! Defining continuous mesh - Omegas_cont, specX0_cont, ImX0_cont, ReX0_cont
-       !$! temp, X0_qw 
     integer(i64) :: istate, &
          n1, ik1, n2, ik2, n3, ik3, n4, ik4, &
          count, nprocs
@@ -3013,8 +3011,7 @@ contains
        !Create initial electron wave vector
        k1_vec = vec(el%indexlist_irred(ik1), el%wvmesh, crys%reclattvecs)
 
-       !$! Defining continuous mesh - Omegas_cont, specX0_cont, ImX0_cont, ReX0_cont
-       !$! temp, X0_qw 
+       !$! Defining continuous mesh 
        allocate(Omegas_cont(600))
        call linspace(Omegas_cont, -0.5_r64, 0.5_r64, 600_i64) !! The ranges to be tested
 
@@ -3046,6 +3043,8 @@ contains
              temp = interpolator_1d([abs(en3-en1)], Omegas_cont, ImX0_cont) &
                   + oneI*interpolator_1d([abs(en3-en1)], Omegas_cont, ReX0_cont)
              X0_qw = temp(1)
+             ! Squared matrix element- screened by RPA dielectric
+             g2 = gCoul2_RPA(el, crys, q_vec%frac, X0_qw) 
 
              !Fermi function of electron 3
              fermi3 = Fermi(en3, el%chempot, crys%T)
@@ -3073,9 +3072,9 @@ contains
                    !Apply energy window to electron 2
                    if(abs(en2 - el%enref) > el%fsthick) cycle
 
-                   !Squared matrix element
-                   g2 = gCoul2(el, crys, q_vec%frac, &
-                        el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :))
+                   !Squared matrix element - Thomas Fermi
+                   !g2 = gCoul2(el, crys, q_vec%frac, &
+                   !     el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :))
                    
                    !Fermi function of electron 2
                    fermi2 = Fermi(en2, el%chempot, crys%T)
