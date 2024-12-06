@@ -291,9 +291,9 @@ program elphbolt
      !Solve BTEs
      if(num%solve_bulk) then
         if(num%onlyphbte .and. .not. num%phe) then
-           call bt%solve_bte(num, crys, sym, ph)
+           call bt%solve_bte(num, crys, wann, sym, ph)
         else
-           call bt%solve_bte(num, crys, sym, ph, el)
+           call bt%solve_bte(num, crys, wann, sym, ph, el)
         end if
      end if
 
@@ -306,9 +306,9 @@ program elphbolt
 
         ! Solve the BTE for the nanostructures
         if(num%onlyphbte .and. .not. num%phe) then
-           call bt_nano%solve_bte(num, crys, sym, nano, ph)
+           call bt_nano%solve_bte(num, crys, wann, sym, nano, ph)
         else
-           call bt_nano%solve_bte(num, crys, sym, nano, ph, el)
+           call bt_nano%solve_bte(num, crys, wann, sym, nano, ph, el)
         end if
 
      end if

@@ -27,7 +27,8 @@ module interactions
        demux_state, mux_vector, mux_state, expi, Bose, binsearch, Fermi, &
        twonorm, write2file_rank2_real, demux_vector, interpolate, expm1, &
        precompute_interpolation_corners_and_weights, interpolate_using_precomputed, &
-       create_set, coarse_grain, timer, eye, shrink, hilbert_transform, interpolator_1d
+       create_set, coarse_grain, timer, eye, shrink, hilbert_transform, interpolator_1d, &
+       linspace
   use resource_module, only: resource
   use screening_module, only: spectral_head_polarizability_3d_qpath
   
@@ -2934,7 +2935,7 @@ contains
     sync all
   end subroutine calculate_eph_interaction_ibzk
 
-  subroutine calculate_Xee_OTF(el, num, istate1, crys, X, &
+  subroutine calculate_Xee_OTF(el, num, wann, istate1, crys, X, &
        istate_el2, istate_el3, istate_el4)
     !! On-the-fly serial calculator of the e-e transition probability.
     !! for a given IBZ electron states within the transport window.
@@ -2942,17 +2943,23 @@ contains
     type(electron), intent(in) :: el
     type(numerics), intent(in) :: num
     type(crystal), intent(in) :: crys
+    type(wannier), intent(in) :: wann
     integer(i64), intent(in) :: istate1
     real(r64), intent(out), allocatable :: X(:)
     integer(i64), intent(out), allocatable, optional :: &
          istate_el2(:), istate_el3(:), istate_el4(:)
     
     !Local variables
+       !$! Defining continuous mesh - Omegas_cont, specX0_cont, ImX0_cont, ReX0_cont
+       !$! temp, X0_qw 
     integer(i64) :: istate, &
          n1, ik1, n2, ik2, n3, ik3, n4, ik4, &
          count, nprocs
     real(r64) :: const, beta, fermi1, fermi2, fermi3, fermi4, &
          delta_val, occup_fac, en1, en2, en3, en4, g2, q_frac_noU(3)
+    real(r64), allocatable :: Omegas_cont(:), specX0_cont(:), ImX0_cont(:), &
+         ReX0_cont(:)
+    complex(r64) :: temp(1), X0_qw 
     character(len = 1024) :: filename
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
     type(vec) :: k1_vec, k2_vec, k3_vec, k4_vec, q_vec
@@ -3005,7 +3012,12 @@ contains
 
        !Create initial electron wave vector
        k1_vec = vec(el%indexlist_irred(ik1), el%wvmesh, crys%reclattvecs)
-       
+
+       !$! Defining continuous mesh - Omegas_cont, specX0_cont, ImX0_cont, ReX0_cont
+       !$! temp, X0_qw 
+       allocate(Omegas_cont(600))
+       call linspace(Omegas_cont, -0.5_r64, 0.5_r64, 600_i64) !! The ranges to be tested
+
        !Run over electrons states 2, 3, and 4, eliminating the k4 sum with the
        !delta(k1 - k3 + k2 - k4)
        do ik3 = 1, el%nwv       
@@ -3014,6 +3026,11 @@ contains
 
           !q \equiv k1 - k3
           q_vec = vec_sub(k1_vec, k3_vec, el%wvmesh, crys%reclattvecs)
+          
+          call spectral_head_polarizability_3d_qpath(&
+            specX0_cont, Omegas_cont, q_vec%frac, el, wann, crys, num%tetrahedra)
+          ImX0_cont = -pi*specX0_cont
+          call hilbert_transform(-ImX0_cont, ReX0_cont)
 
           !DBG
           !q = \equiv k1 - k3, without Umklapp, fractional units
@@ -3025,6 +3042,10 @@ contains
 
              !Apply energy window to electron 3
              if(abs(en3 - el%enref) > el%fsthick) cycle
+          
+             temp = interpolator_1d([abs(en3-en1)], Omegas_cont, ImX0_cont) &
+                  + oneI*interpolator_1d([abs(en3-en1)], Omegas_cont, ReX0_cont)
+             X0_qw = temp(1)
 
              !Fermi function of electron 3
              fermi3 = Fermi(en3, el%chempot, crys%T)
@@ -3491,7 +3512,7 @@ contains
   end subroutine calculate_4ph_rta_rates
   
   subroutine calculate_el_rta_rates(rta_rates_eph, rta_rates_echimp, rta_rates_ee, &
-       num, crys, el)
+       num, crys, el, wann)
     !! Subroutine for parallel reading of the e-ph transition probabilities
     !! from disk and calculating the relaxation time approximation (RTA)
     !! scattering rates for the e-ph channel.
@@ -3501,6 +3522,7 @@ contains
     type(numerics), intent(in) :: num
     type(crystal), intent(in) :: crys
     type(electron), intent(in) :: el
+    type(wannier), intent(in) :: wann
     
     !Local variables
     integer(i64) :: nstates_irred, istate, nprocs_eph, nprocs_echimp, &
@@ -3538,7 +3560,7 @@ contains
 
           !e-e scattering rates (OTF only at the mo)
           if(num%elel) then
-             call calculate_Xee_OTF(el, num, istate, crys, X)
+             call calculate_Xee_OTF(el, num, wann, istate, crys, X)
              do iproc = 1, size(X)
                 rta_rates_ee(ik, m) = rta_rates_ee(ik, m) + X(iproc)
              end do
