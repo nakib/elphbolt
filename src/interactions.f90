@@ -2952,7 +2952,7 @@ contains
     !Local variables
     integer(i64) :: istate, &
          n1, ik1, n2, ik2, n3, ik3, n4, ik4, &
-         count, nprocs
+         count, nprocs, ncont
     real(r64) :: const, beta, fermi1, fermi2, fermi3, fermi4, &
          delta_val, occup_fac, en1, en2, en3, en4, g2, q_frac_noU(3)
     real(r64), allocatable :: Omegas_cont(:), specX0_cont(:), ImX0_cont(:), &
@@ -3011,8 +3011,9 @@ contains
        !Create initial electron wave vector
        k1_vec = vec(el%indexlist_irred(ik1), el%wvmesh, crys%reclattvecs)
 
-       !$! Defining continuous mesh 
-       allocate(Omegas_cont(600))
+       !$! Defining continuous mesh
+       ncont = 600 
+       allocate(Omegas_cont(ncont), specX0_cont(ncont), ImX0_cont(ncont), ReX0_cont(ncont))
        call linspace(Omegas_cont, -0.5_r64, 0.5_r64, 600_i64) !! The ranges to be tested
 
        !Run over electrons states 2, 3, and 4, eliminating the k4 sum with the
@@ -3040,11 +3041,13 @@ contains
              !Apply energy window to electron 3
              if(abs(en3 - el%enref) > el%fsthick) cycle
           
-             temp = interpolator_1d([abs(en3-en1)], Omegas_cont, ImX0_cont) &
-                  + oneI*interpolator_1d([abs(en3-en1)], Omegas_cont, ReX0_cont)
+             temp = interpolator_1d([(en3-en1)], Omegas_cont, ImX0_cont) &
+                  + oneI*interpolator_1d([(en3-en1)], Omegas_cont, ReX0_cont)
              X0_qw = temp(1)
              ! Squared matrix element- screened by RPA dielectric
-             g2 = gCoul2_RPA(el, crys, q_vec%frac, X0_qw) 
+             g2 = gCoul2_RPA(el, crys, q_vec%frac, X0_qw)
+             !if(abs(en3-en1)<1e-5) write(10101,*) &
+             !   en3-en1, twonorm(q_vec%frac), g2 
 
              !Fermi function of electron 3
              fermi3 = Fermi(en3, el%chempot, crys%T)
