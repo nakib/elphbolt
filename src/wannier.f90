@@ -464,7 +464,6 @@ contains
        H = 0
        dH = 0
        do iuc = 1,self%nwsk
-          print *, "kvec-",kvecs(ik,:),"rcell", self%rcells_k(iuc,:),"elw", self%elwsdeg(iuc)
           caux = expi(twopi*dot_product(kvecs(ik,:),self%rcells_k(iuc,:)))&
                /self%elwsdeg(iuc)
           H = H + caux*self%Hwann(iuc,:,:)

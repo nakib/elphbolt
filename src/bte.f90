@@ -183,11 +183,9 @@ contains
     !     call dragless_ebte_RTA(Tdir, self, num, crys, wann, sym, el, ph)
     !DEBUG - Only calc the ee rates and screened potential
     if(.not. num%onlyphbte) then
-       print *,"**** Debug - RPA ****"
-       !open(unit=10101, file="debug_gee_file")
+       if(this_image() == 1) print *,"**** Debug - RPA ****"
        call dragless_ebte_RTA(Tdir, self, num, crys, wann, sym, el, ph)
-       !close(10101)
-       print *,"**** Pre-exiting - Debug RPA ****"
+       if(this_image() == 1) print *,"**** Pre-exiting - Debug RPA ****"
        call exit
     end if
     !Dragful electron-phonon BTEs
