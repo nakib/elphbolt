@@ -229,7 +229,8 @@ program elphbolt
         call t_event%end_timer('IBZ e-ph transition probabilities')
      end if
 
-     !DEBUG: Initial postion of wannier deallocation
+     !NOTE: Initial postion of wannier deallocation
+
      if(num%onlyebte .or. num%drag) then
         if(num%elchimp) then
            call t_event%start_timer('e-ch. imp. interactions')
@@ -309,6 +310,7 @@ program elphbolt
 
      end if
 
+     ! NOTE: Now the wannier deallocation is happening after solve_BTE 
      if(num%need_Wannier) then
         !Deallocate Wannier quantities
         call wann%deallocate_wannier(num)

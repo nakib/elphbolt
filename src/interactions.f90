@@ -158,35 +158,24 @@ contains
     gCoul2 = Gsum*prefac*overlap
   end function gCoul2
 
-  subroutine  gCoul2_RPA_sub(el, crys, qcrys, X0_qw, g2)
+  pure real(r64) function gCoul2_RPA(el, crys, qcrys, X0_qw)
     !! Function to calculate the RPA screened
     !! squared electron-electron vertex.
-    !!
 
     type(crystal), intent(in) :: crys
     type(electron), intent(in) :: el
     real(r64), intent(in) :: qcrys(3)
     complex(r64), intent(in) :: X0_qw
-    real(r64), intent(out) :: g2
-    !! complex(r64), intent(in) :: evec_k(:), evec_kp(:)
 
-    real(r64) :: qcart(3), prefac !overlap
+    real(r64) :: qcart(3), prefac 
     complex(r64) :: diel_qw, W_qw
-    real(r64) :: G_plusq(3), Gp_plusq(3)
-    integer(i64) :: ik1, ik2, ik3, ikp1, ikp2, ikp3
+    real(r64) :: G_plusq(3)
+    integer(i64) :: ik1, ik2, ik3
 
-    ! Prefac: Need to check correctness
-    prefac = 1.0e18_r64*qe**2/(perm0*crys%epsilon0)**2
-    if(this_image() == 1) print *,"Pref-",prefac
-    if(this_image() == 1) print *,"X0_qw-",X0_qw
-    if(this_image() == 1) print*,"reclatt:",crys%reclattvecs
+    prefac = 1.0e9_r64*qe/(perm0*crys%epsilon0) ! ev.nm
+
     !Transfer wave vector in Cartesian coordinates
     qcart = matmul(crys%reclattvecs, qcrys)
-    if(this_image() == 1) print*,"qcart:",qcart
-
-    !This is [U(k')U^\dagger(k)]_nm squared
-    !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
-    !overlap = (abs(dot_product(evec_kp, evec_k)))**2
 
     !Use a safe range for the G vector sums
     !Assuming G = G' (neglecting local-field effects: N.E.Brener et. al. 1975 )
@@ -196,75 +185,14 @@ contains
              G_plusq = (  ik1*crys%reclattvecs(:, 1) &
                   + ik2*crys%reclattvecs(:, 2) &
                   + ik3*crys%reclattvecs(:, 3)  ) + qcart
-             if(this_image() == 1) print *,"q-",qcart
-             if(this_image() == 1) print *,"Gq-",G_plusq
              diel_qw = 1 - prefac*X0_qw/twonorm(G_plusq)**2
-             if(this_image() == 1) print *,"diel-",diel_qw
              W_qw = W_qw + 1.0_r64/diel_qw/twonorm(G_plusq)**2
-             if(this_image() == 1) print *,"W_qw-",W_qw
           end do
        end do
     end do
 
-    g2 = prefac*abs(W_qw)**2  ! ?? Not sure
-    if(this_image() == 1) print *,"g2-", g2
-  end subroutine gCoul2_RPA_sub
-
-! pure real(r64) function gCoul2_RPA(el, crys, qcrys, X0_qw)
-!   !! Function to calculate the RPA screened
-!   !! squared electron-electron vertex.
-!   !!
-
-!   type(crystal), intent(in) :: crys
-!   type(electron), intent(in) :: el
-!   real(r64), intent(in) :: qcrys(3)
-!   complex(r64), intent(in) :: X0_qw
-!   !! complex(r64), intent(in) :: evec_k(:), evec_kp(:)
-
-!   real(r64) :: qcart(3), prefac !overlap
-!   complex(r64) :: diel_qw, W_qw
-!   real(r64) :: G_plusq(3), Gp_plusq(3)
-!   integer(i64) :: ik1, ik2, ik3, ikp1, ikp2, ikp3
-
-!   ! Prefac: Need to check correctness
-!   prefac = 1.0e18_r64*qe**2/(perm0*crys%epsilon0)**2
-
-!   !Transfer wave vector in Cartesian coordinates
-!   qcart = matmul(crys%reclattvecs, qcrys)
-
-!   !This is [U(k')U^\dagger(k)]_nm squared
-!   !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
-!   !overlap = (abs(dot_product(evec_kp, evec_k)))**2
-
-!   !Use a safe range for the G vector sums
-!   do ik1 = -3, 3
-!      do ik2 = -3, 3
-!         do ik3 = -3, 3
-!            G_plusq = (  ik1*crys%reclattvecs(:, 1) &
-!                 + ik2*crys%reclattvecs(:, 2) &
-!                 + ik3*crys%reclattvecs(:, 3)  ) + qcart
-!            !G prime vector sums
-!            do ikp1 = -3, 3
-!               do ikp2 = -3, 3
-!                  do ikp3 = -3, 3
-!                     Gp_plusq = (  ikp1*crys%reclattvecs(:, 1) &
-!                           + ikp2*crys%reclattvecs(:, 2) &
-!                           + ikp3*crys%reclattvecs(:, 3)  ) + qcart
-!                     if (all(G_plusq==Gp_plusq)) then
-!                        diel_qw = 1 - prefac*X0_qw/twonorm(G_plusq)/twonorm(Gp_plusq)
-!                     else
-!                        diel_qw = - prefac*X0_qw/twonorm(G_plusq)/twonorm(Gp_plusq)
-!                     end if
-!                     W_qw = W_qw + 1.0_r64/diel_qw/twonorm(G_plusq)/twonorm(Gp_plusq)
-!                  end do
-!               end do
-!            end do
-!         end do
-!      end do
-!   end do
-
-!   gCoul2_RPA = prefac*abs(W_qw)**2  ! ?? Not sure
-! end function gCoul2_RPA
+    gCoul2_RPA = (prefac*abs(W_qw))**2  ! screened Coulomb interaction squared
+  end function gCoul2_RPA
   
   pure real(r64) function Vm2_3ph(ev1_s1, ev2_s2, ev3_s3, &
     Index_i, Index_j, Index_k, ifc3, phases_q2q3, ntrip, nb)
@@ -3062,10 +2990,10 @@ contains
        !Create initial electron wave vector
        k1_vec = vec(el%indexlist_irred(ik1), el%wvmesh, crys%reclattvecs)
 
-       !$! Defining continuous mesh
-       ncont = 10_i64 
+       ! Defining continuous energy mesh over the full energy range (not necesarry?!)
+       ncont = 10_i64  !? add a parameter for continuous mesh size
        allocate(Omegas_cont(ncont), specX0_cont(ncont), ImX0_cont(ncont), ReX0_cont(ncont))
-       call linspace(Omegas_cont, -0.5_r64, 0.5_r64, ncont) !! The ranges to be tested
+       call linspace(Omegas_cont, el%enref - el%fsthick, el%enref + el%fsthick, ncont) 
 
        !Run over electrons states 2, 3, and 4, eliminating the k4 sum with the
        !delta(k1 - k3 + k2 - k4)
@@ -3092,19 +3020,19 @@ contains
              !Apply energy window to electron 3
              if(abs(en3 - el%enref) > el%fsthick) cycle
           
+             ! Interpolating polarizability from continuous mesh to sample energy
              temp = interpolator_1d([(en3-en1)], Omegas_cont, ImX0_cont) &
                   + oneI*interpolator_1d([(en3-en1)], Omegas_cont, ReX0_cont)
              X0_qw = temp(1)
-             if(this_image() == 1) print *,"X-",X0_qw
              ! Squared matrix element- screened by RPA dielectric
+             ! q=0 divergence case is handled by the Thomas-Fermi screening
+             !? Also add a parameter to switch between Thomas-Fermi and RPA screeening
              if(twonorm(q_vec%frac) /= 0) then
-                call gCoul2_RPA_sub(el, crys, q_vec%frac, X0_qw, g2)
+                g2 = gCoul2_RPA(el, crys, q_vec%frac, X0_qw)
              else
                 g2 = gCoul2(el, crys, q_vec%frac, &
                         el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :))
              end if
-             !if(abs(en3-en1)<1e-5) write(10101,*) &
-             !   en3-en1, twonorm(q_vec%frac), g2  !DEBUG
 
              !Fermi function of electron 3
              fermi3 = Fermi(en3, el%chempot, crys%T)

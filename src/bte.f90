@@ -179,15 +179,17 @@ contains
          call dragless_phbte_RTA(Tdir, self, num, crys, sym, ph, el)
 
     !Electron RTA
-    !if(.not. num%onlyphbte) &
-    !     call dragless_ebte_RTA(Tdir, self, num, crys, wann, sym, el, ph)
-    !DEBUG - Only calc the ee rates and screened potential
-    if(.not. num%onlyphbte) then
-       if(this_image() == 1) print *,"**** Debug - RPA ****"
-       call dragless_ebte_RTA(Tdir, self, num, crys, wann, sym, el, ph)
-       if(this_image() == 1) print *,"**** Pre-exiting - Debug RPA ****"
-       call exit
-    end if
+    if(.not. num%onlyphbte) &
+         call dragless_ebte_RTA(Tdir, self, num, crys, wann, sym, el, ph)
+    
+    !$! TEST for RPA- Only calc the ee rates and screened potential
+    !$! if(.not. num%onlyphbte) then
+    !$!   if(this_image() == 1) print *,"**** TEST - RPA ****"
+    !$!   call dragless_ebte_RTA(Tdir, self, num, crys, wann, sym, el, ph)
+    !$!   if(this_image() == 1) print *,"**** Pre-exiting - TEST RPA ****"
+    !$!   call exit
+    !$! end if
+
     !Dragful electron-phonon BTEs
     if(num%drag) &
          call dragfull_ephbtes(Tdir, self, num, crys, wann, sym, ph, el)
