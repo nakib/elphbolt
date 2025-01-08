@@ -189,32 +189,19 @@ contains
     !overlap = (abs(dot_product(evec_kp, evec_k)))**2
 
     !Use a safe range for the G vector sums
+    !Assuming G = G' (neglecting local-field effects: N.E.Brener et. al. 1975 )
     do ik1 = -3, 3
        do ik2 = -3, 3
           do ik3 = -3, 3
              G_plusq = (  ik1*crys%reclattvecs(:, 1) &
                   + ik2*crys%reclattvecs(:, 2) &
                   + ik3*crys%reclattvecs(:, 3)  ) + qcart
+             if(this_image() == 1) print *,"q-",qcart
              if(this_image() == 1) print *,"Gq-",G_plusq
-             !G prime vector sums
-             do ikp1 = -3, 3
-                do ikp2 = -3, 3
-                   do ikp3 = -3, 3
-                      Gp_plusq = (  ikp1*crys%reclattvecs(:, 1) &
-                            + ikp2*crys%reclattvecs(:, 2) &
-                            + ikp3*crys%reclattvecs(:, 3)  ) + qcart
-                      if(this_image() == 1) print *,"Gpq-",Gp_plusq
-                      if (all(G_plusq==Gp_plusq)) then
-                         diel_qw = 1 - prefac*X0_qw/twonorm(G_plusq)/twonorm(Gp_plusq)
-                      else
-                         diel_qw = - prefac*X0_qw/twonorm(G_plusq)/twonorm(Gp_plusq)
-                      end if
-                      if(this_image() == 1) print *,"diel-",diel_qw
-                      W_qw = W_qw + 1.0_r64/diel_qw/twonorm(G_plusq)/twonorm(Gp_plusq)
-                      if(this_image() == 1) print *,"W_qw-",W_qw
-                   end do
-                end do
-             end do
+             diel_qw = 1 - prefac*X0_qw/twonorm(G_plusq)**2
+             if(this_image() == 1) print *,"diel-",diel_qw
+             W_qw = W_qw + 1.0_r64/diel_qw/twonorm(G_plusq)**2
+             if(this_image() == 1) print *,"W_qw-",W_qw
           end do
        end do
     end do
@@ -3110,7 +3097,12 @@ contains
              X0_qw = temp(1)
              if(this_image() == 1) print *,"X-",X0_qw
              ! Squared matrix element- screened by RPA dielectric
-             call gCoul2_RPA_sub(el, crys, q_vec%frac, X0_qw, g2)
+             if(twonorm(q_vec%frac) /= 0) then
+                call gCoul2_RPA_sub(el, crys, q_vec%frac, X0_qw, g2)
+             else
+                g2 = gCoul2(el, crys, q_vec%frac, &
+                        el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :))
+             end if
              !if(abs(en3-en1)<1e-5) write(10101,*) &
              !   en3-en1, twonorm(q_vec%frac), g2  !DEBUG
 
