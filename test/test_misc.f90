@@ -7,12 +7,13 @@ program test_misc
        twonorm, binsearch, mux_vector, demux_vector, interpolate, coarse_grained, &
        unique, linspace, compsimps, mux_state, demux_state, demux_mesh, expm1, &
        Fermi, Bose, Pade_continued, precompute_interpolation_corners_and_weights, &
-       interpolate_using_precomputed, operator(.umklapp.), shrink, Hilbert_transform
+       interpolate_using_precomputed, operator(.umklapp.), shrink, Hilbert_transform, &
+       interpolator_1d
   
   implicit none
 
   integer :: itest
-  integer, parameter :: num_tests = 32
+  integer, parameter :: num_tests = 33
   type(testify) :: test_array(num_tests), tests_all
   integer(i64) :: index, quotient, remainder, int_array(5), v1(3), v2(3), &
        v1_muxed, v2_muxed, ik, ik1, ik2, ik3, ib1, ib2, ib3, wvmesh(3), &
@@ -380,6 +381,11 @@ program test_misc
   call Hilbert_transform(fx2(x_odd), hfx2_odd)
   call test_array(itest)%assert(hfx2_odd(ind_odd), hfx2(x_odd(ind_odd)), &
        tol = 1e-5_r64)
+  
+  itest = itest + 1
+  test_array(itest) = testify("1D Interpolation")
+  call test_array(itest)%assert([9, 19, 29]*1.0_r64, interpolator_1d([2, 4, 6]*1.0_r64, &
+                                 [1, 3, 5, 7]*1.0_r64, [4, 14, 24, 34]*1.0_r64))
 
   tests_all = testify(test_array)
   call tests_all%report

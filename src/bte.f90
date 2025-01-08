@@ -182,7 +182,7 @@ contains
     if(.not. num%onlyphbte) &
          call dragless_ebte_RTA(Tdir, self, num, crys, wann, sym, el, ph)
     
-    !$! TEST for RPA- Only calc the ee rates and screened potential
+    !$! TEST for RPA: Only calculate the e-e rates
     !$! if(.not. num%onlyphbte) then
     !$!   if(this_image() == 1) print *,"**** TEST - RPA ****"
     !$!   call dragless_ebte_RTA(Tdir, self, num, crys, wann, sym, el, ph)
