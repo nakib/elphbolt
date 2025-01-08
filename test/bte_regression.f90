@@ -336,9 +336,9 @@ program bte_regression
 
   !Solve BTEs
   if(num%onlyphbte .and. .not. num%phe) then
-     call bt%solve_bte(num, crys, sym, ph)
+     call bt%solve_bte(num, crys, wann, sym, ph)
   else
-     call bt%solve_bte(num, crys, sym, ph, el)
+     call bt%solve_bte(num, crys, wann, sym, ph, el)
   end if
 
   sync all
