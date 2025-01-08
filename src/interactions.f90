@@ -3006,7 +3006,7 @@ contains
           
           call spectral_head_polarizability_3d_qpath(&
             specX0_cont, Omegas_cont, q_vec%frac, el, wann, crys, num%tetrahedra)
-          ImX0_cont = -pi*specX0_cont
+          ImX0_cont = - pi*specX0_cont
           call hilbert_transform(-ImX0_cont, ReX0_cont)
 
           !DBG
@@ -3021,8 +3021,8 @@ contains
              if(abs(en3 - el%enref) > el%fsthick) cycle
           
              ! Interpolating polarizability from continuous mesh to sample energy
-             temp = interpolator_1d([(en3-en1)], Omegas_cont, ImX0_cont) &
-                  + oneI*interpolator_1d([(en3-en1)], Omegas_cont, ReX0_cont)
+             temp = interpolator_1d([(en3 - en1)], Omegas_cont, ImX0_cont) &
+                  + oneI*interpolator_1d([(en3 - en1)], Omegas_cont, ReX0_cont)
              X0_qw = temp(1)
              ! Squared matrix element- screened by RPA dielectric
              ! q=0 divergence case is handled by the Thomas-Fermi screening
