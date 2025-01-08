@@ -441,7 +441,7 @@ contains
 
     !Local variables
     integer(i64) :: iuc, ib, jb, ipol, ik, nwork, tmp
-    real(r64) :: rcart(3), temp !DEBUG: CHANGE THIS
+    real(r64) :: rcart(3)
     real(r64),  allocatable :: rwork(:)
     complex(r64), allocatable :: work(:)
     complex(r64) :: caux, H(self%numwannbands,self%numwannbands), &

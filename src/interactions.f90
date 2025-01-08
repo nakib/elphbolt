@@ -27,7 +27,7 @@ module interactions
        demux_state, mux_vector, mux_state, expi, Bose, binsearch, Fermi, &
        twonorm, write2file_rank2_real, demux_vector, interpolate, expm1, &
        precompute_interpolation_corners_and_weights, interpolate_using_precomputed, &
-       create_set, coarse_grain, timer, eye, shrink, hilbert_transform, interpolator_1d, &
+       create_set, coarse_grain, timer, eye, shrink, Hilbert_transform, interpolator_1d, &
        linspace
   use resource_module, only: resource
   use screening_module, only: spectral_head_polarizability_3d_qpath
@@ -178,7 +178,7 @@ contains
     qcart = matmul(crys%reclattvecs, qcrys)
 
     !Use a safe range for the G vector sums
-    !Assuming G = G' (neglecting local-field effects: N.E.Brener et. al. 1975 )
+    !Assuming G = G' (neglecting local-field effects)
     do ik1 = -3, 3
        do ik2 = -3, 3
           do ik3 = -3, 3
@@ -3060,7 +3060,7 @@ contains
                    !Apply energy window to electron 2
                    if(abs(en2 - el%enref) > el%fsthick) cycle
 
-                   !Squared matrix element - Thomas Fermi
+                   !Squared matrix element - Thomas Fermi screening
                    !g2 = gCoul2(el, crys, q_vec%frac, &
                    !     el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :))
                    
