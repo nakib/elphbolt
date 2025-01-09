@@ -204,8 +204,6 @@ program elphbolt
 
            call t_event%end_timer('IBZ ph-e transition probilities')
         end if
-                
-        call t_event%end_timer('IBZ ph-e transition probilities')
      end if
      
      if(num%onlyebte .or. num%drag) then
