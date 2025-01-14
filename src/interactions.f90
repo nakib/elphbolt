@@ -168,8 +168,8 @@ contains
     complex(r64), intent(in) :: X0_qw
 
     real(r64) :: qcart(3), prefac 
-    complex(r64) :: diel_qw, W_qw
-    real(r64) :: G_plusq(3)
+    complex(r64) :: diel_qw, W_qw_msq
+    real(r64) :: Gplusq(3), Gplusq_2normsq 
     integer(i64) :: ik1, ik2, ik3
 
     prefac = 1.0e9_r64*qe/(perm0*crys%epsilon0) ! ev.nm
@@ -178,20 +178,21 @@ contains
     qcart = matmul(crys%reclattvecs, qcrys)
 
     !Use a safe range for the G vector sums
-    !Assuming G = G' (neglecting local-field effects)
+    !Ignoring G /= G' terms
     do ik1 = -3, 3
        do ik2 = -3, 3
           do ik3 = -3, 3
-             G_plusq = (  ik1*crys%reclattvecs(:, 1) &
+             Gplusq = (  ik1*crys%reclattvecs(:, 1) &
                   + ik2*crys%reclattvecs(:, 2) &
                   + ik3*crys%reclattvecs(:, 3)  ) + qcart
-             diel_qw = 1 - prefac*X0_qw/twonorm(G_plusq)**2
-             W_qw = W_qw + 1.0_r64/diel_qw/twonorm(G_plusq)**2
+             Gplusq_2normsq = twonorm(Gplusq)**2
+             diel_qw = 1 - prefac*X0_qw/Gplusq_2normsq
+             W_qw_msq = W_qw_msq + abs(1.0_r64/diel_qw/Gplusq_2normsq)**2
           end do
        end do
     end do
 
-    gCoul2_RPA = (prefac*abs(W_qw))**2  ! screened Coulomb interaction squared
+    gCoul2_RPA = W_qw_msq*prefac**2  ! screened Coulomb interaction squared
   end function gCoul2_RPA
   
   pure real(r64) function Vm2_3ph(ev1_s1, ev2_s2, ev3_s3, &
@@ -2991,7 +2992,7 @@ contains
        k1_vec = vec(el%indexlist_irred(ik1), el%wvmesh, crys%reclattvecs)
 
        ! Defining continuous energy mesh over the full energy range (not necesarry?!)
-       ncont = 10_i64  !? add a parameter for continuous mesh size
+       ncont = 50_i64  !? add a parameter for continuous mesh size
        allocate(Omegas_cont(ncont), specX0_cont(ncont), ImX0_cont(ncont), ReX0_cont(ncont))
        call linspace(Omegas_cont, el%enref - el%fsthick, el%enref + el%fsthick, ncont) 
 
@@ -3006,12 +3007,8 @@ contains
           
           call spectral_head_polarizability_3d_qpath(&
             specX0_cont, Omegas_cont, q_vec%frac, el, wann, crys, num%tetrahedra)
-          ImX0_cont = - pi*specX0_cont
+          ImX0_cont = -pi*specX0_cont
           call hilbert_transform(-ImX0_cont, ReX0_cont)
-
-          !DBG
-          !q = \equiv k1 - k3, without Umklapp, fractional units
-          !q_frac_noU = k1_vec%frac - k3_vec%frac
 
           do n3 = 1, el%numbands
              !Electron 3 energy
@@ -3026,12 +3023,11 @@ contains
              X0_qw = temp(1)
              ! Squared matrix element- screened by RPA dielectric
              ! q=0 divergence case is handled by the Thomas-Fermi screening
-             !? Also add a parameter to switch between Thomas-Fermi and RPA screeening
-             if(twonorm(q_vec%frac) /= 0) then
-                g2 = gCoul2_RPA(el, crys, q_vec%frac, X0_qw)
-             else
+             if(all(q_vec%frac == 0) .or. num%elel_screening_type=='TF') then
                 g2 = gCoul2(el, crys, q_vec%frac, &
                         el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :))
+             else
+                g2 = gCoul2_RPA(el, crys, q_vec%frac, X0_qw)
              end if
 
              !Fermi function of electron 3

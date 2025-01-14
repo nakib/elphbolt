@@ -382,8 +382,10 @@ program test_misc
   call test_array(itest)%assert(hfx2_odd(ind_odd), hfx2(x_odd(ind_odd)), &
        tol = 1e-5_r64)
   
+  ! 1D Interpolation
   itest = itest + 1
   test_array(itest) = testify("1D Interpolation")
+  ! Testing for function f(x) = 5x - 1
   call test_array(itest)%assert([9, 19, 29]*1.0_r64, interpolator_1d([2, 4, 6]*1.0_r64, &
                                  [1, 3, 5, 7]*1.0_r64, [4, 14, 24, 34]*1.0_r64))
 
