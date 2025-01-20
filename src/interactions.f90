@@ -167,16 +167,18 @@ contains
     real(r64), intent(in) :: qcrys(3)
     complex(r64), intent(in) :: X0_qw
 
-    real(r64) :: qcart(3), prefac 
-    complex(r64) :: diel_qw, W_qw_msq
+    real(r64) :: qcart(3), prefac1, prefac2, W_qw_msq
+    complex(r64) :: diel_qw
     real(r64) :: Gplusq(3), Gplusq_2normsq 
     integer(i64) :: ik1, ik2, ik3
 
-    prefac = 1.0e9_r64*qe/(perm0*crys%epsilon0) ! ev.nm
+    prefac1 = 1.0e9_r64*qe/(perm0*crys%epsiloninf) ! ev.nm
+    prefac2 = prefac1 ! ev.nm
 
-    !Transfer wave vector in Cartesian coordinates
+    !Wave vector in Cartesian coordinates
     qcart = matmul(crys%reclattvecs, qcrys)
 
+    W_qw_msq = 0.0_r64
     !Use a safe range for the G vector sums
     !Ignoring G /= G' terms
     do ik1 = -3, 3
@@ -186,13 +188,15 @@ contains
                   + ik2*crys%reclattvecs(:, 2) &
                   + ik3*crys%reclattvecs(:, 3)  ) + qcart
              Gplusq_2normsq = twonorm(Gplusq)**2
-             diel_qw = 1 - prefac*X0_qw/Gplusq_2normsq
+             !Computing dielectric matrix elements 
+             diel_qw = 1.0_r64 - prefac2*X0_qw/Gplusq_2normsq
+             !Squared Coulomb interaction without the prefactor
              W_qw_msq = W_qw_msq + abs(1.0_r64/diel_qw/Gplusq_2normsq)**2
           end do
        end do
     end do
 
-    gCoul2_RPA = W_qw_msq*prefac**2  ! screened Coulomb interaction squared
+    gCoul2_RPA = W_qw_msq*prefac1**2/crys%volume**2 ! eV^2 
   end function gCoul2_RPA
   
   pure real(r64) function Vm2_3ph(ev1_s1, ev2_s2, ev3_s3, &
@@ -2994,7 +2998,7 @@ contains
        ! Defining continuous energy mesh over the full energy range (not necesarry?!)
        ncont = 50_i64  !? add a parameter for continuous mesh size
        allocate(Omegas_cont(ncont), specX0_cont(ncont), ImX0_cont(ncont), ReX0_cont(ncont))
-       call linspace(Omegas_cont, el%enref - el%fsthick, el%enref + el%fsthick, ncont) 
+       call linspace(Omegas_cont, -2*el%fsthick, 2*el%fsthick, ncont) 
 
        !Run over electrons states 2, 3, and 4, eliminating the k4 sum with the
        !delta(k1 - k3 + k2 - k4)
@@ -3004,10 +3008,13 @@ contains
 
           !q \equiv k1 - k3
           q_vec = vec_sub(k1_vec, k3_vec, el%wvmesh, crys%reclattvecs)
+
+          !TEST
+          !if(twonorm(q_vec%frac) > 0.2_r64) cycle
           
           call spectral_head_polarizability_3d_qpath(&
             specX0_cont, Omegas_cont, q_vec%frac, el, wann, crys, num%tetrahedra)
-          ImX0_cont = -pi*specX0_cont
+          ImX0_cont = -pi*specX0_cont 
           call hilbert_transform(-ImX0_cont, ReX0_cont)
 
           do n3 = 1, el%numbands
@@ -3018,8 +3025,11 @@ contains
              if(abs(en3 - el%enref) > el%fsthick) cycle
           
              ! Interpolating polarizability from continuous mesh to sample energy
-             temp = interpolator_1d([(en3 - en1)], Omegas_cont, ImX0_cont) &
-                  + oneI*interpolator_1d([(en3 - en1)], Omegas_cont, ReX0_cont)
+             !temp = interpolator_1d([(en1 - en3)], Omegas_cont, ImX0_cont) &
+             !     + oneI*interpolator_1d([(en1 - en3)], Omegas_cont, ReX0_cont)
+             temp = interpolator_1d([(0.0_r64)], Omegas_cont, ImX0_cont) &
+                  + oneI*interpolator_1d([(0.0_r64)], Omegas_cont, ReX0_cont)
+             
              X0_qw = temp(1)
              ! Squared matrix element- screened by RPA dielectric
              ! q=0 divergence case is handled by the Thomas-Fermi screening
