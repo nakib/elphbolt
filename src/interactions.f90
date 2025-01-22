@@ -205,21 +205,27 @@ contains
     real(r64), intent(in) :: qcrys(3)
     complex(r64), intent(in) :: X0_qw
     real(r64) :: diel_tf, prefac, prefac1, scrpa, sctf
+    real(r64) :: re_barecol 
     complex(r64) :: diel_rpa
     real(r64) :: qcart(3), qmag
 
     prefac = 1.0e9_r64*qe/(perm0*crys%epsiloninf) ! ev.nm
     prefac1 = 1.0e9_r64*qe/perm0 ! ev.nm
+
     qcart = matmul(crys%reclattvecs, qcrys)
     qmag = twonorm(qcart) ! nm^-1
+    
+    re_barecol = qmag**2/prefac1    ! ev^-1.nm^-3
+    
     diel_tf = 1.0_r64 + crys%qTF**2/qmag**2
-    sctf = prefac/(qmag**2 + crys%qTF**2)
-    diel_rpa = 1.0_r64 - prefac*X0_qw/qmag**2
-    scrpa = prefac/abs(diel_rpa)/qmag**2
+    sctf = prefac1**2/(qmag**2 + crys%qTF**2)**2
+
+    diel_rpa = 1.0_r64 - prefac1*X0_qw/qmag**2
+    scrpa = 1.0_r64/abs(re_barecol - X0_qw)**2
 
     if(this_image()==1) then
-       print*,"TF-diel::",qmag,diel_tf,(prefac/diel_tf/qmag**2)**2
-       print*,"RPA-diel::",qmag,real(diel_rpa),imag(diel_rpa),scrpa**2
+       print*,"TF-diel::", qmag, diel_tf, sctf
+       print*,"RPA-diel::",qmag, real(diel_rpa), imag(diel_rpa), scrpa
     end if
   end subroutine print_diel
 
