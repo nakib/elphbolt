@@ -198,7 +198,31 @@ contains
 
     gCoul2_RPA = W_qw_msq*prefac1**2/crys%volume**2 ! eV^2 
   end function gCoul2_RPA
-  
+
+  subroutine print_diel(el, crys, qcrys, X0_qw)
+    type(crystal), intent(in) :: crys
+    type(electron), intent(in) :: el
+    real(r64), intent(in) :: qcrys(3)
+    complex(r64), intent(in) :: X0_qw
+    real(r64) :: diel_tf, prefac, prefac1, scrpa, sctf
+    complex(r64) :: diel_rpa
+    real(r64) :: qcart(3), qmag
+
+    prefac = 1.0e9_r64*qe/(perm0*crys%epsiloninf) ! ev.nm
+    prefac1 = 1.0e9_r64*qe/perm0 ! ev.nm
+    qcart = matmul(crys%reclattvecs, qcrys)
+    qmag = twonorm(qcart) ! nm^-1
+    diel_tf = 1.0_r64 + crys%qTF**2/qmag**2
+    sctf = prefac/(qmag**2 + crys%qTF**2)
+    diel_rpa = 1.0_r64 - prefac*X0_qw/qmag**2
+    scrpa = prefac/abs(diel_rpa)/qmag**2
+
+    if(this_image()==1) then
+       print*,"TF-diel::",qmag,diel_tf,(prefac/diel_tf/qmag**2)**2
+       print*,"RPA-diel::",qmag,real(diel_rpa),imag(diel_rpa),scrpa**2
+    end if
+  end subroutine print_diel
+
   pure real(r64) function Vm2_3ph(ev1_s1, ev2_s2, ev3_s3, &
     Index_i, Index_j, Index_k, ifc3, phases_q2q3, ntrip, nb)
     !! Function to calculate the squared 3-ph interaction vertex |V-|^2.
@@ -3016,6 +3040,12 @@ contains
             specX0_cont, Omegas_cont, q_vec%frac, el, wann, crys, num%tetrahedra)
           ImX0_cont = -pi*specX0_cont 
           call hilbert_transform(-ImX0_cont, ReX0_cont)
+          
+          !TEST
+          temp = interpolator_1d([(0.0_r64)], Omegas_cont, ImX0_cont) &
+               + oneI*interpolator_1d([(0.0_r64)], Omegas_cont, ReX0_cont)
+          X0_qw = temp(1)
+          call print_diel(el, crys, q_vec%frac, X0_qw)
 
           do n3 = 1, el%numbands
              !Electron 3 energy
@@ -3027,10 +3057,7 @@ contains
              ! Interpolating polarizability from continuous mesh to sample energy
              !temp = interpolator_1d([(en1 - en3)], Omegas_cont, ImX0_cont) &
              !     + oneI*interpolator_1d([(en1 - en3)], Omegas_cont, ReX0_cont)
-             temp = interpolator_1d([(0.0_r64)], Omegas_cont, ImX0_cont) &
-                  + oneI*interpolator_1d([(0.0_r64)], Omegas_cont, ReX0_cont)
              
-             X0_qw = temp(1)
              ! Squared matrix element- screened by RPA dielectric
              ! q=0 divergence case is handled by the Thomas-Fermi screening
              if(all(q_vec%frac == 0) .or. num%elel_screening_type=='TF') then
@@ -3039,7 +3066,6 @@ contains
              else
                 g2 = gCoul2_RPA(el, crys, q_vec%frac, X0_qw)
              end if
-
              !Fermi function of electron 3
              fermi3 = Fermi(en3, el%chempot, crys%T)
 
