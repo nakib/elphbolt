@@ -53,15 +53,15 @@ name="superconda"
 source-dir="app"
 main="superconda.f90"
 
-#[[executable]]
-#name="test_V_perm_symm"
-#source-dir="app"
-#main="test_V_perm_symm.f90"
-
 [[executable]]
-name = "screening_comparison"
-source-dir="src"
-main = "screening_comparison.f90"
+name="V3offload"
+source-dir="app"
+main="V3offload.f90"
+
+#[[executable]]
+#name = "screening_comparison"
+#source-dir="src"
+#main = "screening_comparison.f90"
 
 [[test]]
 name = "test_misc"
@@ -83,12 +83,18 @@ name = "test_vector"
 source-dir="test"
 main = "test_vector.f90"
 
-#[[test]]
-#name = "check_interactions_symmetries"
-#source-dir="test"
-#main = "check_interactions_symmetries.f90"
-
 [[test]]
 name = "bte_regression"
 source-dir="test"
 main = "bte_regression.f90"
+
+#
+#[[test]]
+#name = "check_interactions_symmetries"
+#source-dir="test"
+#main = "check_interactions_symmetries.f90"
+#
+#[[test]]
+#name="test_V_perm_symm"
+#source-dir="test"
+#main="test_V_perm_symm.f90"

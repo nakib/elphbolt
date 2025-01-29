@@ -16,10 +16,6 @@
 
 module misc
   !! Module containing miscellaneous math and numerics related functions and subroutines.
-
-#ifdef _OPENACC
-  use openacc
-#endif
   
   use precision, only: r128, r64, i64
   use params, only: kB, twopi, pi
@@ -913,8 +909,6 @@ contains
     !! v is the demultiplexed triplet of a wave vector.
     !! mesh is the number of wave vectors along the three reciprocal lattice vectors.
     !! base states whether v has 0- or 1-based indexing.
-
-    !$acc routine seq
     
     integer(i64), intent(in) :: v(3), mesh(3), base
     integer(i64) :: mux_vector

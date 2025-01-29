@@ -6,9 +6,4 @@ FORBLASLAPACK_DIR="~/.local/lib/"
 
 export FPM_FC=caf
 #bounds check does not work with -fopenacc...not sure why...
-export FPM_FFLAGS="-g -O2 -cpp -fopenacc -DOPENACC=1 -foffload=-lm -fopt-info-omp -fPIC -Wunused -Wconversion -Wunderflow -Wdo-subscript -L $FORBLASLAPACK_DIR"
-#export FPM_FFLAGS="-g -O3 -cpp -fopenacc -DOPENACC=1 -no-pie -foffload=nvptx-none -foffload=-lm -fopt-info-omp -fPIC -Wunused -Wconversion -Wunderflow -Wdo-subscript -L $FORBLASLAPACK_DIR"
-
-#export FPM_FFLAGS="-g -O2 -cpp -fopenacc -DOPENACC=1 -foffload=-lm -fopt-info-omp -fPIC -Wunused -Wconversion -Wunderflow -Wdo-subscript -L $FORBLASLAPACK_DIR"
-
-#export FPM_FFLAGS="-g -O3 -cpp -fopenacc -DOPENACC=1 -no-pie -foffload=nvptx-none -foffload=-lm -fopt-info-omp -L $FORBLASLAPACK_DIR"
+export FPM_FFLAGS="-g -O3 -cpp -fopenacc -fopt-info-omp -DOPENACC=1 -foffload=-lm -foffload=nvptx-none -no-pie -fPIC -Wunused -Wconversion -Wunderflow -Wdo-subscript -L $FORBLASLAPACK_DIR"

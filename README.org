@@ -73,8 +73,7 @@ The source is heavily commented and can be auto-documented with ~FORD~ (https://
      #+BEGIN_SRC bash
      ./install.sh --with-fortran <path to>/gfortran \
      --with-cxx <path to>/g++ \
-     --with-c <path to>/gcc \ 
-     --with-mpi <path to mpich installation directory>
+     --with-c <path to>/gcc
      #+END_SRC
 
 Carefully read the output on the screen and add the paths to ~caf~ and ~cafrun~ to your ~$PATH~.
