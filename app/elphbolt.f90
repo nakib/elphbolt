@@ -217,10 +217,11 @@ program elphbolt
         call t_event%end_timer('IBZ e-ph transition probabilities')
      end if
 
-     if(num%need_Wannier) then
-        !Deallocate Wannier quantities
-        call wann%deallocate_wannier(num)
-     end if
+     ! Temporary solution: manual deallocation skipped; will handle later.
+     !if(num%need_Wannier) then
+     !   !Deallocate Wannier quantities
+     !   call wann%deallocate_wannier(num)
+     !end if
 
      if(num%onlyebte .or. num%drag) then
         if(num%elchimp) then
@@ -267,9 +268,9 @@ program elphbolt
      !Solve BTEs
      if(num%solve_bulk) then
         if(num%onlyphbte .and. .not. num%phe) then
-           call bt%solve_bte(num, crys, sym, ph)
+           call bt%solve_bte(num, crys, wann, sym, ph)
         else
-           call bt%solve_bte(num, crys, sym, ph, el)
+           call bt%solve_bte(num, crys, wann, sym, ph, el)
         end if
      end if
 
@@ -282,12 +283,13 @@ program elphbolt
 
         ! Solve the BTE for the nanostructures
         if(num%onlyphbte .and. .not. num%phe) then
-           call bt_nano%solve_bte(num, crys, sym, nano, ph)
+           call bt_nano%solve_bte(num, crys, wann, sym, nano, ph)
         else
-           call bt_nano%solve_bte(num, crys, sym, nano, ph, el)
+           call bt_nano%solve_bte(num, crys, wann, sym, nano, ph, el)
         end if
 
      end if
+
 
   case(2) !BTE Post-processing case
      call subtitle("Post-processing...")

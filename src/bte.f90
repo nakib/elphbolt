@@ -28,6 +28,7 @@ module bte_module
        interpolate_using_precomputed, Jacobian, cross_product, qdist
   use numerics_module, only: numerics
   use crystal_module, only: crystal
+  use wannier_module, only: wannier
   use nano_module, only: nanostructure
   use symmetry_module, only: symmetry
   use phonon_module, only: phonon
@@ -140,7 +141,7 @@ contains
          self%el_alphabyT(el_numbands, 3, 3), self%el_kappa0(el_numbands, 3, 3))
   end subroutine allocate_el_transport_coeffs
   
-  subroutine bte_driver(self, num, crys, sym, ph, el)
+  subroutine bte_driver(self, num, crys, wann, sym, ph, el)
     !! Subroutine to orchestrate the BTE calculations.
     !!
     !! self BTE object
@@ -153,6 +154,7 @@ contains
     class(bte), intent(inout) :: self
     type(numerics), intent(in) :: num
     type(crystal), intent(in) :: crys
+    type(wannier), intent(in) :: wann
     type(symmetry), intent(in) :: sym
     type(phonon), intent(in) :: ph
     type(electron), intent(in), optional :: el
@@ -177,12 +179,20 @@ contains
          call dragless_phbte_RTA(Tdir, self, num, crys, sym, ph, el)
 
     !Electron RTA
-    if(.not. num%onlyphbte) &
-         call dragless_ebte_RTA(Tdir, self, num, crys, sym, el, ph)
+    !if(.not. num%onlyphbte) &
+    !     call dragless_ebte_RTA(Tdir, self, num, crys, wann, sym, el, ph)
     
+    !$! TEST for RPA: Only calculate the e-e rates
+    if(.not. num%onlyphbte) then
+      if(this_image() == 1) print *,"**** TEST - RPA ****"
+      call dragless_ebte_RTA(Tdir, self, num, crys, wann, sym, el, ph)
+      if(this_image() == 1) print *,"**** Pre-exiting - TEST RPA ****"
+      call exit
+    end if
+
     !Dragful electron-phonon BTEs
     if(num%drag) &
-         call dragfull_ephbtes(Tdir, self, num, crys, sym, ph, el)
+         call dragfull_ephbtes(Tdir, self, num, crys, wann, sym, ph, el)
 
     !Dragless full phonon BTE
     if(num%onlyphbte .or. num%drag) &
@@ -190,10 +200,10 @@ contains
 
     !Dragless full electron BTE
     if(num%onlyebte .or. num%drag) &
-         call dragless_ebte_full(Tdir, self, num, crys, sym, el)
+         call dragless_ebte_full(Tdir, self, num, crys, wann, sym, el)
   end subroutine bte_driver
   
-  subroutine dragless_ebte_RTA(Tdir, self, num, crys, sym, el, ph)
+  subroutine dragless_ebte_RTA(Tdir, self, num, crys, wann, sym, el, ph)
     !! Dragless electron BTE calculator in the relaxation time approximation.
     !! It is impure as it mutates the electron sector of the bte data type and
     !! writes to disk. It should be kept private to this data type unless made safer.
@@ -201,6 +211,7 @@ contains
     class(bte), intent(inout) :: self !Mutation alert!
     type(numerics), intent(in) :: num
     type(crystal), intent(in) :: crys
+    type(wannier), intent(in) :: wann
     type(symmetry), intent(in) :: sym
     type(phonon), intent(in) :: ph
     type(electron), intent(in) :: el
@@ -220,7 +231,7 @@ contains
     !Calculate RTA scattering rates
     ! e-ph and e-impurity
     call calculate_el_rta_rates(self%el_rta_rates_eph_ibz, self%el_rta_rates_echimp_ibz, &
-         self%el_rta_rates_ee_ibz, num, crys, el)
+         self%el_rta_rates_ee_ibz, num, crys, el, wann)
 
     ! e-boundary
     call calculate_bound_scatt_rates(el%prefix, num%elbound, crys%bound_length, &
@@ -335,7 +346,7 @@ contains
     sync all
   end subroutine dragless_ebte_RTA
 
-  subroutine dragless_ebte_full(Tdir, self, num, crys, sym, el)
+  subroutine dragless_ebte_full(Tdir, self, num, crys, wann, sym, el)
     !! Dragless full electron BTE calculator.
     !! It is impure as it mutates the electron sector of the bte data type and
     !! writes to disk. It should be kept private to this data type unless made safer.
@@ -343,6 +354,7 @@ contains
     class(bte), intent(inout) :: self !Mutation alert!
     type(numerics), intent(in) :: num
     type(crystal), intent(in) :: crys
+    type(wannier), intent(in) :: wann
     type(symmetry), intent(in) :: sym
     type(electron), intent(in) :: el
     character(*), intent(in) :: Tdir
@@ -372,7 +384,7 @@ contains
 
     do it_el = 1, num%maxiter
        !E field:
-       call iterate_bte_el(num, el, crys, &
+       call iterate_bte_el(num, el, crys, wann, &
             self%el_rta_rates_ibz, self%el_field_term_E, self%el_response_E)
 
        !Calculate electron transport coefficients
@@ -382,7 +394,7 @@ contains
        trans%el_alphabyT = trans%el_alphabyT/crys%T
 
        !delT field:
-       call iterate_bte_el(num, el, crys, &
+       call iterate_bte_el(num, el, crys, wann, &
             self%el_rta_rates_ibz, self%el_field_term_T, self%el_response_T)
        !Enforce Kelvin-Onsager relation
        do icart = 1, 3
@@ -651,7 +663,7 @@ contains
     sync all
   end subroutine dragless_phbte_full
 
-  subroutine dragfull_ephbtes(Tdir, self, num, crys, sym, ph, el)
+  subroutine dragfull_ephbtes(Tdir, self, num, crys, wann, sym, ph, el)
     !! Dragful electron-phonon BTEs calculator.
     !! It is impure as it mutates the the bte data type and
     !! writes to disk. It should be kept private to this data type unless made safer.
@@ -659,6 +671,7 @@ contains
     class(bte), intent(inout) :: self !Mutation alert!
     type(numerics), intent(in) :: num
     type(crystal), intent(in) :: crys
+    type(wannier), intent(in) :: wann
     type(symmetry), intent(in) :: sym
     type(phonon), intent(in) :: ph
     type(electron), intent(in) :: el
@@ -758,7 +771,7 @@ contains
        !Iterate electron response all the way
        do it_el = 1, num%maxiter
           !E field:
-          call iterate_bte_el(num, el, crys, &
+          call iterate_bte_el(num, el, crys, wann, &
                self%el_rta_rates_ibz, self%el_field_term_E, self%el_response_E, ph_drag_term_E)
 
           !Calculate electron transport coefficients
@@ -768,7 +781,7 @@ contains
           trans%el_alphabyT = trans%el_alphabyT/crys%T
 
           !delT field:
-          call iterate_bte_el(num, el, crys, &
+          call iterate_bte_el(num, el, crys, wann, &
                self%el_rta_rates_ibz, self%el_field_term_T, self%el_response_T, ph_drag_term_T)
           !Enforce Kelvin-Onsager relation:
           !Fix "diffusion" part
@@ -1224,7 +1237,7 @@ contains
     end do
   end subroutine iterate_bte_ph
 
-  subroutine iterate_bte_el(num, el, crys, rta_rates_ibz, field_term, &
+  subroutine iterate_bte_el(num, el, crys, wann, rta_rates_ibz, field_term, &
        response_el, ph_drag_term)
     !! Subroutine to iterate the electron BTE one step.
     !! 
@@ -1240,6 +1253,7 @@ contains
     type(electron), intent(in) :: el
     type(numerics), intent(in) :: num
     type(crystal), intent(in) :: crys
+    type(wannier), intent(in) :: wann
     !real(r64), intent(in) :: T, rta_rates_ibz(:,:), field_term(:,:,:)
     real(r64), intent(in) :: rta_rates_ibz(:,:), field_term(:,:,:)
     real(r64), intent(in), optional :: ph_drag_term(:,:,:)
@@ -1344,7 +1358,7 @@ contains
           
           !Electron-electron transition rates (for now on-the-fly computation)
           if(num%elel) then
-             call calculate_Xee_OTF(el, num, istate, crys, Xee, &
+             call calculate_Xee_OTF(el, num, wann, istate, crys, Xee, &
                   istate_el_ee2, istate_el_ee3, istate_el_ee4)
              nprocs_ee = size(Xee)
           end if

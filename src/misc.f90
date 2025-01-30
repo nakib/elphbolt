@@ -1688,4 +1688,40 @@ contains
        Hfx(k + 1) = -(fx(k + 2) - fx(k) + term2 + term3)/pi
     end do
   end subroutine Hilbert_transform
+
+  pure function interpolator_1d(samp, cont, f_cont) result(f_samp)
+    !! linear interpolation from 1d array evaluated on a fine, continuous mesh
+    !! to a sample mesh, where the former mesh should cover the full range of the latter. 
+    !!
+    !! samp Sample mesh
+    !! cont Continuous mesh
+    !! f_cont 1D array evaluated on cont
+    !! f_samp Interpolated array on samp 
+    real(r64), intent(in) :: samp(:), cont(:)
+    real(r64), intent(in) :: f_cont(:)
+    real(r64), allocatable :: f_samp(:)
+
+    integer :: isamp, ncont, nsamp, ileft, iright
+    real(r64) :: dcont, w
+
+    ncont = size(cont)
+    nsamp = size(samp)
+    
+    allocate(f_samp(nsamp))
+
+    dcont = cont(2) - cont(1)
+    
+    do isamp = 1, nsamp
+       w = samp(isamp)
+       ileft = minloc(abs(cont - w), dim = 1) ! Find the left index in cont closest to samp
+       if(ileft == ncont) then    ! If the index is the last point, use its value 
+          f_samp(isamp) = f_cont(ileft)
+       else
+          iright = ileft + 1  ! right neighbouring index
+          ! Linear interpolation using two nearest points
+          f_samp(isamp) = ((cont(iright) - w)*f_cont(ileft) + &
+               (w - cont(ileft))*f_cont(iright))/dcont
+       end if
+    end do
+  end function interpolator_1d
 end module misc

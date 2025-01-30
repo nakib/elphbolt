@@ -23,8 +23,10 @@ module interactions
        demux_state, mux_vector, mux_state, expi, Bose, binsearch, Fermi, &
        twonorm, write2file_rank2_real, demux_vector, interpolate, expm1, &
        precompute_interpolation_corners_and_weights, interpolate_using_precomputed, &
-       create_set, coarse_grain, timer, eye, shrink
+       create_set, coarse_grain, timer, eye, shrink, Hilbert_transform, interpolator_1d, &
+       linspace
   use resource_module, only: resource
+  use screening_module, only: spectral_head_polarizability_3d_qpath
   
   use wannier_module, only: wannier
   use crystal_module, only: crystal
@@ -119,13 +121,13 @@ contains
     real(r64), intent(in) :: qcrys(3)
     complex(r64), intent(in) :: evec_k(:), evec_kp(:)
 
-    real(r64) :: qcart(3), prefac, overlap
+    real(r64) :: qcart(3), prefac, overlap, screened_qTF_sq
     real(r64) :: Gsum, Gplusq(3)
     integer :: ik1, ik2, ik3
 
     !Note that here we use an extra screening with epsiloninf following
     !Sanborn's prescription.
-    prefac = 1.0e18_r64/crys%volume**2*qe**2/(perm0*crys%epsiloninf)**2
+    prefac = 1.0e18_r64/crys%volume**2*qe**2/(crys%epsiloninf*perm0)**2
 
     !Transfer wave vector in Cartesian coordinates
     qcart = matmul(crys%reclattvecs, qcrys)
@@ -133,6 +135,9 @@ contains
     !This is [U(k')U^\dagger(k)]_nm squared
     !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
     overlap = (abs(dot_product(evec_kp, evec_k)))**2
+
+    ! Pre screened Thomas Fermi wavevector squared, to match Sanborn's prescription 
+    screened_qTF_sq = crys%qTF**2/crys%epsiloninf
 
     Gsum = 0.0_r64
     !Use a safe range for the G vector sums
@@ -144,14 +149,58 @@ contains
                      + ik3*crys%reclattvecs(:, 3)) + qcart
              
              Gsum = Gsum + &
-                  1.0_r64/(twonorm(Gplusq)**2 + crys%qTF**2)**2 !eV^2
+                  1.0_r64/(twonorm(Gplusq)**2 + screened_qTF_sq)**2 !eV^2
           end do
        end do
     end do
 
     gCoul2 = Gsum*prefac*overlap
   end function gCoul2
-  
+
+  pure real(r64) function gCoul2_RPA(el, crys, qcrys, evec_k, evec_kp, X0_qw)
+    !! Function to calculate the RPA screened
+    !! squared electron-electron vertex.
+
+    type(crystal), intent(in) :: crys
+    type(electron), intent(in) :: el
+    real(r64), intent(in) :: qcrys(3)
+    complex(r64), intent(in) :: X0_qw
+    complex(r64), intent(in) :: evec_k(:), evec_kp(:)
+
+    real(r64) :: qcart(3), prefac, W_qw_msq, overlap
+    complex(r64) :: diel_qw
+    real(r64) :: Gplusq(3), Gplusq_2normsq 
+    integer(i64) :: ik1, ik2, ik3
+
+    prefac = 1.0e9_r64*qe/(perm0*crys%epsiloninf) ! ev.nm
+
+    !Wave vector in Cartesian coordinates
+    qcart = matmul(crys%reclattvecs, qcrys)
+    
+    overlap = (abs(dot_product(evec_kp, evec_k)))**2
+
+    W_qw_msq = 0.0_r64
+    !Use a safe range for the G vector sums
+    !Ignoring G /= G' terms
+    do ik1 = -3, 3
+       do ik2 = -3, 3
+          do ik3 = -3, 3
+             Gplusq = (  ik1*crys%reclattvecs(:, 1) &
+                  + ik2*crys%reclattvecs(:, 2) &
+                  + ik3*crys%reclattvecs(:, 3)  ) + qcart
+             Gplusq_2normsq = twonorm(Gplusq)**2
+             
+             !Computing dielectric matrix elements 
+             diel_qw = 1.0_r64 - prefac*X0_qw/Gplusq_2normsq
+             !Squared Coulomb interaction without the prefactor
+             W_qw_msq = W_qw_msq + abs(1.0_r64/diel_qw/Gplusq_2normsq)**2
+          end do
+       end do
+    end do
+
+    gCoul2_RPA = W_qw_msq*prefac**2*overlap/crys%volume**2 ! eV^2 
+  end function gCoul2_RPA
+
   pure real(r64) function Vm2_3ph(ev1_s1, ev2_s2, ev3_s3, &
     Index_i, Index_j, Index_k, ifc3, phases_q2q3, ntrip, nb)
     !! Function to calculate the squared 3-ph interaction vertex |V-|^2.
@@ -1928,7 +1977,7 @@ contains
     sync all
   end subroutine calculate_eph_interaction_ibzk
 
-  subroutine calculate_Xee_OTF(el, num, istate1, crys, X, &
+  subroutine calculate_Xee_OTF(el, num, wann, istate1, crys, X, &
        istate_el2, istate_el3, istate_el4)
     !! On-the-fly serial calculator of the e-e transition probability.
     !! for a given IBZ electron states within the transport window.
@@ -1936,6 +1985,7 @@ contains
     type(electron), intent(in) :: el
     type(numerics), intent(in) :: num
     type(crystal), intent(in) :: crys
+    type(wannier), intent(in) :: wann
     integer(i64), intent(in) :: istate1
     real(r64), intent(out), allocatable :: X(:)
     integer(i64), intent(out), allocatable, optional :: &
@@ -1946,7 +1996,10 @@ contains
          n1, ik1, n2, ik2, n3, ik3, n4, ik4, &
          count, nprocs
     real(r64) :: const, beta, fermi1, fermi2, fermi3, fermi4, &
-         delta_val, occup_fac, en1, en2, en3, en4, g2, q_frac_noU(3)
+         delta_val, occup_fac, en1, en2, en3, en4, g2 
+    real(r64), allocatable :: Omegas_cont(:), specX0_cont(:), ImX0_cont(:), &
+         ReX0_cont(:)
+    complex(r64) :: temp(1), X0_qw 
     character(len = 1024) :: filename
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
     type(vec) :: k1_vec, k2_vec, k3_vec, k4_vec, q_vec
@@ -1999,7 +2052,11 @@ contains
 
        !Create initial electron wave vector
        k1_vec = vec(el%indexlist_irred(ik1), el%wvmesh, crys%reclattvecs)
-       
+
+       ! Defining continuous energy mesh over the full energy range
+       allocate(Omegas_cont(num%ncont_mesh), specX0_cont(num%ncont_mesh), ImX0_cont(num%ncont_mesh), ReX0_cont(num%ncont_mesh))
+       call linspace(Omegas_cont, -2*el%fsthick, 2*el%fsthick, num%ncont_mesh) 
+
        !Run over electrons states 2, 3, and 4, eliminating the k4 sum with the
        !delta(k1 - k3 + k2 - k4)
        do ik3 = 1, el%nwv       
@@ -2008,10 +2065,11 @@ contains
 
           !q \equiv k1 - k3
           q_vec = vec_sub(k1_vec, k3_vec, el%wvmesh, crys%reclattvecs)
-
-          !DBG
-          !q = \equiv k1 - k3, without Umklapp, fractional units
-          !q_frac_noU = k1_vec%frac - k3_vec%frac
+          
+          call spectral_head_polarizability_3d_qpath(&
+           specX0_cont, Omegas_cont, q_vec%frac, el, wann, crys, num%tetrahedra)
+          ImX0_cont = -pi*specX0_cont 
+          call hilbert_transform(-ImX0_cont, ReX0_cont)
 
           do n3 = 1, el%numbands
              !Electron 3 energy
@@ -2019,7 +2077,21 @@ contains
 
              !Apply energy window to electron 3
              if(abs(en3 - el%enref) > el%fsthick) cycle
-
+          
+             ! Interpolating polarizability from continuous mesh to sample energy
+             temp = interpolator_1d([(en1 - en3)], Omegas_cont, ReX0_cont) &
+                  + oneI*interpolator_1d([(en1 - en3)], Omegas_cont, ImX0_cont)
+             X0_qw = temp(1)
+             
+             ! Squared matrix element- screened by TF or RPA dielectric
+             ! q=0 divergence case is handled by the Thomas-Fermi screening
+             if(all(q_vec%frac == 0) .or. num%elel_screening_type=='TF') then
+                g2 = gCoul2(el, crys, q_vec%frac, &
+                        el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :))
+             else
+                g2 = gCoul2_RPA(el, crys, q_vec%frac, &
+                        el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :), X0_qw)
+             end if
              !Fermi function of electron 3
              fermi3 = Fermi(en3, el%chempot, crys%T)
 
@@ -2046,9 +2118,9 @@ contains
                    !Apply energy window to electron 2
                    if(abs(en2 - el%enref) > el%fsthick) cycle
 
-                   !Squared matrix element
-                   g2 = gCoul2(el, crys, q_vec%frac, &
-                        el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :))
+                   !Squared matrix element - Thomas Fermi screening
+                   !g2 = gCoul2(el, crys, q_vec%frac, &
+                   !     el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :))
                    
                    !Fermi function of electron 2
                    fermi2 = Fermi(en2, el%chempot, crys%T)
@@ -2485,7 +2557,7 @@ contains
   end subroutine calculate_4ph_rta_rates
   
   subroutine calculate_el_rta_rates(rta_rates_eph, rta_rates_echimp, rta_rates_ee, &
-       num, crys, el)
+       num, crys, el, wann)
     !! Subroutine for parallel reading of the e-ph transition probabilities
     !! from disk and calculating the relaxation time approximation (RTA)
     !! scattering rates for the e-ph channel.
@@ -2495,6 +2567,7 @@ contains
     type(numerics), intent(in) :: num
     type(crystal), intent(in) :: crys
     type(electron), intent(in) :: el
+    type(wannier), intent(in) :: wann
     
     !Local variables
     integer(i64) :: nstates_irred, istate, nprocs_eph, nprocs_echimp, &
@@ -2532,7 +2605,7 @@ contains
 
           !e-e scattering rates (OTF only at the mo)
           if(num%elel) then
-             call calculate_Xee_OTF(el, num, istate, crys, X)
+             call calculate_Xee_OTF(el, num, wann, istate, crys, X)
              do iproc = 1, size(X)
                 rta_rates_ee(ik, m) = rta_rates_ee(ik, m) + X(iproc)
              end do

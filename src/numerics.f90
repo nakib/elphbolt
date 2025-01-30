@@ -106,6 +106,10 @@ module numerics_module
      !! Use electron-charged impurity scattering?
      logical :: elel
      !! Use electron-electron scattering?
+     character(len = 3) :: elel_screening_type
+     !! Type of electron-electron screening
+     integer(i64) :: ncont_mesh
+     !! Size of the continuous mesh needed for calculating RPA dielectric
      logical :: elbound
      !! Use electron-boundary scattering?
      logical :: drag
@@ -164,10 +168,12 @@ contains
     !Local variables
     integer(i64) :: mesh_ref, qmesh(3), maxiter, runlevel, el_en_num, &
          ph_en_num, ph_mfp_npts, ph_abs_q_npts, fourph_mesh_ref
-    integer :: i
+    integer :: i 
+    integer(i64) :: ncont_mesh
     real(r64) :: fsthick, conv_thres, ph_en_min, ph_en_max, el_en_min, el_en_max, Bfield(3)
     character(len = 1024) :: datadumpdir, tag
     character(len = 6) :: phiso_1B_theory
+    character(len = 3) :: elel_screening_type
     character(len = 1) :: numcols
     logical :: read_gq2, read_gk2, read_V, read_W, tetrahedra, phe, phiso, phsubs, &
          phbound, phdef_Tmat, onlyphbte, onlyebte, elchimp, elbound, drag, plot_along_path, &
@@ -179,7 +185,7 @@ contains
          conv_thres, drag, elchimp, plot_along_path, runlevel, ph_en_min, ph_en_max, &
          ph_en_num, el_en_min, el_en_max, el_en_num, phbound, elbound, phdef_Tmat, &
          ph_mfp_npts, ph_abs_q_npts, phthinfilm, phthinfilm_ballistic, &
-         fourph, fourph_mesh_ref, use_Wannier_ifc2s, elel, &
+         fourph, fourph_mesh_ref, use_Wannier_ifc2s, elel, elel_screening_type, ncont_mesh,&
          phiso_Tmat, phiso_1B_theory, Bfield_on, Bfield, W_OTF, Y_OTF, &
          solve_bulk, solve_nano
 
@@ -213,6 +219,8 @@ contains
     onlyebte = .false.
     elchimp = .false.
     elel = .false.
+    elel_screening_type = 'TF'
+    ncont_mesh = 1
     elbound = .false.
     drag = .true.
     use_Wannier_ifc2s = .false.
@@ -239,7 +247,7 @@ contains
     if(read_W .and. W_OTF) &
          call exit_with_message("read_W and W_OTF can't both be true. Exiting.")
     
-    if(any(qmesh <= 0) .or. fourph_mesh_ref < 1 .or. mesh_ref < 1 .or. fsthick < 0) then
+    if(any(qmesh <= 0) .or. fourph_mesh_ref < 1 .or. mesh_ref < 1 .or. fsthick < 0 .or. ncont_mesh < 1) then
        call exit_with_message('Bad input(s) in numerics.')
     end if
 
@@ -265,6 +273,12 @@ contains
        end if
        if(phiso_1B_theory == "Tamura" .and. crys%DIB) then
           call exit_with_message("phiso_1B_theory can't be 'Tamura' if 'DIB' is true. Exiting.")
+       end if
+    end if
+    
+    if(elel) then
+       if((elel_screening_type /= "RPA") .and. (elel_screening_type /= "TF")) then
+          call exit_with_message("elel_screening_type can be either 'RPA' or 'TF'. Exiting.")
        end if
     end if
 
@@ -319,6 +333,8 @@ contains
        self%onlyebte = onlyebte
        self%elchimp = elchimp
        self%elel = elel
+       self%elel_screening_type = trim(elel_screening_type)
+       self%ncont_mesh = ncont_mesh
        self%elbound = elbound
        self%drag = drag
        self%Y_OTF = Y_OTF
@@ -349,6 +365,11 @@ contains
     
     if(crys%twod .and. self%qmesh(3) /= 1) then
        call exit_with_message('For 2d systems, qmesh(3) must be equal to 1.')
+    end if
+
+    ! Enforcing continuous mesh size to be odd
+    if(mod(self%ncont_mesh, 2) == 0) then
+       self%ncont_mesh = self%ncont_mesh + 1
     end if
     
     !Set BTE solution type
@@ -490,6 +511,7 @@ contains
           end if
           write(*, "(A, L)") "Include el-charged impurity interaction: ", self%elchimp
           write(*, "(A, L)") "Include el-el interaction: ", self%elel
+          write(*, "(A, A)") "Type of el-el screening: ", trim(self%elel_screening_type)
           write(*, "(A, L)") "Include el-boundary interaction: ", self%elbound
           write(*, "(A, L)") "Solve bulk-BTE: ", self%solve_bulk
           write(*, "(A, L)") "Solve nano-BTE: ", self%solve_nano
