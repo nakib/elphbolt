@@ -1,6 +1,6 @@
 * Style guide for  ~elphbolt~
 ** Use the right case
-Fortran is case insensitive: ~FUNCTION~ means the same as ~function~. We write all Fortran constructs in lower case. This includes, but is not limited to, the following: ~program~, ~module~, ~type~, ~class~, ~intent~, ~if~, ~do~, ~case~, ~select~, ~subroutine~, ~function~, ~pure~, ~elemental~, ~recursive~, ~integer~, ~real~, and ~logical~. Do not, under any circumstance, write in all-caps. All-caps things are hard to read and hard to type.
+Fortran is case insensitive: ~FUNCTION~ means the same as ~function~. Please write all Fortran constructs in lower case. This includes, but is not limited to, the following: ~program~, ~module~, ~type~, ~class~, ~intent~, ~if~, ~do~, ~case~, ~select~, ~subroutine~, ~function~, ~pure~, ~elemental~, ~recursive~, ~integer~, ~real~, and ~logical~. Do not, under any circumstance, write in all-caps. All-caps things are hard to read and hard to type.
 
 Write intrinsic math functions in lower case: ~sqrt~, ~exp~, ~log~, ~nint~, ~max~, ~mod~, ~modulo~, ~pack~, ~count~, etc.
 
@@ -28,7 +28,7 @@ while the following is not:
   end do
 #+END_SRC
 
-A good text editor allows selecting a region and pressing ~TAB~ or something similar to automatically apply proper indentation. If your editor does not do that, get a better editor. Set your ~TAB~ to 2 spaces for the indentation level under `program`, `module`, `subroutine`, and `function`, and to 3 spaces for `if` and `do`.
+A good text editor allows selecting a region and pressing ~TAB~ or something similar to automatically apply proper indentation. If your editor does not do that, get a better editor. (Here's the greatest text editor of all time - [[https://www.gnu.org/software/emacs/][Emacs]]. You're welcome!) Set your ~TAB~ to 2 spaces for the indentation level under ~program~, ~module~, ~subroutine~, and ~function~, and to 3 spaces for ~if~ and ~do~.
 
 ** Use space and comma properly
 Write code the way you would write an essay. Use spaces and linebreaks to improve readability and separate conceptually distinct sections of the calculation. Below are some examples.
@@ -90,9 +90,9 @@ Use modern notation everywhere.
 | do           | don't              |
 |--------------+--------------------|
 | ~>~ and ~>=~ | ~.gt.~ and  ~.ge.~ |
-| ~<~ and ~<=~ | ~.lt.~ and ~le~    |
+| ~<~ and ~<=~ | ~.lt.~ and ~.le.~  |
 | ~==~         | ~.eq.~             |
-| ~/=~         | ~.ne~              |
+| ~/=~         | ~.ne.~             |
 | ~[1, 2, 3]~  | ~(/1, 2, 3/)~      |
 
 ** Brevity
@@ -206,4 +206,7 @@ Always specify exactly what you need from a module. That is, always do ~use modu
 ** Only immutables (~parameter~) can be global
 No other variable should be. Subroutines should not access global variables. Write ~pure~ subroutines and functions whenever possible. Strictly control data access and modification rights with the ~intent~ keyword.
 ** Use a light touch approach
-Use objects but don't write Java. Use the functional style but don't try to mimic Haskell. The style we use can be called object-based procedural. Try to strike a good balance between performance, readability, and extensibility. Think La Sagrada Familia, not the Sistine Chapel.
+Use objects but don't write Java. Use the functional style but don't try to mimic Haskell. The style we use can be called object-based procedural. Try to write pure procedures whenever possible. Try to strike a good balance between performance, readability, and extensibility. Think La Sagrada Familia, not the Sistine Chapel.
+
+** Fix issues when you see them
+If you see any of these rules broken near the part of the code you are touching, please go ahead and it.

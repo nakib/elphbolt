@@ -218,16 +218,16 @@ program bte_regression
 
   call t_event%end_timer('Density of states and one-particle scattering rates')
 
-  if(num%plot_along_path) then
-     call t_event%start_timer('Plots along path')
-
-     call subtitle("Plotting along high-symmetry path...")
-
-     !Plot electron bands, phonon dispersions, and g along path.
-     call wann%plot_along_path(crys, num,el%scissor)
-
-     call t_event%end_timer('Plots along path')
-  end if
+!!$  if(num%plot_along_path) then
+!!$     call t_event%start_timer('Plots along path')
+!!$
+!!$     call subtitle("Plotting along high-symmetry path...")
+!!$
+!!$     !Plot electron bands, phonon dispersions, and g along path.
+!!$     call wann%plot_along_path(crys, num,el%scissor)
+!!$
+!!$     call t_event%end_timer('Plots along path')
+!!$  end if
 
   call subtitle("Calculating interactions...")
 
@@ -278,11 +278,11 @@ program bte_regression
      call t_event%end_timer('IBZ e-ph transition probabilities')
   end if
 
-  if(num%onlyebte .or. num%drag .or. num%phe .or. num%drag &
-       .or. num%plot_along_path) then
-     !Deallocate Wannier quantities
-     call wann%deallocate_wannier(num)
-  end if
+!!$  if(num%onlyebte .or. num%drag .or. num%phe .or. num%drag &
+!!$       .or. num%plot_along_path) then
+!!$     !Deallocate Wannier quantities
+!!$     call wann%deallocate_wannier(num)
+!!$  end if
   
   if(num%onlyebte .or. num%drag) then
      if(num%elchimp) then
@@ -310,15 +310,6 @@ program bte_regression
         call t_event%end_timer('IBZ q ph-ph interactions')
      end if
 
-!!$     if(.not. num%read_W) then
-!!$        call t_event%start_timer('IBZ ph-ph scattering rates')
-!!$
-!!$        !Calculate ph-ph transition probabilities
-!!$        call calculate_3ph_interaction(ph, crys, num, 'W')
-!!$
-!!$        call t_event%end_timer('IBZ ph-ph scattering rates')
-!!$     end if
-
      if(.not. num%W_OTF) then
         call t_event%start_timer('IBZ ph-ph scattering rates')
 
@@ -339,6 +330,8 @@ program bte_regression
      call bt%solve_bte(num, crys, wann, sym, ph)
   else
      call bt%solve_bte(num, crys, wann, sym, ph, el)
+     
+     !TODO Here test the transport coefficients
   end if
 
   sync all

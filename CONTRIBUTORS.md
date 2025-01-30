@@ -10,7 +10,7 @@
 	 - [PR #96](https://github.com/nakib/elphbolt/pull/96): Fast trilinear interpolation to speed up BTE iteration cycles.
 	 - [PR #104](https://github.com/nakib/elphbolt/pull/104): Exact in-scattering correction to the BTE for electron-charged impurity and phonon-point defect scattering.
 	 - [PR #141](https://github.com/nakib/elphbolt/pull/141): Solver for the BTE in highly symmetric nanostructures
-	- Nils Wittemeier
+   - Nils Wittemeier
 	 - [PR #138](https://github.com/nakib/elphbolt/pull/138): Periodic table of elements represented as a hashtable.
-	- Pritam Sarkar
+   - Pritam Sarkar
 	 - [PR #158](https://github.com/nakib/elphbolt/pull/158): Better handling of tetrahedra vertices that lie outside the Fermi shell.

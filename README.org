@@ -35,9 +35,9 @@ To date (Jan 7, 2025), ~elphbolt~ / ~superconda~ has been used in the following 
 | Diamond                            | drag                                                                                                  | [[https://doi.org/10.1016/j.mtphys.2022.100740][Mat. Tod. Phys 27, 100740]]                 |
 | Si                                 | drag                                                                                                  | [[https://www.nature.com/articles/s41524-022-00710-0][npj Comp. Mat. 8, 28]]                      |
 
-Stylistically, ~elphbolt~ is designed to be simple, small, fast, and extensible. It uses an object-based procedural style, which allows fast development, while resulting in a rather compact source (~ 10k lines of code, generated using David A. Wheeler's ~SLOCCount~). The symmetries of the crystal are fully exploited and the transport active Fermi window is used to allow the sampling of extremely fine wave vector meshes needed for accurate solutions of the BTEs and Eliashberg equations. Parallelism is achieved through modern Fortran's intrinsic ~coarrays~ feature that is fully supported by recent versions of both the ~gcc~ and ~intel~ compilers.
+Stylistically, ~elphbolt~ is designed to be simple, small, fast, and extensible. It uses an object-based procedural style, which allows fast development, while resulting in a rather compact source. The symmetries of the crystal are fully exploited and the transport active Fermi window is used to allow the sampling of extremely fine wave vector meshes needed for accurate solutions of the BTEs and Eliashberg equations. Parallelism is achieved through modern Fortran's intrinsic ~coarrays~ feature that is fully supported by recent versions of the ~gcc~ compiler.
 
-~elphbolt~ currently works with the ~Quantum Espresso~ (https://www.quantum-espresso.org/) suite and its core module ~EPW~ (https://epw-code.org/) for the phonon quantities and the Wannier space information, respectively. An interface with all-electron ~exciting~ (https://exciting-code.org/) code is currently under construction.
+~elphbolt~ currently works with the ~Quantum Espresso~ (https://www.quantum-espresso.org/) suite and its core module ~EPW~ (https://epw-code.org/) for the phonon quantities and the Wannier space information, respectively. An partial interface with all-electron ~exciting~ (https://exciting-code.org/) code exists.
 
 ~elphbolt~ is a "free as in freedom" code distributed under the GNU General Public License (GPL) version 3. You can read more about the philosophy of software freedom here: [[https://www.gnu.org/philosophy/free-sw.en.html]].
 
@@ -51,7 +51,7 @@ The source is heavily commented and can be auto-documented with ~FORD~ (https://
 
 *** 1. Get compiler
 
-     You will need a *recent* version of ~gcc~ that supports Fortran 2018 features. Here I show how you can build it with spack (https://spack.io/). I suggest building with ~nvptx~ since that will allow you to use gpu acceleration later on. If you do not care for gpus at the moment, leave out the ~+nvptx~ bit in the following command.
+     You will need a *recent* version of ~gcc~ that supports Fortran 2018 features. Most HPC systems will have a module that you can load. If not, build your own. Here I show how you can build it with spack (https://spack.io/). I suggest building with ~nvptx~ since that will allow you to use gpu acceleration later on. If you do not care for gpus at the moment, leave out the ~+nvptx~ bit in the following command.
      
      #+BEGIN_SRC bash
      spack install gcc@12.3.0+nvptx
@@ -59,35 +59,39 @@ The source is heavily commented and can be auto-documented with ~FORD~ (https://
      
     I like to add the ~<path to spack build of gcc>/bin~ directory to my system ~$PATH~. Alternatively, you can follow spack's own recommendations for using its packages.
 
-*** 2. Get MPI
+*** 2. Get Fortran package manager (~fpm~ [v>=0.7])
+    Follow the instructions here: https://fpm.fortran-lang.org/install/index.html#install to install ~fpm~. I, personally, like to build from source, as described here: https://fpm.fortran-lang.org/install/index.html#building-from-source. Alternatively, grab the binary, ~chmod +x~ it, and place in your system ~$PATH~.
 
-    You need an MPI implementation. It could be MPICH or OpenMPI. The first is preferred.
-
-*** 3. Get Fortran package manager (~fpm~ [v>=0.7])
-    Follow the instructions here: https://fpm.fortran-lang.org/install/index.html#install to install ~fpm~. I, personally, like to build from source, as described here: https://fpm.fortran-lang.org/install/index.html#building-from-source.
-
-*** 4. Get ~OpenCoarrays~
+*** 3. Get ~OpenCoarrays~
     
-~OpenCoarrays~ ([[http://www.opencoarrays.org]]) is an implementation of the ~coarrays~ functionalities. Follow its installation guide to build it on your system. I personally like to use its install script where I pass my compiler and MPI relared flags explicitly. So something like the following should work
+~OpenCoarrays~ ([[http://www.opencoarrays.org]]) is an implementation of the ~coarrays~ functionalities. Follow its installation guide to build it on your system. I personally like to use its install script where I pass my compiler explicitly. So something like the following should work. ~Opencoarrays~ will internally download a compatible MPI implementation. 
 
      #+BEGIN_SRC bash
      ./install.sh --with-fortran <path to>/gfortran \
      --with-cxx <path to>/g++ \
-     --with-c <path to>/gcc \ 
-     --with-mpi <path to mpich installation directory>
+     --with-c <path to>/gcc
      #+END_SRC
 
-Carefully read the output on the screen and add the paths to ~caf~ and ~cafrun~ to your ~$PATH~.
+Carefully read the output on the screen and add the paths to ~caf~ and ~cafrun~ to your ~$PATH~. At this point, check the outputs of 
 
-*** 5. Build ~elphbolt~
+     #+BEGIN_SRC bash
+     caf --show
+     #+END_SRC
+and
+     #+BEGIN_SRC bash
+     cafrun --show
+     #+END_SRC
+to confirm that these are wrapping the correct compiler and runner.
+
+*** 4. Build ~elphbolt~
 **** Standard (no gpu)
-    For a cpu-only build and test with Fortran Package Manager (https://fpm.fortran-lang.org/), first say
+    First say the following to install a dependency:
 
     #+BEGIN_SRC bash
        sh install_blas+lapack.sh
      #+END_SRC
 
-     This will build ~blas~ and ~lapack~ using a local copy of https://github.com/gha3mi/forblas and  https://github.com/gha3mi/forlapack. You need to do this just once. The libraries will be placed in ~$HOME/.local/lib/~.
+     This will build ~blas~ and ~lapack~ using a local copy of https://github.com/gha3mi/forblas and  https://github.com/gha3mi/forlapack. You need to do this just once. The libraries will be placed in ~$HOME/.local/lib/~. Then to build, install, and test, say
     
      #+BEGIN_SRC bash
        source fpm_config_caf.sh; fpm install
@@ -95,11 +99,11 @@ Carefully read the output on the screen and add the paths to ~caf~ and ~cafrun~ 
        fpm test bte_regression --runner="sh test/3C-SiC/fpm_run_bte_caf.sh"
      #+END_SRC
 
-    The ~elphbolt~ and ~superconda~ apps will be available in your ~$HOME/.local/bin~ directory. They should both be directly callable from your shell. If not, add the above directory to our path.
+    The ~elphbolt~ and ~superconda~ apps will now be available in your ~$HOME/.local/bin~ directory. They should both be directly callable from your shell. If not, add the above directory to our path.
 
-    Modify the fpm manifest file, ~fpm.toml~, to suit your system. I'd appreciate any feedback.
+    Modify the fpm manifest file, ~fpm.toml~, to suit your system.
 
-**** Experimental method (with gpu)
+**** Experimental method (broken at the moment!)
      For a cpu+gpu build with OpenACC (https://www.openacc.org/), the only difference from the above is that you need to source a different file before the install:
 
      #+BEGIN_SRC bash
