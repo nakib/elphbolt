@@ -1719,11 +1719,12 @@ contains
     
     do isamp = 1, nsamp
        w = samp(isamp)
-       ileft = minloc(abs(cont - w), dim = 1)
-       if(ileft == ncont) then
+       ileft = minloc(abs(cont - w), dim = 1) ! Find the left index in cont closest to samp
+       if(ileft == ncont) then    ! If the index is the last point, use its value 
           f_samp(isamp) = f_cont(ileft)
        else
-          iright = ileft + 1
+          iright = ileft + 1  ! right neighbouring index
+          ! Linear interpolation using two nearest points
           f_samp(isamp) = ((cont(iright) - w)*f_cont(ileft) + &
                (w - cont(ileft))*f_cont(iright))/dcont
        end if

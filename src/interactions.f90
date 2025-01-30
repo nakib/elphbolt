@@ -125,13 +125,13 @@ contains
     real(r64), intent(in) :: qcrys(3)
     complex(r64), intent(in) :: evec_k(:), evec_kp(:)
 
-    real(r64) :: qcart(3), prefac, overlap
+    real(r64) :: qcart(3), prefac, overlap, screened_qTF_sq
     real(r64) :: Gsum, Gplusq(3)
     integer :: ik1, ik2, ik3
 
     !Note that here we use an extra screening with epsiloninf following
     !Sanborn's prescription.
-    prefac = 1.0e18_r64/crys%volume**2*qe**2/(perm0*crys%epsiloninf)**2
+    prefac = 1.0e18_r64/crys%volume**2*qe**2/(crys%epsiloninf*perm0)**2
 
     !Transfer wave vector in Cartesian coordinates
     qcart = matmul(crys%reclattvecs, qcrys)
@@ -139,6 +139,9 @@ contains
     !This is [U(k')U^\dagger(k)]_nm squared
     !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
     overlap = (abs(dot_product(evec_kp, evec_k)))**2
+
+    ! Pre screened Thomas Fermi wavevector squared, to match Sanborn's prescription 
+    screened_qTF_sq = crys%qTF**2/crys%epsiloninf
 
     Gsum = 0.0_r64
     !Use a safe range for the G vector sums
@@ -150,7 +153,7 @@ contains
                      + ik3*crys%reclattvecs(:, 3)) + qcart
              
              Gsum = Gsum + &
-                  1.0_r64/(twonorm(Gplusq)**2 + crys%qTF**2)**2 !eV^2
+                  1.0_r64/(twonorm(Gplusq)**2 + screened_qTF_sq)**2 !eV^2
           end do
        end do
     end do
@@ -158,7 +161,7 @@ contains
     gCoul2 = Gsum*prefac*overlap
   end function gCoul2
 
-  pure real(r64) function gCoul2_RPA(el, crys, qcrys, X0_qw)
+  pure real(r64) function gCoul2_RPA(el, crys, qcrys, evec_k, evec_kp, X0_qw)
     !! Function to calculate the RPA screened
     !! squared electron-electron vertex.
 
@@ -166,17 +169,19 @@ contains
     type(electron), intent(in) :: el
     real(r64), intent(in) :: qcrys(3)
     complex(r64), intent(in) :: X0_qw
+    complex(r64), intent(in) :: evec_k(:), evec_kp(:)
 
-    real(r64) :: qcart(3), prefac1, prefac2, W_qw_msq
+    real(r64) :: qcart(3), prefac, W_qw_msq, overlap
     complex(r64) :: diel_qw
     real(r64) :: Gplusq(3), Gplusq_2normsq 
     integer(i64) :: ik1, ik2, ik3
 
-    prefac1 = 1.0e9_r64*qe/(perm0*crys%epsiloninf) ! ev.nm
-    prefac2 = prefac1 ! ev.nm
+    prefac = 1.0e9_r64*qe/(perm0*crys%epsiloninf) ! ev.nm
 
     !Wave vector in Cartesian coordinates
     qcart = matmul(crys%reclattvecs, qcrys)
+    
+    overlap = (abs(dot_product(evec_kp, evec_k)))**2
 
     W_qw_msq = 0.0_r64
     !Use a safe range for the G vector sums
@@ -188,46 +193,17 @@ contains
                   + ik2*crys%reclattvecs(:, 2) &
                   + ik3*crys%reclattvecs(:, 3)  ) + qcart
              Gplusq_2normsq = twonorm(Gplusq)**2
+             
              !Computing dielectric matrix elements 
-             diel_qw = 1.0_r64 - prefac2*X0_qw/Gplusq_2normsq
+             diel_qw = 1.0_r64 - prefac*X0_qw/Gplusq_2normsq
              !Squared Coulomb interaction without the prefactor
              W_qw_msq = W_qw_msq + abs(1.0_r64/diel_qw/Gplusq_2normsq)**2
           end do
        end do
     end do
 
-    gCoul2_RPA = W_qw_msq*prefac1**2/crys%volume**2 ! eV^2 
+    gCoul2_RPA = W_qw_msq*prefac**2*overlap/crys%volume**2 ! eV^2 
   end function gCoul2_RPA
-
-  subroutine print_diel(el, crys, qcrys, X0_qw)
-    type(crystal), intent(in) :: crys
-    type(electron), intent(in) :: el
-    real(r64), intent(in) :: qcrys(3)
-    complex(r64), intent(in) :: X0_qw
-    real(r64) :: diel_tf, prefac, prefac1, scrpa, sctf
-    real(r64) :: re_barecol 
-    complex(r64) :: diel_rpa
-    real(r64) :: qcart(3), qmag
-
-    prefac = 1.0e9_r64*qe/(perm0*crys%epsiloninf) ! ev.nm
-    prefac1 = 1.0e9_r64*qe/perm0 ! ev.nm
-
-    qcart = matmul(crys%reclattvecs, qcrys)
-    qmag = twonorm(qcart) ! nm^-1
-    
-    re_barecol = qmag**2/prefac1    ! ev^-1.nm^-3
-    
-    diel_tf = 1.0_r64 + crys%qTF**2/qmag**2
-    sctf = prefac1**2/(qmag**2 + crys%qTF**2)**2
-
-    diel_rpa = 1.0_r64 - prefac1*X0_qw/qmag**2
-    scrpa = 1.0_r64/abs(re_barecol - X0_qw)**2
-
-    if(this_image()==1) then
-       print*,"TF-diel::", qmag, diel_tf, sctf
-       print*,"RPA-diel::",qmag, real(diel_rpa), imag(diel_rpa), scrpa
-    end if
-  end subroutine print_diel
 
   pure real(r64) function Vm2_3ph(ev1_s1, ev2_s2, ev3_s3, &
     Index_i, Index_j, Index_k, ifc3, phases_q2q3, ntrip, nb)
@@ -2966,9 +2942,9 @@ contains
     !Local variables
     integer(i64) :: istate, &
          n1, ik1, n2, ik2, n3, ik3, n4, ik4, &
-         count, nprocs, ncont
+         count, nprocs
     real(r64) :: const, beta, fermi1, fermi2, fermi3, fermi4, &
-         delta_val, occup_fac, en1, en2, en3, en4, g2, q_frac_noU(3)
+         delta_val, occup_fac, en1, en2, en3, en4, g2 
     real(r64), allocatable :: Omegas_cont(:), specX0_cont(:), ImX0_cont(:), &
          ReX0_cont(:)
     complex(r64) :: temp(1), X0_qw 
@@ -3025,10 +3001,9 @@ contains
        !Create initial electron wave vector
        k1_vec = vec(el%indexlist_irred(ik1), el%wvmesh, crys%reclattvecs)
 
-       ! Defining continuous energy mesh over the full energy range (not necesarry?!)
-       ncont = 50_i64  !? add a parameter for continuous mesh size
-       allocate(Omegas_cont(ncont), specX0_cont(ncont), ImX0_cont(ncont), ReX0_cont(ncont))
-       call linspace(Omegas_cont, -2*el%fsthick, 2*el%fsthick, ncont) 
+       ! Defining continuous energy mesh over the full energy range
+       allocate(Omegas_cont(num%ncont_mesh), specX0_cont(num%ncont_mesh), ImX0_cont(num%ncont_mesh), ReX0_cont(num%ncont_mesh))
+       call linspace(Omegas_cont, -2*el%fsthick, 2*el%fsthick, num%ncont_mesh) 
 
        !Run over electrons states 2, 3, and 4, eliminating the k4 sum with the
        !delta(k1 - k3 + k2 - k4)
@@ -3038,20 +3013,11 @@ contains
 
           !q \equiv k1 - k3
           q_vec = vec_sub(k1_vec, k3_vec, el%wvmesh, crys%reclattvecs)
-
-          !TEST
-          !if(twonorm(q_vec%frac) > 0.2_r64) cycle
           
           call spectral_head_polarizability_3d_qpath(&
-            specX0_cont, Omegas_cont, q_vec%frac, el, wann, crys, num%tetrahedra)
+           specX0_cont, Omegas_cont, q_vec%frac, el, wann, crys, num%tetrahedra)
           ImX0_cont = -pi*specX0_cont 
           call hilbert_transform(-ImX0_cont, ReX0_cont)
-          
-          !TEST
-          temp = interpolator_1d([(0.0_r64)], Omegas_cont, ImX0_cont) &
-               + oneI*interpolator_1d([(0.0_r64)], Omegas_cont, ReX0_cont)
-          X0_qw = temp(1)
-          call print_diel(el, crys, q_vec%frac, X0_qw)
 
           do n3 = 1, el%numbands
              !Electron 3 energy
@@ -3061,16 +3027,18 @@ contains
              if(abs(en3 - el%enref) > el%fsthick) cycle
           
              ! Interpolating polarizability from continuous mesh to sample energy
-             !temp = interpolator_1d([(en1 - en3)], Omegas_cont, ImX0_cont) &
-             !     + oneI*interpolator_1d([(en1 - en3)], Omegas_cont, ReX0_cont)
+             temp = interpolator_1d([(en1 - en3)], Omegas_cont, ReX0_cont) &
+                  + oneI*interpolator_1d([(en1 - en3)], Omegas_cont, ImX0_cont)
+             X0_qw = temp(1)
              
-             ! Squared matrix element- screened by RPA dielectric
+             ! Squared matrix element- screened by TF or RPA dielectric
              ! q=0 divergence case is handled by the Thomas-Fermi screening
              if(all(q_vec%frac == 0) .or. num%elel_screening_type=='TF') then
                 g2 = gCoul2(el, crys, q_vec%frac, &
                         el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :))
              else
-                g2 = gCoul2_RPA(el, crys, q_vec%frac, X0_qw)
+                g2 = gCoul2_RPA(el, crys, q_vec%frac, &
+                        el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :), X0_qw)
              end if
              !Fermi function of electron 3
              fermi3 = Fermi(en3, el%chempot, crys%T)
