@@ -1652,6 +1652,9 @@ contains
     !! Does Hilbert tranform for a given function
     !! Ref - EQ (4)3, R. Balito et. al.
     !! "An algorithm for fast Hilbert transform of real functions"
+    !!
+    !! fx The input function
+    !! Hfx The Hilbert transform
 
     real(r64), intent(in) :: fx(:)
     real(r64), allocatable, intent(out) :: Hfx(:)
@@ -1696,7 +1699,8 @@ contains
     !! samp Sample mesh
     !! cont Continuous mesh
     !! f_cont 1D array evaluated on cont
-    !! f_samp Interpolated array on samp 
+    !! f_samp Interpolated array on samp
+    
     real(r64), intent(in) :: samp(:), cont(:)
     real(r64), intent(in) :: f_cont(:)
     real(r64), allocatable :: f_samp(:)

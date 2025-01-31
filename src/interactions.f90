@@ -91,6 +91,7 @@ contains
 
     Gsum = 0.0_r64
     !Use a safe range for the G vector sums
+    !This is likely a severe overkill...
     do ik1 = -3, 3
        do ik2 = -3, 3
           do ik3 = -3, 3
@@ -112,7 +113,7 @@ contains
     gchimp2 = prefac*overlap*Gsum !ev^2
   end function gchimp2
 
-  pure real(r64) function gCoul2(el, crys, qcrys, evec_k, evec_kp)
+  pure real(r64) function gCoul2_TF(el, crys, qcrys, evec_k, evec_kp)
     !! Function to calculate the Thomas-Fermi screened
     !! squared electron-electron vertex.
 
@@ -139,27 +140,26 @@ contains
     ! Pre screened Thomas Fermi wavevector squared, to match Sanborn's prescription 
     screened_qTF_sq = crys%qTF**2/crys%epsiloninf
 
+    !So far, we have been ignoring the G /= G' terms
+    !
+    !TODO for DP: Add the off-diagonal contributions 
+    !Note that we don't have to calculate all the G, G' terms, just
+    !the upper triangle will suffice.
     Gsum = 0.0_r64
-    !Use a safe range for the G vector sums
-    do ik1 = -3, 3
-       do ik2 = -3, 3
-          do ik3 = -3, 3
-             Gplusq = (ik1*crys%reclattvecs(:, 1) &
-                     + ik2*crys%reclattvecs(:, 2) &
-                     + ik3*crys%reclattvecs(:, 3)) + qcart
-             
-             Gsum = Gsum + &
-                  1.0_r64/(twonorm(Gplusq)**2 + screened_qTF_sq)**2 !eV^2
-          end do
-       end do
+    do concurrent(ik1 = -1:1, ik2 = -1:1, ik3 = -1:1)
+       Gplusq = (ik1*crys%reclattvecs(:, 1) &
+               + ik2*crys%reclattvecs(:, 2) &
+               + ik3*crys%reclattvecs(:, 3)) + qcart
+
+       Gsum = Gsum + &
+            1.0_r64/(twonorm(Gplusq)**2 + screened_qTF_sq)**2 !eV^2
     end do
 
-    gCoul2 = Gsum*prefac*overlap
-  end function gCoul2
+    gCoul2_TF = Gsum*prefac*overlap
+  end function gCoul2_TF
 
   pure real(r64) function gCoul2_RPA(el, crys, qcrys, evec_k, evec_kp, X0_qw)
-    !! Function to calculate the RPA screened
-    !! squared electron-electron vertex.
+    !! Function to calculate the RPA screened squared electron-electron vertex.
 
     type(crystal), intent(in) :: crys
     type(electron), intent(in) :: el
@@ -176,26 +176,30 @@ contains
 
     !Wave vector in Cartesian coordinates
     qcart = matmul(crys%reclattvecs, qcrys)
-    
-    overlap = (abs(dot_product(evec_kp, evec_k)))**2
 
+    !This is [U(k')U^\dagger(k)]_nm squared
+    !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
+    overlap = (abs(dot_product(evec_kp, evec_k)))**2
+    
+    !So far, we have been ignoring the G /= G' terms
+    !
+    !TODO for DP: Add the off-diagonal contributions
+    !Note that we don't have to calculate all the G, G' terms, just
+    !the upper triangle will suffice.
     W_qw_msq = 0.0_r64
-    !Use a safe range for the G vector sums
-    !Ignoring G /= G' terms
-    do ik1 = -3, 3
-       do ik2 = -3, 3
-          do ik3 = -3, 3
-             Gplusq = (  ik1*crys%reclattvecs(:, 1) &
-                  + ik2*crys%reclattvecs(:, 2) &
-                  + ik3*crys%reclattvecs(:, 3)  ) + qcart
-             Gplusq_2normsq = twonorm(Gplusq)**2
-             
-             !Computing dielectric matrix elements 
-             diel_qw = 1.0_r64 - prefac*X0_qw/Gplusq_2normsq
-             !Squared Coulomb interaction without the prefactor
-             W_qw_msq = W_qw_msq + abs(1.0_r64/diel_qw/Gplusq_2normsq)**2
-          end do
-       end do
+    do concurrent(ik1 = -1:1, ik2 = -1:1, ik3 = -1:1)
+       Gplusq = (ik1*crys%reclattvecs(:, 1) &
+               + ik2*crys%reclattvecs(:, 2) &
+               + ik3*crys%reclattvecs(:, 3)) + qcart
+
+       !|G + q|^2
+       Gplusq_2normsq = twonorm(Gplusq)**2
+
+       !Dielectric matrix elements 
+       diel_qw = 1.0_r64 - prefac*X0_qw/Gplusq_2normsq
+
+       !Squared Coulomb matrix elements without the prefactor
+       W_qw_msq = W_qw_msq + abs(1.0_r64/diel_qw/Gplusq_2normsq)**2
     end do
 
     gCoul2_RPA = W_qw_msq*prefac**2*overlap/crys%volume**2 ! eV^2 
@@ -1976,7 +1980,7 @@ contains
     end if
     sync all
   end subroutine calculate_eph_interaction_ibzk
-
+  
   subroutine calculate_Xee_OTF(el, num, wann, istate1, crys, X, &
        istate_el2, istate_el3, istate_el4)
     !! On-the-fly serial calculator of the e-e transition probability.
@@ -2027,6 +2031,14 @@ contains
     if(keep_interaction_tally) &
          allocate(istate_el2(nprocs), istate_el3(nprocs), istate_el4(nprocs))
 
+    if(num%elel_screening_type == 'RPA') then
+       !Allocate and create continuous energy mesh over around the Fermi shell
+       allocate(Omegas_cont(num%ncont_mesh), specX0_cont(num%ncont_mesh), &
+            ImX0_cont(num%ncont_mesh), ReX0_cont(num%ncont_mesh))
+
+       call linspace(Omegas_cont, -2*el%fsthick, 2*el%fsthick, num%ncont_mesh) 
+    end if
+    
     !Initialize X, and if needed, the process tallies
     X(:) = 0.0_r64
     if(keep_interaction_tally) then
@@ -2053,10 +2065,6 @@ contains
        !Create initial electron wave vector
        k1_vec = vec(el%indexlist_irred(ik1), el%wvmesh, crys%reclattvecs)
 
-       ! Defining continuous energy mesh over the full energy range
-       allocate(Omegas_cont(num%ncont_mesh), specX0_cont(num%ncont_mesh), ImX0_cont(num%ncont_mesh), ReX0_cont(num%ncont_mesh))
-       call linspace(Omegas_cont, -2*el%fsthick, 2*el%fsthick, num%ncont_mesh) 
-
        !Run over electrons states 2, 3, and 4, eliminating the k4 sum with the
        !delta(k1 - k3 + k2 - k4)
        do ik3 = 1, el%nwv       
@@ -2065,33 +2073,39 @@ contains
 
           !q \equiv k1 - k3
           q_vec = vec_sub(k1_vec, k3_vec, el%wvmesh, crys%reclattvecs)
-          
-          call spectral_head_polarizability_3d_qpath(&
-           specX0_cont, Omegas_cont, q_vec%frac, el, wann, crys, num%tetrahedra)
-          ImX0_cont = -pi*specX0_cont 
-          call hilbert_transform(-ImX0_cont, ReX0_cont)
 
+          if(num%elel_screening_type == 'RPA') then
+             !Calculate polarizablity
+             call spectral_head_polarizability_3d_qpath(&
+                  specX0_cont, Omegas_cont, q_vec%frac, el, wann, crys, num%tetrahedra)
+
+             ImX0_cont = -pi*specX0_cont 
+
+             call hilbert_transform(-ImX0_cont, ReX0_cont)
+          end if
+          
           do n3 = 1, el%numbands
              !Electron 3 energy
              en3 = el%ens(ik3, n3)
 
              !Apply energy window to electron 3
              if(abs(en3 - el%enref) > el%fsthick) cycle
-          
-             ! Interpolating polarizability from continuous mesh to sample energy
-             temp = interpolator_1d([(en1 - en3)], Omegas_cont, ReX0_cont) &
-                  + oneI*interpolator_1d([(en1 - en3)], Omegas_cont, ImX0_cont)
-             X0_qw = temp(1)
              
-             ! Squared matrix element- screened by TF or RPA dielectric
-             ! q=0 divergence case is handled by the Thomas-Fermi screening
-             if(all(q_vec%frac == 0) .or. num%elel_screening_type=='TF') then
-                g2 = gCoul2(el, crys, q_vec%frac, &
+             ! Squared matrix element screened by Thomas-Fermi or RPA dielectric.
+             ! q = 0 divergence case is handled by the Thomas-Fermi screening.
+             if(all(q_vec%frac == 0) .or. num%elel_screening_type == 'TF') then
+                g2 = gCoul2_TF(el, crys, q_vec%frac, &
                         el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :))
              else
+                !Interpolating polarizability from continuous mesh to sampling energy
+                temp = interpolator_1d([(en1 - en3)], Omegas_cont, ReX0_cont) &
+                     + oneI*interpolator_1d([(en1 - en3)], Omegas_cont, ImX0_cont)
+                X0_qw = temp(1)
+                
                 g2 = gCoul2_RPA(el, crys, q_vec%frac, &
                         el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :), X0_qw)
              end if
+             
              !Fermi function of electron 3
              fermi3 = Fermi(en3, el%chempot, crys%T)
 
@@ -2102,10 +2116,6 @@ contains
                 !Create final electron wave vector
                 !delta(q + k2 - k4)
                 k4_vec = vec_add(q_vec, k2_vec, el%wvmesh, crys%reclattvecs)
-!!$                !DBG Don't use q_vec
-!!$                k4_vec = vec_add(&
-!!$                     vec_sub(k1_vec, k3_vec, el%wvmesh, crys%reclattvecs), &
-!!$                     k2_vec, el%wvmesh, crys%reclattvecs)
 
                 !Is k4 within the transport window restricted BZ?
                 call binsearch(el%indexlist, k4_vec%muxed_index, ik4)
@@ -2118,9 +2128,9 @@ contains
                    !Apply energy window to electron 2
                    if(abs(en2 - el%enref) > el%fsthick) cycle
 
-                   !Squared matrix element - Thomas Fermi screening
-                   !g2 = gCoul2(el, crys, q_vec%frac, &
-                   !     el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :))
+!!$                   !Squared matrix element - Thomas Fermi screening
+!!$                   g2 = gCoul2_TF(el, crys, q_vec%frac, &
+!!$                        el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :))
                    
                    !Fermi function of electron 2
                    fermi2 = Fermi(en2, el%chempot, crys%T)
@@ -2137,8 +2147,6 @@ contains
                       count = count + 1
 
                       !Fermi function of electron 4
-!!$                      fermi4 = Fermi(en4, el%chempot, crys%T)
-                      !DBG
                       fermi4 = Fermi(en1 + en2 - en3, el%chempot, crys%T)
                       
                       !Evaulate delta function
@@ -2146,14 +2154,11 @@ contains
                            ik2, n2, el%wvmesh, el%simplex_map, &
                            el%simplex_count, el%simplex_evals)
 
-!!$                      !Temperature dependent occupation factor
+                      !Temperature dependent occupation factor
                       !f1.f2.(1 - f3)(1 - f4)/[f1(1 - f1)] simplified
                       occup_fac = fermi2*(1.0_r64 - &
                            fermi3*(1.0_r64 - exp(beta*(en3 - en1))))* &
                            (1.0_r64 - fermi4)
-!!$
-!!$                      occup_fac = fermi2*(1.0_r64 - fermi3)*(1.0_r64 - fermi4) &
-!!$                           /(1.0_r64 - fermi1)
 
                       !Save transition rate
                       X(count) = g2*occup_fac*delta_val

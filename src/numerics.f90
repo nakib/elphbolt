@@ -220,7 +220,7 @@ contains
     elchimp = .false.
     elel = .false.
     elel_screening_type = 'TF'
-    ncont_mesh = 1
+    ncont_mesh = 51
     elbound = .false.
     drag = .true.
     use_Wannier_ifc2s = .false.
