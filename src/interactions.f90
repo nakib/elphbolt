@@ -1285,7 +1285,7 @@ contains
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
     type(vec) :: q_vec, k_vec, kp_vec
     
-    if(key /= 'g' .and. key /= 'Y') then
+    if(key /= 'g' .and. key /= 'Y' .and. key /= 'O') then
        call exit_with_message(&
             "Invalid value of key in call to calculate_eph_interaction_ibzq. Exiting.")
     end if
@@ -1699,17 +1699,18 @@ contains
     integer(i64) :: nstates_irred, istate, m, ik, ik_fbz, n, ikp, s, &
          iq_fine, iq_coarse, start, end, chunk, count, nprocs, num_active_images
     real(r64) :: ph_ens_iq(1, ph%numbands), qlist(1, 3), &
-         const, bosefac, fermi_minus_fac, fermi_plus_fac, en_ph, en_el, delta, occup_fac
-    real(r64), allocatable :: g2_istate(:), Xplus_istate(:), Xminus_istate(:)
+         const, bosefac, fermi_minus_fac, fermi_plus_fac, en_ph, en_el, delta_plus, delta_minus, &
+         occup_fac_plus, occup_fac_minus
+    real(r64), allocatable :: g2_istate(:), TPplus_istate(:), TPminus_istate(:)
     integer(i64), allocatable :: istate_el(:), istate_ph(:)
     complex(r64), allocatable :: gkRp_ik(:, :, :, :)
     complex(r64) :: ph_evecs_iq(1, ph%numbands,ph%numbands)
-    character(len = 1024) :: filename
+    character(len = 1024) :: filename, filename_plus, filename_minus
     logical :: needfinephon
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
     type(vec) :: k_vec, kp_vec, q_vec, q_vec_coarse
     
-    if(key /= 'g' .and. key /= 'X') then
+    if(key /= 'g' .and. key /= 'X' .and. key /= 'O') then
        call exit_with_message(&
             "Invalid value of key in call to calculate_eph_interaction_ibzk. Exiting.")
     end if
@@ -1785,7 +1786,7 @@ contains
              filename = 'gk2.istate'//trim(adjustl(filename))
              open(1, file = trim(filename), status = 'old', access = 'stream')
              read(1) nprocs
-             if(allocated(g2_istate)) deallocate(g2_istate, Xplus_istate, Xminus_istate, &
+             if(allocated(g2_istate)) deallocate(g2_istate, TPplus_istate, TPminus_istate, &
                   istate_el, istate_ph)
              allocate(g2_istate(nprocs))
              if(nprocs > 0) read(1) g2_istate
@@ -1795,12 +1796,12 @@ contains
              call chdir(num%cwd)
 
              !Allocate and initialize quantities related to transition probabilities
-             allocate(Xplus_istate(nprocs), Xminus_istate(nprocs))
+             allocate(TPplus_istate(nprocs), TPminus_istate(nprocs))
              allocate(istate_el(nprocs), istate_ph(nprocs))
              istate_el(:) = 0_i64
              istate_ph(:) = 0_i64
-             Xplus_istate(:) = 0.0_r64
-             Xminus_istate(:) = 0.0_r64
+             TPplus_istate(:) = 0.0_r64
+             TPminus_istate(:) = 0.0_r64
           end if
 
           !Initialize eligible process counter for this state
@@ -1857,49 +1858,51 @@ contains
                       end if
                    end if
 
-                   if(key == 'X') then
+                   if(key == 'X' .or. key == 'O') then
                       !Phonon energy
                       if(needfinephon) then
                          en_ph = ph_ens_iq(1, s)
                       else
                          en_ph = ph%ens(iq_coarse, s)
                       end if
+                      
+                      if(key == 'X') then
+                         !Bose and Fermi factors
+                         if(en_ph /= 0.0_r64) then
+                            bosefac = Bose(en_ph, crys%T)
+                         else
+                            bosefac = 0.0_r64
+                         end if
+                         fermi_plus_fac = Fermi(en_el + en_ph, el%chempot, crys%T)
+                         fermi_minus_fac = Fermi(en_el - en_ph, el%chempot, crys%T)
 
-                      !Bose and Fermi factors
-                      if(en_ph /= 0.0_r64) then
-                         bosefac = Bose(en_ph, crys%T)
-                      else
-                         bosefac = 0.0_r64
+                         !Temperature dependent occupation factors
+                         occup_fac_plus = bosefac + fermi_plus_fac
+
+                         occup_fac_minus = 1.0_r64 + bosefac - fermi_minus_fac
                       end if
-                      fermi_plus_fac = Fermi(en_el + en_ph, el%chempot, crys%T)
-                      fermi_minus_fac = Fermi(en_el - en_ph, el%chempot, crys%T)
+
+                      if(key == 'O') then
+                         !Temperature dependent occupation factors
+                         occup_fac_plus = (Fermi(en_el, el%chempot, crys%T) - fermi_plus_fac)/&
+                              Fermi(en_el, el%chempot, crys%T)/(1.0_r64 - Fermi(en_el, el%chempot, crys%T))
+                         
+                         occup_fac_minus = (Fermi(en_el, el%chempot, crys%T) - fermi_minus_fac)/&
+                              Fermi(en_el, el%chempot, crys%T)/(1.0_r64 - Fermi(en_el, el%chempot, crys%T))
+                      end if
 
                       !Calculate X+:
 
                       !Evaulate delta function
-                      delta = delta_fn_ptr(en_el + en_ph, ikp, n, el%wvmesh, el%simplex_map, &
+                      delta_plus = delta_fn_ptr(en_el + en_ph, ikp, n, el%wvmesh, el%simplex_map, &
+                           el%simplex_count, el%simplex_evals)
+                      delta_minus = delta_fn_ptr(en_el - en_ph, ikp, n, el%wvmesh, el%simplex_map, &
                            el%simplex_count, el%simplex_evals)
 
-                      !Temperature dependent occupation factor
-                      occup_fac = bosefac + fermi_plus_fac
-
-                      !Save X+
+                      !Save X+ and X-
                       if(en_ph >= 0.5e-3) then !Use a small phonon energy cut-off
-                         Xplus_istate(count) = g2_istate(count)*occup_fac*delta
-                      end if
-
-                      !Calculate X-:
-
-                      !Evaulate delta function
-                      delta = delta_fn_ptr(en_el - en_ph, ikp, n, el%wvmesh, el%simplex_map, &
-                           el%simplex_count, el%simplex_evals)
-
-                      !Temperature dependent occupation factor
-                      occup_fac = 1.0_r64 + bosefac - fermi_minus_fac
-
-                      !Save X-
-                      if(en_ph >= 0.5e-3) then !Use a small phonon energy cut-off
-                         Xminus_istate(count) = g2_istate(count)*occup_fac*delta
+                         TPplus_istate(count) = g2_istate(count)*occup_fac_plus*delta_plus
+                         TPminus_istate(count) = g2_istate(count)*occup_fac_minus*delta_minus
                       end if
 
                       !Save final electron and interacting phonon states (same for + and -)
@@ -1931,29 +1934,37 @@ contains
           end if
 
           if(key == 'X') then
+             write (filename_plus, '(I9)') istate
+             filename_plus = 'Xplus.istate'//trim(adjustl(filename))
+             filename_minus = 'Xminus.istate'//trim(adjustl(filename))
+          end if
+
+          if(key == 'O') then
+             write (filename_plus, '(I9)') istate
+             filename_plus = 'Omegaplus.istate'//trim(adjustl(filename))
+             filename_minus = 'Omegaminus.istate'//trim(adjustl(filename))
+          end if
+          
+          if(key == 'X' .or. key == 'O') then
              !Multiply constant factor, unit factor, etc.
-             Xplus_istate(1:count) = const*Xplus_istate(1:count) !THz
-             Xminus_istate(1:count) = const*Xminus_istate(1:count) !THz
+             TPplus_istate(1:count) = const*TPplus_istate(1:count) !THz
+             TPminus_istate(1:count) = const*TPminus_istate(1:count) !THz
 
              !Change to data output directory
              call chdir(trim(adjustl(num%Xdir)))
 
              !Write data in binary format
              !Note: this will overwrite existing data!
-             write (filename, '(I9)') istate
-             filename = 'Xplus.istate'//trim(adjustl(filename))
-             open(1, file = trim(filename), status = 'replace', access = 'stream')
+             open(1, file = trim(filename_plus), status = 'replace', access = 'stream')
              write(1) count
-             write(1) Xplus_istate(1:count)
+             write(1) TPplus_istate(1:count)
              write(1) istate_el(1:count)
              write(1) istate_ph(1:count)
              close(1)
 
-             write (filename, '(I9)') istate
-             filename = 'Xminus.istate'//trim(adjustl(filename))
-             open(1, file = trim(filename), status = 'replace', access = 'stream')
+             open(1, file = trim(filename_minus), status = 'replace', access = 'stream')
              write(1) count
-             write(1) Xminus_istate(1:count)
+             write(1) TPminus_istate(1:count)
              write(1) istate_el(1:count)
              write(1) istate_ph(1:count)
              close(1)
@@ -1962,7 +1973,7 @@ contains
           !Change back to working directory
           call chdir(num%cwd)
 
-          if(key == 'X') deallocate(g2_istate, Xplus_istate, Xminus_istate, &
+          if(key /= 'g') deallocate(g2_istate, TPplus_istate, TPminus_istate, &
                istate_el, istate_ph)
        end do
     end if
