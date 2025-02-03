@@ -2018,7 +2018,7 @@ contains
     character(len = 1024) :: filename
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
     type(vec) :: k1_vec, k2_vec, k3_vec, k4_vec, q_vec
-    logical :: keep_interaction_tally
+    logical :: keep_interaction_tally, screening_computed, g2_computed
 
     !Do I need to keep a tally of the all the interacting states?
     keep_interaction_tally = present(istate_el2) .and. present(istate_el3) &
@@ -2085,15 +2085,18 @@ contains
           !q \equiv k1 - k3
           q_vec = vec_sub(k1_vec, k3_vec, el%wvmesh, crys%reclattvecs)
 
-          if(num%elel_screening_type == 'RPA') then
-             !Calculate polarizablity
-             call spectral_head_polarizability_3d_qpath(&
-                  specX0_cont, Omegas_cont, q_vec%frac, el, wann, crys, num%tetrahedra)
-
-             ImX0_cont = -pi*specX0_cont 
-
-             call hilbert_transform(-ImX0_cont, ReX0_cont)
-          end if
+          !Reset screening precomputation flag
+          screening_computed = .false.
+          
+!!$          if(num%elel_screening_type == 'RPA') then
+!!$             !Calculate polarizablity
+!!$             call spectral_head_polarizability_3d_qpath(&
+!!$                  specX0_cont, Omegas_cont, q_vec%frac, el, wann, crys, num%tetrahedra)
+!!$
+!!$             ImX0_cont = -pi*specX0_cont 
+!!$
+!!$             call hilbert_transform(-ImX0_cont, ReX0_cont)
+!!$          end if
           
           do n3 = 1, el%numbands
              !Electron 3 energy
@@ -2102,20 +2105,20 @@ contains
              !Apply energy window to electron 3
              if(abs(en3 - el%enref) > el%fsthick) cycle
              
-             ! Squared matrix element screened by Thomas-Fermi or RPA dielectric.
-             ! q = 0 divergence case is handled by the Thomas-Fermi screening.
-             if(all(q_vec%frac == 0) .or. num%elel_screening_type == 'TF') then
-                g2 = gCoul2_TF(el, crys, q_vec%frac, &
-                        el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :))
-             else
-                !Interpolating polarizability from continuous mesh to sampling energy
-                temp = interpolator_1d([(en1 - en3)], Omegas_cont, ReX0_cont) &
-                     + oneI*interpolator_1d([(en1 - en3)], Omegas_cont, ImX0_cont)
-                X0_qw = temp(1)
-                
-                g2 = gCoul2_RPA(el, crys, q_vec%frac, &
-                        el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :), X0_qw)
-             end if
+!!$             ! Squared matrix element screened by Thomas-Fermi or RPA dielectric.
+!!$             ! q = 0 divergence case is handled by the Thomas-Fermi screening.
+!!$             if(all(q_vec%frac == 0) .or. num%elel_screening_type == 'TF') then
+!!$                g2 = gCoul2_TF(el, crys, q_vec%frac, &
+!!$                        el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :))
+!!$             else
+!!$                !Interpolating polarizability from continuous mesh to sampling energy
+!!$                temp = interpolator_1d([(en1 - en3)], Omegas_cont, ReX0_cont) &
+!!$                     + oneI*interpolator_1d([(en1 - en3)], Omegas_cont, ImX0_cont)
+!!$                X0_qw = temp(1)
+!!$                
+!!$                g2 = gCoul2_RPA(el, crys, q_vec%frac, &
+!!$                        el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :), X0_qw)
+!!$             end if
              
              !Fermi function of electron 3
              fermi3 = Fermi(en3, el%chempot, crys%T)
@@ -2132,6 +2135,9 @@ contains
                 call binsearch(el%indexlist, k4_vec%muxed_index, ik4)
                 if(ik4 < 0) cycle
 
+                !Reset g2 precomputation flag
+                g2_computed = .false.
+                
                 do n2 = 1, el%numbands
                    !Electron 2 energy
                    en2 = el%ens(ik2, n2)
@@ -2154,6 +2160,39 @@ contains
                       !Apply energy window to electron 4
                       if(abs(en4 - el%enref) > el%fsthick) cycle
 
+                      if(.not. screening_computed) then
+                         if(num%elel_screening_type == 'RPA') then
+                            !Calculate polarizablity
+                            call spectral_head_polarizability_3d_qpath(&
+                                 specX0_cont, Omegas_cont, q_vec%frac, el, wann, crys, num%tetrahedra)
+
+                            ImX0_cont = -pi*specX0_cont 
+
+                            call hilbert_transform(-ImX0_cont, ReX0_cont)
+                         end if
+
+                         screening_computed = .true.
+                      end if
+
+                      if(.not. g2_computed) then
+                         ! Squared matrix element screened by Thomas-Fermi or RPA dielectric.
+                         ! q = 0 divergence case is handled by the Thomas-Fermi screening.
+                         if(all(q_vec%frac == 0) .or. num%elel_screening_type == 'TF') then
+                            g2 = gCoul2_TF(el, crys, q_vec%frac, &
+                                 el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :))
+                         else
+                            !Interpolating polarizability from continuous mesh to sampling energy
+                            temp = interpolator_1d([(en1 - en3)], Omegas_cont, ReX0_cont) &
+                                 + oneI*interpolator_1d([(en1 - en3)], Omegas_cont, ImX0_cont)
+                            X0_qw = temp(1)
+
+                            g2 = gCoul2_RPA(el, crys, q_vec%frac, &
+                                 el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :), X0_qw)
+                         end if
+
+                         g2_computed = .true.
+                      end if
+                      
                       !Increase viable process counter
                       count = count + 1
 
