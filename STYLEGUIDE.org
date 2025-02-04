@@ -209,4 +209,4 @@ No other variable should be. Subroutines should not access global variables. Wri
 Use objects but don't write Java. Use the functional style but don't try to mimic Haskell. The style we use can be called object-based procedural. Try to write pure procedures whenever possible. Try to strike a good balance between performance, readability, and extensibility. Think La Sagrada Familia, not the Sistine Chapel.
 
 ** Fix issues when you see them
-If you see any of these rules broken near the part of the code you are touching, please go ahead and it.
+If you see any of these rules broken near the part of the code you are touching, please go ahead and fix it.

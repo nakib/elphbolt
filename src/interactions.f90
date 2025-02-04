@@ -26,7 +26,7 @@ module interactions
        create_set, coarse_grain, timer, eye, shrink, Hilbert_transform, interpolator_1d, &
        linspace
   use resource_module, only: resource
-  use screening_module, only: spectral_head_polarizability_3d_qpath
+  use screening_module, only: spectral_head_polarizability_3d_q
   
   use wannier_module, only: wannier
   use crystal_module, only: crystal
@@ -1996,6 +1996,16 @@ contains
        istate_el2, istate_el3, istate_el4)
     !! On-the-fly serial calculator of the e-e transition probability.
     !! for a given IBZ electron states within the transport window.
+    !!
+    !! el Electron data type
+    !! num Numerics data type
+    !! wann Wannier data type
+    !! istate1 1st electron state
+    !! crys Crystal data type
+    !! X Transition rate
+    !! istate_el2 2nd electron state
+    !! istate_el3 3rd electron state
+    !! istate_el4 4th electron state
 
     type(electron), intent(in) :: el
     type(numerics), intent(in) :: num
@@ -2088,37 +2098,12 @@ contains
           !Reset screening precomputation flag
           screening_computed = .false.
           
-!!$          if(num%elel_screening_type == 'RPA') then
-!!$             !Calculate polarizablity
-!!$             call spectral_head_polarizability_3d_qpath(&
-!!$                  specX0_cont, Omegas_cont, q_vec%frac, el, wann, crys, num%tetrahedra)
-!!$
-!!$             ImX0_cont = -pi*specX0_cont 
-!!$
-!!$             call hilbert_transform(-ImX0_cont, ReX0_cont)
-!!$          end if
-          
           do n3 = 1, el%numbands
              !Electron 3 energy
              en3 = el%ens(ik3, n3)
 
              !Apply energy window to electron 3
              if(abs(en3 - el%enref) > el%fsthick) cycle
-             
-!!$             ! Squared matrix element screened by Thomas-Fermi or RPA dielectric.
-!!$             ! q = 0 divergence case is handled by the Thomas-Fermi screening.
-!!$             if(all(q_vec%frac == 0) .or. num%elel_screening_type == 'TF') then
-!!$                g2 = gCoul2_TF(el, crys, q_vec%frac, &
-!!$                        el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :))
-!!$             else
-!!$                !Interpolating polarizability from continuous mesh to sampling energy
-!!$                temp = interpolator_1d([(en1 - en3)], Omegas_cont, ReX0_cont) &
-!!$                     + oneI*interpolator_1d([(en1 - en3)], Omegas_cont, ImX0_cont)
-!!$                X0_qw = temp(1)
-!!$                
-!!$                g2 = gCoul2_RPA(el, crys, q_vec%frac, &
-!!$                        el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :), X0_qw)
-!!$             end if
              
              !Fermi function of electron 3
              fermi3 = Fermi(en3, el%chempot, crys%T)
@@ -2144,10 +2129,6 @@ contains
 
                    !Apply energy window to electron 2
                    if(abs(en2 - el%enref) > el%fsthick) cycle
-
-!!$                   !Squared matrix element - Thomas Fermi screening
-!!$                   g2 = gCoul2_TF(el, crys, q_vec%frac, &
-!!$                        el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :))
                    
                    !Fermi function of electron 2
                    fermi2 = Fermi(en2, el%chempot, crys%T)
@@ -2163,10 +2144,9 @@ contains
                       if(.not. screening_computed) then
                          if(num%elel_screening_type == 'RPA') then
                             !Calculate polarizablity
-                            call spectral_head_polarizability_3d_qpath(&
-                                 specX0_cont, Omegas_cont, q_vec%frac, el, wann, crys, num%tetrahedra)
-
-                            ImX0_cont = -pi*specX0_cont 
+                            call spectral_head_polarizability_3d_q(&
+                                 ImX0_cont, Omegas_cont, q_vec, el, wann, crys, num%tetrahedra)
+                            ImX0_cont = -pi*ImX0_cont
 
                             call hilbert_transform(-ImX0_cont, ReX0_cont)
                          end if
