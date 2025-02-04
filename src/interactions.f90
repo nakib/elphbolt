@@ -1278,14 +1278,14 @@ contains
          ikp_window, start, end, chunk, nprocs, count, num_active_images
     integer(i64), allocatable :: istate1(:), istate2(:)
     real(r64) :: en_ph, en_el, en_elp, const, delta, &
-         invboseplus1, fermi1, fermi2, occup_fac
-    real(r64), allocatable :: g2_istate(:), Y_istate(:)
+         bose1, invboseplus1, invboseboseplus1, fermi1, fermi2, occup_fac
+    real(r64), allocatable :: g2_istate(:), TP_istate(:)
     complex(r64), allocatable :: gReq_iq(:,:,:,:)
     character(len = 1024) :: filename
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
     type(vec) :: q_vec, k_vec, kp_vec
     
-    if(key /= 'g' .and. key /= 'Y' .and. key /= 'O') then
+    if(key /= 'g' .and. key /= 'Y' .and. key /= 'U') then
        call exit_with_message(&
             "Invalid value of key in call to calculate_eph_interaction_ibzq. Exiting.")
     end if
@@ -1358,8 +1358,18 @@ contains
              end if
           end if
 
+          !1/Bose/(1 + Bose) for phonon
+          if(key == 'U') then
+             if(en_ph /= 0.0_r64) then
+                bose1 = Bose(en_ph, crys%T)
+                invboseboseplus1 = 1.0_r64/bose1/(1.0_r64 + bose1)
+             else
+                invboseboseplus1 = 0.0_r64
+             end if
+          end if
+
           !Load g2_istate from disk for scattering rates calculation
-          if(key == 'Y') then
+          if(key /= 'g') then
              !Change to data output directory
              call chdir(trim(adjustl(num%g2dir)))
 
@@ -1368,7 +1378,7 @@ contains
              filename = 'gq2.istate'//trim(adjustl(filename))
              open(1, file = trim(filename), status = 'old', access = 'stream')
              read(1) nprocs
-             if(allocated(g2_istate)) deallocate(g2_istate, Y_istate, istate1, istate2)
+             if(allocated(g2_istate)) deallocate(g2_istate, TP_istate, istate1, istate2)
              allocate(g2_istate(nprocs))
              if(nprocs > 0) read(1) g2_istate
              close(1)
@@ -1377,11 +1387,11 @@ contains
              call chdir(num%cwd)
 
              !Allocate and initialize quantities related to transition probabilities
-             allocate(Y_istate(nprocs))
+             allocate(TP_istate(nprocs))
              allocate(istate1(nprocs), istate2(nprocs))
              istate1(:) = -1_i64
              istate2(:) = -1_i64
-             Y_istate(:) = 0.0_r64
+             TP_istate(:) = 0.0_r64
           end if
 
           !Initialize process counter
@@ -1408,7 +1418,7 @@ contains
                 if(abs(en_el - el%enref) > el%fsthick) cycle
 
                 !Fermi factor for initial and final electrons
-                if(key == 'Y') then
+                if(key /= 'g') then
                    fermi1 = Fermi(en_el, el%chempot, crys%T)
                    fermi2 = Fermi(en_el + en_ph, el%chempot, crys%T)
                 end if
@@ -1434,8 +1444,6 @@ contains
                    end if
 
                    if(key == 'Y') then                   
-                      !Calculate Y:
-
                       !Evaluate delta function
                       delta = delta_fn_ptr(en_elp - en_ph, ik, m, el%wvmesh, &
                            el%simplex_map, el%simplex_count, el%simplex_evals)
@@ -1445,7 +1453,25 @@ contains
 
                       !Save Y
                       if(en_ph >= 0.5e-3) then !Use a small phonon energy cut-off
-                         Y_istate(count) = g2_istate(count)*occup_fac*delta
+                         TP_istate(count) = g2_istate(count)*occup_fac*delta
+                      end if
+                      
+                      !Save initial and final electron states
+                      istate1(count) = mux_state(el%numbands, m, ik)
+                      istate2(count) = mux_state(el%numbands, n, ikp_window)
+                   end if
+
+                   if(key == 'U') then                   
+                      !Evaluate delta function
+                      delta = delta_fn_ptr(en_elp + en_ph, ik, m, el%wvmesh, &
+                           el%simplex_map, el%simplex_count, el%simplex_evals)
+
+                      !Temperature dependent occupation factor
+                      occup_fac = (fermi1 - fermi2)*invboseboseplus1
+
+                      !Save U
+                      if(en_ph >= 0.5e-3) then !Use a small phonon energy cut-off
+                         TP_istate(count) = g2_istate(count)*occup_fac*delta
                       end if
 
                       !Save initial and final electron states
@@ -1471,19 +1497,27 @@ contains
           end if
 
           if(key == 'Y') then
+             write (filename, '(I9)') istate
+             filename = 'Y.istate'//trim(adjustl(filename))
+          end if
+
+          if(key == 'U') then
+             write (filename, '(I9)') istate
+             filename = 'U.istate'//trim(adjustl(filename))
+          end if
+          
+          if(key /= 'g') then
              !Multiply constant factor, unit factor, etc.
-             Y_istate(1:count) = const*Y_istate(1:count) !THz
+             TP_istate(1:count) = const*TP_istate(1:count) !THz
 
              !Change to data output directory
              call chdir(trim(adjustl(num%Ydir)))
 
              !Write data in binary format
              !Note: this will overwrite existing data!
-             write (filename, '(I9)') istate
-             filename = 'Y.istate'//trim(adjustl(filename))
              open(1, file = trim(filename), status = 'replace', access = 'stream')
              write(1) count
-             write(1) Y_istate(1:count)
+             write(1) TP_istate(1:count)
              write(1) istate1(1:count)
              write(1) istate2(1:count)
              close(1)
@@ -1492,7 +1526,7 @@ contains
           !Change back to working directory
           call chdir(num%cwd)
 
-          if(key == 'Y') deallocate(g2_istate, Y_istate, istate1, istate2)
+          if(key /= 'g') deallocate(g2_istate, TP_istate, istate1, istate2)
        end do
     end if
     sync all
@@ -1510,6 +1544,267 @@ contains
 
     sync all
   end subroutine calculate_eph_interaction_ibzq
+
+!!$  !!
+!!$  subroutine calculate_eph_interaction_ibzq(wann, crys, el, ph, num, key)
+!!$    !! Parallel driver of g2(q,k) over IBZ phonon states.
+!!$    !!
+!!$    !! This subroutine will calculate the full Bloch rep. matrix elements for
+!!$    !! all the energy window restricted electron-phonon processes for a given
+!!$    !! irreducible initial phonon state = (branch, wave vector). 
+!!$    !! This list will be written to disk in files tagged with the muxed state index.
+!!$    !!
+!!$    !! key = 'g', 'Y' for vertex, transition probability calculation, respectively.
+!!$    !
+!!$    !In the FBZ and IBZ blocks a wave vector was retained when at least one
+!!$    !band belonged within the energy window. Here the bands outside the energy
+!!$    !window will be skipped in the calculation as they are irrelevant for transport.
+!!$
+!!$    type(wannier), intent(in) :: wann
+!!$    type(crystal), intent(in) :: crys
+!!$    type(electron), intent(in) :: el
+!!$    type(phonon), intent(in) :: ph
+!!$    type(numerics), intent(in) :: num
+!!$    character(len = 1), intent(in) :: key
+!!$
+!!$    !Local variables
+!!$    integer(i64) :: nstates_irred, istate, m, iq, iq_fbz, n, ik, s, &
+!!$         ikp_window, start, end, chunk, nprocs, count, num_active_images
+!!$    integer(i64), allocatable :: istate1(:), istate2(:)
+!!$    real(r64) :: en_ph, en_el, en_elp, const, delta, &
+!!$         invboseplus1, fermi1, fermi2, occup_fac
+!!$    real(r64), allocatable :: g2_istate(:), Y_istate(:)
+!!$    complex(r64), allocatable :: gReq_iq(:,:,:,:)
+!!$    character(len = 1024) :: filename
+!!$    procedure(delta_fn), pointer :: delta_fn_ptr => null()
+!!$    type(vec) :: q_vec, k_vec, kp_vec
+!!$
+!!$    if(key /= 'g' .and. key /= 'Y') then
+!!$       call exit_with_message(&
+!!$            "Invalid value of key in call to calculate_eph_interaction_ibzq. Exiting.")
+!!$    end if
+!!$
+!!$    if(key == 'g') then
+!!$       call print_message("Calculating g(Re,q) -> |g(k,q)|^2 for all IBZ phonons...")
+!!$    else
+!!$       call print_message("Calculating ph-e transition probabilities for all IBZ phonons...")
+!!$    end if
+!!$
+!!$    !Allocate and initialize gReq_iq and g2_istate
+!!$    if(key == 'g') then
+!!$       allocate(gReq_iq(wann%numwannbands, wann%numwannbands, wann%numbranches, wann%nwsk))
+!!$
+!!$       !Maximum length of g2_istate
+!!$       nprocs = el%nstates_inwindow*ph%numbands
+!!$       allocate(g2_istate(nprocs))
+!!$       g2_istate(:) = 0.0_r64
+!!$    end if
+!!$
+!!$    !Associate delta function procedure pointer
+!!$    delta_fn_ptr => get_delta_fn_pointer(num%tetrahedra)
+!!$
+!!$    !Conversion factor in transition probability expression
+!!$    const = twopi/hbar_eVps
+!!$
+!!$    !Total number of IBZ blocks states
+!!$    nstates_irred = ph%nwv_irred*ph%numbands
+!!$
+!!$    call distribute_points(nstates_irred, chunk, start, end, num_active_images)
+!!$
+!!$    if(this_image() == 1) then
+!!$       write(*, "(A, I10)") " #states = ", nstates_irred
+!!$       write(*, "(A, I10)") " #states/image <= ", chunk
+!!$    end if
+!!$
+!!$    !Only work with the active images
+!!$    if(this_image() <= num_active_images) then
+!!$       do istate = start, end !over IBZ blocks states
+!!$          !Demux state index into branch (s) and wave vector (iq) indices
+!!$          call demux_state(istate, ph%numbands, s, iq)
+!!$
+!!$          if(key == 'g') then
+!!$             !Load gReq(iq) here for use inside the loops below
+!!$             call chdir(trim(adjustl(num%g2dir)))
+!!$             write (filename, '(I6)') iq
+!!$             filename = 'gReq.iq'//trim(adjustl(filename))
+!!$
+!!$             open(1,file=filename,status="old",access='stream')
+!!$             read(1) gReq_iq
+!!$             close(1)
+!!$             call chdir(num%cwd)
+!!$          end if
+!!$
+!!$          !Get the muxed index of FBZ wave vector from the IBZ index list
+!!$          iq_fbz = ph%indexlist_irred(iq)
+!!$
+!!$          !Energy of phonon
+!!$          en_ph = ph%ens(iq_fbz, s)
+!!$
+!!$          !Create phonon wave vector
+!!$          q_vec = vec(iq_fbz, ph%wvmesh, crys%reclattvecs)
+!!$
+!!$          !1/(1 + Bose factor) for phonon
+!!$          if(key == 'Y') then
+!!$             if(en_ph /= 0.0_r64) then
+!!$                invboseplus1 = 1.0_r64/(1.0_r64 + Bose(en_ph, crys%T))
+!!$             else
+!!$                invboseplus1 = 0.0_r64
+!!$             end if
+!!$          end if
+!!$
+!!$          !Load g2_istate from disk for scattering rates calculation
+!!$          if(key == 'Y') then
+!!$             !Change to data output directory
+!!$             call chdir(trim(adjustl(num%g2dir)))
+!!$
+!!$             !Read data in binary format
+!!$             write (filename, '(I9)') istate
+!!$             filename = 'gq2.istate'//trim(adjustl(filename))
+!!$             open(1, file = trim(filename), status = 'old', access = 'stream')
+!!$             read(1) nprocs
+!!$             if(allocated(g2_istate)) deallocate(g2_istate, Y_istate, istate1, istate2)
+!!$             allocate(g2_istate(nprocs))
+!!$             if(nprocs > 0) read(1) g2_istate
+!!$             close(1)
+!!$
+!!$             !Change back to working directory
+!!$             call chdir(num%cwd)
+!!$
+!!$             !Allocate and initialize quantities related to transition probabilities
+!!$             allocate(Y_istate(nprocs))
+!!$             allocate(istate1(nprocs), istate2(nprocs))
+!!$             istate1(:) = -1_i64
+!!$             istate2(:) = -1_i64
+!!$             Y_istate(:) = 0.0_r64
+!!$          end if
+!!$
+!!$          !Initialize process counter
+!!$          count = 0
+!!$
+!!$          !Run over initial (in-window, FBZ blocks) electron wave vectors
+!!$          do ik = 1, el%nwv
+!!$             !Initial wave vector (crystal coords.)
+!!$             k_vec = vec(el%indexlist(ik), el%wvmesh, crys%reclattvecs)
+!!$
+!!$             !Find final electron wave vector
+!!$             kp_vec = vec_add(k_vec, q_vec, el%wvmesh, crys%reclattvecs) 
+!!$
+!!$             !Check if final electron wave vector is within energy window
+!!$             call binsearch(el%indexlist, kp_vec%muxed_index, ikp_window)
+!!$             if(ikp_window < 0) cycle
+!!$
+!!$             !Run over initial electron bands
+!!$             do m = 1, el%numbands                
+!!$                !Energy of initial electron
+!!$                en_el = el%ens(ik, m)
+!!$
+!!$                !Apply energy window to initial electron
+!!$                if(abs(en_el - el%enref) > el%fsthick) cycle
+!!$
+!!$                !Fermi factor for initial and final electrons
+!!$                if(key == 'Y') then
+!!$                   fermi1 = Fermi(en_el, el%chempot, crys%T)
+!!$                   fermi2 = Fermi(en_el + en_ph, el%chempot, crys%T)
+!!$                end if
+!!$
+!!$                !Run over final electron bands
+!!$                do n = 1, el%numbands
+!!$                   !Energy of final electron
+!!$                   en_elp = el%ens(ikp_window, n)
+!!$
+!!$                   !Apply energy window to final electron
+!!$                   if(abs(en_elp - el%enref) > el%fsthick) cycle
+!!$
+!!$                   !Increment g2 process counter
+!!$                   count = count + 1
+!!$
+!!$                   if(key == 'g') then
+!!$                      !Calculate |g_mns(k,<q>)|^2
+!!$                      g2_istate(count) = wann%g2(crys, &
+!!$                           k_vec%frac, q_vec%frac, &
+!!$                           el%evecs(ik, m, :), el%evecs(ikp_window, n, :), &
+!!$                           ph%evecs(iq_fbz, s, :), &
+!!$                           ph%ens(iq_fbz, s), gReq_iq, 'el')
+!!$                   end if
+!!$
+!!$                   if(key == 'Y') then                   
+!!$                      !Calculate Y:
+!!$
+!!$                      !Evaluate delta function
+!!$                      delta = delta_fn_ptr(en_elp - en_ph, ik, m, el%wvmesh, &
+!!$                           el%simplex_map, el%simplex_count, el%simplex_evals)
+!!$
+!!$                      !Temperature dependent occupation factor
+!!$                      occup_fac = fermi1*(1.0_r64 - fermi2)*invboseplus1
+!!$
+!!$                      !Save Y
+!!$                      if(en_ph >= 0.5e-3) then !Use a small phonon energy cut-off
+!!$                         Y_istate(count) = g2_istate(count)*occup_fac*delta
+!!$                      end if
+!!$
+!!$                      !Save initial and final electron states
+!!$                      istate1(count) = mux_state(el%numbands, m, ik)
+!!$                      istate2(count) = mux_state(el%numbands, n, ikp_window)
+!!$                   end if
+!!$                end do !n
+!!$             end do !m
+!!$          end do !ik
+!!$
+!!$          if(key == 'g') then
+!!$             !Change to data output directory
+!!$             call chdir(trim(adjustl(num%g2dir)))
+!!$
+!!$             !Write data in binary format
+!!$             !Note: this will overwrite existing data!
+!!$             write (filename, '(I9)') istate
+!!$             filename = 'gq2.istate'//trim(adjustl(filename))
+!!$             open(1, file = trim(filename), status = 'replace', access = 'stream')
+!!$             write(1) count
+!!$             write(1) g2_istate(1:count)
+!!$             close(1)
+!!$          end if
+!!$
+!!$          if(key == 'Y') then
+!!$             !Multiply constant factor, unit factor, etc.
+!!$             Y_istate(1:count) = const*Y_istate(1:count) !THz
+!!$
+!!$             !Change to data output directory
+!!$             call chdir(trim(adjustl(num%Ydir)))
+!!$
+!!$             !Write data in binary format
+!!$             !Note: this will overwrite existing data!
+!!$             write (filename, '(I9)') istate
+!!$             filename = 'Y.istate'//trim(adjustl(filename))
+!!$             open(1, file = trim(filename), status = 'replace', access = 'stream')
+!!$             write(1) count
+!!$             write(1) Y_istate(1:count)
+!!$             write(1) istate1(1:count)
+!!$             write(1) istate2(1:count)
+!!$             close(1)
+!!$          end if
+!!$
+!!$          !Change back to working directory
+!!$          call chdir(num%cwd)
+!!$
+!!$          if(key == 'Y') deallocate(g2_istate, Y_istate, istate1, istate2)
+!!$       end do
+!!$    end if
+!!$    sync all
+!!$
+!!$    if(key == 'g') then
+!!$       !Delete the gReq disk data
+!!$       if(this_image() == 1) then
+!!$          call chdir(trim(adjustl(num%g2dir)))
+!!$          call system('rm gReq.*')
+!!$          call chdir(num%cwd)
+!!$       end if
+!!$    end if
+!!$
+!!$    if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
+!!$
+!!$    sync all
+!!$  end subroutine calculate_eph_interaction_ibzq
+!!$  !!
 
   subroutine calculate_Y_OTF(el, ph, num, crys, istate, T, &
        Y_istate, istate_el1, istate_el2)
@@ -1777,7 +2072,7 @@ contains
           k_vec = vec(ik_fbz, el%wvmesh, crys%reclattvecs)
           
           !Load g2_istate from disk for scattering rates calculation
-          if(key == 'X') then
+          if(key == 'X' .or. key == 'O') then
              !Change to data output directory
              call chdir(trim(adjustl(num%g2dir)))
 
