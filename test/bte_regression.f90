@@ -278,11 +278,11 @@ program bte_regression
      call t_event%end_timer('IBZ e-ph transition probabilities')
   end if
 
-!!$  if(num%onlyebte .or. num%drag .or. num%phe .or. num%drag &
-!!$       .or. num%plot_along_path) then
-!!$     !Deallocate Wannier quantities
-!!$     call wann%deallocate_wannier(num)
-!!$  end if
+  if(num%onlyebte .or. num%drag .or. num%phe .or. num%drag &
+       .or. num%plot_along_path) then
+     !Deallocate Wannier quantities
+     call wann%deallocate_wannier(num)
+  end if
   
   if(num%onlyebte .or. num%drag) then
      if(num%elchimp) then
@@ -327,9 +327,9 @@ program bte_regression
 
   !Solve BTEs
   if(num%onlyphbte .and. .not. num%phe) then
-     call bt%solve_bte(num, crys, wann, sym, ph)
+     call bt%solve_bte(num, crys, sym, ph)
   else
-     call bt%solve_bte(num, crys, wann, sym, ph, el)
+     call bt%solve_bte(num, crys, sym, ph, el)
      
      !TODO Here test the transport coefficients
   end if

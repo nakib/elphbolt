@@ -2287,14 +2287,13 @@ contains
     sync all
   end subroutine calculate_eph_interaction_ibzk
   
-  subroutine calculate_Xee_OTF(el, num, wann, istate1, crys, X, &
+  subroutine calculate_Xee_OTF(el, num, istate1, crys, X, &
        istate_el2, istate_el3, istate_el4)
     !! On-the-fly serial calculator of the e-e transition probability.
     !! for a given IBZ electron states within the transport window.
     !!
     !! el Electron data type
     !! num Numerics data type
-    !! wann Wannier data type
     !! istate1 1st electron state
     !! crys Crystal data type
     !! X Transition rate
@@ -2305,7 +2304,6 @@ contains
     type(electron), intent(in) :: el
     type(numerics), intent(in) :: num
     type(crystal), intent(in) :: crys
-    type(wannier), intent(in) :: wann
     integer(i64), intent(in) :: istate1
     real(r64), intent(out), allocatable :: X(:)
     integer(i64), intent(out), allocatable, optional :: &
@@ -2440,7 +2438,7 @@ contains
                          if(num%elel_screening_type == 'RPA') then
                             !Calculate polarizablity
                             call spectral_head_polarizability_3d_q(&
-                                 ImX0_cont, Omegas_cont, q_vec, el, wann, crys, num%tetrahedra)
+                                 ImX0_cont, Omegas_cont, q_vec, el, crys, num%tetrahedra)
                             ImX0_cont = -pi*ImX0_cont
 
                             call hilbert_transform(-ImX0_cont, ReX0_cont)
@@ -2887,7 +2885,7 @@ contains
   end subroutine calculate_4ph_rta_rates
   
   subroutine calculate_el_rta_rates(rta_rates_eph, rta_rates_echimp, rta_rates_ee, &
-       num, crys, el, wann)
+       num, crys, el)
     !! Subroutine for parallel reading of the e-ph transition probabilities
     !! from disk and calculating the relaxation time approximation (RTA)
     !! scattering rates for the e-ph channel.
@@ -2897,7 +2895,6 @@ contains
     type(numerics), intent(in) :: num
     type(crystal), intent(in) :: crys
     type(electron), intent(in) :: el
-    type(wannier), intent(in) :: wann
     
     !Local variables
     integer(i64) :: nstates_irred, istate, nprocs_eph, nprocs_echimp, &
@@ -2935,7 +2932,7 @@ contains
 
           !e-e scattering rates (OTF only at the mo)
           if(num%elel) then
-             call calculate_Xee_OTF(el, num, wann, istate, crys, X)
+             call calculate_Xee_OTF(el, num, istate, crys, X)
              do iproc = 1, size(X)
                 rta_rates_ee(ik, m) = rta_rates_ee(ik, m) + X(iproc)
              end do

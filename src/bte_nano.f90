@@ -28,7 +28,6 @@ module bte_nano_module
        interpolate_using_precomputed, Jacobian, cross_product, qdist
   use numerics_module, only: numerics
   use crystal_module, only: crystal
-  use wannier_module, only: wannier
   use nano_module, only: nanostructure
   use symmetry_module, only: symmetry
   use phonon_module, only: phonon
@@ -220,7 +219,7 @@ contains
 
    end function check_ph_convergence
 
-  subroutine bte_driver(self, num, crys, wann, sym, nano, ph, el)
+  subroutine bte_driver(self, num, crys, sym, nano, ph, el)
     !! Subroutine to orchestrate the BTE calculations.
     !!
     !! self nano BTE object
@@ -233,7 +232,6 @@ contains
     class(bte_nano), intent(inout) :: self
     type(numerics), intent(in) :: num
     type(crystal), intent(in) :: crys
-    type(wannier), intent(in) :: wann
     type(symmetry), intent(in) :: sym
     type(phonon), intent(in) :: ph
     type(nanostructure), intent(inout) :: nano
@@ -261,7 +259,7 @@ contains
 
     !Electron RTA
     if(.not. num%onlyphbte) &
-         call dragless_ebte_RTA(Tdir, self, num, crys, wann, sym, nano, el, ph)
+         call dragless_ebte_RTA(Tdir, self, num, crys, sym, nano, el, ph)
     
     !Dragful electron-phonon BTEs
     if(num%drag) &
@@ -276,7 +274,7 @@ contains
          call dragless_ebte_full(Tdir, self, num, crys, sym, nano, el)
   end subroutine bte_driver
   
-  subroutine dragless_ebte_RTA(Tdir, self, num, crys, wann, sym, nano, el, ph)
+  subroutine dragless_ebte_RTA(Tdir, self, num, crys, sym, nano, el, ph)
     !! Dragless electron BTE calculator in the relaxation time approximation.
     !! It is impure as it mutates the electron sector of the bte data type and
     !! writes to disk. It should be kept private to this data type unless made safer.
@@ -284,7 +282,6 @@ contains
     class(bte_nano), intent(inout) :: self !Mutation alert!
     type(numerics), intent(in) :: num
     type(crystal), intent(in) :: crys
-    type(wannier), intent(in) :: wann
     type(symmetry), intent(in) :: sym
     type(nanostructure), intent(inout) :: nano
     type(phonon), intent(in) :: ph
@@ -305,7 +302,7 @@ contains
     !Calculate RTA scattering rates
     ! e-ph and e-impurity
     call calculate_el_rta_rates(self%el_rta_rates_eph_ibz, self%el_rta_rates_echimp_ibz, &
-         self%el_rta_rates_ee_ibz, num, crys, el, wann)
+         self%el_rta_rates_ee_ibz, num, crys, el)
 
     !Allocate total RTA scattering rates
     allocate(self%el_rta_rates_ibz(el%nwv_irred, el%numbands))

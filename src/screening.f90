@@ -64,7 +64,7 @@ contains
   end subroutine calculate_qTF
   
   subroutine spectral_head_polarizability_3d_q(spec_eps, Omegas, qvec, &
-       el, wann, crys, tetrahedra)
+       el, crys, tetrahedra)
     !! Spectral head of the bare polarizability of the 3d Kohn-Sham system using
     !! Eq. 16 of Shishkin and Kresse Phys. Rev. B 74, 035101 (2006).
     !!
@@ -75,14 +75,12 @@ contains
     !! Omega Energy of excitation in the electron gas
     !! qvec Transfer wave vector
     !! el Electron data type
-    !! wann Wannier data type
     !! crys Crystal data type
     !! tetrahedra Delta evaulator selector
 
     real(r64), intent(in) :: Omegas(:)
     type(vec), intent(in) :: qvec
     type(electron), intent(in) :: el
-    type(wannier), intent(in) :: wann
     type(crystal), intent(in) :: crys
     logical, intent(in) :: tetrahedra
     real(r64), allocatable, intent(out) :: spec_eps(:)
@@ -93,9 +91,8 @@ contains
     complex(r64) :: el_evecs_kp(1, el%numbands, el%numbands)
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
     type(vec) :: kvec, kpvec
-    
     real(r64) :: dOmega
-
+    
     nOmegas = size(Omegas)
 
     dOmega = Omegas(2) - Omegas(1)
@@ -123,14 +120,14 @@ contains
        el_ens_kp(1, :) = el%ens(where_in_indexlist, :)
        el_evecs_kp(1, :, :) = el%evecs(where_in_indexlist, :, :)
                  
-       do m = 1, wann%numwannbands
+       do m = 1, el%numbands
           ek = el%ens(ik, m)
           
           !Apply energy window to initial electron
           if(abs(ek - el%enref) > el%fsthick) cycle
           
           do iOmega = nOmegas/2 + 2, nOmegas !positive energy sector
-             do n = 1, wann%numwannbands
+             do n = 1, el%numbands
 
                 ekp = el_ens_kp(1, n)
                 
