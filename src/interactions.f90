@@ -2000,7 +2000,7 @@ contains
     integer(i64), allocatable :: istate_el(:), istate_ph(:)
     complex(r64), allocatable :: gkRp_ik(:, :, :, :)
     complex(r64) :: ph_evecs_iq(1, ph%numbands,ph%numbands)
-    character(len = 1024) :: filename, filename_plus, filename_minus
+    character(len = 1024) :: filename_g, filename_plus, filename_minus
     logical :: needfinephon
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
     type(vec) :: k_vec, kp_vec, q_vec, q_vec_coarse
@@ -2051,9 +2051,9 @@ contains
           if(key == 'g') then
              !Load gkRp(ik) here for use inside the loops below
              call chdir(trim(adjustl(num%g2dir)))
-             write (filename, '(I6)') ik
-             filename = 'gkRp.ik'//trim(adjustl(filename))
-             open(1,file=filename,status="old",access='stream')
+             write (filename_g, '(I6)') ik
+             filename_g = 'gkRp.ik'//trim(adjustl(filename_g))
+             open(1,file=filename_g,status="old",access='stream')
              read(1) gkRp_ik
              close(1)
              call chdir(num%cwd)
@@ -2072,14 +2072,14 @@ contains
           k_vec = vec(ik_fbz, el%wvmesh, crys%reclattvecs)
           
           !Load g2_istate from disk for scattering rates calculation
-          if(key == 'X' .or. key == 'O') then
+          if(key /= 'g') then
              !Change to data output directory
              call chdir(trim(adjustl(num%g2dir)))
 
              !Read data in binary format
-             write (filename, '(I9)') istate
-             filename = 'gk2.istate'//trim(adjustl(filename))
-             open(1, file = trim(filename), status = 'old', access = 'stream')
+             write (filename_g, '(I9)') istate
+             filename_g = 'gk2.istate'//trim(adjustl(filename_g))
+             open(1, file = trim(filename_g), status = 'old', access = 'stream')
              read(1) nprocs
              if(allocated(g2_istate)) deallocate(g2_istate, TPplus_istate, TPminus_istate, &
                   istate_el, istate_ph)
@@ -2151,9 +2151,7 @@ contains
                               ph%evecs(iq_coarse, s, :), ph%ens(iq_coarse, s), &
                               gkRp_ik, 'ph')
                       end if
-                   end if
-
-                   if(key == 'X' .or. key == 'O') then
+                   else
                       !Phonon energy
                       if(needfinephon) then
                          en_ph = ph_ens_iq(1, s)
@@ -2186,7 +2184,7 @@ contains
                               Fermi(en_el, el%chempot, crys%T)/(1.0_r64 - Fermi(en_el, el%chempot, crys%T))
                       end if
 
-                      !Calculate X+:
+                      !Calculate X+/-:
 
                       !Evaulate delta function
                       delta_plus = delta_fn_ptr(en_el + en_ph, ikp, n, el%wvmesh, el%simplex_map, &
@@ -2194,7 +2192,7 @@ contains
                       delta_minus = delta_fn_ptr(en_el - en_ph, ikp, n, el%wvmesh, el%simplex_map, &
                            el%simplex_count, el%simplex_evals)
 
-                      !Save X+ and X-
+                      !Save X+/-
                       if(en_ph >= 0.5e-3) then !Use a small phonon energy cut-off
                          TPplus_istate(count) = g2_istate(count)*occup_fac_plus*delta_plus
                          TPminus_istate(count) = g2_istate(count)*occup_fac_minus*delta_minus
@@ -2220,9 +2218,9 @@ contains
 
              !Write data in binary format
              !Note: this will overwrite existing data!
-             write (filename, '(I9)') istate
-             filename = 'gk2.istate'//trim(adjustl(filename))
-             open(1, file = trim(filename), status = 'replace', access = 'stream')
+             write (filename_g, '(I9)') istate
+             filename_g = 'gk2.istate'//trim(adjustl(filename_g))
+             open(1, file = trim(filename_g), status = 'replace', access = 'stream')
              write(1) count
              write(1) g2_istate
              close(1)
@@ -2230,17 +2228,19 @@ contains
 
           if(key == 'X') then
              write (filename_plus, '(I9)') istate
-             filename_plus = 'Xplus.istate'//trim(adjustl(filename))
-             filename_minus = 'Xminus.istate'//trim(adjustl(filename))
+             write (filename_minus, '(I9)') istate
+             filename_plus = 'Xplus.istate'//trim(adjustl(filename_plus))
+             filename_minus = 'Xminus.istate'//trim(adjustl(filename_minus))
           end if
 
           if(key == 'O') then
              write (filename_plus, '(I9)') istate
-             filename_plus = 'Omegaplus.istate'//trim(adjustl(filename))
-             filename_minus = 'Omegaminus.istate'//trim(adjustl(filename))
+             write (filename_minus, '(I9)') istate
+             filename_plus = 'Omegaplus.istate'//trim(adjustl(filename_plus))
+             filename_minus = 'Omegaminus.istate'//trim(adjustl(filename_minus))
           end if
           
-          if(key == 'X' .or. key == 'O') then
+          if(key /= 'g') then
              !Multiply constant factor, unit factor, etc.
              TPplus_istate(1:count) = const*TPplus_istate(1:count) !THz
              TPminus_istate(1:count) = const*TPminus_istate(1:count) !THz
