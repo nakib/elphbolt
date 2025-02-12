@@ -2673,9 +2673,9 @@ contains
 
                 ! Squared matrix element screened by Thomas-Fermi or RPA dielectric.
                 ! q = 0 divergence case is handled by the Thomas-Fermi screening.
-                if(all(q_crys == 0) .or. num%elel_screening_type == 'TF') then
+                if(all(q_vec%frac == 0) .or. num%elel_screening_type == 'TF') then
                    !Calculate matrix element
-                   g2 = gchimp2_TF(el, crys, q_crys, &
+                   g2 = gchimp2_TF(el, crys, q_vec%frac, &
                      el%evecs_irred(ik, m, :), el%evecs(ikp, n, :))
                 else
                    !Interpolating polarizability from continuous mesh to sampling energy
@@ -2683,7 +2683,7 @@ contains
                         + oneI*interpolator_1d([(en_el_p - en_el)], Omegas_cont, ImX0_cont)
                    X0_qw = temp(1)
 
-                   g2 = gchimp2_RPA(el, crys, q_crys, &
+                   g2 = gchimp2_RPA(el, crys, q_vec%frac, &
                      el%evecs_irred(ik, m, :), el%evecs(ikp, n, :), X0_qw)
                 end if
 
