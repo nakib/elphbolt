@@ -78,7 +78,7 @@ contains
     complex(r64),intent(in) :: evec_k(:), evec_kp(:)
 
     real(r64) :: qcart(3), prefac, overlap, Gsum, &
-         Gplusq(3), eps_3x3(3, 3), screened_qTF_sq
+         Gplusq(3), eps_3x3(3, 3)
     integer :: ik1, ik2, ik3
         
     qcart = matmul(crys%reclattvecs, qcrys)
@@ -100,7 +100,6 @@ contains
                   + ik2*crys%reclattvecs(:, 2) &
                   + ik3*crys%reclattvecs(:, 3)  ) + qcart
 
-             screened_qTF_sq = crys%qTF**2/crys%epsiloninf
              !Following Eq. 7 of Nat. Comm. 12:2222 (2021)
              !G + q dependent dielectric function
              eps_3x3 = (crys%epsilon0 + (crys%qTF/twonorm(Gplusq))**2)*eye(3_i64)
@@ -133,7 +132,6 @@ contains
     qcart = matmul(crys%reclattvecs, qcrys)
     
     !This is [U(k')U^\dagger(k)]_nm squared
-    !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
     overlap = (abs(dot_product(evec_kp, evec_k)))**2
 
     prefac = 1.0e-3_r64/crys%volume/perm0**2*&
