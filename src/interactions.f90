@@ -103,7 +103,7 @@ contains
              screened_qTF_sq = crys%qTF**2/crys%epsiloninf
              !Following Eq. 7 of Nat. Comm. 12:2222 (2021)
              !G + q dependent dielectric function
-             eps_3x3 = (crys%epsiloninf + (crys%qTF/twonorm(Gplusq))**2)*eye(3_i64)
+             eps_3x3 = (crys%epsilon0 + (crys%qTF/twonorm(Gplusq))**2)*eye(3_i64)
 
              !Only want G /= -q in the sum over G
              if(all(Gplusq /= 0)) Gsum = Gsum + &
@@ -116,11 +116,8 @@ contains
   end function gchimp2_TF
 
   pure real(r64) function gchimp2_RPA(el, crys, qcrys, evec_k, evec_kp, X0_qw)
-    !! Function to calculate the squared electron-charged impurity vertex.
-    !!
-    !! The expression implemented here was derived by Leveillee et al.
-    !! in PRB 107, 125207 (2023) with the G-dependent dielectric
-    !! from Ganose et al. Nat. Comm. 12:2222 (2021).
+    !! Function to calculate the RPA screened squared electron-charged 
+    !! impurity vertex.
 
     type(crystal), intent(in) :: crys
     type(electron), intent(in) :: el
@@ -153,7 +150,7 @@ contains
                   + ik3*crys%reclattvecs(:, 3)  ) + qcart
 
              !G + q dependent dielectric function
-             eps_3x3 = (crys%epsiloninf - prefac*X0_qw/twonorm(Gplusq)**2)*eye(3_i64)
+             eps_3x3 = (crys%epsilon0 - prefac*X0_qw/twonorm(Gplusq)**2)*eye(3_i64)
 
              !Only want G /= -q in the sum over G
              if(all(Gplusq /= 0)) Gsum = Gsum + &
