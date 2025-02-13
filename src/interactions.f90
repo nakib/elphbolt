@@ -2588,6 +2588,7 @@ contains
     complex(r64) :: temp(1), X0_qw 
     type(vec) :: kp_vec, k_vec, q_vec
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
+    integer(i64) :: k_indvec(3), kp_indvec(3), q_indvec(3)
 
     call print_message("Calculating e-ch. imp. transition probabilities for all IBZ electrons...")
 
@@ -2634,7 +2635,7 @@ contains
           if(abs(en_el - el%enref) > el%fsthick) cycle
 
           !Initial (IBZ blocks) wave vector (crystal coords.)
-          !k = el%wavevecs_irred(ik, :)
+          k = el%wavevecs_irred(ik, :)
           k_vec = vec(el%indexlist_irred(ik), el%wvmesh, crys%reclattvecs)
 
           !Initialize eligible process counter for this state
@@ -2643,10 +2644,16 @@ contains
           !Run over final (FBZ blocks) electron wave vectors
           do ikp = 1, el%nwv
              !Final wave vector (crystal coords.)
-             !kp = el%wavevecs(ikp, :)
+             kp = el%wavevecs(ikp, :)
              kp_vec = vec(el%indexlist(ikp), el%wvmesh, crys%reclattvecs)
              !q \equiv kp - k
-             q_vec = vec_sub(kp_vec, k_vec, el%wvmesh, crys%reclattvecs) 
+             q_vec = vec_sub(kp_vec, k_vec, el%wvmesh, crys%reclattvecs)
+             
+             ! Test
+             !k_indvec = nint(k*el%wvmesh)
+             !kp_indvec = nint(kp*el%wvmesh)
+             !q_indvec = kp_indvec - k_indvec !0-based index vector
+             !q_crys = q_indvec/dble(el%wvmesh) 
 
              if(num%elel_screening_type == 'RPA') then
                 !Calculate polarizablity
