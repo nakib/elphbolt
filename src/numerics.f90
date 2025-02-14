@@ -107,7 +107,7 @@ module numerics_module
      logical :: elel
      !! Use electron-electron scattering?
      character(len = 3) :: col_screening_type
-     !! Type of Coloumb screening
+     !! Type of Coulomb screening
      integer(i64) :: ncont_mesh
      !! Size of the continuous mesh needed for calculating RPA dielectric
      logical :: elbound
@@ -276,7 +276,7 @@ contains
        end if
     end if
     
-    if(elel) then
+    if(elel .or. elchimp) then
        if((col_screening_type /= "RPA") .and. (col_screening_type /= "TF")) then
           call exit_with_message("col_screening_type can be either 'RPA' or 'TF'. Exiting.")
        end if
@@ -511,7 +511,12 @@ contains
           end if
           write(*, "(A, L)") "Include el-charged impurity interaction: ", self%elchimp
           write(*, "(A, L)") "Include el-el interaction: ", self%elel
-          write(*, "(A, A)") "Type of el-el screening: ", trim(self%col_screening_type)
+          if(self%elel .or. self%elchimp) then
+             write(*, "(A, A)") "Type of Coulomb screening: ", trim(self%col_screening_type)
+             if(self%col_screening_type == 'RPA') then
+                write(*, "(A, I5)") "Size of continuous energy mesh: ", self%ncont_mesh
+             end if
+          end if
           write(*, "(A, L)") "Include el-boundary interaction: ", self%elbound
           write(*, "(A, L)") "Solve bulk-BTE: ", self%solve_bulk
           write(*, "(A, L)") "Solve nano-BTE: ", self%solve_nano
