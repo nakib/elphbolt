@@ -64,7 +64,7 @@ module interactions
   
 contains
   
-  pure real(r64) function gchimp2_TF(el, crys, qcrys, evec_k, evec_kp)
+  pure real(r64) function gchimp2_TF(el, crys, qcart, evec_k, evec_kp)
     !! Function to calculate the Thomas Fermi screened squared 
     !! electron-charged impurity vertex
     !!
@@ -74,15 +74,13 @@ contains
 
     type(crystal), intent(in) :: crys
     type(electron), intent(in) :: el
-    real(r64), intent(in) :: qcrys(3)
+    real(r64), intent(in) :: qcart(3)
     complex(r64),intent(in) :: evec_k(:), evec_kp(:)
 
-    real(r64) :: qcart(3), prefac, overlap, Gsum, &
+    real(r64) :: prefac, overlap, Gsum, &
          Gplusq(3), eps_3x3(3, 3)
     integer :: ik1, ik2, ik3
         
-    qcart = matmul(crys%reclattvecs, qcrys)
-    
     !This is [U(k')U^\dagger(k)]_nm squared
     !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
     overlap = (abs(dot_product(evec_kp, evec_k)))**2
@@ -93,44 +91,38 @@ contains
     Gsum = 0.0_r64
     !Use a safe range for the G vector sums
     !This is likely a severe overkill...
-    do ik1 = -3, 3
-       do ik2 = -3, 3
-          do ik3 = -3, 3
-             Gplusq = (  ik1*crys%reclattvecs(:, 1) &
-                  + ik2*crys%reclattvecs(:, 2) &
-                  + ik3*crys%reclattvecs(:, 3)  ) + qcart
+    do concurrent(ik1 = -3:3, ik2 = -3:3, ik3 = -3:3)
+       Gplusq = (  ik1*crys%reclattvecs(:, 1) &
+            + ik2*crys%reclattvecs(:, 2) &
+            + ik3*crys%reclattvecs(:, 3)  ) + qcart
 
-             !Following Eq. 7 of Nat. Comm. 12:2222 (2021)
-             !G + q dependent dielectric function
-             eps_3x3 = (crys%epsilon0 + (crys%qTF/twonorm(Gplusq))**2)*eye(3_i64)
+       !Following Eq. 7 of Nat. Comm. 12:2222 (2021)
+       !G + q dependent TF dielectric function
+       eps_3x3 = (crys%epsilon0 + (crys%qTF/twonorm(Gplusq))**2)*eye(3_i64)
 
-             !Only want G /= -q in the sum over G
-             if(all(Gplusq /= 0)) Gsum = Gsum + &
-                  1.0_r64/(dot_product(Gplusq, matmul(eps_3x3, Gplusq)))**2
-          end do
-       end do
+       !Only want G /= -q in the sum over G
+       if(all(Gplusq /= 0)) Gsum = Gsum + &
+            1.0_r64/(dot_product(Gplusq, matmul(eps_3x3, Gplusq)))**2
     end do
 
     gchimp2_TF = prefac*overlap*Gsum !ev^2
   end function gchimp2_TF
 
-  pure real(r64) function gchimp2_RPA(el, crys, qcrys, evec_k, evec_kp, X0_qw)
+  pure real(r64) function gchimp2_RPA(el, crys, qcart, evec_k, evec_kp, X0_qw)
     !! Function to calculate the RPA screened squared electron-charged 
     !! impurity vertex.
 
     type(crystal), intent(in) :: crys
     type(electron), intent(in) :: el
-    real(r64), intent(in) :: qcrys(3)
+    real(r64), intent(in) :: qcart(3)
     complex(r64), intent(in) :: X0_qw
     complex(r64),intent(in) :: evec_k(:), evec_kp(:)
 
-    real(r64) :: qcart(3), prefac, overlap, Gsum, &
+    real(r64) :: prefac, overlap, Gsum, &
          Gplusq(3)
     complex(r64) :: eps_3x3(3, 3)
     integer :: ik1, ik2, ik3
         
-    qcart = matmul(crys%reclattvecs, qcrys)
-    
     !This is [U(k')U^\dagger(k)]_nm squared
     overlap = (abs(dot_product(evec_kp, evec_k)))**2
 
@@ -140,36 +132,32 @@ contains
     Gsum = 0.0_r64
     !Use a safe range for the G vector sums
     !This is likely a severe overkill...
-    do ik1 = -3, 3
-       do ik2 = -3, 3
-          do ik3 = -3, 3
-             Gplusq = (  ik1*crys%reclattvecs(:, 1) &
-                  + ik2*crys%reclattvecs(:, 2) &
-                  + ik3*crys%reclattvecs(:, 3)  ) + qcart
+    do concurrent(ik1 = -3:3, ik2 = -3:3, ik3 = -3:3)
+       Gplusq = (  ik1*crys%reclattvecs(:, 1) &
+            + ik2*crys%reclattvecs(:, 2) &
+            + ik3*crys%reclattvecs(:, 3)  ) + qcart
 
-             !G + q dependent dielectric function
-             eps_3x3 = (crys%epsilon0 - prefac*X0_qw/twonorm(Gplusq)**2)*eye(3_i64)
+       !G + q dependent RPA dielectric function
+       eps_3x3 = (crys%epsilon0 - qe/perm0*X0_qw/twonorm(Gplusq)**2)*eye(3_i64)
 
-             !Only want G /= -q in the sum over G
-             if(all(Gplusq /= 0)) Gsum = Gsum + &
-                  abs(1.0_r64/dot_product(Gplusq, matmul(eps_3x3, Gplusq)))**2
-          end do
-       end do
+       !Only want G /= -q in the sum over G
+       if(all(Gplusq /= 0)) Gsum = Gsum + &
+                 abs(1.0_r64/dot_product(Gplusq, matmul(eps_3x3, Gplusq)))**2
     end do
 
     gchimp2_RPA = prefac*overlap*Gsum !ev^2
   end function gchimp2_RPA
   
-  pure real(r64) function gCoul2_TF(el, crys, qcrys, evec_k, evec_kp)
+  pure real(r64) function gCoul2_TF(el, crys, qcart, evec_k, evec_kp)
     !! Function to calculate the Thomas-Fermi screened
     !! squared electron-electron vertex.
 
     type(crystal), intent(in) :: crys
     type(electron), intent(in) :: el
-    real(r64), intent(in) :: qcrys(3)
+    real(r64), intent(in) :: qcart(3)
     complex(r64), intent(in) :: evec_k(:), evec_kp(:)
 
-    real(r64) :: qcart(3), prefac, overlap, screened_qTF_sq
+    real(r64) :: prefac, overlap, screened_qTF_sq
     real(r64) :: Gsum, Gplusq(3)
     integer :: ik1, ik2, ik3
 
@@ -177,9 +165,6 @@ contains
     !Sanborn's prescription.
     prefac = 1.0e18_r64/crys%volume**2*qe**2/(crys%epsiloninf*perm0)**2
 
-    !Transfer wave vector in Cartesian coordinates
-    qcart = matmul(crys%reclattvecs, qcrys)
-    
     !This is [U(k')U^\dagger(k)]_nm squared
     !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
     overlap = (abs(dot_product(evec_kp, evec_k)))**2
@@ -205,24 +190,21 @@ contains
     gCoul2_TF = Gsum*prefac*overlap
   end function gCoul2_TF
 
-  pure real(r64) function gCoul2_RPA(el, crys, qcrys, evec_k, evec_kp, X0_qw)
+  pure real(r64) function gCoul2_RPA(el, crys, qcart, evec_k, evec_kp, X0_qw)
     !! Function to calculate the RPA screened squared electron-electron vertex.
 
     type(crystal), intent(in) :: crys
     type(electron), intent(in) :: el
-    real(r64), intent(in) :: qcrys(3)
+    real(r64), intent(in) :: qcart(3)
     complex(r64), intent(in) :: X0_qw
     complex(r64), intent(in) :: evec_k(:), evec_kp(:)
 
-    real(r64) :: qcart(3), prefac, W_qw_msq, overlap
+    real(r64) :: prefac, W_qw_msq, overlap
     complex(r64) :: diel_qw
     real(r64) :: Gplusq(3), Gplusq_2normsq 
     integer(i64) :: ik1, ik2, ik3
 
     prefac = 1.0e9_r64*qe/(perm0*crys%epsiloninf) ! ev.nm
-
-    !Wave vector in Cartesian coordinates
-    qcart = matmul(crys%reclattvecs, qcrys)
 
     !This is [U(k')U^\dagger(k)]_nm squared
     !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
@@ -2392,7 +2374,7 @@ contains
     if(keep_interaction_tally) &
          allocate(istate_el2(nprocs), istate_el3(nprocs), istate_el4(nprocs))
 
-    if(num%elel_screening_type == 'RPA') then
+    if(num%col_screening_type == 'RPA') then
        !Allocate and create continuous energy mesh over around the Fermi shell
        allocate(Omegas_cont(num%ncont_mesh), specX0_cont(num%ncont_mesh), &
             ImX0_cont(num%ncont_mesh), ReX0_cont(num%ncont_mesh))
@@ -2482,7 +2464,7 @@ contains
                       if(abs(en4 - el%enref) > el%fsthick) cycle
 
                       if(.not. screening_computed) then
-                         if(num%elel_screening_type == 'RPA') then
+                         if(num%col_screening_type == 'RPA') then
                             !Calculate polarizablity
                             call spectral_head_polarizability_3d_q(&
                                  ImX0_cont, Omegas_cont, q_vec, el, crys, num%tetrahedra)
@@ -2497,8 +2479,8 @@ contains
                       if(.not. g2_computed) then
                          ! Squared matrix element screened by Thomas-Fermi or RPA dielectric.
                          ! q = 0 divergence case is handled by the Thomas-Fermi screening.
-                         if(all(q_vec%frac == 0) .or. num%elel_screening_type == 'TF') then
-                            g2 = gCoul2_TF(el, crys, q_vec%frac, &
+                         if(all(q_vec%cart == 0) .or. num%col_screening_type == 'TF') then
+                            g2 = gCoul2_TF(el, crys, q_vec%cart, &
                                  el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :))
                          else
                             !Interpolating polarizability from continuous mesh to sampling energy
@@ -2506,7 +2488,7 @@ contains
                                  + oneI*interpolator_1d([(en1 - en3)], Omegas_cont, ImX0_cont)
                             X0_qw = temp(1)
 
-                            g2 = gCoul2_RPA(el, crys, q_vec%frac, &
+                            g2 = gCoul2_RPA(el, crys, q_vec%cart, &
                                  el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :), X0_qw)
                          end if
 
@@ -2607,7 +2589,7 @@ contains
     !Total number of IBZ blocks states
     nstates_irred = el%nwv_irred*el%numbands
     
-    if(num%elel_screening_type == 'RPA') then
+    if(num%col_screening_type == 'RPA') then
        !Allocate and create continuous energy mesh over around the Fermi shell
        allocate(Omegas_cont(num%ncont_mesh), specX0_cont(num%ncont_mesh), &
             ImX0_cont(num%ncont_mesh), ReX0_cont(num%ncont_mesh))
@@ -2635,7 +2617,7 @@ contains
           if(abs(en_el - el%enref) > el%fsthick) cycle
 
           !Initial (IBZ blocks) wave vector (crystal coords.)
-          k = el%wavevecs_irred(ik, :)
+          !k = el%wavevecs_irred(ik, :)   ! previous implementation
           k_vec = vec(el%indexlist_irred(ik), el%wvmesh, crys%reclattvecs)
 
           !Initialize eligible process counter for this state
@@ -2644,18 +2626,18 @@ contains
           !Run over final (FBZ blocks) electron wave vectors
           do ikp = 1, el%nwv
              !Final wave vector (crystal coords.)
-             kp = el%wavevecs(ikp, :)
+             !kp = el%wavevecs(ikp, :) !previous implementation
              kp_vec = vec(el%indexlist(ikp), el%wvmesh, crys%reclattvecs)
              !q \equiv kp - k
              q_vec = vec_sub(kp_vec, k_vec, el%wvmesh, crys%reclattvecs)
              
-             ! Test
+             ! Previous implementation
              !k_indvec = nint(k*el%wvmesh)
              !kp_indvec = nint(kp*el%wvmesh)
              !q_indvec = kp_indvec - k_indvec !0-based index vector
              !q_crys = q_indvec/dble(el%wvmesh) 
 
-             if(num%elel_screening_type == 'RPA') then
+             if(num%col_screening_type == 'RPA') then
                 !Calculate polarizablity
                 call spectral_head_polarizability_3d_q(&
                      ImX0_cont, Omegas_cont, q_vec, el, crys, num%tetrahedra)
@@ -2674,10 +2656,9 @@ contains
                 count = count + 1
 
                 ! Squared matrix element screened by Thomas-Fermi or RPA dielectric.
-                ! q = 0 divergence case is handled by the Thomas-Fermi screening.
-                if(all(q_vec%frac == 0) .or. num%elel_screening_type == 'TF') then
+                if(num%col_screening_type == 'TF') then
                    !Calculate matrix element
-                   g2 = gchimp2_TF(el, crys, q_vec%frac, &
+                   g2 = gchimp2_TF(el, crys, q_vec%cart, &
                      el%evecs_irred(ik, m, :), el%evecs(ikp, n, :))
                 else
                    !Interpolating polarizability from continuous mesh to sampling energy
@@ -2685,7 +2666,7 @@ contains
                         + oneI*interpolator_1d([(en_el_p - en_el)], Omegas_cont, ImX0_cont)
                    X0_qw = temp(1)
 
-                   g2 = gchimp2_RPA(el, crys, q_vec%frac, &
+                   g2 = gchimp2_RPA(el, crys, q_vec%cart, &
                      el%evecs_irred(ik, m, :), el%evecs(ikp, n, :), X0_qw)
                 end if
 
