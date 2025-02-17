@@ -2567,7 +2567,7 @@ contains
     character(len = 1024) :: filename
     real(r64), allocatable :: Omegas_cont(:), specX0_cont(:), ImX0_cont(:), &
          ReX0_cont(:)
-    complex(r64) :: temp(1), X0_qw 
+    complex(r64) :: temp(1), X0_qw0 
     type(vec) :: kp_vec, k_vec, q_vec
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
     integer(i64) :: k_indvec(3), kp_indvec(3), q_indvec(3)
@@ -2644,6 +2644,11 @@ contains
                 ImX0_cont = -pi*ImX0_cont
 
                 call hilbert_transform(-ImX0_cont, ReX0_cont)
+                
+                !Interpolating polarizability from continuous mesh to sampling energy
+                temp = interpolator_1d([0.0_r64], Omegas_cont, ReX0_cont) &
+                     + oneI*interpolator_1d([0.0_r64], Omegas_cont, ImX0_cont)
+                X0_qw0 = temp(1)
              end if
              !Run over final electron bands
              do n = 1, el%numbands
@@ -2657,17 +2662,11 @@ contains
 
                 ! Squared matrix element screened by Thomas-Fermi or RPA dielectric.
                 if(num%Coulomb_screening_type == 'TF') then
-                   !Calculate matrix element
                    g2 = gchimp2_TF(el, crys, q_vec%cart, &
                      el%evecs_irred(ik, m, :), el%evecs(ikp, n, :))
                 else
-                   !Interpolating polarizability from continuous mesh to sampling energy
-                   temp = interpolator_1d([(en_el_p - en_el)], Omegas_cont, ReX0_cont) &
-                        + oneI*interpolator_1d([(en_el_p - en_el)], Omegas_cont, ImX0_cont)
-                   X0_qw = temp(1)
-
                    g2 = gchimp2_RPA(el, crys, q_vec%cart, &
-                     el%evecs_irred(ik, m, :), el%evecs(ikp, n, :), X0_qw)
+                     el%evecs_irred(ik, m, :), el%evecs(ikp, n, :), X0_qw0)
                 end if
 
                 !Evaulate delta function
