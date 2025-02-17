@@ -106,7 +106,7 @@ module numerics_module
      !! Use electron-charged impurity scattering?
      logical :: elel
      !! Use electron-electron scattering?
-     character(len = 3) :: col_screening_type
+     character(len = 3) :: Coulomb_screening_type
      !! Type of Coulomb screening
      integer(i64) :: ncont_mesh
      !! Size of the continuous mesh needed for calculating RPA dielectric
@@ -173,7 +173,7 @@ contains
     real(r64) :: fsthick, conv_thres, ph_en_min, ph_en_max, el_en_min, el_en_max, Bfield(3)
     character(len = 1024) :: datadumpdir, tag
     character(len = 6) :: phiso_1B_theory
-    character(len = 3) :: col_screening_type
+    character(len = 3) :: Coulomb_screening_type
     character(len = 1) :: numcols
     logical :: read_gq2, read_gk2, read_V, read_W, tetrahedra, phe, phiso, phsubs, &
          phbound, phdef_Tmat, onlyphbte, onlyebte, elchimp, elbound, drag, plot_along_path, &
@@ -185,7 +185,7 @@ contains
          conv_thres, drag, elchimp, plot_along_path, runlevel, ph_en_min, ph_en_max, &
          ph_en_num, el_en_min, el_en_max, el_en_num, phbound, elbound, phdef_Tmat, &
          ph_mfp_npts, ph_abs_q_npts, phthinfilm, phthinfilm_ballistic, &
-         fourph, fourph_mesh_ref, use_Wannier_ifc2s, elel, col_screening_type, ncont_mesh,&
+         fourph, fourph_mesh_ref, use_Wannier_ifc2s, elel, Coulomb_screening_type, ncont_mesh,&
          phiso_Tmat, phiso_1B_theory, Bfield_on, Bfield, W_OTF, Y_OTF, &
          solve_bulk, solve_nano
 
@@ -219,7 +219,7 @@ contains
     onlyebte = .false.
     elchimp = .false.
     elel = .false.
-    col_screening_type = 'TF'
+    Coulomb_screening_type = 'TF'
     ncont_mesh = 51
     elbound = .false.
     drag = .true.
@@ -277,8 +277,8 @@ contains
     end if
     
     if(elel .or. elchimp) then
-       if((col_screening_type /= "RPA") .and. (col_screening_type /= "TF")) then
-          call exit_with_message("col_screening_type can be either 'RPA' or 'TF'. Exiting.")
+       if((Coulomb_screening_type /= "RPA") .and. (Coulomb_screening_type /= "TF")) then
+          call exit_with_message("Coulomb_screening_type can be either 'RPA' or 'TF'. Exiting.")
        end if
     end if
 
@@ -333,7 +333,7 @@ contains
        self%onlyebte = onlyebte
        self%elchimp = elchimp
        self%elel = elel
-       self%col_screening_type = trim(col_screening_type)
+       self%Coulomb_screening_type = trim(Coulomb_screening_type)
        self%ncont_mesh = ncont_mesh
        self%elbound = elbound
        self%drag = drag
@@ -512,8 +512,8 @@ contains
           write(*, "(A, L)") "Include el-charged impurity interaction: ", self%elchimp
           write(*, "(A, L)") "Include el-el interaction: ", self%elel
           if(self%elel .or. self%elchimp) then
-             write(*, "(A, A)") "Type of Coulomb screening: ", trim(self%col_screening_type)
-             if(self%col_screening_type == 'RPA') then
+             write(*, "(A, A)") "Type of Coulomb screening: ", trim(self%Coulomb_screening_type)
+             if(self%Coulomb_screening_type == 'RPA') then
                 write(*, "(A, I5)") "Size of continuous energy mesh: ", self%ncont_mesh
              end if
           end if

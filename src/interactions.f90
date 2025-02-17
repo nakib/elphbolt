@@ -2374,7 +2374,7 @@ contains
     if(keep_interaction_tally) &
          allocate(istate_el2(nprocs), istate_el3(nprocs), istate_el4(nprocs))
 
-    if(num%col_screening_type == 'RPA') then
+    if(num%Coulomb_screening_type == 'RPA') then
        !Allocate and create continuous energy mesh over around the Fermi shell
        allocate(Omegas_cont(num%ncont_mesh), specX0_cont(num%ncont_mesh), &
             ImX0_cont(num%ncont_mesh), ReX0_cont(num%ncont_mesh))
@@ -2464,7 +2464,7 @@ contains
                       if(abs(en4 - el%enref) > el%fsthick) cycle
 
                       if(.not. screening_computed) then
-                         if(num%col_screening_type == 'RPA') then
+                         if(num%Coulomb_screening_type == 'RPA') then
                             !Calculate polarizablity
                             call spectral_head_polarizability_3d_q(&
                                  ImX0_cont, Omegas_cont, q_vec, el, crys, num%tetrahedra)
@@ -2479,7 +2479,7 @@ contains
                       if(.not. g2_computed) then
                          ! Squared matrix element screened by Thomas-Fermi or RPA dielectric.
                          ! q = 0 divergence case is handled by the Thomas-Fermi screening.
-                         if(all(q_vec%cart == 0) .or. num%col_screening_type == 'TF') then
+                         if(all(q_vec%cart == 0) .or. num%Coulomb_screening_type == 'TF') then
                             g2 = gCoul2_TF(el, crys, q_vec%cart, &
                                  el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :))
                          else
@@ -2589,7 +2589,7 @@ contains
     !Total number of IBZ blocks states
     nstates_irred = el%nwv_irred*el%numbands
     
-    if(num%col_screening_type == 'RPA') then
+    if(num%Coulomb_screening_type == 'RPA') then
        !Allocate and create continuous energy mesh over around the Fermi shell
        allocate(Omegas_cont(num%ncont_mesh), specX0_cont(num%ncont_mesh), &
             ImX0_cont(num%ncont_mesh), ReX0_cont(num%ncont_mesh))
@@ -2637,7 +2637,7 @@ contains
              !q_indvec = kp_indvec - k_indvec !0-based index vector
              !q_crys = q_indvec/dble(el%wvmesh) 
 
-             if(num%col_screening_type == 'RPA') then
+             if(num%Coulomb_screening_type == 'RPA') then
                 !Calculate polarizablity
                 call spectral_head_polarizability_3d_q(&
                      ImX0_cont, Omegas_cont, q_vec, el, crys, num%tetrahedra)
@@ -2656,7 +2656,7 @@ contains
                 count = count + 1
 
                 ! Squared matrix element screened by Thomas-Fermi or RPA dielectric.
-                if(num%col_screening_type == 'TF') then
+                if(num%Coulomb_screening_type == 'TF') then
                    !Calculate matrix element
                    g2 = gchimp2_TF(el, crys, q_vec%cart, &
                      el%evecs_irred(ik, m, :), el%evecs(ikp, n, :))
