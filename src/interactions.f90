@@ -84,7 +84,7 @@ contains
     !This is [U(k')U^\dagger(k)]_nm squared
     !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
     overlap = (abs(dot_product(evec_kp, evec_k)))**2
-
+    
     prefac = 1.0e-3_r64/crys%volume/perm0**2*&
          (el%chimp_conc_n*(qe*el%Zn)**2 + el%chimp_conc_p*(qe*el%Zp)**2)
 
@@ -2549,6 +2549,9 @@ contains
   subroutine calculate_echimp_interaction_ibzk(crys, el, num)
     !! Parallel driver of |g_e-chimp(k,k')|^2 over IBZ electron states.
     !!
+    !! crys Crystal data type
+    !! el Electron data type
+    !! num Numerics data type
     !
     !In the FBZ and IBZ blocks a wave vector was retained when at least one
     !band belonged within the energy window. Here the bands outside the energy
@@ -2561,7 +2564,7 @@ contains
     !Local variables
     integer(i64) :: nstates_irred, istate, m, ik, n, ikp, &
          start, end, chunk, count, nprocs, num_active_images
-    real(r64) :: k(3), kp(3), q_crys(3), const, en_el, en_el_p, delta, g2
+    real(r64) :: const, en_el, en_el_p, delta, g2
     real(r64), allocatable :: Xchimp_istate(:)
     integer(i64), allocatable :: istate_el(:)
     character(len = 1024) :: filename
@@ -2570,7 +2573,6 @@ contains
     complex(r64) :: temp(1), X0_qw 
     type(vec) :: kp_vec, k_vec, q_vec
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
-    integer(i64) :: k_indvec(3), kp_indvec(3), q_indvec(3)
 
     call print_message("Calculating e-ch. imp. transition probabilities for all IBZ electrons...")
 
@@ -2617,7 +2619,6 @@ contains
           if(abs(en_el - el%enref) > el%fsthick) cycle
 
           !Initial (IBZ blocks) wave vector (crystal coords.)
-          !k = el%wavevecs_irred(ik, :)   ! previous implementation
           k_vec = vec(el%indexlist_irred(ik), el%wvmesh, crys%reclattvecs)
 
           !Initialize eligible process counter for this state
@@ -2626,16 +2627,10 @@ contains
           !Run over final (FBZ blocks) electron wave vectors
           do ikp = 1, el%nwv
              !Final wave vector (crystal coords.)
-             !kp = el%wavevecs(ikp, :) !previous implementation
              kp_vec = vec(el%indexlist(ikp), el%wvmesh, crys%reclattvecs)
+             
              !q \equiv kp - k
              q_vec = vec_sub(kp_vec, k_vec, el%wvmesh, crys%reclattvecs)
-             
-             ! Previous implementation
-             !k_indvec = nint(k*el%wvmesh)
-             !kp_indvec = nint(kp*el%wvmesh)
-             !q_indvec = kp_indvec - k_indvec !0-based index vector
-             !q_crys = q_indvec/dble(el%wvmesh) 
 
              if(num%Coulomb_screening_type == 'RPA') then
                 !Calculate polarizablity
@@ -2645,10 +2640,12 @@ contains
 
                 call hilbert_transform(-ImX0_cont, ReX0_cont)
              end if
+             
              !Run over final electron bands
              do n = 1, el%numbands
                 ! Energy of final electron
                 en_el_p = el%ens(ikp, n)
+                
                 !Apply energy window to final electron
                 if(abs(en_el_p - el%enref) > el%fsthick) cycle
                 
@@ -2659,7 +2656,7 @@ contains
                 if(num%Coulomb_screening_type == 'TF') then
                    !Calculate matrix element
                    g2 = gchimp2_TF(el, crys, q_vec%cart, &
-                     el%evecs_irred(ik, m, :), el%evecs(ikp, n, :))
+                        el%evecs_irred(ik, m, :), el%evecs(ikp, n, :))
                 else
                    !Interpolating polarizability from continuous mesh to sampling energy
                    temp = interpolator_1d([(en_el_p - en_el)], Omegas_cont, ReX0_cont) &
@@ -2675,7 +2672,7 @@ contains
                      el%simplex_count, el%simplex_evals)
 
                 !Save Xchimp (just the out-scattering part)
-                Xchimp_istate(count) = g2 * delta
+                Xchimp_istate(count) = g2*delta
 
                 !Save final electron state
                 istate_el(count) = mux_state(el%numbands, n, ikp)

@@ -5,4 +5,4 @@
 FORBLASLAPACK_DIR="~/.local/lib/"
 
 export FPM_FC=caf
-export FPM_FFLAGS="-g -O3 -fPIC -fbounds-check -Wunused -Wconversion -Wunderflow -Wdo-subscript -L $FORBLASLAPACK_DIR"
+export FPM_FFLAGS="-g -O2 -fPIC -fbounds-check -Wunused -Wconversion -Wunderflow -Wdo-subscript -L $FORBLASLAPACK_DIR"
