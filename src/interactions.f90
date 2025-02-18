@@ -172,11 +172,7 @@ contains
     ! Pre screened Thomas Fermi wavevector squared, to match Sanborn's prescription 
     screened_qTF_sq = crys%qTF**2/crys%epsiloninf
 
-    !So far, we have been ignoring the G /= G' terms
-    !
-    !TODO for DP: Add the off-diagonal contributions 
-    !Note that we don't have to calculate all the G, G' terms, just
-    !the upper triangle will suffice.
+    !Here ignore local field effects. That is, epsilon^{-1}(G /= G') = 0. 
     Gsum = 0.0_r64
     do concurrent(ik1 = -1:1, ik2 = -1:1, ik3 = -1:1)
        Gplusq = (ik1*crys%reclattvecs(:, 1) &
@@ -210,11 +206,7 @@ contains
     !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
     overlap = (abs(dot_product(evec_kp, evec_k)))**2
     
-    !So far, we have been ignoring the G /= G' terms
-    !
-    !TODO for DP: Add the off-diagonal contributions
-    !Note that we don't have to calculate all the G, G' terms, just
-    !the upper triangle will suffice.
+    !Here ignore local field effects. That is, epsilon^{-1}(G /= G') = 0. 
     W_qw_msq = 0.0_r64
     do concurrent(ik1 = -1:1, ik2 = -1:1, ik3 = -1:1)
        Gplusq = (ik1*crys%reclattvecs(:, 1) &
