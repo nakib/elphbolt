@@ -87,6 +87,8 @@ module electron_module
      !! Ionization number of acceptor dopant.
      real(r64), allocatable :: scissor(:)
      !! Scissor operator (eV)
+     real(r64), allocatable :: split_off(:)
+     !! Splitt off operator (eV)
      logical :: metallic
      !! Is the system metallic?
      character(len = 1) :: dopingtype
@@ -123,7 +125,7 @@ contains
     type(numerics), intent(in) :: num
 
     !Local variables
-    real(r64) :: enref, Zn, Zp, chempot, scissor 
+    real(r64) :: enref, Zn, Zp, chempot, scissor, split_off(4) 
     real(r64), allocatable :: Tlist(:), conclist(:)
     integer(i64) :: ib, spindeg, numbands, indlowband, indhighband, &
          indlowconduction, indhighvalence, numT, numconc
@@ -134,7 +136,7 @@ contains
     namelist /electrons/ enref, spindeg, numbands, &
          indlowband, indhighband, metallic, chempot, Zn, Zp, &
          indlowconduction, indhighvalence, dopingtype, numT, numconc, &
-         Tlist, conclist, scissor
+         Tlist, conclist, scissor, split_off
          
     call subtitle("Setting up electrons...")
     
@@ -152,6 +154,7 @@ contains
     Zn = 0.0_r64
     Zp = 0.0_r64
     scissor = 0.0_r64
+    split_off = [0.0, 0.0, 0.0, 0.0]*1.0_r64
     chempot = -999999.99999_r64 !Something crazy
     enref = -999999.99999_r64 !Something crazy
     numT = 100 !Something crazy big
@@ -255,6 +258,8 @@ contains
     if (.not. metallic .and. self%indlowconduction > self%indhighvalence) then
       self%scissor(self%indlowconduction:wann%numwannbands) = scissor
     end if
+
+    self%split_off = split_off
     
     !Print out information.
     if(this_image() == 1) then
@@ -362,7 +367,7 @@ contains
          self%vels_irred(self%nwv_irred, wann%numwannbands, 3), &
          self%evecs_irred(self%nwv_irred, wann%numwannbands, wann%numwannbands))
     call wann%el_wann(crys, self%nwv_irred, self%wavevecs_irred, self%ens_irred, &
-         self%vels_irred, self%evecs_irred,self%scissor)
+         self%vels_irred, self%evecs_irred,self%scissor, self%split_off)
     
     ! 4. Map out FBZ quantities from IBZ ones
     call print_message("Mapping out FBZ energies...")
