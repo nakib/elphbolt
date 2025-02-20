@@ -125,7 +125,7 @@ contains
     type(numerics), intent(in) :: num
 
     !Local variables
-    real(r64) :: enref, Zn, Zp, chempot, scissor, split_off(4) 
+    real(r64) :: enref, Zn, Zp, chempot, scissor, split_off(20) 
     real(r64), allocatable :: Tlist(:), conclist(:)
     integer(i64) :: ib, spindeg, numbands, indlowband, indhighband, &
          indlowconduction, indhighvalence, numT, numconc
@@ -154,7 +154,7 @@ contains
     Zn = 0.0_r64
     Zp = 0.0_r64
     scissor = 0.0_r64
-    split_off = [0.0, 0.0, 0.0, 0.0]*1.0_r64
+    split_off = 0.0_r64
     chempot = -999999.99999_r64 !Something crazy
     enref = -999999.99999_r64 !Something crazy
     numT = 100 !Something crazy big
@@ -259,7 +259,8 @@ contains
       self%scissor(self%indlowconduction:wann%numwannbands) = scissor
     end if
 
-    self%split_off = split_off
+    allocate(self%split_off(wann%numwannbands))
+    self%split_off(:) = split_off(1:numbands)
     
     !Print out information.
     if(this_image() == 1) then
@@ -280,6 +281,7 @@ contains
           write(*, "(A, 1E16.8, A)") "Scissor operator = ", &
             self%scissor(self%indlowconduction) , " eV"
        end if
+       write(*, "(A, *(F10.3))") "Split_off operator(in eV) = ", self%split_off
     end if
     
     !Calculate electrons
@@ -367,7 +369,7 @@ contains
          self%vels_irred(self%nwv_irred, wann%numwannbands, 3), &
          self%evecs_irred(self%nwv_irred, wann%numwannbands, wann%numwannbands))
     call wann%el_wann(crys, self%nwv_irred, self%wavevecs_irred, self%ens_irred, &
-         self%vels_irred, self%evecs_irred,self%scissor, self%split_off)
+         self%vels_irred, self%evecs_irred, self%scissor, self%split_off)
     
     ! 4. Map out FBZ quantities from IBZ ones
     call print_message("Mapping out FBZ energies...")
@@ -448,7 +450,7 @@ contains
     allocate(self%evecs(self%nwv, wann%numwannbands, wann%numwannbands))
     allocate(el_ens_tmp(self%nwv, wann%numwannbands), el_vels_tmp(self%nwv, wann%numwannbands, 3))
     call wann%el_wann(crys, self%nwv, self%wavevecs, el_ens_tmp, el_vels_tmp, &
-      self%evecs,self%scissor)
+      self%evecs, self%scissor, self%split_off)
     deallocate(el_ens_tmp, el_vels_tmp) !free up memory
     
     ! 8. Find IBZ of energy window restricted blocks
@@ -491,7 +493,7 @@ contains
          self%vels_irred(self%nwv_irred, wann%numwannbands, 3), &
          self%evecs_irred(self%nwv_irred, wann%numwannbands, wann%numwannbands))
     call wann%el_wann(crys, self%nwv_irred, self%wavevecs_irred, self%ens_irred, &
-         self%vels_irred, self%evecs_irred,self%scissor)
+         self%vels_irred, self%evecs_irred, self%scissor, self%split_off)
     
     ! 10. Calculate the number of FBZ blocks electronic states
     !     available for scattering
@@ -590,14 +592,14 @@ contains
             self%simplicial_complex, self%simplex_count, &
             self%simplex_map, .true., self%indexlist)
        call fill_tetrahedra_3d(self%simplicial_complex, self%ens, self%simplex_evals, &
-            wann, crys, self%wvmesh, self%scissor)
+            wann, crys, self%wvmesh, self%scissor, self%split_off)
     else
        call print_message("Calculating electron mesh triangles...")
        call form_triangles(self%nwv, self%wvmesh, &
             self%simplicial_complex, self%simplex_count, &
             self%simplex_map, .true., self%indexlist)
        call fill_triangles(self%simplicial_complex, self%ens, self%simplex_evals, &
-            wann, crys, self%wvmesh, self%scissor)
+            wann, crys, self%wvmesh, self%scissor, self%split_off)
     end if
   end subroutine calculate_electrons
 
