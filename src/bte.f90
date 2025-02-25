@@ -34,7 +34,8 @@ module bte_module
   use electron_module, only: electron
   use interactions, only: calculate_ph_rta_rates, read_transition_probs_e, &
        calculate_el_rta_rates, calculate_bound_scatt_rates, calculate_thinfilm_scatt_rates, &
-       calculate_4ph_rta_rates, calculate_W3ph_OTF, calculate_Y_OTF, calculate_Xee_OTF
+       calculate_4ph_rta_rates, calculate_W3ph_OTF, calculate_Y_OTF, calculate_Xee_OTF, &
+       calculate_Xee_13_OTF
   use bz_sums, only: calculate_transport_coeff, calculate_spectral_transport_coeff, &
        calculate_cumulative_transport_coeff
 
@@ -1224,6 +1225,223 @@ contains
     end do
   end subroutine iterate_bte_ph
 
+!!$  subroutine iterate_bte_el(num, el, crys, rta_rates_ibz, field_term, &
+!!$       response_el, ph_drag_term)
+!!$    !! Subroutine to iterate the electron BTE one step.
+!!$    !! 
+!!$    !! T Temperature in K
+!!$    !! drag Is drag included?
+!!$    !! el Electron object
+!!$    !! sym Symmetry
+!!$    !! rta_rates_ibz Electron RTA scattering rates
+!!$    !! field_term Electron field coupling term
+!!$    !! response_el Electron response function
+!!$    !! ph_drag_term Phonon drag term
+!!$    
+!!$    type(electron), intent(in) :: el
+!!$    type(numerics), intent(in) :: num
+!!$    type(crystal), intent(in) :: crys
+!!$    real(r64), intent(in) :: rta_rates_ibz(:,:), field_term(:,:,:)
+!!$    real(r64), intent(in), optional :: ph_drag_term(:,:,:)
+!!$    real(r64), intent(inout) :: response_el(:,:,:)
+!!$
+!!$    !Local variables
+!!$    integer(i64) :: nstates_irred, nprocs, chunk, istate, numbands, numbranches, &
+!!$         ik_ibz, m, ieq, ik_sym, ik_fbz, iproc, ikp, n, nk, num_active_images, &
+!!$         aux, aux2, aux3, aux4, start, end, nprocs_echimp, neg_ik_fbz, nprocs_ee, &
+!!$         n2, n3, n4, ik2, ik3, ik4
+!!$    integer :: i, j
+!!$    integer(i64), allocatable :: istate_el(:), istate_ph(:), istate_el_echimp(:), &
+!!$         istate_el_ee2(:), istate_el_ee3(:), istate_el_ee4(:)
+!!$         
+!!$    real(r64) :: tau_ibz, Bfield_unit_factor, eps
+!!$    real(r64), allocatable :: Xphplus(:), Xphminus(:),  Xchimp(:), Xee(:), &
+!!$         response_el_reduce(:,:,:), Delk_response(:, :, :, :), scratch(:, :)
+!!$    character(1024) :: filepath_Xphminus, filepath_Xphplus, filepath_Xechimp, tag
+!!$
+!!$    !Factor to make B-field term have units of
+!!$    !C.nm for the E-field BTE and
+!!$    !eV.nm/K for the gradT-field BTE.
+!!$    Bfield_unit_factor = 1.0e-6_r64/hbar_eVps
+!!$    
+!!$    !Set output directory of transition probilities
+!!$    write(tag, "(E9.3)") crys%T
+!!$    
+!!$    !Number of electron bands
+!!$    numbands = size(rta_rates_ibz(1,:))
+!!$
+!!$    !Number of in-window FBZ wave vectors
+!!$    nk = size(field_term(:,1,1))
+!!$
+!!$    !Total number of IBZ states
+!!$    nstates_irred = size(rta_rates_ibz(:,1))*numbands
+!!$
+!!$    if(present(ph_drag_term)) then
+!!$       !Number of phonon branches
+!!$       numbranches = size(ph_drag_term(1,:,1))
+!!$    end if
+!!$
+!!$    !Bfield related
+!!$    !Allocate Jacobian of response function
+!!$    if(num%Bfield_on) allocate(Delk_response(nk, numbands, 3, 3))
+!!$
+!!$    allocate(scratch(numbands, 3))
+!!$    
+!!$    !Allocate and initialize response reduction array
+!!$    allocate(response_el_reduce(nk, numbands, 3))
+!!$    response_el_reduce(:,:,:) = 0.0_r64
+!!$    
+!!$    !Divide electron states among images
+!!$    call distribute_points(nstates_irred, chunk, start, end, num_active_images)
+!!$
+!!$    !Compute the Jacobian of the electronic response
+!!$    if(num%Bfield_on) then
+!!$       !print*, 'B-field is on. B-field = ', num%Bfield
+!!$       !TODO The call below will be parallel and blocking.
+!!$       call Jacobian(response_el, Delk_response, crys%lattvecs, &
+!!$            el%wvmesh, el%indexlist, crys%dim, blocks = .true.)
+!!$    end if
+!!$    
+!!$    !Only work with the active images
+!!$    if(this_image() <= num_active_images) then
+!!$       !Run over electron IBZ states
+!!$       do istate = start, end
+!!$          !Demux state index into band (m) and wave vector (ik_ibz) indices
+!!$          call demux_state(istate, numbands, m, ik_ibz)
+!!$          
+!!$          !Apply energy window to initial (IBZ blocks) electron
+!!$          if(abs(el%ens_irred(ik_ibz, m) - el%enref) > el%fsthick) cycle
+!!$
+!!$          !RTA lifetime
+!!$          tau_ibz = 0.0_r64
+!!$          if(rta_rates_ibz(ik_ibz, m) /= 0.0_r64) then
+!!$             tau_ibz = 1.0_r64/rta_rates_ibz(ik_ibz, m)
+!!$          end if
+!!$          
+!!$          !Set X+ filename
+!!$          write(tag, '(I9)') istate
+!!$          filepath_Xphplus = trim(adjustl(num%Xdir))//'/Xplus.istate'//trim(adjustl(tag))
+!!$
+!!$          !Read X+ from file
+!!$          call read_transition_probs_e(trim(adjustl(filepath_Xphplus)), nprocs, Xphplus, &
+!!$               istate_el, istate_ph)
+!!$
+!!$          !Set X- filename
+!!$          write(tag, '(I9)') istate
+!!$          filepath_Xphminus = trim(adjustl(num%Xdir))//'/Xminus.istate'//trim(adjustl(tag))
+!!$
+!!$          !Read X- from file
+!!$          call read_transition_probs_e(trim(adjustl(filepath_Xphminus)), nprocs, Xphminus)
+!!$
+!!$          !Read Xchimp from file
+!!$          if(num%elchimp) then
+!!$             !Set Xchimp filename
+!!$             write(tag, '(I9)') istate
+!!$             filepath_Xechimp = trim(adjustl(num%Xdir))//'/Xchimp.istate'//trim(adjustl(tag))
+!!$             call read_transition_probs_e(trim(adjustl(filepath_Xechimp)), nprocs_echimp, Xchimp, &
+!!$                  istate_el_echimp)
+!!$          end if
+!!$          
+!!$          !Electron-electron transition rates (for now on-the-fly computation)
+!!$          if(num%elel) then
+!!$             call calculate_Xee_OTF(el, num, istate, crys, Xee, &
+!!$                  istate_el_ee2, istate_el_ee3, istate_el_ee4)
+!!$             nprocs_ee = size(Xee)
+!!$          end if
+!!$          
+!!$          !Sum over the number of equivalent k-points of the IBZ point
+!!$          do ieq = 1, el%nequiv(ik_ibz)
+!!$             ik_sym = el%ibz2fbz_map(ieq, ik_ibz, 1) !symmetry
+!!$             call binsearch(el%indexlist, el%ibz2fbz_map(ieq, ik_ibz, 2), ik_fbz)
+!!$
+!!$             !Sum over scattering processes
+!!$             do iproc = 1, nprocs
+!!$                !Grab the final electron and, if needed, the interacting phonon
+!!$                call demux_state(istate_el(iproc), numbands, n, ikp)
+!!$
+!!$                !Self contribution:
+!!$
+!!$                !Find image of final electron wave vector due to the current symmetry
+!!$                call binsearch(el%indexlist, el%equiv_map(ik_sym, ikp), aux)
+!!$
+!!$                response_el_reduce(ik_fbz, m, :) = response_el_reduce(ik_fbz, m, :) + &
+!!$                     response_el(aux, n, :)*(Xphplus(iproc) + Xphminus(iproc))
+!!$             end do
+!!$             
+!!$             !Add charged impurity contribution to the self consistent term
+!!$             if(num%elchimp) then
+!!$                do iproc = 1, nprocs_echimp
+!!$                   !Grab the final electron and, if needed, the interacting phonon
+!!$                   call demux_state(istate_el_echimp(iproc), numbands, n, ikp)
+!!$                   
+!!$                   !Self contribution:
+!!$                   !Find image of final electron wave vector due to the current symmetry
+!!$                   call binsearch(el%indexlist, el%equiv_map(ik_sym, ikp), aux)
+!!$                   
+!!$                   response_el_reduce(ik_fbz, m, :) = response_el_reduce(ik_fbz, m, :) + &
+!!$                        response_el(aux, n, :) * Xchimp(iproc)
+!!$                end do
+!!$             end if
+!!$
+!!$             !Add electron-electron scattering contribution to the self consistent term
+!!$             if(num%elel) then
+!!$                do iproc = 1, nprocs_ee
+!!$                   !Electron 2
+!!$                   call demux_state(istate_el_ee2(iproc), numbands, n2, ik2)
+!!$                   !Find image of k2 due to the current symmetry
+!!$                   call binsearch(el%indexlist, el%equiv_map(ik_sym, ik2), aux2)
+!!$
+!!$                   !Electron 3
+!!$                   call demux_state(istate_el_ee3(iproc), numbands, n3, ik3)
+!!$                   !Find image of k3 due to the current symmetry
+!!$                   call binsearch(el%indexlist, el%equiv_map(ik_sym, ik3), aux3)
+!!$
+!!$                   !Electron 4
+!!$                   call demux_state(istate_el_ee4(iproc), numbands, n4, ik4)
+!!$                   !Find image of k4 due to the current symmetry
+!!$                   call binsearch(el%indexlist, el%equiv_map(ik_sym, ik4), aux4)
+!!$                   
+!!$                   response_el_reduce(ik_fbz, m, :) = response_el_reduce(ik_fbz, m, :) + &
+!!$                        Xee(iproc)*(-response_el(aux2, n2, :) + response_el(aux3, n3, :) + &
+!!$                                     response_el(aux4, n4, :))
+!!$                end do
+!!$             end if
+!!$
+!!$             !B-field term
+!!$             if(num%Bfield_on) then
+!!$                response_el_reduce(ik_fbz, m, :) = response_el_reduce(ik_fbz, m, :) + &
+!!$                     Bfield_unit_factor*matmul( &
+!!$                     Delk_response(ik_fbz, m, :, :), cross_product(el%vels(ik_fbz, m, :), num%Bfield))
+!!$             end if
+!!$             
+!!$             !Iterate BTE
+!!$             response_el_reduce(ik_fbz, m, :) = field_term(ik_fbz, m, :) + &
+!!$                  response_el_reduce(ik_fbz, m, :)*tau_ibz
+!!$          end do
+!!$       end do
+!!$    end if
+!!$    
+!!$    !Update the response function
+!!$    call co_sum(response_el_reduce)
+!!$    response_el = response_el_reduce
+!!$    
+!!$    if(present(ph_drag_term)) then
+!!$       !Drag contribution:
+!!$       response_el(:,:,:) = response_el(:,:,:) + ph_drag_term(:,:,:)
+!!$    end if
+!!$
+!!$    !TODO The following has to be generalized in the presence of a B-field
+!!$    if(.not. num%Bfield_on) then
+!!$       !Symmetrize response function
+!!$       do ik_fbz = 1, nk
+!!$          response_el(ik_fbz, :, :) = transpose(&
+!!$               matmul(el%symmetrizers(:, :, ik_fbz), transpose(response_el(ik_fbz, :, :))))
+!!$       end do
+!!$    else
+!!$       !TODO
+!!$    end if
+!!$  end subroutine iterate_bte_el
+
   subroutine iterate_bte_el(num, el, crys, rta_rates_ibz, field_term, &
        response_el, ph_drag_term)
     !! Subroutine to iterate the electron BTE one step.
@@ -1245,17 +1463,18 @@ contains
     real(r64), intent(inout) :: response_el(:,:,:)
 
     !Local variables
-    integer(i64) :: nstates_irred, nprocs, chunk, istate, numbands, numbranches, &
+    integer(i64) :: nstates_irred, nstates, nprocs, chunk, istate, istate3, numbands, numbranches, &
          ik_ibz, m, ieq, ik_sym, ik_fbz, iproc, ikp, n, nk, num_active_images, &
          aux, aux2, aux3, aux4, start, end, nprocs_echimp, neg_ik_fbz, nprocs_ee, &
-         n2, n3, n4, ik2, ik3, ik4
+         nprocs_ee_13, n2, n3, n4, ik2, ik3, ik4
     integer :: i, j
     integer(i64), allocatable :: istate_el(:), istate_ph(:), istate_el_echimp(:), &
          istate_el_ee2(:), istate_el_ee3(:), istate_el_ee4(:)
          
     real(r64) :: tau_ibz, Bfield_unit_factor, eps
-    real(r64), allocatable :: Xphplus(:), Xphminus(:),  Xchimp(:), Xee(:), &
+    real(r64), allocatable :: Xphplus(:), Xphminus(:),  Xchimp(:), Xee(:), Xee_13(:), &
          response_el_reduce(:,:,:), Delk_response(:, :, :, :), scratch(:, :)
+    integer(i64), allocatable :: ik1_image_array(:), ik3_image_array(:)
     character(1024) :: filepath_Xphminus, filepath_Xphplus, filepath_Xechimp, tag
 
     !Factor to make B-field term have units of
@@ -1274,6 +1493,9 @@ contains
 
     !Total number of IBZ states
     nstates_irred = size(rta_rates_ibz(:,1))*numbands
+
+    !Total number of FBZ states
+    nstates = el%nwv*numbands
 
     if(present(ph_drag_term)) then
        !Number of phonon branches
@@ -1300,6 +1522,8 @@ contains
        call Jacobian(response_el, Delk_response, crys%lattvecs, &
             el%wvmesh, el%indexlist, crys%dim, blocks = .true.)
     end if
+
+    allocate(ik1_image_array(maxval(el%nequiv)), ik3_image_array(maxval(el%nequiv)))
     
     !Only work with the active images
     if(this_image() <= num_active_images) then
@@ -1340,18 +1564,66 @@ contains
              call read_transition_probs_e(trim(adjustl(filepath_Xechimp)), nprocs_echimp, Xchimp, &
                   istate_el_echimp)
           end if
+
+          !Precompute image of k1 due to the all symmetries
+          do ieq = 1, el%nequiv(ik_ibz)
+             call binsearch(el%indexlist, el%ibz2fbz_map(ieq, ik_ibz, 2), ik1_image_array(ieq))
+          end do
           
-          !Electron-electron transition rates (for now on-the-fly computation)
+          !Treat the e-e scattering in a special way for the sake of using less memory
           if(num%elel) then
-             call calculate_Xee_OTF(el, num, istate, crys, Xee, &
-                  istate_el_ee2, istate_el_ee3, istate_el_ee4)
-             nprocs_ee = size(Xee)
+             do istate3 = 1, nstates !over FBZ blocks states
+                !Demux state index into band (n3) and wave vector (ik3) indices
+                call demux_state(istate3, numbands, n3, ik3)
+
+                !Apply energy window to 3rd (FBZ blocks) electron
+                if(abs(el%ens(ik3, n3) - el%enref) > el%fsthick) cycle
+
+                !Calculate all the transition rates of processes involving states 1 and 3
+                call calculate_Xee_13_OTF(el, num, istate, istate3, crys, Xee_13, &
+                     istate_el_ee2, istate_el_ee4)
+
+                !Number of such allowed processes
+                nprocs_ee_13 = size(Xee_13)
+
+                !Precompute image of k3 due to the all symmetries
+                do ieq = 1, el%nequiv(ik_ibz)
+                   ik_sym = el%ibz2fbz_map(ieq, ik_ibz, 1) !symmetry
+                   call binsearch(el%indexlist, el%equiv_map(ik_sym, ik3), ik3_image_array(ieq))
+                end do
+
+                !Add electron-electron scattering contribution to the self consistent term
+                do ieq = 1, el%nequiv(ik_ibz)
+                   ik_sym = el%ibz2fbz_map(ieq, ik_ibz, 1) !symmetry
+                   ik_fbz = ik1_image_array(ieq)
+
+                   !Electron 3
+                   !Fetch image of k3 due to the current symmetry from precomputed list
+                   aux3 = ik3_image_array(ieq)
+                   
+                   do iproc = 1, nprocs_ee_13
+                      !Electron 2
+                      call demux_state(istate_el_ee2(iproc), numbands, n2, ik2)
+                      !Find image of k2 due to the current symmetry
+                      call binsearch(el%indexlist, el%equiv_map(ik_sym, ik2), aux2)
+
+                      !Electron 4
+                      call demux_state(istate_el_ee4(iproc), numbands, n4, ik4)
+                      !Find image of k4 due to the current symmetry
+                      call binsearch(el%indexlist, el%equiv_map(ik_sym, ik4), aux4)
+
+                      response_el_reduce(ik_fbz, m, :) = response_el_reduce(ik_fbz, m, :) + &
+                           Xee_13(iproc)*(-response_el(aux2, n2, :) + response_el(aux3, n3, :) + &
+                           response_el(aux4, n4, :))
+                   end do
+                end do
+             end do
           end if
           
           !Sum over the number of equivalent k-points of the IBZ point
           do ieq = 1, el%nequiv(ik_ibz)
              ik_sym = el%ibz2fbz_map(ieq, ik_ibz, 1) !symmetry
-             call binsearch(el%indexlist, el%ibz2fbz_map(ieq, ik_ibz, 2), ik_fbz)
+             ik_fbz = ik1_image_array(ieq)
 
              !Sum over scattering processes
              do iproc = 1, nprocs
@@ -1382,30 +1654,6 @@ contains
                 end do
              end if
 
-             !Add electron-electron scattering contribution to the self consistent term
-             if(num%elel) then
-                do iproc = 1, nprocs_ee
-                   !Electron 2
-                   call demux_state(istate_el_ee2(iproc), numbands, n2, ik2)
-                   !Find image of k2 due to the current symmetry
-                   call binsearch(el%indexlist, el%equiv_map(ik_sym, ik2), aux2)
-
-                   !Electron 3
-                   call demux_state(istate_el_ee3(iproc), numbands, n3, ik3)
-                   !Find image of k3 due to the current symmetry
-                   call binsearch(el%indexlist, el%equiv_map(ik_sym, ik3), aux3)
-
-                   !Electron 4
-                   call demux_state(istate_el_ee4(iproc), numbands, n4, ik4)
-                   !Find image of k4 due to the current symmetry
-                   call binsearch(el%indexlist, el%equiv_map(ik_sym, ik4), aux4)
-                   
-                   response_el_reduce(ik_fbz, m, :) = response_el_reduce(ik_fbz, m, :) + &
-                        Xee(iproc)*(-response_el(aux2, n2, :) + response_el(aux3, n3, :) + &
-                                     response_el(aux4, n4, :))
-                end do
-             end if
-
              !B-field term
              if(num%Bfield_on) then
                 response_el_reduce(ik_fbz, m, :) = response_el_reduce(ik_fbz, m, :) + &
@@ -1421,9 +1669,7 @@ contains
     end if
     
     !Update the response function
-    sync all
     call co_sum(response_el_reduce)
-    sync all
     response_el = response_el_reduce
     
     if(present(ph_drag_term)) then
@@ -1442,7 +1688,7 @@ contains
        !TODO
     end if
   end subroutine iterate_bte_el
-
+  
   subroutine calculate_phonon_drag(num, el, ph, idc, widc, sym, rta_rates_ibz, response_ph, &
                                    ph_drag_term)
     !! Subroutine to calculate the phonon drag term.
