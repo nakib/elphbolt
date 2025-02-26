@@ -130,14 +130,14 @@ contains
     end do
   end function eye
 
-  pure function permtutations(N)
+  pure function permutations(N)
     !! Returns all permutations of an array of size N
 
     integer(i64), intent(in) :: N
     integer(i64) :: permutations(N)
 
     !TODO
-  end function permtutations
+  end function permutations
   
   subroutine linspace(grid, min, max, num)
     !! Create equidistant grid.
