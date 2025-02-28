@@ -2863,20 +2863,21 @@ contains
                 !Increment g2 processes counter
                 count = count + 1
 
-                if(.not. screening_computed) then
-                   if(num%Coulomb_screening_type == 'RPA') then
-                      !Calculate polarizablity
-                      call spectral_head_polarizability_3d_q(&
-                           ImX0_cont, Omegas_cont, q_vec, el, crys, num%tetrahedra)
-                      ImX0_cont = -pi*ImX0_cont
+                if(.not. screening_computed &
+                     .and. num%Coulomb_screening_type == 'RPA') then
+                   !Calculate polarizablity
+                   call spectral_head_polarizability_3d_q(&
+                        ImX0_cont, Omegas_cont, q_vec, el, crys, num%tetrahedra)
+                   ImX0_cont = -pi*ImX0_cont
 
-                      call hilbert_transform(-ImX0_cont, ReX0_cont)
-                      
-                      !Interpolating polarizability from continuous mesh to sampling energy
-                      temp = interpolator_1d([0.0_r64], Omegas_cont, ReX0_cont) &
-                           + oneI*interpolator_1d([0.0_r64], Omegas_cont, ImX0_cont)
-                      X0_qw0 = temp(1)
-                   end if
+                   call hilbert_transform(-ImX0_cont, ReX0_cont)
+
+                   !Interpolating polarizability from continuous mesh to sampling energy
+                   temp = interpolator_1d([0.0_r64], Omegas_cont, ReX0_cont) &
+                        + oneI*interpolator_1d([0.0_r64], Omegas_cont, ImX0_cont)
+                   X0_qw0 = temp(1)
+
+                   !Update screening_computed
                    screening_computed = .true.
                 end if
 
