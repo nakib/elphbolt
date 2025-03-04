@@ -130,91 +130,78 @@ contains
     end do
   end function eye
   
- !factorial(N)
- pure function factorial(N) result(fact)
-        implicit none
-        integer(i64), intent(in) :: N
-        integer(i64) :: fact, i
-        
-        ! Handle edge case for factorial(0) = 1
-        if (n == 0) then
-            fact = 1
-            return
-        end if
+  ! Permutations function
+  pure function permutations(N) result(perms)
+    !! Returns the number of permutations of N
+     
+    integer(i64), intent(in) :: N
+    integer(i64) :: fact, perm_count
+    integer(i64), allocatable :: perms(:,:)
+    integer(i64) :: p(N), dir(N)
+    integer(i64) :: i, t, q, s, temp
 
-        fact = 1
-        do i = 2, N
-            fact = fact * i
-        end do
-    end function factorial
-       
- ! Permutations function
-    pure function permutations(N) result(perms)
-        implicit none
-        integer(i64), intent(in) :: N
-        integer(i64) :: fact, perm_count
-        integer(i64), allocatable :: perms(:,:)
-        integer(i64) :: p(N), dir(N)
-        integer(i64) :: i, t, q, s, temp
-        fact = factorial(N)
-        allocate(perms(fact, N))
+    ! Use gamma function to compute factorial(N) as gamma(N)=(N-1)!
+    fact = int(gamma(real(N+1, kind=8)))
 
-! Initialize permutation array
+    allocate(perms(fact, N))
+
+    ! Initialize permutation array
     do i = 1, N
-        p(i) = i
-        dir(i) = -1  ! -1 means left, 1 means right
+       p(i) = i
+       dir(i) = -1  ! -1 means left, 1 means right
     end do
 
     perm_count = 1
     perms(perm_count, :) = p
-    
+
     do
-        q = 0
-        t = 0
+       q = 0
+       t = 0
 
- !loop to find largest mobile element
-        do i = 1, N
-            if (dir(i) == -1 .and. i > 1) then
-                if (p(i) > p(i-1) .and. p(i) > q) then
-                    q = p(i)
-                    t = i
-                end if
-            else if (dir(i) == 1 .and. i < N) then
-                if (p(i) > p(i+1) .and. p(i) > q) then
-                    q = p(i)
-                    t = i
-                end if
-            end if
-        end do
+       ! Loop to find the largest mobile element
+       do i = 1, N
+          if (dir(i) == -1 .and. i > 1) then
+             if (p(i) > p(i-1) .and. p(i) > q) then
+                q = p(i)
+                t = i
+             end if
+          else if (dir(i) == 1 .and. i < N) then
+             if (p(i) > p(i+1) .and. p(i) > q) then
+                q = p(i)
+                t = i
+             end if
+          end if
+       end do
 
-        ! If no mobile element found, exit
-        if (q == 0) exit
+       ! If no mobile element found, exit
+       if (q == 0) exit
 
-        ! Compute new position safely
-        s = t + dir(t)
+       ! Compute new position safely
+       s = t + dir(t)
 
-        ! Ensure s stays within valid bounds
-        if (s < 1 .or. s > N) exit
+       ! Ensure s stays within valid bounds
+       if (s < 1 .or. s > N) exit
 
-        ! Swap p(t) and p(s)
-        temp = p(t)
-        p(t) = p(s)
-        p(s) = temp
+       ! Swap p(t) and p(s)
+       temp = p(t)
+       p(t) = p(s)
+       p(s) = temp
 
-        ! Swap directions
-        temp = dir(t)
-        dir(t) = dir(s)
-        dir(s) = temp
+       ! Swap directions
+       temp = dir(t)
+       dir(t) = dir(s)
+       dir(s) = temp
 
-        perm_count = perm_count + 1
-        perms(perm_count, :) = p
+       perm_count = perm_count + 1
+       perms(perm_count, :) = p
 
-        ! Reverse direction of all elements larger than q
-        do i = 1, N
-            if (p(i) > q) dir(i) = -dir(i)
-        end do
+       ! Reverse direction of all elements larger than q
+       do i = 1, N
+          if (p(i) > q) dir(i) = -dir(i)
+       end do
     end do
-end function permutations 
+  end function permutations
+
     
   subroutine linspace(grid, min, max, num)
     !! Create equidistant grid.
