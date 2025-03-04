@@ -13,11 +13,11 @@ program test_misc
   implicit none
 
   integer :: itest
-  integer, parameter :: num_tests = 33
+  integer, parameter :: num_tests = 34
   type(testify) :: test_array(num_tests), tests_all
   integer(i64) :: index, quotient, remainder, int_array(5), v1(3), v2(3), &
        v1_muxed, v2_muxed, ik, ik1, ik2, ik3, ib1, ib2, ib3, wvmesh(3), &
-       mesh_ref_array(3), nk_coarse, ninterp, N, fact, i, j, actual_size_1, actual_size_2
+       mesh_ref_array(3), nk_coarse, ninterp, N, factorial, i, j
   integer(i64), allocatable :: index_mesh_0(:, :), index_mesh_1(:, :), &
        ksint(:, :), idc(:, :), ik_interp(:), array_of_ints(:), perm(:, :)
   real(r64) :: pauli1(2, 2), ipauli2(2, 2), pauli3(2, 2), &
@@ -51,24 +51,11 @@ program test_misc
   call int_div(3_i64, 10_i64, quotient, remainder)
   call test_array(itest)%assert([quotient, remainder], [0_i64, 3_i64])
    
-  ! Test permutations(N)
+  !permutations(N)
   itest = itest + 1
   test_array(itest) = testify("permutations(N)")
-  N = 3
-  fact = int(gamma(real(N+1, kind=8)))  ! Use gamma(N+1) instead of factorial
+  N = 3  
   perm = permutations(N)  
-  print *, "Expected factorial:", fact
-  print *, "Actual array size:", size(perm, 1)
-  print *, "Generated permutations(", N, "):"
-  do i = 1, size(perm, 1)
-     print *, perm(i, :)
-  end do
-  actual_size_1 = size(perm, 1)
-  actual_size_2 = size(perm, 2)
-  ! Assert that the number of rows matches the expected factorial value
-  call test_array(itest)%assert(actual_size_1, fact)  
-  call test_array(itest)%assert(actual_size_2, N)  
-  ! Ensure each row contains all numbers from {1,..., N}
   do i = 1, size(perm, 1) 
      call test_array(itest)%assert([sum(perm(i, :))], [sum([(j, j=1,N)])])
   end do

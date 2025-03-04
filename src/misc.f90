@@ -133,72 +133,74 @@ contains
   ! Permutations function
   pure function permutations(N) result(perms)
     !! Returns the number of permutations of N
-     
+
     integer(i64), intent(in) :: N
-    integer(i64) :: fact, perm_count
+    integer(i64) :: factorial, perm_count
     integer(i64), allocatable :: perms(:,:)
-    integer(i64) :: p(N), dir(N)
-    integer(i64) :: i, t, q, s, temp
+    integer(i64) :: perm_array(N), dir(N)
+    integer(i64) :: i, largest_mobile_index, largest_mobile_value, swap_index, temp_value
 
-    ! Use gamma function to compute factorial(N) as gamma(N)=(N-1)!
-    fact = int(gamma(real(N+1, kind=8)))
+    ! Gamma function to compute factorial(N) as Gamma(N)=(N-1)!
+    factorial = int(Gamma(real(N + 1)))
 
-    allocate(perms(fact, N))
+    allocate(perms(factorial, N))
 
     ! Initialize permutation array
     do i = 1, N
-       p(i) = i
+       perm_array(i) = i
        dir(i) = -1  ! -1 means left, 1 means right
     end do
 
     perm_count = 1
-    perms(perm_count, :) = p
+    perms(perm_count, :) = perm_array
 
     do
-       q = 0
-       t = 0
+       largest_mobile_value = 0
+       largest_mobile_index = 0
 
-       ! Loop to find the largest mobile element
-       do i = 1, N
-          if (dir(i) == -1 .and. i > 1) then
-             if (p(i) > p(i-1) .and. p(i) > q) then
-                q = p(i)
-                t = i
-             end if
-          else if (dir(i) == 1 .and. i < N) then
-             if (p(i) > p(i+1) .and. p(i) > q) then
-                q = p(i)
-                t = i
-             end if
-          end if
-       end do
 
-       ! If no mobile element found, exit
-       if (q == 0) exit
+    ! Search for the largest mobile element
+    do i = 1, N
+       if (dir(i) == -1 .and. i > 1) then
+           if (perm_array(i) > perm_array(i-1) .and. perm_array(i) > largest_mobile_value) then
+                largest_mobile_value = perm_array(i)
+                largest_mobile_index = i
+           end if
+       else if (dir(i) == 1 .and. i < N) then
+           if (perm_array(i) > perm_array(i+1) .and. perm_array(i) > largest_mobile_value) then
+                largest_mobile_value = perm_array(i)
+                largest_mobile_index = i
+           end if
+       end if
+    end do
 
-       ! Compute new position safely
-       s = t + dir(t)
 
-       ! Ensure s stays within valid bounds
-       if (s < 1 .or. s > N) exit
+    ! If no mobile element found, exit
+       if (largest_mobile_value == 0) exit
 
-       ! Swap p(t) and p(s)
-       temp = p(t)
-       p(t) = p(s)
-       p(s) = temp
+    ! Compute new position
+    swap_index = largest_mobile_index + dir(largest_mobile_index)
 
-       ! Swap directions
-       temp = dir(t)
-       dir(t) = dir(s)
-       dir(s) = temp
+    ! Ensure swap index stays within valid bounds
+       if (swap_index < 1 .or. swap_index > N) exit
 
-       perm_count = perm_count + 1
-       perms(perm_count, :) = p
+    ! Swap perm_array(largest_mobile_index) and perm_array(swap_index)
+    temp_value = perm_array(largest_mobile_index)
+    perm_array(largest_mobile_index) = perm_array(swap_index)
+    perm_array(swap_index) = temp_value
 
-       ! Reverse direction of all elements larger than q
-       do i = 1, N
-          if (p(i) > q) dir(i) = -dir(i)
-       end do
+    ! Swap directions
+    temp_value = dir(largest_mobile_index)
+    dir(largest_mobile_index) = dir(swap_index)
+    dir(swap_index) = temp_value
+
+    perm_count = perm_count + 1
+    perms(perm_count, :) = perm_array
+
+    ! Reverse direction of all elements larger than the largest mobile value
+    do i = 1, N
+       if (perm_array(i) > largest_mobile_value) dir(i) = -dir(i)
+    end do
     end do
   end function permutations
 
