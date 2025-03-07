@@ -130,14 +130,12 @@ contains
     end do
   end function eye
   
-  !Permutations function
   pure function permutations(N) result(perms)
-    !! N Number of elements to permute.
-    !!
-    !! Returns the permutations of a list of N elements
+    !! Returns the permutations of a list of N elements.
     !! Each consecutive permutation in the sequence is formed by swapping two adjacent elements from the previous one
-    !! using Johnson and Trotter algorithm 
-    !! using chap.7 of Combinatorial algorithm (Albert Nijenhuis et al.)
+    !! using Johnson and Trotter algorithm as described in chap.7 of Combinatorial algorithm (Albert Nijenhuis et al.)
+    !!
+    !! N Number of elements to permute.
 
     integer(i64), intent(in) :: N
     integer(i64) :: num_perms, perm_count
