@@ -64,12 +64,12 @@ The source is heavily commented and can be auto-documented with ~FORD~ (https://
 
 *** 3. Get ~OpenCoarrays~
     
-~OpenCoarrays~ ([[http://www.opencoarrays.org]]) is an implementation of the ~coarrays~ functionalities. Follow its installation guide to build it on your system. I personally like to use its install script where I pass my compiler explicitly. So something like the following should work. ~Opencoarrays~ will internally download a compatible MPI implementation. 
+~OpenCoarrays~ ([[http://www.opencoarrays.org]]) is an implementation of the ~coarrays~ functionalities. Follow its installation guide to build it on your system. I personally like to use its install script where I pass my compiler explicitly. So something like the following should work. ~Opencoarrays~ will internally download a compatible MPI implementation. It is advisable that you remove any other MPI implementation (OpenMPI or MPICH) that you might have accessible on your system before running the following script. At the moment the combination of `gfortran-12` with `OpenCoarrays v2.9.3` should work.
 
      #+BEGIN_SRC bash
-     ./install.sh --with-fortran <path to>/gfortran \
-     --with-cxx <path to>/g++ \
-     --with-c <path to>/gcc
+     ./install.sh --with-fortran <path to>/gfortran-12 \
+     --with-cxx <path to>/g++-12 \
+     --with-c <path to>/gcc-12
      #+END_SRC
 
 Carefully read the output on the screen and add the paths to ~caf~ and ~cafrun~ to your ~$PATH~. At this point, check the outputs of 

@@ -1,6 +1,7 @@
 - Core team
   - Nakib H. Protik (maintainer)
   - Dwaipayan Paul
+  - Sally Issa
 
 - External contributors
    - Xavier Cartoixà Soler
