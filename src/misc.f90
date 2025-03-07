@@ -157,7 +157,7 @@ contains
     perm_count = 1
     perms(:, perm_count) = perm_array  
 
-    do while (perm_count < factorial)
+    do while(perm_count < factorial)
        largest_mobile_value = 0
        largest_mobile_index = 0
 
