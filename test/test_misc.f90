@@ -13,7 +13,7 @@ program test_misc
   implicit none
 
   integer :: itest
-  integer, parameter :: num_tests = 34
+  integer, parameter :: num_tests = 35
   type(testify) :: test_array(num_tests), tests_all
   integer(i64) :: index, quotient, remainder, int_array(5), v1(3), v2(3), &
        v1_muxed, v2_muxed, ik, ik1, ik2, ik3, ib1, ib2, ib3, wvmesh(3), &
@@ -53,13 +53,22 @@ program test_misc
    
   !permutations(N)
   itest = itest + 1
-  test_array(itest) = testify("permutations(N)")
+  test_array(itest) = testify("permutations of 3 elements")
   N = 3  
   perm = permutations(N)  
-  do i = 1, size(perm, 1) 
-     call test_array(itest)%assert([sum(perm(i, :))], [sum([(j, j=1,N)])])
-  end do
-  deallocate(perm)
+  call test_array(itest)%assert(reshape(perm, [6*3]), [ &
+       1, 2, 3, 1, 3, 2, 3, 1, 2, 3, 2, 1, 2, 3, 1,  2, 1, 3]*1_i64)
+
+  itest =  itest + 1 
+  test_array(itest) = testify("permutations of 4 elements")
+  N=4
+  perm = permutations(N)
+  call test_array(itest)%assert(reshape(perm, [24*4]), [ &
+       1, 2, 3, 4,  1, 2, 4, 3,  1, 4, 2, 3,  4, 1, 2, 3,  4, 1, 3, 2,  1, 4, 3, 2, &
+       1, 3, 4, 2,  1, 3, 2, 4,  3, 1, 2, 4,  3, 1, 4, 2,  3, 4, 1, 2,  4, 3, 1, 2, &
+       4, 3, 2, 1,  3, 4, 2, 1,  3, 2, 4, 1,  3, 2, 1, 4,  2, 3, 1, 4,  2, 3, 4, 1, &
+       2, 4, 3, 1,  4, 2, 3, 1,  4, 2, 1, 3,  2, 4, 1, 3,  2, 1, 4, 3,  2, 1, 3, 4 &
+       ]*1_i64)
 
   !distribute_points
   !TODO This is a coarray dependent test. Will revisit.
