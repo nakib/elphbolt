@@ -779,9 +779,10 @@ contains
           end do
           !Correct "drag" part
           I_drag = self%el_response_T - I_diff
-          
-          call correct_I_drag(I_drag, sum(trans%ph_alphabyT, dim = 1), lambda)
-          self%el_response_T = I_diff + I_drag*spread(spread(lambda, dim=1, ncopies=size(I_drag,1)), dim=2, ncopies=size(I_drag,2))
+          call correct_I_drag(I_drag, trace(sum(trans%ph_alphabyT, dim = 1))/crys%dim, lambda)
+          self%el_response_T = I_diff + lambda*I_drag
+          !call correct_I_drag_expt(I_drag, sum(trans%ph_alphabyT, dim = 1), lambda)
+          !self%el_response_T = I_diff + I_drag*spread(spread(lambda, dim=1, ncopies=size(I_drag,1)), dim=2, ncopies=size(I_drag,2))
 
           !Calculate electron transport coefficients
           call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
@@ -877,6 +878,39 @@ contains
   contains
 
      subroutine correct_I_drag(I_drag, constraint, lambda)
+      !! Subroutine to find scaling correction to I_drag.
+
+      real(r64), intent(in) :: I_drag(:,:,:), constraint
+      real(r64), intent(out) :: lambda
+
+      !Internal variables
+      integer(i64) :: it, maxiter
+      real(r64) :: a, b, sigmaS(size(I_drag(1,:,1)), 3, 3),&
+           thresh, sigmaS_scalar, dummy(size(I_drag(1,:,1)), 3, 3)
+
+      a = 0.0_r64 !lower bound
+      b = 2.0_r64 !upper bound
+      maxiter = 100
+      thresh = 1.0e-6_r64
+      do it = 1, maxiter
+         lambda = 0.5_r64*(a + b)
+         !Calculate electron transport coefficients
+         call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
+              el%ens, el%vels, crys%volume, el%wvmesh, lambda*I_drag, sym, &
+              dummy, sigmaS)         
+         sigmaS_scalar = trace(sum(sigmaS, dim = 1))/crys%dim
+
+         if(abs(sigmaS_scalar - constraint) < thresh) then
+            exit
+         else if(abs(sigmaS_scalar) < abs(constraint)) then
+            a = lambda
+         else
+            b = lambda
+         end if
+      end do
+     end subroutine correct_I_drag
+
+     subroutine correct_I_drag_expt(I_drag, constraint, lambda)
           !! Subroutine to find scaling correction to I_drag.
           
           real(r64), intent(in) :: I_drag(:,:,:), constraint(3,3)
@@ -888,8 +922,8 @@ contains
                thresh, sigmaS_mat(3,3), dummy(size(I_drag(1,:,1)), 3, 3)
           logical :: flag_conv
 
-          a = (/0.0_r64, 0.0_r64, 0.0_r64/) !lower bound
-          b = (/2.0_r64, 2.0_r64, 2.0_r64/) !upper bound
+          a = [0.0_r64, 0.0_r64, 0.0_r64] !lower bound
+          b = [2.0_r64, 2.0_r64, 2.0_r64] !upper bound
 
           maxiter = 100
           thresh = 1.0e-6_r64
@@ -911,11 +945,9 @@ contains
                     end if
                     flag_conv = .FALSE.
                end do
-               if (flag_conv) then
-                    exit
-               end if  
+               if (flag_conv) exit
           end do 
-     end subroutine correct_I_drag
+     end subroutine correct_I_drag_expt
 
   end subroutine dragfull_ephbtes
   
