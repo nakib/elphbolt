@@ -8,18 +8,18 @@ program test_misc
        unique, linspace, compsimps, mux_state, demux_state, demux_mesh, expm1, &
        Fermi, Bose, Pade_continued, precompute_interpolation_corners_and_weights, &
        interpolate_using_precomputed, operator(.umklapp.), shrink, Hilbert_transform, &
-       interpolator_1d
+       interpolator_1d, permutations
   
   implicit none
 
   integer :: itest
-  integer, parameter :: num_tests = 33
+  integer, parameter :: num_tests = 35
   type(testify) :: test_array(num_tests), tests_all
   integer(i64) :: index, quotient, remainder, int_array(5), v1(3), v2(3), &
        v1_muxed, v2_muxed, ik, ik1, ik2, ik3, ib1, ib2, ib3, wvmesh(3), &
-       mesh_ref_array(3), nk_coarse, ninterp
+       mesh_ref_array(3), nk_coarse, ninterp, N, i, j
   integer(i64), allocatable :: index_mesh_0(:, :), index_mesh_1(:, :), &
-       ksint(:, :), idc(:, :), ik_interp(:), array_of_ints(:)
+       ksint(:, :), idc(:, :), ik_interp(:), array_of_ints(:), perm(:, :)
   real(r64) :: pauli1(2, 2), ipauli2(2, 2), pauli3(2, 2), &
        real_array(5), result, q1(3, 4), q2(3, 4), q3(3, 4)
   real(r64), allocatable :: integrand(:), domain(:), im_axis(:), real_func(:), &
@@ -27,7 +27,7 @@ program test_misc
   real(r64), allocatable :: hfx1_even(:), hfx1_odd(:), hfx2_even(:), hfx2_odd(:), &
        ind_even(:), ind_odd(:), x_even(:), x_odd(:), xmin, xmax
   integer(i64) :: n_even, n_odd
-
+ 
   print*, '<<module misc unit tests>>'
   
   !Some data to be used in the tests below
@@ -50,6 +50,26 @@ program test_misc
   test_array(itest) = testify("int_div 3/10")
   call int_div(3_i64, 10_i64, quotient, remainder)
   call test_array(itest)%assert([quotient, remainder], [0_i64, 3_i64])
+   
+  !permutations(N)
+  itest = itest + 1
+  test_array(itest) = testify("permutations of 3 elements")
+  N = 3  
+  perm = permutations(N)  
+  call test_array(itest)%assert(reshape(perm, [6*3]), [ &
+       1, 2, 3,  1, 3, 2,  3, 1, 2,  3, 2, 1,  2, 3, 1,  2, 1, 3 &
+       ]*1_i64)
+
+  itest =  itest + 1 
+  test_array(itest) = testify("permutations of 4 elements")
+  N = 4
+  perm = permutations(N)
+  call test_array(itest)%assert(reshape(perm, [24*4]), [ &
+       1, 2, 3, 4,  1, 2, 4, 3,  1, 4, 2, 3,  4, 1, 2, 3,  4, 1, 3, 2,  1, 4, 3, 2, &
+       1, 3, 4, 2,  1, 3, 2, 4,  3, 1, 2, 4,  3, 1, 4, 2,  3, 4, 1, 2,  4, 3, 1, 2, &
+       4, 3, 2, 1,  3, 4, 2, 1,  3, 2, 4, 1,  3, 2, 1, 4,  2, 3, 1, 4,  2, 3, 4, 1, &
+       2, 4, 3, 1,  4, 2, 3, 1,  4, 2, 1, 3,  2, 4, 1, 3,  2, 1, 4, 3,  2, 1, 3, 4 &
+       ]*1_i64)
 
   !distribute_points
   !TODO This is a coarray dependent test. Will revisit.

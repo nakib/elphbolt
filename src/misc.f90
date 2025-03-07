@@ -129,16 +129,82 @@ contains
        eye(i, i) = 1
     end do
   end function eye
-
-  pure function permutations(N)
-    !! Returns all permutations of an array of size N
+  
+  !Permutations function
+  pure function permutations(N) result(perms)
+    !! N Number of elements to permute.
+    !!
+    !! Returns the permutations of a list of N elements
+    !! Each consecutive permutation in the sequence is formed by swapping two adjacent elements from the previous one
+    !! using Johnson and Trotter algorithm 
+    !! using chap.7 of Combinatorial algorithm (Albert Nijenhuis et al.)
 
     integer(i64), intent(in) :: N
-    integer(i64) :: permutations(N)
+    integer(i64) :: num_perms, perm_count
+    integer(i64), allocatable :: perms(:, :)  
+    integer(i64) :: perm_array(N), dir(N)
+    integer(i64) :: i, largest_mobile_index, largest_mobile_value, swap_index, temp_value
 
-    !TODO
+    ! Gamma function to compute number of permutations(N) as Gamma(N) = (N - 1)!
+    num_perms = int(Gamma(real(N + 1)))
+
+    allocate(perms(N, num_perms))  
+
+    ! Initialize permutation array
+    perm_array = [(i, i = 1, N)]
+    dir = -1
+
+    perm_count = 1
+    perms(:, perm_count) = perm_array  
+
+    do while(perm_count < num_perms)
+       largest_mobile_value = 0
+       largest_mobile_index = 0
+
+       ! Search for the largest mobile element
+       do i = 1, N
+          if(dir(i) == -1 .and. i > 1) then
+             if(perm_array(i) > perm_array(i - 1) .and. perm_array(i) > largest_mobile_value) then
+                largest_mobile_value = perm_array(i)
+                largest_mobile_index = i
+             end if
+          else if(dir(i) == 1 .and. i < N) then
+             if(perm_array(i) > perm_array(i + 1) .and. perm_array(i) > largest_mobile_value) then
+                largest_mobile_value = perm_array(i)
+                largest_mobile_index = i
+             end if
+          end if
+       end do
+
+       ! If no mobile element found, exit
+       if(largest_mobile_value == 0) exit
+
+       ! Calculate new position
+       swap_index = largest_mobile_index + dir(largest_mobile_index)
+
+       ! Check the swap index to avoid out of bounds errors
+       if(swap_index < 1 .or. swap_index > N) exit
+
+       ! Swap perm_array(largest_mobile_index) and perm_array(swap_index)
+       temp_value = perm_array(largest_mobile_index)
+       perm_array(largest_mobile_index) = perm_array(swap_index)
+       perm_array(swap_index) = temp_value
+
+       ! Swap directions
+       temp_value = dir(largest_mobile_index)
+       dir(largest_mobile_index) = dir(swap_index)
+       dir(swap_index) = temp_value
+
+       perm_count = perm_count + 1
+       perms(:, perm_count) = perm_array 
+
+       ! Reverse direction of all elements larger than the largest mobile value
+       do i = 1, N
+          if(perm_array(i) > largest_mobile_value) dir(i) = -dir(i)
+       end do
+    end do
   end function permutations
-  
+
   subroutine linspace(grid, min, max, num)
     !! Create equidistant grid.
 
