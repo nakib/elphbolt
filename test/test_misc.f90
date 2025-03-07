@@ -17,7 +17,7 @@ program test_misc
   type(testify) :: test_array(num_tests), tests_all
   integer(i64) :: index, quotient, remainder, int_array(5), v1(3), v2(3), &
        v1_muxed, v2_muxed, ik, ik1, ik2, ik3, ib1, ib2, ib3, wvmesh(3), &
-       mesh_ref_array(3), nk_coarse, ninterp, N, factorial, i, j
+       mesh_ref_array(3), nk_coarse, ninterp, N, i, j
   integer(i64), allocatable :: index_mesh_0(:, :), index_mesh_1(:, :), &
        ksint(:, :), idc(:, :), ik_interp(:), array_of_ints(:), perm(:, :)
   real(r64) :: pauli1(2, 2), ipauli2(2, 2), pauli3(2, 2), &
@@ -57,11 +57,12 @@ program test_misc
   N = 3  
   perm = permutations(N)  
   call test_array(itest)%assert(reshape(perm, [6*3]), [ &
-       1, 2, 3, 1, 3, 2, 3, 1, 2, 3, 2, 1, 2, 3, 1,  2, 1, 3]*1_i64)
+       1, 2, 3,  1, 3, 2,  3, 1, 2,  3, 2, 1,  2, 3, 1,  2, 1, 3 &
+       ]*1_i64)
 
   itest =  itest + 1 
   test_array(itest) = testify("permutations of 4 elements")
-  N=4
+  N = 4
   perm = permutations(N)
   call test_array(itest)%assert(reshape(perm, [24*4]), [ &
        1, 2, 3, 4,  1, 2, 4, 3,  1, 4, 2, 3,  4, 1, 2, 3,  4, 1, 3, 2,  1, 4, 3, 2, &

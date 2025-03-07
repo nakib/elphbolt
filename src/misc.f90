@@ -129,47 +129,47 @@ contains
        eye(i, i) = 1
     end do
   end function eye
-
-  ! Permutations function
+  
+  !Permutations function
   pure function permutations(N) result(perms)
+    !! N Number of elements to permute.
+    !!
     !! Returns the permutations of a list of N elements
     !! Each consecutive permutation in the sequence is formed by swapping two adjacent elements from the previous one
     !! using Johnson and Trotter algorithm 
     !! using chap.7 of Combinatorial algorithm (Albert Nijenhuis et al.)
 
     integer(i64), intent(in) :: N
-    integer(i64) :: factorial, perm_count
+    integer(i64) :: num_perms, perm_count
     integer(i64), allocatable :: perms(:, :)  
     integer(i64) :: perm_array(N), dir(N)
     integer(i64) :: i, largest_mobile_index, largest_mobile_value, swap_index, temp_value
 
-    ! Gamma function to compute factorial(N) as Gamma(N) = (N - 1)!
-    factorial = int(Gamma(real(N + 1)))
+    ! Gamma function to compute number of permutations(N) as Gamma(N) = (N - 1)!
+    num_perms = int(Gamma(real(N + 1)))
 
-    allocate(perms(N, factorial))  
+    allocate(perms(N, num_perms))  
 
     ! Initialize permutation array
-    do i = 1, N
-       perm_array(i) = i
-       dir(i) = -1  ! -1 means left, 1 means right
-    end do
+    perm_array = [(i, i = 1, N)]
+    dir = -1
 
     perm_count = 1
     perms(:, perm_count) = perm_array  
 
-    do while(perm_count < factorial)
+    do while(perm_count < num_perms)
        largest_mobile_value = 0
        largest_mobile_index = 0
 
        ! Search for the largest mobile element
        do i = 1, N
           if(dir(i) == -1 .and. i > 1) then
-             if(perm_array(i) > perm_array(i-1) .and. perm_array(i) > largest_mobile_value) then
+             if(perm_array(i) > perm_array(i - 1) .and. perm_array(i) > largest_mobile_value) then
                 largest_mobile_value = perm_array(i)
                 largest_mobile_index = i
              end if
           else if(dir(i) == 1 .and. i < N) then
-             if(perm_array(i) > perm_array(i+1) .and. perm_array(i) > largest_mobile_value) then
+             if(perm_array(i) > perm_array(i + 1) .and. perm_array(i) > largest_mobile_value) then
                 largest_mobile_value = perm_array(i)
                 largest_mobile_index = i
              end if
