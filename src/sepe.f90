@@ -172,7 +172,7 @@ contains
     !! field_term Electron field coupling term
     !! response_el Electron response function
     !! ph_drag_term Phonon drag term
-    !! ph_coherence_term Phonon drag term
+    !! ph_coherence_term Phonon drag term => H[gradT-field] or P[E-field]
 
     type(electron), intent(in) :: el
     type(numerics), intent(in) :: num
@@ -184,13 +184,15 @@ contains
     !Local variables
     integer(i64) :: nstates_irred, nprocs, chunk, istate, numbands, numbranches, &
          ik_ibz, m, ieq, ik_sym, ik_fbz, iproc, ikp, n, nk, num_active_images, &
-         aux, aux2, aux3, aux4, start, end, nprocs_echimp, neg_ik_fbz
-    integer(i64), allocatable :: istate_el(:), istate_ph(:), istate_el_echimp(:)
+         aux, aux2, aux3, aux4, start, end, nprocs_echimp, neg_ik_fbz, nprocs_phcoh
+    integer(i64), allocatable :: istate_el(:), istate_ph(:), istate_el_echimp(:), &
+         istate_el_phcoh(:), istate_ph_phcoh(:)
 
     real(r64) :: tau_ibz
     real(r64), allocatable :: Xphplus(:), Xphminus(:), Xchimp(:), &
-         response_el_reduce(:, :, :)
-    character(1024) :: filepath_Xphminus, filepath_Xphplus, filepath_Xechimp, tag
+         response_el_reduce(:, :, :), Omegaplus(:), Omegaminus(:)
+    character(1024) :: filepath_Xphminus, filepath_Xphplus, filepath_Xechimp, tag, &
+         filepath_Omegaminus, filepath_Omegaplus
 
     !Set output directory of transition probilities
     write(tag, "(E9.3)") crys%T
@@ -232,6 +234,8 @@ contains
              tau_ibz = 1.0_r64/rta_rates_ibz(ik_ibz, m)
           end if
 
+          !The e-ph (population) bit:
+          
           !Set X+ filename
           write(tag, '(I9)') istate
           filepath_Xphplus = trim(adjustl(num%Xdir))//'/Xplus.istate'//trim(adjustl(tag))
@@ -246,7 +250,26 @@ contains
 
           !Read X- from file
           call read_transition_probs_e(trim(adjustl(filepath_Xphminus)), nprocs, Xphminus)
+          
+          !The e-ph (coherence) bit:
+          
+          !Set Omega+ filename
+          write(tag, '(I9)') istate
+          filepath_Omegaplus = trim(adjustl(num%Xdir))//'/Omegaplus.istate'//trim(adjustl(tag))
 
+          !Read Omega+ from file
+          call read_transition_probs_e(trim(adjustl(filepath_Omegaplus)), nprocs_phcoh, Omegaplus, &
+               istate_el_phcoh, istate_ph_phcoh)
+
+          !Set Omega- filename
+          write(tag, '(I9)') istate
+          filepath_Omegaminus = trim(adjustl(num%Xdir))//'/Omegaminus.istate'//trim(adjustl(tag))
+
+          !Read Omega- from file
+          call read_transition_probs_e(trim(adjustl(filepath_Omegaminus)), nprocs_phcoh, Omegaminus)
+
+          !The e-ch. imp. bit:
+          
           !Read Xchimp from file
           if(num%elchimp) then
              !Set Xchimp filename
@@ -261,6 +284,8 @@ contains
              ik_sym = el%ibz2fbz_map(ieq, ik_ibz, 1) !symmetry
              call binsearch(el%indexlist, el%ibz2fbz_map(ieq, ik_ibz, 2), ik_fbz)
 
+             !The e-ph population bit:
+             
              !Sum over scattering processes
              do iproc = 1, nprocs
                 !Grab the final electron
@@ -275,6 +300,21 @@ contains
                      response_el(aux, n, :)*(Xphplus(iproc) + Xphminus(iproc))
              end do
 
+             !The e-ph coherence bit:
+             
+             !Sum over scattering processes
+             do iproc = 1, nprocs_phcoh
+                !Grab the final electron
+                call demux_state(istate_el_phcoh(iproc), numbands, n, ikp)
+
+                !Find image of final electron wave vector due to the current symmetry
+                call binsearch(el%indexlist, el%equiv_map(ik_sym, ikp), aux)
+
+                !(Note that below we use the fact that H and P are even in wave vector)
+                response_el_reduce(ik_fbz, m, :) = response_el_reduce(ik_fbz, m, :) + &
+                     response_el(aux, n, :)*(-Omegaplus(iproc) - Omegaminus(iproc))
+             end do
+             
              !Add charged impurity contribution to the self consistent term
              if(num%elchimp) then
                 do iproc = 1, nprocs_echimp
@@ -447,108 +487,108 @@ contains
     ph_drag_term = ph_drag_term_reduce
   end subroutine calculate_phonon_drag
   
-  subroutine calculate_ph_coherenece(ph, ph_coherence_term)
-    !! Computes the phonon coherence.
-    !!
-    !! ph_coherence Phonon coherence
-    
-    real(r64), intent(inout) :: ph_coherence_term(:, :)
-    
-    !Number of electron bands
-    numbands = el%numbands
-
-    !Number of in-window FBZ wave vectors
-    nk = el%nwv
-
-    !Total number of IBZ states
-    nstates_irred = el%nwv_irred*numbands
-    
-    !Number of phonon branches
-    numbranches = ph%numbands
-
-    !Allocate and initialize response reduction array
-    allocate(ph_coherence_term_reduce(nk, numbands, 3))
-    ph_drag_term_reduce(:,:,:) = 0.0_r64
-
-    !Divide electron states among images
-    call distribute_points(nstates_irred, chunk, start, end, num_active_images)
-
-    !Only work with the active images
-    if(this_image() <= num_active_images) then
-       !Run over electron IBZ states
-       do istate = start, end
-          !Demux state index into band (m) and wave vector (ik_ibz) indices
-          call demux_state(istate, numbands, m, ik_ibz)
-
-          !Apply energy window to initial (IBZ blocks) electron
-          if(abs(el%ens_irred(ik_ibz, m) - el%enref) > el%fsthick) cycle
-
-          !RTA lifetime
-          tau_ibz = 0.0_r64
-          if(rta_rates_ibz(ik_ibz, m) /= 0.0_r64) then
-             tau_ibz = 1.0_r64/rta_rates_ibz(ik_ibz, m)
-          end if
-
-          !Set X+ filename
-          write(tag, '(I9)') istate
-          filepath_Xplus = trim(adjustl(num%Xdir))//'/Xplus.istate'//trim(adjustl(tag))
-
-          !Read X+ from file
-          call read_transition_probs_e(trim(adjustl(filepath_Xplus)), nprocs, Xplus, &
-               istate_el, istate_ph)
-
-          !Set X- filename
-          write(tag, '(I9)') istate
-          filepath_Xminus = trim(adjustl(num%Xdir))//'/Xminus.istate'//trim(adjustl(tag))
-
-          !Read X- from file
-          call read_transition_probs_e(trim(adjustl(filepath_Xminus)), nprocs, Xminus)
-
-          !Sum over the number of equivalent k-points of the IBZ point
-          do ieq = 1, el%nequiv(ik_ibz)
-             ik_sym = el%ibz2fbz_map(ieq, ik_ibz, 1) !symmetry
-             call binsearch(el%indexlist, el%ibz2fbz_map(ieq, ik_ibz, 2), ik_fbz)
-
-             !Sum over scattering processes
-             do iproc = 1, nprocs
-                if(istate_ph(iproc) < 0) then !This phonon is on the (fine) electron mesh
-                   call demux_state(-istate_ph(iproc), numbranches, s, iq)
-                   iq = -iq !Keep the negative tag
-                else !This phonon is on the phonon mesh
-                   call demux_state(istate_ph(iproc), numbranches, s, iq)
-                end if
-
-                !Drag contribution:             
-                if(iq < 0) then !Need to interpolate on this point
-                   !Calculate the fine mesh wave vector, 0-based index vector
-                   call demux_vector(-iq, fineq_indvec, el%wvmesh, 0_i64)
-
-                   !Find image of phonon wave vector due to the current symmetry
-                   fineq_indvec = modulo( &
-                        nint(matmul(sym%qrotations(:, :, ik_sym), fineq_indvec)), el%wvmesh)
-
-                   !Interpolate response function on this wave vector using precomputed tabulated weights
-                   !and points. I note that response_ph(:, s, :) is not contiguous in memory.
-                   iq2inter = mux_vector(fineq_indvec,el%wvmesh, 0_i64)
-                   call interpolate_using_precomputed(idc(iq2inter,:), widc(iq2inter,:),&
-                        response_ph(:, s, :), ForG(:))
-                else
-                   !F(q) or G(q)
-                   ForG(:) = response_ph(ph%equiv_map(ik_sym, iq), s, :)
-                end if
-                !Here we use the fact that F(-q) = -F(q) and G(-q) = -G(q)
-                ph_drag_term_reduce(ik_fbz, m, :) = ph_drag_term_reduce(ik_fbz, m, :) - &
-                     ForG(:)*(Xplus(iproc) + Xminus(iproc))
-             end do
-
-             !Multiply life time factor 
-             ph_drag_term_reduce(ik_fbz, m, :) = ph_drag_term_reduce(ik_fbz, m, :)*tau_ibz
-          end do
-       end do
-    end if
-
-    !Reduce from all images
-    call co_sum(ph_drag_term_reduce)
-    ph_drag_term = ph_drag_term_reduce
-  end subroutine calculate_ph_coherenece
+!!$  subroutine calculate_ph_coherenece(ph, ph_coherence_term)
+!!$    !! Computes the phonon coherence.
+!!$    !!
+!!$    !! ph_coherence Phonon coherence
+!!$    
+!!$    real(r64), intent(inout) :: ph_coherence_term(:, :)
+!!$    
+!!$    !Number of electron bands
+!!$    numbands = el%numbands
+!!$
+!!$    !Number of in-window FBZ wave vectors
+!!$    nk = el%nwv
+!!$
+!!$    !Total number of IBZ states
+!!$    nstates_irred = el%nwv_irred*numbands
+!!$    
+!!$    !Number of phonon branches
+!!$    numbranches = ph%numbands
+!!$
+!!$    !Allocate and initialize response reduction array
+!!$    allocate(ph_coherence_term_reduce(nk, numbands, 3))
+!!$    ph_drag_term_reduce(:,:,:) = 0.0_r64
+!!$
+!!$    !Divide electron states among images
+!!$    call distribute_points(nstates_irred, chunk, start, end, num_active_images)
+!!$
+!!$    !Only work with the active images
+!!$    if(this_image() <= num_active_images) then
+!!$       !Run over electron IBZ states
+!!$       do istate = start, end
+!!$          !Demux state index into band (m) and wave vector (ik_ibz) indices
+!!$          call demux_state(istate, numbands, m, ik_ibz)
+!!$
+!!$          !Apply energy window to initial (IBZ blocks) electron
+!!$          if(abs(el%ens_irred(ik_ibz, m) - el%enref) > el%fsthick) cycle
+!!$
+!!$          !RTA lifetime
+!!$          tau_ibz = 0.0_r64
+!!$          if(rta_rates_ibz(ik_ibz, m) /= 0.0_r64) then
+!!$             tau_ibz = 1.0_r64/rta_rates_ibz(ik_ibz, m)
+!!$          end if
+!!$
+!!$          !Set X+ filename
+!!$          write(tag, '(I9)') istate
+!!$          filepath_Xplus = trim(adjustl(num%Xdir))//'/Xplus.istate'//trim(adjustl(tag))
+!!$
+!!$          !Read X+ from file
+!!$          call read_transition_probs_e(trim(adjustl(filepath_Xplus)), nprocs, Xplus, &
+!!$               istate_el, istate_ph)
+!!$
+!!$          !Set X- filename
+!!$          write(tag, '(I9)') istate
+!!$          filepath_Xminus = trim(adjustl(num%Xdir))//'/Xminus.istate'//trim(adjustl(tag))
+!!$
+!!$          !Read X- from file
+!!$          call read_transition_probs_e(trim(adjustl(filepath_Xminus)), nprocs, Xminus)
+!!$
+!!$          !Sum over the number of equivalent k-points of the IBZ point
+!!$          do ieq = 1, el%nequiv(ik_ibz)
+!!$             ik_sym = el%ibz2fbz_map(ieq, ik_ibz, 1) !symmetry
+!!$             call binsearch(el%indexlist, el%ibz2fbz_map(ieq, ik_ibz, 2), ik_fbz)
+!!$
+!!$             !Sum over scattering processes
+!!$             do iproc = 1, nprocs
+!!$                if(istate_ph(iproc) < 0) then !This phonon is on the (fine) electron mesh
+!!$                   call demux_state(-istate_ph(iproc), numbranches, s, iq)
+!!$                   iq = -iq !Keep the negative tag
+!!$                else !This phonon is on the phonon mesh
+!!$                   call demux_state(istate_ph(iproc), numbranches, s, iq)
+!!$                end if
+!!$
+!!$                !Drag contribution:             
+!!$                if(iq < 0) then !Need to interpolate on this point
+!!$                   !Calculate the fine mesh wave vector, 0-based index vector
+!!$                   call demux_vector(-iq, fineq_indvec, el%wvmesh, 0_i64)
+!!$
+!!$                   !Find image of phonon wave vector due to the current symmetry
+!!$                   fineq_indvec = modulo( &
+!!$                        nint(matmul(sym%qrotations(:, :, ik_sym), fineq_indvec)), el%wvmesh)
+!!$
+!!$                   !Interpolate response function on this wave vector using precomputed tabulated weights
+!!$                   !and points. I note that response_ph(:, s, :) is not contiguous in memory.
+!!$                   iq2inter = mux_vector(fineq_indvec,el%wvmesh, 0_i64)
+!!$                   call interpolate_using_precomputed(idc(iq2inter,:), widc(iq2inter,:),&
+!!$                        response_ph(:, s, :), ForG(:))
+!!$                else
+!!$                   !F(q) or G(q)
+!!$                   ForG(:) = response_ph(ph%equiv_map(ik_sym, iq), s, :)
+!!$                end if
+!!$                !Here we use the fact that F(-q) = -F(q) and G(-q) = -G(q)
+!!$                ph_drag_term_reduce(ik_fbz, m, :) = ph_drag_term_reduce(ik_fbz, m, :) - &
+!!$                     ForG(:)*(Xplus(iproc) + Xminus(iproc))
+!!$             end do
+!!$
+!!$             !Multiply life time factor 
+!!$             ph_drag_term_reduce(ik_fbz, m, :) = ph_drag_term_reduce(ik_fbz, m, :)*tau_ibz
+!!$          end do
+!!$       end do
+!!$    end if
+!!$
+!!$    !Reduce from all images
+!!$    call co_sum(ph_drag_term_reduce)
+!!$    ph_drag_term = ph_drag_term_reduce
+!!$  end subroutine calculate_ph_coherenece
 end module SEPE_module
