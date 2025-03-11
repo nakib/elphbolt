@@ -20,7 +20,8 @@ module SEPE_module
 
   use precision, only: r64, i64
   use params, only: qe, kB, hbar_eVps
-  use misc, only: Bose
+  use misc, only: Bose, mux_vector, binsearch, timer, subtitle, &
+       print_message, distribute_points, demux_state
 !!$  use misc, only: print_message, exit_with_message, write2file_rank2_real, &
 !!$       distribute_points, demux_state, binsearch, interpolate, demux_vector, mux_vector, &
 !!$       trace, subtitle, append2file_transport_tensor, write2file_response, &
@@ -43,18 +44,18 @@ module SEPE_module
   type sepe
      !! Data and procedures related to the BTE.
 
-!!$     real(r64), allocatable :: ph_rta_rates_phe_ibz(:,:)
-!!$     !! Phonon RTA scattering rates on the IBZ due to ph-e interactions.
-!!$     real(r64), allocatable :: ph_rta_rates_ibz(:,:)
-!!$     !! Phonon RTA scattering rates on the IBZ.
-!!$     real(r64), allocatable :: ph_field_term_T(:,:,:)
-!!$     !! Phonon field coupling term for gradT field on the FBZ.
-!!$     real(r64), allocatable :: ph_response_T(:,:,:)
-!!$     !! Phonon response function for gradT field on the FBZ.
-!!$     real(r64), allocatable :: ph_field_term_E(:,:,:)
-!!$     !! Phonon field coupling term for E field on the FBZ.
-!!$     real(r64), allocatable :: ph_response_E(:,:,:)
-!!$     !! Phonon response function for E field on the FBZ.
+     real(r64), allocatable :: ph_rta_rates_phe_ibz(:,:)
+     !! Phonon RTA scattering rates on the IBZ due to ph-e interactions.
+     real(r64), allocatable :: ph_rta_rates_ibz(:,:)
+     !! Phonon RTA scattering rates on the IBZ.
+     real(r64), allocatable :: ph_field_term_T(:,:,:)
+     !! Phonon field coupling term for gradT field on the FBZ.
+     real(r64), allocatable :: ph_response_T(:,:,:)
+     !! Phonon response function for gradT field on the FBZ.
+     real(r64), allocatable :: ph_field_term_E(:,:,:)
+     !! Phonon field coupling term for E field on the FBZ.
+     real(r64), allocatable :: ph_response_E(:,:,:)
+     !! Phonon response function for E field on the FBZ.
      complex(r64), allocatable :: ph_coherence_T(:, :)
      !! Phonon coherence term for gradT field on the FBZ
      complex(r64), allocatable :: ph_coherence_E(:, :)
@@ -126,8 +127,9 @@ contains
     character(*), intent(in) :: Tdir
 
     !Locals
-    !real(r64) :: sepe_term(ph%nwv, ph%numbands)
-    integer :: it_el, s
+    real(r64), allocatable :: ph_drag_term_E(:, :, :), ph_coherence_term_E(:, :, :)
+    type(timer) :: t
+    integer :: it_el, s, it_ph_coh
 
     call t%start_timer('Iterative electron sector of SEPE')
 
@@ -137,8 +139,8 @@ contains
     !Restart with RTA solution
     self%el_response_E = self%el_field_term_E
 
-    do it_coh = 1, num%maxiter
-       call calculate_ph_coherenece(self%el_response_E, self%ph_coherence)
+    do it_ph_coh = 1, num%maxiter
+       !call calculate_ph_coherenece(self%el_response_E, self%ph_coherence_E)
 
 !!$       !Calculate the "sepe term": 1 + theta/n0
 !!$       do s = 1, ph%numbands
@@ -146,11 +148,15 @@ contains
 !!$               self%ph_coherence(:, s)/Bose(ph%ens(:, s), crys%T)
 !!$       end do
 
+       !TODO start phonon iterator
+       !call iterate_bte_ph(crys%T, num, crys, ph, el, self%ph_rta_rates_ibz, &
+       !     self%ph_field_term_E, self%ph_response_E, self%el_response_E)
+       
        do it_el = 1, num%maxiter
           !E field:
-          call iterate_el_eqn(num, el, crys, &
-               self%el_rta_rates_ibz, self%el_field_term_E, sepe_term, self%el_response_E)
-
+          call iterate_el_eqn(num, el, crys, self%el_rta_rates_ibz, self%el_field_term_E, &
+               self%el_response_E, ph_drag_term_E, ph_coherence_term_E)
+          
           !TODO Set up convergence criterion to exit iteration loop
        end do !electron iterator
 
@@ -357,6 +363,206 @@ contains
             matmul(el%symmetrizers(:, :, ik_fbz), transpose(response_el(ik_fbz, :, :))))
     end do
   end subroutine iterate_el_eqn
+
+  subroutine iterate_ph_occupations_eqn(T, num, crys, ph, el, rta_rates_ibz, &
+       field_term, response_ph, response_el, coherence_ph)
+    !! Subroutine to iterate the phonon occupations equation one step.
+    !! 
+    !! T Temperature in K
+    !! num Numerics object
+    !! crys Crystal object
+    !! ph Phonon object
+    !! el Electron object
+    !! rta_rates_ibz Phonon RTA scattering rates
+    !! field_term Phonon field coupling term
+    !! response_ph Phonon response function
+    !! response_el Electron response function
+    !! coherence_ph Phonon coherence term
+
+    type(phonon), intent(in) :: ph
+    type(electron), intent(in) :: el
+    type(numerics), intent(in) :: num
+    type(crystal), intent(in) :: crys
+    real(r64), intent(in) :: T, rta_rates_ibz(:, :), field_term(:, :, :)
+    real(r64), intent(in) :: response_el(:, :, :), coherence_ph(:, :, :)
+    real(r64), intent(inout) :: response_ph(:, :, :)
+
+    !Local variables
+    integer(i64) :: nstates_irred, chunk, istate1, numbranches, s1, &
+         iq1_ibz, ieq, iq1_sym, iq1_fbz, iproc, iq2, s2, iq3, s3, nq, &
+         num_active_images, numbands, ik, ikp, m, n, nprocs_phe, aux1, aux2, &
+         nprocs_3ph_plus, nprocs_3ph_minus, start, end, nprocs_phcoh
+    integer(i64), allocatable :: istate2_plus(:), istate3_plus(:), &
+         istate2_minus(:), istate3_minus(:), istate_el1(:), istate_el2(:)
+    real(r64) :: tau_ibz
+    real(r64), allocatable :: Wp(:), Wm(:), Y(:), U(:), response_ph_reduce(:, :, :)
+    character(len = 1024) :: filepath_Wm, filepath_Wp, filepath_Y, filepath_U, tag
+
+    !Set output directory of transition probilities
+    write(tag, "(E9.3)") T
+    
+    !Number of electron bands
+    numbands = size(response_el(1,:,1))
+    
+    !Number of phonon branches
+    numbranches = size(rta_rates_ibz(1,:))
+
+    !Number of FBZ wave vectors
+    nq = size(field_term(:,1,1))
+    
+    !Total number of IBZ states
+    nstates_irred = size(rta_rates_ibz(:,1))*numbranches
+    
+    !Allocate and initialize response reduction array
+    allocate(response_ph_reduce(nq, numbranches, 3))
+    response_ph_reduce(:,:,:) = 0.0_r64
+    
+    !Divide phonon states among images
+    call distribute_points(nstates_irred, chunk, start, end, num_active_images)
+
+    !Only work with the active images
+    if(this_image() <= num_active_images) then       
+       !Run over first phonon IBZ states
+       do istate1 = start, end
+          !Demux state index into branch (s) and wave vector (iq1_ibz) indices
+          call demux_state(istate1, numbranches, s1, iq1_ibz)
+
+          !Set file tag
+          write(tag, '(I9)') istate1
+          
+          !RTA lifetime
+          tau_ibz = 0.0_r64
+          if(rta_rates_ibz(iq1_ibz, s1) /= 0.0_r64) then
+             tau_ibz = 1.0_r64/rta_rates_ibz(iq1_ibz, s1)
+          end if
+          
+          if(num%W_OTF) then
+             call calculate_W3ph_OTF(ph, num, istate1, T, &
+                  Wm, Wp, istate2_plus, istate3_plus, istate2_minus, istate3_minus)
+             nprocs_3ph_plus = size(Wp); nprocs_3ph_minus = size(Wm)
+          else
+             !Set W+ filename
+             filepath_Wp = trim(adjustl(num%Wdir))//'/Wp.istate'//trim(adjustl(tag))
+
+             !Read W+ from file
+             if(allocated(Wp)) deallocate(Wp)
+             if(allocated(istate2_plus)) deallocate(istate2_plus)
+             if(allocated(istate3_plus)) deallocate(istate3_plus)
+             call read_transition_probs_e(trim(adjustl(filepath_Wp)), nprocs_3ph_plus, Wp, &
+                  istate2_plus, istate3_plus)
+
+             !Set W- filename
+             filepath_Wm = trim(adjustl(num%Wdir))//'/Wm.istate'//trim(adjustl(tag))
+
+             !Read W- from file
+             if(allocated(Wm)) deallocate(Wm)
+             if(allocated(istate2_minus)) deallocate(istate2_minus)
+             if(allocated(istate3_minus)) deallocate(istate3_minus)
+             call read_transition_probs_e(trim(adjustl(filepath_Wm)), nprocs_3ph_minus, Wm, &
+                  istate2_minus, istate3_minus)
+          end if
+
+          !if(present(response_el)) then
+          if(num%Y_OTF) then
+             call calculate_Y_OTF(el, ph, num, crys, istate1, T, Y, istate_el1, istate_el2)
+             nprocs_phe = size(Y)
+          else
+             !Set Y filename
+             filepath_Y = trim(adjustl(num%Ydir))//'/Y.istate'//trim(adjustl(tag))
+
+             !Read Y from file
+             if(allocated(Y)) deallocate(Y)
+             if(allocated(istate_el1)) deallocate(istate_el1)
+             if(allocated(istate_el2)) deallocate(istate_el2)
+             call read_transition_probs_e(trim(adjustl(filepath_Y)), nprocs_phe, Y, &
+                  istate_el1, istate_el2)
+          end if
+          !end if
+
+          !Set U filename
+          filepath_U = trim(adjustl(num%Ydir))//'/U.istate'//trim(adjustl(tag))
+          
+          !Read Y from file
+          if(allocated(U)) deallocate(U)
+          call read_transition_probs_e(trim(adjustl(filepath_Y)), nprocs_phcoh, U)
+
+          !Sum over the number of equivalent q-points of the IBZ point
+          do ieq = 1, ph%nequiv(iq1_ibz)
+             iq1_sym = ph%ibz2fbz_map(ieq, iq1_ibz, 1) !symmetry
+             iq1_fbz = ph%ibz2fbz_map(ieq, iq1_ibz, 2) !image due to symmetry
+
+             !Sum over scattering processes
+             !Self contribution from plus processes:
+             do iproc = 1, nprocs_3ph_plus
+                !Grab 2nd and 3rd phonons
+                call demux_state(istate2_plus(iproc), numbranches, s2, iq2)
+                call demux_state(istate3_plus(iproc), numbranches, s3, iq3)
+
+                response_ph_reduce(iq1_fbz, s1, :) = response_ph_reduce(iq1_fbz, s1, :) + &
+                     Wp(iproc)*(response_ph(ph%equiv_map(iq1_sym, iq3), s3, :) - &
+                     response_ph(ph%equiv_map(iq1_sym, iq2), s2, :))
+             end do
+
+             !Self contribution from minus processes:
+             do iproc = 1, nprocs_3ph_minus
+                !Grab 2nd and 3rd phonons
+                call demux_state(istate2_minus(iproc), numbranches, s2, iq2)
+                call demux_state(istate3_minus(iproc), numbranches, s3, iq3)
+
+                response_ph_reduce(iq1_fbz, s1, :) = response_ph_reduce(iq1_fbz, s1, :) + &
+                     0.5_r64*Wm(iproc)*(response_ph(ph%equiv_map(iq1_sym, iq3), s3, :) + &
+                     response_ph(ph%equiv_map(iq1_sym, iq2), s2, :))
+             end do
+
+             !Drag contribution:
+
+             !if(present(response_el)) then
+             do iproc = 1, nprocs_phe
+                !Grab initial and final electron states
+                call demux_state(istate_el1(iproc), numbands, m, ik)
+                call demux_state(istate_el2(iproc), numbands, n, ikp)
+
+                !Find image of electron wave vector due to the current symmetry
+                call binsearch(el%indexlist, el%equiv_map(iq1_sym, ik), aux1)
+                call binsearch(el%indexlist, el%equiv_map(iq1_sym, ikp), aux2)
+
+                response_ph_reduce(iq1_fbz, s1, :) = response_ph_reduce(iq1_fbz, s1, :) + &
+                     el%spindeg*Y(iproc)*(response_el(aux2, n, :) - response_el(aux1, m, :))
+             end do
+             !end if             
+
+             !Coherence contribution:
+             do iproc = 1, nprocs_phcoh
+                response_ph_reduce(iq1_fbz, s1, :) = response_ph_reduce(iq1_fbz, s1, :) - &
+                     el%spindeg*U(iproc)*coherence_ph(iq1_fbz, s1, :)
+             end do
+             
+             !Iterate BTE
+             response_ph_reduce(iq1_fbz, s1, :) = field_term(iq1_fbz, s1, :) + &
+                  response_ph_reduce(iq1_fbz, s1, :)*tau_ibz          
+          end do
+       end do
+    end if
+
+    !Update the response function
+    sync all
+    call co_sum(response_ph_reduce)
+    sync all
+    response_ph = response_ph_reduce
+
+    !Symmetrize response function
+    do iq1_fbz = 1, nq
+       response_ph(iq1_fbz,:,:)=transpose(&
+            matmul(ph%symmetrizers(:,:,iq1_fbz),transpose(response_ph(iq1_fbz,:,:))))
+    end do
+    
+  end subroutine iterate_ph_occupations_eqn
+
+  
+  
+  subroutine iterate_ph_coherence_eqn
+    !TODO
+  end subroutine iterate_ph_coherence_eqn
 
   subroutine calculate_phonon_drag(num, el, ph, idc, widc, sym, rta_rates_ibz, response_ph, &
        ph_drag_term)
