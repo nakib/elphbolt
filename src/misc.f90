@@ -202,7 +202,7 @@ contains
        end do
     end do
   end function permutations
-
+  
   subroutine linspace(grid, min, max, num)
     !! Create equidistant grid.
 
