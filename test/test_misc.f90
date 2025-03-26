@@ -27,7 +27,7 @@ program test_misc
   real(r64), allocatable :: hfx1_even(:), hfx1_odd(:), hfx2_even(:), hfx2_odd(:), &
        ind_even(:), ind_odd(:), x_even(:), x_odd(:), xmin, xmax
   integer(i64) :: n_even, n_odd
- 
+  
   print*, '<<module misc unit tests>>'
   
   !Some data to be used in the tests below
@@ -70,6 +70,7 @@ program test_misc
        4, 3, 2, 1,  3, 4, 2, 1,  3, 2, 4, 1,  3, 2, 1, 4,  2, 3, 1, 4,  2, 3, 4, 1, &
        2, 4, 3, 1,  4, 2, 3, 1,  4, 2, 1, 3,  2, 4, 1, 3,  2, 1, 4, 3,  2, 1, 3, 4 &
        ]*1_i64)
+
 
   !distribute_points
   !TODO This is a coarray dependent test. Will revisit.
