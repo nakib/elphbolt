@@ -2886,8 +2886,9 @@ contains
                    g2 = gchimp2_TF(el, crys, q_vec%cart, &
                         el%evecs_irred(ik, m, :), el%evecs(ikp, n, :))
                 else
-                   g2 = gchimp2_RPA(el, crys, q_vec%cart, &
-                     el%evecs_irred(ik, m, :), el%evecs(ikp, n, :), X0_qw0)
+                   !g2 = gchimp2_RPA(el, crys, q_vec%cart, &
+                   !  el%evecs_irred(ik, m, :), el%evecs(ikp, n, :), X0_qw0)
+                   g2 = 0.1_r64 
                 end if
 
                 !Evaulate delta function
