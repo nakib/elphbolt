@@ -529,11 +529,79 @@ contains
     end do
   end subroutine iterate_ph_occupations_eqn
   
-  subroutine iterate_ph_coherence_eqn
-    !Subroutine to calculate the phonon coherence equation.
-
-    
-  end subroutine iterate_ph_coherence_eqn
+!!$  subroutine iterate_ph_coherence_eqn(T, num, crys, ph, el, rta_rates_ibz, &
+!!$       field_term, response_ph, response_el, coherence_ph)
+!!$    !! Subroutine to calculate the phonon coherence equation.
+!!$    !! 
+!!$    !! T Temperature in K
+!!$    !! num Numerics object
+!!$    !! crys Crystal object
+!!$    !! ph Phonon object
+!!$    !! el Electron object
+!!$    !! rta_rates_ibz Phonon RTA scattering rates
+!!$    !! field_term Phonon field coupling term
+!!$    !! response_ph Phonon response function
+!!$    !! response_el Electron response function
+!!$    !! coherence_ph Phonon coherence term
+!!$
+!!$    type(phonon), intent(in) :: ph
+!!$    type(electron), intent(in) :: el
+!!$    type(numerics), intent(in) :: num
+!!$    type(crystal), intent(in) :: crys
+!!$    real(r64), intent(in) :: T, rta_rates_ibz(:, :), field_term(:, :, :)
+!!$    real(r64), intent(in) :: response_el(:, :, :)
+!!$    real(r64), intent(in) :: response_ph(:, :, :)
+!!$    complex(r64), intent(inout) :: coherence_ph(:, :, :)
+!!$
+!!$    !Local variables
+!!$    integer(i64) :: nstates_irred, chunk, istate1, numbranches, s1, &
+!!$         iq1_ibz, ieq, iq1_sym, iq1_fbz, iproc, iq2, s2, iq3, s3, nq, &
+!!$         num_active_images, numbands, ik, ikp, m, n, nprocs_phe, aux1, aux2, &
+!!$         nprocs_3ph_plus, nprocs_3ph_minus, start, end, nprocs_phcoh
+!!$    integer(i64), allocatable :: istate2_plus(:), istate3_plus(:), &
+!!$         istate2_minus(:), istate3_minus(:), istate_el1(:), istate_el2(:)
+!!$    real(r64) :: tau_ibz
+!!$    real(r64), allocatable :: Y(:), U(:), response_ph_reduce(:, :, :), &
+!!$         coherence_ph_real(:, :, :)
+!!$    character(len = 1024) :: filepath_Wm, filepath_Wp, filepath_Y, filepath_U, tag
+!!$
+!!$    !Set output directory of transition probilities
+!!$    write(tag, "(E9.3)") T
+!!$    
+!!$    !Number of electron bands
+!!$    numbands = size(response_el(1,:,1))
+!!$    
+!!$    !Number of phonon branches
+!!$    numbranches = size(rta_rates_ibz(1,:))
+!!$
+!!$    !Number of FBZ wave vectors
+!!$    nq = size(field_term(:,1,1))
+!!$    
+!!$    !Total number of IBZ states
+!!$    nstates_irred = size(rta_rates_ibz(:,1))*numbranches
+!!$    
+!!$    !Allocate and initialize response reduction array
+!!$    allocate(response_ph_reduce(nq, numbranches, 3))
+!!$    response_ph_reduce(:,:,:) = 0.0_r64
+!!$    
+!!$    !Divide phonon states among images
+!!$    call distribute_points(nstates_irred, chunk, start, end, num_active_images)
+!!$
+!!$    !Only work with the active images
+!!$    if(this_image() <= num_active_images) then
+!!$       !TODO
+!!$    end if
+!!$
+!!$    !Update the response function
+!!$    call co_sum(response_ph_reduce)
+!!$    response_ph = response_ph_reduce
+!!$
+!!$    !Symmetrize response function
+!!$    do iq1_fbz = 1, nq
+!!$       response_ph(iq1_fbz,:,:)=transpose(&
+!!$            matmul(ph%symmetrizers(:,:,iq1_fbz),transpose(response_ph(iq1_fbz,:,:))))
+!!$    end do    
+!!$  end subroutine iterate_ph_coherence_eqn
 
   subroutine calculate_phonon_drag(num, el, ph, idc, widc, sym, rta_rates_ibz, &
        response_ph, ph_drag_term)
