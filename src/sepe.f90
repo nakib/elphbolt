@@ -350,7 +350,8 @@ contains
     type(numerics), intent(in) :: num
     type(crystal), intent(in) :: crys
     real(r64), intent(in) :: T, rta_rates_ibz(:, :), field_term(:, :, :)
-    real(r64), intent(in) :: response_el(:, :, :), coherence_ph(:, :, :)
+    real(r64), intent(in) :: response_el(:, :, :)
+    complex(r64), intent(in) :: coherence_ph(:, :, :)
     real(r64), intent(inout) :: response_ph(:, :, :)
 
     !Local variables
@@ -361,7 +362,8 @@ contains
     integer(i64), allocatable :: istate2_plus(:), istate3_plus(:), &
          istate2_minus(:), istate3_minus(:), istate_el1(:), istate_el2(:)
     real(r64) :: tau_ibz
-    real(r64), allocatable :: Wp(:), Wm(:), Y(:), U(:), response_ph_reduce(:, :, :)
+    real(r64), allocatable :: Wp(:), Wm(:), Y(:), U(:), response_ph_reduce(:, :, :), &
+         coherence_ph_real(:, :, :)
     character(len = 1024) :: filepath_Wm, filepath_Wp, filepath_Y, filepath_U, tag
 
     !Set output directory of transition probilities
@@ -382,6 +384,10 @@ contains
     !Allocate and initialize response reduction array
     allocate(response_ph_reduce(nq, numbranches, 3))
     response_ph_reduce(:,:,:) = 0.0_r64
+
+    !Allocate and set the real part of the coherence function
+    allocate(coherence_ph_real(size(coherence_ph, 1), numbranches, 3))
+    coherence_ph_real = real(coherence_ph)
     
     !Divide phonon states among images
     call distribute_points(nstates_irred, chunk, start, end, num_active_images)
@@ -500,7 +506,7 @@ contains
              !Coherence contribution:
              do iproc = 1, nprocs_phcoh
                 response_ph_reduce(iq1_fbz, s1, :) = response_ph_reduce(iq1_fbz, s1, :) - &
-                     el%spindeg*U(iproc)*coherence_ph(iq1_fbz, s1, :)
+                     el%spindeg*U(iproc)*coherence_ph_real(iq1_fbz, s1, :)
              end do
              
              !Iterate BTE
@@ -680,7 +686,8 @@ contains
     type(numerics), intent(in) :: num
     type(symmetry), intent(in) :: sym
     integer(i64), intent(in) :: coarse_mesh_corners(:, :)
-    real(r64), intent(in) :: rta_rates_ibz(:, :), coherence_ph(:, :, :), weights_coarse_mesh_corners(:, :)
+    real(r64), intent(in) :: rta_rates_ibz(:, :), weights_coarse_mesh_corners(:, :)
+    complex(r64), intent(in) :: coherence_ph(:, :, :)
     real(r64), intent(out) :: ph_coherence_term(:, :, :)
 
     !Local variables
@@ -691,7 +698,7 @@ contains
     integer(i64), allocatable :: istate_el_phcoh(:), istate_ph_phcoh(:)
     real(r64) :: tau_ibz, HorP(3)
     real(r64), allocatable :: Omegaplus(:), Omegaminus(:), &
-         ph_coherence_term_reduce(:, :, :)
+         ph_coherence_term_reduce(:, :, :), coherence_ph_real(:, :, :)
     character(1024) :: filepath_Omegaminus, filepath_Omegaplus, tag
     
     !Number of electron bands
@@ -708,6 +715,10 @@ contains
 
     !Allocate and initialize response reduction array
     allocate(ph_coherence_term_reduce(nk, numbands, 3))
+
+    !Allocate and set the real part of the coherence function
+    allocate(coherence_ph_real(size(coherence_ph, 1), numbranches, 3))
+    coherence_ph_real = real(coherence_ph)
 
     !Divide electron states among images
     call distribute_points(nstates_irred, chunk, start, end, num_active_images)
@@ -772,10 +783,10 @@ contains
                    call interpolate_using_precomputed(&
                         coarse_mesh_corners(iq2inter,:), &
                         weights_coarse_mesh_corners(iq2inter,:),&
-                        coherence_ph(:, s, :), HorP(:))
+                        coherence_ph_real(:, s, :), HorP(:))
                 else
                    !H(q) or P(q)
-                   HorP(:) = coherence_ph(ph%equiv_map(ik_sym, iq), s, :)
+                   HorP(:) = coherence_ph_real(ph%equiv_map(ik_sym, iq), s, :)
                 end if
 
                 !(Note that below we use the fact that H and P are even in wave vector)
