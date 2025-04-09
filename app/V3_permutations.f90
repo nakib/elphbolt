@@ -37,6 +37,8 @@ program V3_permutations
       write(*, '(A, I5)') 'Number of coarray images = ', num_images()
    end if
 
+   call triplet_test()
+
 contains
 
    subroutine triplet_test()
