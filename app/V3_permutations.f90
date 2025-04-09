@@ -16,7 +16,13 @@ program V3_permutations
 
    implicit none
 
+   !NHP: We don't use Java/C++-style naming convention in elphbolt. See below:
+   !https://github.com/nakib/elphbolt/blob/develop/STYLEGUIDE.org#follow-naming-convention
    type TripletSet
+      !NHP: This is not the correct way to document members of the a data type.
+      !NHP: Fix grammar errors.
+      !NHP: Is "reps" or "canonical represenative" standard nomenclature for the mathematics you are doing? I suggest using standard jargon, if it exists.
+      !Ignore this comment if it is indeed the standard jargon. 
       !! reps is canonical representatives of equivalent permutation triplets (pick 1 unique triplet representation to represent the whole triplets)
       !! counts tells how many permutations belong to reps
       !! stores all permutations that map to reps
@@ -37,9 +43,19 @@ program V3_permutations
       write(*, '(A, I5)') 'Number of coarray images = ', num_images()
    end if
 
+   !NHP: The following has to be called, or else the program will not
+   !print anything useful.
+   call triplet_test
+   
 contains
 
-   subroutine triplet_test()
+  !NHP: The code is not properly indented. Please read the following section:
+  !https://github.com/nakib/elphbolt/blob/develop/STYLEGUIDE.org#indent-your-code
+  !and configure your editor/ide to comply with the styleguide.
+  
+  subroutine triplet_test()
+    !NHP: There is no need to write implicit none inside a procedure if this has already
+    !been declared at the module level.  
       implicit none
 
       integer(i64) :: nbands, test
@@ -63,6 +79,7 @@ contains
    subroutine generate_triplets(nbands, mesh_size, lambda_1, lambda_2, triplet_data)
       !! this subroutine generates all valid triplets of the form ((iband1, ik1), (iband2, ik2), (iband3, ik3))
       !!
+     !NHP: de/mux_state/vector, etc. have been documented before. As such, there is no need to repeat this information.
       !! each input lambda index corresponds to a state (iband, ik), where
       !! demux_state is used to extract (iband, ik) from the 1D lambda index
       !! demux_vector is used to convert ik to a 3D q-vector q(i) on the mesh
@@ -83,7 +100,14 @@ contains
       integer(i64) :: perm(3)
       logical :: new_triplet
 
+      !NHP: This is a strange comment. So what something could be stored? Just describe the action.
       ! the maximum number of irreducible triplets could be stored
+      !NHP: Why use "d0" when elphbolt has predefined precision? What is "d0"?
+      !NHP: Please read https://github.com/nakib/elphbolt/blob/develop/STYLEGUIDE.org#use-space-and-comma-properly
+      !and fix all issues related to the use of space around operators.
+      !NHP: What is the logic behind this line? I don't see how the maximum number of triplets is 20% larger
+      !than size(lambda_1)*size(lambda_2)*nbands
+      !NHP: The name is ambigious. Did you mean max_num_triplets?
       max_triplets = int(1.2d0 * size(lambda_1) * size(lambda_2) * nbands)
 
       allocate(triplet_data%reps(3, 2, max_triplets))
@@ -95,22 +119,32 @@ contains
 
       all_perms = permutations(3_i64)
 
+      !NHP: This is abuse of notation. Lambda is a state index which combines a wave vector and a band.
+      !It would make sense to use iq to point to a wave vector, not a state vector.
       do iq1 = 1, size(lambda_1)
+         !NHP: I do not agree with using m to store a state vector.
          m1 = lambda_1(iq1)
          ! Demux state for lambda_1: for each lambda_1 value, convert its index to (iband1, ik1)
          call demux_state(m1, nbands, iband1, ik1)
+         !NHP: Need a space here. Read https://github.com/nakib/elphbolt/blob/develop/STYLEGUIDE.org#use-space-and-comma-properly
+         !and fix all such issues.
          ! Demux vector to get q1
          call demux_vector(ik1, q1, mesh_size, base = 0_i64)
 
+         !NHP: Check earlier comment about abuse of notation.
          do iq2 = 1, size(lambda_2)
+            !NHP: I do not agree with using m to store a state vector.
             m2 = lambda_2(iq2)
             ! Demux state for lambda_2: for each lambda_2 value, convert its index to (iband2, ik2)
             call demux_state(m2, nbands, iband2, ik2)
             ! Demux vector to get q1
             call demux_vector(ik2, q2, mesh_size, base = 0_i64)
 
+            !NHP: The equation you wrote in the comment does not look correct to me.
             ! Compute q3 using modular arithmetic: such that momentum is conserved: q₁ - q₂ + q₃ ≡ 0
             q3 = modulo(q1 - q2, mesh_size)
+            !NHP: This comment is a bit useless. It is clear from the code that the right hand is being put
+            !into the left hand. The comment, if there has to be one, should explain the logic.
             ! Compute ik3 using mux_vector
             ik3 = mux_vector(q3, mesh_size, base = 0_i64)
 
@@ -122,16 +156,26 @@ contains
                sorted = triplet
 
                ! Generate all permutations using Johnson–Trotter, compare them, and finds the lexicographically smallest triplet
+               !NHP: Compute the total number of permutations outside of these loops.
                do i = 1, size(all_perms, 2)
+                  !NHP Why is this auxiliary perm variable needed? Why not use all_perms inside the j-loop?
                   perm = all_perms(:, i)
 
                   do j = 1, 3
                      permuted(j, 1) = triplet(perm(j), 1)
                      permuted(j, 2) = triplet(perm(j), 2)
                   end do
+                  !NHP: Add a space here. Please re-read: https://github.com/nakib/elphbolt/blob/develop/STYLEGUIDE.org#use-space-and-comma-properly
                   if(lex_less(permuted, sorted)) sorted = permuted
                end do
 
+               !NHP: I find the logic below upside down.
+               !First, the name new_triplet is confusing to me. A better name would be
+               !triplet_exists. You can enter the top-most loop with this set to true.
+               !If you do this, the logic below will have to be inverted.
+               
+               !NHP: Please remove random capitalization of words in comments.
+               !NHP: Avoid redundant what?
                ! Check and Store Unique Triplets to avoid redundant
                new_triplet = .true.
                do k = 1, n_stored
@@ -147,10 +191,13 @@ contains
                   triplet_data%counts(n_stored) = 0
                end if
 
+               !NHP: Change "Mapping" to "Map"
+               !NHP: "canonical representative group" or "member in the canonical representative group"?
                ! Mapping current triplet permutation to its canonical representative group
                do k = 1, n_stored
                   if(all(sorted == triplet_data%reps(:, :, k))) then
                      perm_index = triplet_data%counts(k) + 1
+                     !NHP: Add space here
                      triplet_data%perm_list(:, :, perm_index, k) = triplet
                      triplet_data%counts(k) = perm_index
                      exit
@@ -161,7 +208,10 @@ contains
       end do
    end subroutine generate_triplets
 
+   !NHP: Move this function to misc.f90 and write corresponding unit test in corresponding test file.
    pure logical function lex_less(a, b)
+     !NHP: This is a strange comment. State what this function does, not what it is essential for.
+     !You should explain the argument variables.
       !! lex_less is essential for enforcing permutation symmetry and finding irreducible triplets
       !!
       !! is a comparison function -- boolean comparator
