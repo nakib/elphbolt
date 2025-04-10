@@ -8,7 +8,7 @@ program V3_permutations
 
    use precision, only: i64, r64
    use misc, only: print_message, subtitle, timer, exit_with_message, mux_vector, demux_state, &
-      mux_state, twonorm, permutations, demux_vector
+      mux_state, twonorm, permutations, demux_vector, lex_less
    use numerics_module, only: numerics
    use crystal_module, only: crystal
    use symmetry_module, only: symmetry
@@ -17,14 +17,10 @@ program V3_permutations
    implicit none
 
    type Triplet_Set
-      !! Canonical representatives of symmetry-equivalent triplets under permutation.
-      !! canonical_representative contains one unique triplet for each equivalence class under permutation symmetry.
-      !! counts stores how many permutations belong to each equivalence class.
-      !! perm_list contains all permutations corresponding to each representative triplet.
+      !! Stores unique irreducible triplets and their corresponding (iq1, iq2) labels
 
       integer(i64), allocatable :: canonical_representative(:, :, :)
-      integer(i64), allocatable :: counts(:)
-      integer(i64), allocatable :: perm_list(:, :, :, :)
+      integer(i64), allocatable :: iq_pairs(:, :)
    end type Triplet_Set
 
    type(numerics) :: num
@@ -77,39 +73,33 @@ contains
       integer(i64) :: ilambda1, ilambda2, iband1, ik1, iband2, ik2, iband3, ik3
       integer(i64) :: q1(3), q2(3), q3(3), m1, m2, base
       integer(i64) :: triplet(3, 2), permuted(3, 2), sorted(3, 2)
-      integer(i64), allocatable :: all_perms(:, :)
-      integer(i64) :: i, j, k, perm_index, n_stored, max_num_triplets
+      integer(i64), allocatable :: all_perms(:, :), tmp(:, :, :), iq_tmp(:, :)
+      integer(i64) :: i, j, k, n_stored, max_num_triplets
       integer(i64) :: perm(3)
       logical :: triplet_exists
 
       !Give an upper bound on the maximum number of triplets based on mesh and band count
       max_num_triplets = int(1.2_r64*size(lambda_1)*size(lambda_2)*nbands)
 
-      allocate(triplet_data%canonical_representative(3, 2, max_num_triplets))
-      allocate(triplet_data%counts(max_num_triplets))
-      allocate(triplet_data%perm_list(3, 2, 6, max_num_triplets))
+      allocate(tmp(3, 2, max_num_triplets))
+      allocate(iq_tmp(2, max_num_triplets))
 
-      triplet_data%counts = 0_i64
       n_stored = 0
 
       all_perms = permutations(3_i64)
 
       do ilambda1 = 1, size(lambda_1)
 
-         m1 = lambda_1(ilambda1)
-
          ! Demux state for lambda_1: for each lambda_1 value, convert its index to (iband1, ik1)
-         call demux_state(m1, nbands, iband1, ik1)
+         call demux_state(lambda_1(ilambda1), nbands, iband1, ik1)
 
          ! Demux vector to get q1
          call demux_vector(ik1, q1, mesh_size, base = 0_i64)
 
          do ilambda2 = 1, size(lambda_2)
 
-            m2 = lambda_2(ilambda2)
-
             ! Demux state for lambda_2: for each lambda_2 value, convert its index to (iband2, ik2)
-            call demux_state(m2, nbands, iband2, ik2)
+            call demux_state(lambda_2(ilambda2), nbands, iband2, ik2)
 
             ! Demux vector to get q1
             call demux_vector(ik2, q2, mesh_size, base = 0_i64)
@@ -140,85 +130,40 @@ contains
                end do
 
                ! Check and store unique triplets to avoid redundant triplet
-               triplet_exists = .true.
+               triplet_exists = .false.
                do k = 1, n_stored
-                  if(all(sorted == triplet_data%canonical_representative(:, :, k))) then
-                     triplet_exists = .false.
+                  if (all(sorted == tmp(:, :, k))) then
+                     triplet_exists = .true.
                      exit
                   end if
                end do
 
-               if(triplet_exists) then
+               if(.not. triplet_exists) then
                   n_stored = n_stored + 1
-                  triplet_data%canonical_representative(:, :, n_stored) = sorted
-                  triplet_data%counts(n_stored) = 0
+                  tmp(:, :, n_stored) = sorted
+                  iq_tmp(:, n_stored) = [ilambda1, ilambda2]
                end if
-
-               ! Map current triplet permutation to its equivalence class representative
-               do k = 1, n_stored
-                  if(all(sorted == triplet_data%canonical_representative(:, :, k))) then
-                     perm_index = triplet_data%counts(k) + 1
-                     triplet_data%perm_list(:, :, perm_index, k) = triplet
-                     triplet_data%counts(k) = perm_index
-                     exit
-                  end if
-               end do
             end do
          end do
       end do
+
+      allocate(triplet_data%canonical_representative(3, 2, n_stored))
+      allocate(triplet_data%iq_pairs(2, n_stored))
+      triplet_data%canonical_representative = tmp(:, :, 1:n_stored)
+      triplet_data%iq_pairs = iq_tmp(:, 1:n_stored)
+
    end subroutine generate_triplets
-
-   pure logical function lex_less(a, b)
-      !! lex_less is a comparison function -- boolean comparator
-      !!
-      !! compare two triplets a and b lexicographically
-      !! this function returns .true. if triplet a comes before triplet b
-      !! in lexicographic order, and .false. otherwise.
-      !! each a and b is a 3×2 array
-      !! a(3, 2): first triplet to compare. Each row represents a (s, iq) pair.
-      !! b(3, 2): Second triplet to compare. Same structure as a.
-
-      integer(i64), intent(in) :: a(3, 2), b(3, 2)
-
-      !Local
-      integer :: i
-
-      do i = 1, 3
-         if(a(i, 1) < b(i, 1)) then
-            lex_less = .true.
-            return
-         else if(a(i, 1) > b(i, 1)) then
-            lex_less = .false.
-            return
-         else if(a(i, 2) < b(i, 2)) then
-            lex_less = .true.
-            return
-         else if(a(i, 2) > b(i, 2)) then
-            lex_less = .false.
-            return
-         end if
-      end do
-
-      lex_less = .false.
-   end function lex_less
 
    subroutine triplet_result(result)
       type(Triplet_Set), intent(in) :: result
-      integer(i64) :: i, k
+      integer(i64) :: k
 
-      do k = 1, size(result%counts)
-         if (result%counts(k) == 0) exit
-         write(*, '(A, 3("(",I0,",",I0,")",:), A, I0)') 'Irreducible Triplet: ', &
-            result%canonical_representative(1, 1, k), result%canonical_representative(1, 2, k), &
-            result%canonical_representative(2, 1, k), result%canonical_representative(2, 2, k), &
-            result%canonical_representative(3, 1, k), result%canonical_representative(3, 2, k), &
-            ' -> Count: ', result%counts(k)
-         write(*,*) 'All Permutations:'
-         do i = 1, result%counts(k)
-            write(*, '(3("(",I0,",",I0,")",:))') result%perm_list(1, 1, i, k), result%perm_list(1, 2, i, k), &
-               result%perm_list(2, 1, i, k), result%perm_list(2, 2, i, k), &
-               result%perm_list(3, 1, i, k), result%perm_list(3, 2, i, k)
-         end do
+      do k = 1, size(result%iq_pairs, 2)
+         write(*,'(A,"((",I0,",",I0,"),(",I0,",",I0,"),(",I0,",",I0,")) = (",I0,",",I0,")")') &
+            'M', result%canonical_representative(1,1,k), result%canonical_representative(1,2,k), &
+            result%canonical_representative(2,1,k), result%canonical_representative(2,2,k), &
+            result%canonical_representative(3,1,k), result%canonical_representative(3,2,k), &
+            result%iq_pairs(1,k), result%iq_pairs(2,k)
       end do
    end subroutine triplet_result
 
