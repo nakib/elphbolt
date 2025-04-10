@@ -8,18 +8,20 @@ program test_misc
       unique, linspace, compsimps, mux_state, demux_state, demux_mesh, expm1, &
       Fermi, Bose, Pade_continued, precompute_interpolation_corners_and_weights, &
       interpolate_using_precomputed, operator(.umklapp.), shrink, Hilbert_transform, &
-      interpolator_1d, permutations, lex_less
+      interpolator_1d, permutations, lex_less, Triplet_Set, generate_triplets
 
    implicit none
 
    integer :: itest
-   integer, parameter :: num_tests = 38
+   integer, parameter :: num_tests = 39
    type(testify) :: test_array(num_tests), tests_all
    integer(i64) :: index, quotient, remainder, int_array(5), v1(3), v2(3), &
       v1_muxed, v2_muxed, ik, ik1, ik2, ik3, ib1, ib2, ib3, wvmesh(3), &
-      mesh_ref_array(3), nk_coarse, ninterp, N, i, j, a(3,2), b(3,2)
+      mesh_ref_array(3), nk_coarse, ninterp, N, i, j, a(3,2), b(3,2), &
+      mesh_size(3), nbands
    integer(i64), allocatable :: index_mesh_0(:, :), index_mesh_1(:, :), &
-      ksint(:, :), idc(:, :), ik_interp(:), array_of_ints(:), perm(:, :)
+      ksint(:, :), idc(:, :), ik_interp(:), array_of_ints(:), perm(:, :), &
+      lambda_1(:), lambda_2(:), unique_triplet(:)
    real(r64) :: pauli1(2, 2), ipauli2(2, 2), pauli3(2, 2), &
       real_array(5), result, q1(3, 4), q2(3, 4), q3(3, 4)
    real(r64), allocatable :: integrand(:), domain(:), im_axis(:), real_func(:), &
@@ -28,6 +30,8 @@ program test_misc
       ind_even(:), ind_odd(:), x_even(:), x_odd(:), xmin, xmax
    integer(i64) :: n_even, n_odd
    logical :: lex_order
+   character(len=100) :: mesh_str
+   type(Triplet_Set) :: triplet_data
 
    print*, '<<module misc unit tests>>'
 
@@ -72,7 +76,7 @@ program test_misc
       2, 4, 3, 1,  4, 2, 3, 1,  4, 2, 1, 3,  2, 4, 1, 3,  2, 1, 4, 3,  2, 1, 3, 4 &
       ]*1_i64)
 
-!lex_less(a, b)
+   !lex_less(a, b)
    itest = itest + 1
    test_array(itest) = testify("lex_less: a smaller than b")
    a = reshape([0, 1,  1, 0,  2, 0]*1_i64, [3, 2])
@@ -93,6 +97,47 @@ program test_misc
    b = reshape([1, 1,  2, 1,  2, 2]*1_i64, [3, 2])
    lex_order = lex_less(a, b)
    call test_array(itest)%assert(lex_order, .false.)
+
+   !Generate triplet
+   itest = itest +1
+   test_array(itest) = testify("triplet to iq mapping")
+   nbands = 2
+   mesh_size = [1, 1, 2]
+   allocate(lambda_1(2))
+   allocate(lambda_2(4))
+   lambda_1 = [1, 2]*1_i64
+   lambda_2 = [1, 2, 3, 4]*1_i64
+   write(mesh_str, '(3(I0,:,1x))') mesh_size
+   write(*,'(A,I0,A,I0,A,A,A)') "Test ", itest, " : nbands= ", nbands, " mesh= [", trim(adjustl(mesh_str)), "]"
+   call generate_triplets(nbands, mesh_size, lambda_1, lambda_2, triplet_data)
+   print *, "Actual:"
+   do i = 1, size(triplet_data%iq_pairs, 2)
+      print *, triplet_data%canonical_representative(1,1,i), triplet_data%canonical_representative(1,2,i), &
+         triplet_data%canonical_representative(2,1,i), triplet_data%canonical_representative(2,2,i), &
+         triplet_data%canonical_representative(3,1,i), triplet_data%canonical_representative(3,2,i), &
+         triplet_data%iq_pairs(1,i), triplet_data%iq_pairs(2,i)
+   end do
+   allocate(unique_triplet(8 * size(triplet_data%iq_pairs, 2)))
+   print *, "Size of unique_triplet: ", size(unique_triplet)
+   print *, "Size of expected values: ", 8 * 10  ! This should match
+   unique_triplet = [ &
+      triplet_data%canonical_representative(1,1,:), triplet_data%canonical_representative(1,2,:), &
+      triplet_data%canonical_representative(2,1,:), triplet_data%canonical_representative(2,2,:), &
+      triplet_data%canonical_representative(3,1,:), triplet_data%canonical_representative(3,2,:), &
+      triplet_data%iq_pairs(1,:), triplet_data%iq_pairs(2,:) &
+      ]
+   call test_array(itest)%assert(reshape(unique_triplet, [10*8]), [ &
+      1, 1, 1, 1, 1, 1, 1, 1, &
+      1, 1, 1, 1, 2, 1, 1, 1, &
+      1, 1, 2, 1, 2, 1, 1, 2, &
+      1, 1, 1, 2, 1, 2, 1, 3, &
+      1, 1, 1, 2, 2, 2, 1, 3, &
+      1, 1, 2, 2, 2, 2, 1, 4, &
+      2, 1, 2, 1, 2, 1, 2, 2, &
+      1, 2, 1, 2, 2, 1, 2, 3, &
+      1, 2, 2, 1, 2, 2, 2, 3, &
+      2, 1, 2, 2, 2, 2, 2, 4  &
+      ] * 1_i64)
 
    !distribute_points
    !TODO This is a coarray dependent test. Will revisit.

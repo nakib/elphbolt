@@ -41,7 +41,7 @@ contains
    subroutine triplet_test()
 
       integer(i64) :: nbands, test
-      integer(i64), parameter :: mesh_size(3) = [2, 2, 2]
+      integer(i64), parameter :: mesh_size(3) = [1, 1, 2]
       integer(i64), allocatable :: lambda_1(:), lambda_2(:)
       type(Triplet_Set) :: result
       character(len=100) :: mesh_str
@@ -49,8 +49,7 @@ contains
       test = 1
       nbands = 2
       allocate(lambda_1(2)); lambda_1 = [1, 2]
-      allocate(lambda_2(16)); lambda_2 = [1, 2, 3, 4, 5, 6, 7, 8, &
-         9, 10, 11, 12, 13, 14, 15, 16]
+      allocate(lambda_2(4)); lambda_2 = [1, 2, 3, 4]
 
       write(mesh_str, '(3(I0,:,1x))') mesh_size
       write(*,'(A,I0,A,I0,A,A,A)') "Test ", test, " : nbands= ", nbands, " mesh= [", trim(adjustl(mesh_str)), "]"
@@ -74,7 +73,7 @@ contains
       integer(i64) :: q1(3), q2(3), q3(3), m1, m2, base
       integer(i64) :: triplet(3, 2), permuted(3, 2), sorted(3, 2)
       integer(i64), allocatable :: all_perms(:, :), tmp(:, :, :), iq_tmp(:, :)
-      integer(i64) :: i, j, k, n_stored, max_num_triplets
+      integer(i64) :: i, j, k, num_unique_triplet, max_num_triplets
       integer(i64) :: perm(3)
       logical :: triplet_exists
 
@@ -84,7 +83,7 @@ contains
       allocate(tmp(3, 2, max_num_triplets))
       allocate(iq_tmp(2, max_num_triplets))
 
-      n_stored = 0
+      num_unique_triplet = 0
 
       all_perms = permutations(3_i64)
 
@@ -131,7 +130,7 @@ contains
 
                ! Check and store unique triplets to avoid redundant triplet
                triplet_exists = .false.
-               do k = 1, n_stored
+               do k = 1, num_unique_triplet
                   if (all(sorted == tmp(:, :, k))) then
                      triplet_exists = .true.
                      exit
@@ -139,18 +138,18 @@ contains
                end do
 
                if(.not. triplet_exists) then
-                  n_stored = n_stored + 1
-                  tmp(:, :, n_stored) = sorted
-                  iq_tmp(:, n_stored) = [ilambda1, ilambda2]
+                  num_unique_triplet = num_unique_triplet + 1
+                  tmp(:, :, num_unique_triplet) = sorted
+                  iq_tmp(:, num_unique_triplet) = [ilambda1, ilambda2]
                end if
             end do
          end do
       end do
 
-      allocate(triplet_data%canonical_representative(3, 2, n_stored))
-      allocate(triplet_data%iq_pairs(2, n_stored))
-      triplet_data%canonical_representative = tmp(:, :, 1:n_stored)
-      triplet_data%iq_pairs = iq_tmp(:, 1:n_stored)
+      allocate(triplet_data%canonical_representative(3, 2, num_unique_triplet))
+      allocate(triplet_data%iq_pairs(2, num_unique_triplet))
+      triplet_data%canonical_representative = tmp(:, :, 1:num_unique_triplet)
+      triplet_data%iq_pairs = iq_tmp(:, 1:num_unique_triplet)
 
    end subroutine generate_triplets
 
