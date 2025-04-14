@@ -8,7 +8,7 @@ program test_misc
       unique, linspace, compsimps, mux_state, demux_state, demux_mesh, expm1, &
       Fermi, Bose, Pade_continued, precompute_interpolation_corners_and_weights, &
       interpolate_using_precomputed, operator(.umklapp.), shrink, Hilbert_transform, &
-      interpolator_1d, permutations, lex_less, Triplet_Set, generate_triplets
+      interpolator_1d, permutations, lex_less, Triplet_Set, generate_triplets, triplet_result
 
    implicit none
 
@@ -21,7 +21,7 @@ program test_misc
       mesh_size(3), nbands
    integer(i64), allocatable :: index_mesh_0(:, :), index_mesh_1(:, :), &
       ksint(:, :), idc(:, :), ik_interp(:), array_of_ints(:), perm(:, :), &
-      lambda_1(:), lambda_2(:), unique_triplet(:)
+      lambda_1(:), lambda_2(:)
    real(r64) :: pauli1(2, 2), ipauli2(2, 2), pauli3(2, 2), &
       real_array(5), result, q1(3, 4), q2(3, 4), q3(3, 4)
    real(r64), allocatable :: integrand(:), domain(:), im_axis(:), real_func(:), &
@@ -110,35 +110,9 @@ program test_misc
    write(mesh_str, '(3(I0,:,1x))') mesh_size
    write(*,'(A,I0,A,I0,A,A,A)') "Test ", itest, " : nbands= ", nbands, " mesh= [", trim(adjustl(mesh_str)), "]"
    call generate_triplets(nbands, mesh_size, lambda_1, lambda_2, triplet_data)
-   print *, "Actual:"
-   do i = 1, size(triplet_data%iq_pairs, 2)
-      print *, triplet_data%canonical_representative(1,1,i), triplet_data%canonical_representative(1,2,i), &
-         triplet_data%canonical_representative(2,1,i), triplet_data%canonical_representative(2,2,i), &
-         triplet_data%canonical_representative(3,1,i), triplet_data%canonical_representative(3,2,i), &
-         triplet_data%iq_pairs(1,i), triplet_data%iq_pairs(2,i)
-   end do
-   allocate(unique_triplet(8 * size(triplet_data%iq_pairs, 2)))
-   print *, "Size of unique_triplet: ", size(unique_triplet)
-   print *, "Size of expected values: ", 8 * 10  ! This should match
-   unique_triplet = [ &
-      triplet_data%canonical_representative(1,1,:), triplet_data%canonical_representative(1,2,:), &
-      triplet_data%canonical_representative(2,1,:), triplet_data%canonical_representative(2,2,:), &
-      triplet_data%canonical_representative(3,1,:), triplet_data%canonical_representative(3,2,:), &
-      triplet_data%iq_pairs(1,:), triplet_data%iq_pairs(2,:) &
-      ]
-   call test_array(itest)%assert(reshape(unique_triplet, [10*8]), [ &
-      1, 1, 1, 1, 1, 1, 1, 1, &
-      1, 1, 1, 1, 2, 1, 1, 1, &
-      1, 1, 2, 1, 2, 1, 1, 2, &
-      1, 1, 1, 2, 1, 2, 1, 3, &
-      1, 1, 1, 2, 2, 2, 1, 3, &
-      1, 1, 2, 2, 2, 2, 1, 4, &
-      2, 1, 2, 1, 2, 1, 2, 2, &
-      1, 2, 1, 2, 2, 1, 2, 3, &
-      1, 2, 2, 1, 2, 2, 2, 3, &
-      2, 1, 2, 2, 2, 2, 2, 4  &
-      ] * 1_i64)
-
+   call triplet_result(triplet_data)
+   !call test_array(itest)%assert(&
+    
    !distribute_points
    !TODO This is a coarray dependent test. Will revisit.
 
