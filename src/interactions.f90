@@ -197,7 +197,7 @@ contains
 
     real(r64) :: prefac, W_qw_msq, overlap
     complex(r64) :: diel_qw
-    real(r64) :: Gplusq(3), Gplusq_2normsq 
+    real(r64) :: Gplusq(3), Gplusq_2normsq
     integer(i64) :: ik1, ik2, ik3
 
     prefac = 1.0e9_r64*qe/(perm0*crys%epsiloninf) ! ev.nm
@@ -226,6 +226,7 @@ contains
     gCoul2_RPA = W_qw_msq*prefac**2*overlap/crys%volume**2 ! eV^2 
   end function gCoul2_RPA
 
+  
   pure real(r64) function Vm2_3ph(ev1_s1, ev2_s2, ev3_s3, &
     Index_i, Index_j, Index_k, ifc3, phases_q2q3, ntrip, nb)
     !! Function to calculate the squared 3-ph interaction vertex |V-|^2.

@@ -19,6 +19,7 @@ module misc
   
   use precision, only: r128, r64, i64
   use params, only: kB, twopi, pi
+  use fftw3
   
   implicit none
   
@@ -1721,48 +1722,96 @@ contains
     if(this_image() == 1) write(*,'(A75)') string2print
   end subroutine subtitle
 
+  ! subroutine Hilbert_transform(fx, Hfx)
+  !   !! Does Hilbert tranform for a given function
+  !   !! Ref - EQ (4)3, R. Balito et. al.
+  !   !! "An algorithm for fast Hilbert transform of real functions"
+  !   !!
+  !   !! fx The input function
+  !   !! Hfx The Hilbert transform
+
+  !   real(r64), intent(in) :: fx(:)
+  !   real(r64), allocatable, intent(out) :: Hfx(:)
+
+  !   ! Local variables
+  !   integer :: n, k, nfx
+  !   real(r64) :: term2, term3, b
+
+  !   nfx = size(fx)
+  !   allocate(Hfx(nfx))
+
+  !   ! Hilbert function is zero at the edges
+  !   Hfx(1) = 0.0_r64
+  !   Hfx(nfx) = 0.0_r64
+
+  !   ! Note: In the reference, we have N + 1 points and indexing is 0-based
+  !   ! whereas here we have N points and indexing is 1-based
+  !   do k = 1, nfx - 2 ! Run over the internal points
+  !      term2 = 0.0_r64 ! 2nd term in Bilato Eq. 4
+  !      term3 = 0.0_r64 ! 3rd term in Bilato Eq. 4
+
+  !      do n = 1, nfx - 2 - k ! Partial sum over internal points
+  !         b = log((n + 1.0_r64)/n)
+  !         term2 = term2 - (1.0_r64 - (n + 1.0_r64)*b)*fx(k + n + 1) + &
+  !              (1.0_r64 - n*b)*fx(k + n + 2)
+  !      end do
+  !      
+  !      do n = 1, k - 1 ! Partial sum over internal points
+  !         b = log((n + 1.0_r64)/n)
+  !         term3 = term3 + (1.0_r64 - (n + 1.0_r64)*b)*fx(k - n + 1) - &
+  !              (1.0_r64 - n*b)*fx(k - n)
+  !      end do
+  !      
+  !      Hfx(k + 1) = -(fx(k + 2) - fx(k) + term2 + term3)/pi
+  !   end do
+  ! end subroutine Hilbert_transform
+
   subroutine Hilbert_transform(fx, Hfx)
-    !! Does Hilbert tranform for a given function
-    !! Ref - EQ (4)3, R. Balito et. al.
-    !! "An algorithm for fast Hilbert transform of real functions"
-    !!
-    !! fx The input function
-    !! Hfx The Hilbert transform
+    !! Hilbert transform, H(f(w)) = IFFT(-i.sgn(t).FFT(f(w)))
+    !! fx is the function 
+    !! Hfx is the Hilbert transform of the function
+    !! 
 
+    real(r64), intent(out) :: Hfx(:)
     real(r64), intent(in) :: fx(:)
-    real(r64), allocatable, intent(out) :: Hfx(:)
 
-    ! Local variables
-    integer :: n, k, nfx
-    real(r64) :: term2, term3, b
+    integer :: i, N
+    complex(r64), allocatable :: x_fft(:), x_hilbert(:), fx_c(:), Hfx_c(:)
+    complex(r64) :: h_filter
+    type(c_ptr) :: plan_fwd, plan_bwd 
 
-    nfx = size(fx)
-    allocate(Hfx(nfx))
+    N = size(fx)
 
-    ! Hilbert function is zero at the edges
-    Hfx(1) = 0.0_r64
-    Hfx(nfx) = 0.0_r64
+    ! allocate all the arrays
+    allocate(x_fft(N), x_hilbert(N), fx_c(N), Hfx_c(N))
 
-    ! Note: In the reference, we have N + 1 points and indexing is 0-based
-    ! whereas here we have N points and indexing is 1-based
-    do k = 1, nfx - 2 ! Run over the internal points
-       term2 = 0.0_r64 ! 2nd term in Bilato Eq. 4
-       term3 = 0.0_r64 ! 3rd term in Bilato Eq. 4
+    !complexify
+    fx_c = fx
 
-       do n = 1, nfx - 2 - k ! Partial sum over internal points
-          b = log((n + 1.0_r64)/n)
-          term2 = term2 - (1.0_r64 - (n + 1.0_r64)*b)*fx(k + n + 1) + &
-               (1.0_r64 - n*b)*fx(k + n + 2)
-       end do
-       
-       do n = 1, k - 1 ! Partial sum over internal points
-          b = log((n + 1.0_r64)/n)
-          term3 = term3 + (1.0_r64 - (n + 1.0_r64)*b)*fx(k - n + 1) - &
-               (1.0_r64 - n*b)*fx(k - n)
-       end do
-       
-       Hfx(k + 1) = -(fx(k + 2) - fx(k) + term2 + term3)/pi
+    ! create plans
+    plan_fwd = fftw_plan_dft_1d(N, fx_c, x_fft, FFTW_FORWARD, FFTW_ESTIMATE)
+    plan_bwd = fftw_plan_dft_1d(N, x_hilbert, Hfx_c, FFTW_BACKWARD, FFTW_ESTIMATE)
+
+    ! Forward FFT
+    call fftw_execute_dft(plan_fwd, fx_c, x_fft)
+
+    !put filter
+    x_hilbert = x_fft*cmplx(0.0_r64, 1.0_r64)
+    x_hilbert(1) = x_fft(1)*cmplx(0.0_r64, 0.0_r64)
+    do i = 2, N/2+1
+      x_hilbert(i) = x_hilbert(i)*(-1.0_r64)
     end do
+    
+    ! inverse FFTW
+    call fftw_execute_dft(plan_bwd, x_hilbert, Hfx_c)
+
+    Hfx = real(Hfx_c)/N ! Normalize
+    
+    ! cleanup
+    call fftw_destroy_plan(plan_fwd)
+    call fftw_destroy_plan(plan_bwd)
+    call fftw_cleanup()
+
   end subroutine Hilbert_transform
 
   pure function interpolator_1d(samp, cont, f_cont) result(f_samp)

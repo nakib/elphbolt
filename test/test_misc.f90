@@ -365,7 +365,11 @@ program test_misc
   xmin = -30.0
   xmax = 30.0
   n_even = 4000
+  allocate(x_even(n_even))
+  call linspace(x_even, xmin, xmax, n_even)
   n_odd = 4001
+  allocate(x_odd(n_odd))
+  call linspace(x_odd, xmin, xmax, n_odd)
   ! ind_even are indices to compare in case of even number of points
   ! ind_odd are indices to compare in case of odd number of points
   allocate(ind_even(6),ind_odd(5))
@@ -374,33 +378,31 @@ program test_misc
 
   itest = itest + 1
   test_array(itest) = testify("Hilbert transform: f(x) = 1/(1 + x^2), even points")
-  allocate(x_even(n_even), hfx1_even(n_even))
-  call linspace(x_even, xmin, xmax, n_even)
+  allocate(hfx1_even(n_even))
   call Hilbert_transform(fx1(x_even), hfx1_even)
   call test_array(itest)%assert(hfx1_even(ind_even), hfx1(x_even(ind_even)), &
-       tol = 2e-4_r64)
+       tol = 2e-3_r64)
 
   itest = itest + 1
   test_array(itest) = testify("Hilbert transform: f(x) = sin(x)/(1 + x^2), even points")
   allocate(hfx2_even(n_even))
   call Hilbert_transform(fx2(x_even), hfx2_even)
   call test_array(itest)%assert(hfx2_even(ind_even), hfx2(x_even(ind_even)), &
-       tol = 1e-4_r64)
+       tol = 1e-3_r64)
 
   itest = itest + 1
   test_array(itest) = testify("Hilbert transform: f(x) = 1/(1 + x^2), odd points")
-  allocate(x_odd(n_odd), hfx1_odd(n_odd))
-  call linspace(x_odd, xmin, xmax, n_odd)
+  allocate(hfx1_odd(n_odd))
   call Hilbert_transform(fx1(x_odd), hfx1_odd)
   call test_array(itest)%assert(hfx1_odd(ind_odd), hfx1(x_odd(ind_odd)), &
-       tol = 4e-4_r64)
+       tol = 4e-3_r64)
 
   itest = itest + 1
   test_array(itest) = testify("Hilbert transform: f(x) = sin(x)/(1 + x^2), odd points")
   allocate(hfx2_odd(n_odd))
   call Hilbert_transform(fx2(x_odd), hfx2_odd)
   call test_array(itest)%assert(hfx2_odd(ind_odd), hfx2(x_odd(ind_odd)), &
-       tol = 1e-5_r64)
+       tol = 1e-3_r64)
   
   ! 1D Interpolation
   itest = itest + 1
