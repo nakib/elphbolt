@@ -8,20 +8,20 @@ program test_misc
       unique, linspace, compsimps, mux_state, demux_state, demux_mesh, expm1, &
       Fermi, Bose, Pade_continued, precompute_interpolation_corners_and_weights, &
       interpolate_using_precomputed, operator(.umklapp.), shrink, Hilbert_transform, &
-      interpolator_1d, permutations, lex_less, Triplet_Set, generate_triplets, triplet_result
+      interpolator_1d, permutations, lex_less_2d, lex_less_1d, map_triplet_full_to_reduced
 
    implicit none
 
    integer :: itest
-   integer, parameter :: num_tests = 39
+   integer, parameter :: num_tests = 41
    type(testify) :: test_array(num_tests), tests_all
    integer(i64) :: index, quotient, remainder, int_array(5), v1(3), v2(3), &
       v1_muxed, v2_muxed, ik, ik1, ik2, ik3, ib1, ib2, ib3, wvmesh(3), &
-      mesh_ref_array(3), nk_coarse, ninterp, N, i, j, a(3,2), b(3,2), &
-      mesh_size(3), nbands
+      mesh_ref_array(3), nk_coarse, ninterp, N, i, j, a(3,2), b(3,2), c(3), d(3), &
+      nbands, mesh_size(3)
    integer(i64), allocatable :: index_mesh_0(:, :), index_mesh_1(:, :), &
       ksint(:, :), idc(:, :), ik_interp(:), array_of_ints(:), perm(:, :), &
-      lambda_1(:), lambda_2(:)
+      lambda_1(:), lambda_2(:), M(:, :, :)
    real(r64) :: pauli1(2, 2), ipauli2(2, 2), pauli3(2, 2), &
       real_array(5), result, q1(3, 4), q2(3, 4), q3(3, 4)
    real(r64), allocatable :: integrand(:), domain(:), im_axis(:), real_func(:), &
@@ -29,9 +29,7 @@ program test_misc
    real(r64), allocatable :: hfx1_even(:), hfx1_odd(:), hfx2_even(:), hfx2_odd(:), &
       ind_even(:), ind_odd(:), x_even(:), x_odd(:), xmin, xmax
    integer(i64) :: n_even, n_odd
-   logical :: lex_order
-   character(len=100) :: mesh_str
-   type(Triplet_Set) :: triplet_data
+   logical :: lex_order_2d, lex_order_1d
 
    print*, '<<module misc unit tests>>'
 
@@ -76,43 +74,51 @@ program test_misc
       2, 4, 3, 1,  4, 2, 3, 1,  4, 2, 1, 3,  2, 4, 1, 3,  2, 1, 4, 3,  2, 1, 3, 4 &
       ]*1_i64)
 
-   !lex_less(a, b)
+   !lex_less_2d(a, b)
    itest = itest + 1
-   test_array(itest) = testify("lex_less: a smaller than b")
+   test_array(itest) = testify("lex_less_2d: a smaller than b")
    a = reshape([0, 1,  1, 0,  2, 0]*1_i64, [3, 2])
    b = reshape([0, 1,  1, 0,  2, 1]*1_i64, [3, 2])
-   lex_order = lex_less(a, b)
-   call test_array(itest)%assert(lex_order, .true.)
+   lex_order_2d = lex_less_2d(a, b)
+   call test_array(itest)%assert(lex_order_2d, .true.)
 
    itest = itest + 1
-   test_array(itest) = testify("lex_less: a equal to b")
+   test_array(itest) = testify("lex_less_2d: a equal to b")
    a = reshape([0, 1,  1, 0,  2, 1]*1_i64, [3, 2])
    b = reshape([0, 1,  1, 0,  2, 1]*1_i64, [3, 2])
-   lex_order = lex_less(a, b)
-   call test_array(itest)%assert(lex_order, .false.)
+   lex_order_2d = lex_less_2d(a, b)
+   call test_array(itest)%assert(lex_order_2d, .false.)
 
    itest = itest + 1
-   test_array(itest) = testify("lex_less: a greater than b")
+   test_array(itest) = testify("lex_less_2d: a greater than b")
    a = reshape([1, 1,  2, 2,  2, 1]*1_i64, [3, 2])
    b = reshape([1, 1,  2, 1,  2, 2]*1_i64, [3, 2])
-   lex_order = lex_less(a, b)
-   call test_array(itest)%assert(lex_order, .false.)
+   lex_order_2d = lex_less_2d(a, b)
+   call test_array(itest)%assert(lex_order_2d, .false.)
 
-   !Generate triplet
-   itest = itest +1
-   test_array(itest) = testify("triplet to iq mapping")
+   !lex_less_1d(c, d)
+   itest = itest + 1
+   test_array(itest) = testify("lex_less_1d: c smaller than d")
+   c = reshape([0, 1, 2]*1_i64, [3])
+   d = reshape([0, 1, 3]*1_i64, [3])
+   lex_order_1d = lex_less_1d(c, d)
+   call test_array(itest)%assert(lex_order_1d, .true.)
+
+   !map_triplet_full_to_reduced(ilambda1, ilambda2)= canonical rep of triplet (lambda1, lambda2, lambda3)
+   itest = itest + 1
+   test_array(itest) = testify("map triplet full to reduced: M(1,1) = [1,1,1]")
    nbands = 2
-   mesh_size = [1, 1, 2]
-   allocate(lambda_1(2))
-   allocate(lambda_2(4))
-   lambda_1 = [1, 2]*1_i64
-   lambda_2 = [1, 2, 3, 4]*1_i64
-   write(mesh_str, '(3(I0,:,1x))') mesh_size
-   write(*,'(A,I0,A,I0,A,A,A)') "Test ", itest, " : nbands= ", nbands, " mesh= [", trim(adjustl(mesh_str)), "]"
-   call generate_triplets(nbands, mesh_size, lambda_1, lambda_2, triplet_data)
-   call triplet_result(triplet_data)
-   !call test_array(itest)%assert(&
-    
+   mesh_size = [2, 2, 2]*1_i64
+   allocate(lambda_1(1), lambda_2(1))
+   lambda_1 = [1]*1_i64
+   lambda_2 = [1, 2]*1_i64
+   call map_triplet_full_to_reduced(nbands, mesh_size, lambda_1, lambda_2, M)
+   call test_array(itest)%assert(reshape(M(:,1,1), [3]), [1, 1, 1]*1_i64)
+
+   itest = itest + 1
+   test_array(itest) = testify("map triplet full to reduced: M(1,2) = [1,1,2]")
+   call test_array(itest)%assert(reshape(M(:,1,2), [3]), [1, 1, 2]*1_i64)
+
    !distribute_points
    !TODO This is a coarray dependent test. Will revisit.
 

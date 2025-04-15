@@ -26,13 +26,6 @@ module misc
    private :: sort_int, sort_real, Pade_coeffs, twonorm_real_rank1, twonorm_real_rank2, &
       invert_complex_square, add_and_fold, add_and_fold_array, shrink_int, shrink_real
 
-   type Triplet_Set
-      !! Stores unique irreducible triplets and their corresponding (iq1, iq2) labels
-
-      integer(i64), allocatable :: canonical_representative(:, :, :)
-      integer(i64), allocatable :: iq_pairs(:, :)
-   end type Triplet_Set
-
    type timer
       !! Container for timing related data and procedures.
 
@@ -210,8 +203,8 @@ contains
       end do
    end function permutations
 
-   pure logical function lex_less(a, b)
-      !! lex_less is a comparison function -- boolean comparator
+   pure logical function lex_less_2d(a, b)
+      !! lex_less_2d is a comparison function -- boolean comparator
       !!
       !! compare two triplets a and b lexicographically
       !! this function returns .true. if triplet a comes before triplet b
@@ -227,26 +220,52 @@ contains
 
       do i = 1, 3
          if(a(i, 1) < b(i, 1)) then
-            lex_less = .true.
+            lex_less_2d = .true.
             return
          else if(a(i, 1) > b(i, 1)) then
-            lex_less = .false.
+            lex_less_2d = .false.
             return
          else if(a(i, 2) < b(i, 2)) then
-            lex_less = .true.
+            lex_less_2d = .true.
             return
          else if(a(i, 2) > b(i, 2)) then
-            lex_less = .false.
+            lex_less_2d = .false.
             return
          end if
       end do
 
-      lex_less = .false.
-   end function lex_less
+      lex_less_2d = .false.
+   end function lex_less_2d
 
-   subroutine generate_triplets(nbands, mesh_size, lambda_1, lambda_2, triplet_data)
-      !! this subroutine generates all valid triplets of the form ((iband1, ik1), (iband2, ik2), (iband3, ik3))
+   pure logical function lex_less_1d(c, d)
+      !! lex_less_1d is a comparison function -- boolean comparator
       !!
+      !! this function performs a lexicographic comparison of two integer triplets a and b, each of shape (3).
+      !! it returns .t. if a is lexicographically less than b, and .f. otherwise
+
+      integer(i64), intent(in) :: c(3), d(3)
+
+      ! Local
+      integer :: i
+
+      do i = 1, 3
+         if(c(i) < d(i)) then
+            lex_less_1d = .true.
+            return
+         else if(c(i) > d(i)) then
+            lex_less_1d = .false.
+            return
+         end if
+      end do
+
+      lex_less_1d = .false.
+   end function lex_less_1d
+
+   subroutine map_triplet_full_to_reduced(nbands, mesh_size, lambda_1, lambda_2, M)
+      !! This subroutine maps the canonical triplet is converted back to (ilambda1, ilambda2) and stored in M(:, iq1, iq2).
+      !!
+      !! M is a 3D array: M(3, size(lambda_1), size(lambda_2))
+      !! For each pair (ilambda1, ilambda2), you construct a triplet (lambda1, lambda2, lambda3)
       !! each input lambda index corresponds to a state (iband, ik), where
       !! ik3 is computed from momentum conservation q1 - q2 - q3 = 0 mod mesh
       !! for each triplet, all 3! = 6 permutations are generated using
@@ -254,23 +273,18 @@ contains
 
       integer(i64), intent(in) :: nbands, mesh_size(3)
       integer(i64), intent(in) :: lambda_1(:), lambda_2(:)
-      type(Triplet_Set), intent(out) :: triplet_data
+      integer(i64), allocatable, intent(out) :: M(:, :, :)
 
-      integer(i64) :: ilambda1, ilambda2, iband1, ik1, iband2, ik2, iband3, ik3
-      integer(i64) :: q1(3), q2(3), q3(3), m1, m2, base
-      integer(i64) :: triplet(3, 2), permuted(3, 2), sorted(3, 2)
-      integer(i64), allocatable :: all_perms(:, :), tmp(:, :, :), iq_tmp(:, :)
-      integer(i64) :: i, j, k, num_unique_triplet, max_num_triplets
-      integer(i64) :: perm(3)
-      logical :: triplet_exists
+      integer(i64) :: ilambda1, ilambda2, iband1, iband2, iband3, ik1, ik2, ik3
+      integer(i64) :: q1(3), q2(3), q3(3)
+      integer(i64), allocatable :: all_perms(:, :)
+      integer(i64) :: triplet_full(3), permuted_triplet(3), canonical_triplet(3)
+      integer(i64) :: i, j
 
-      !Give an upper bound on the maximum number of triplets based on mesh and band count
-      max_num_triplets = int(1.2_r64*size(lambda_1)*size(lambda_2)*nbands)
+      allocate(M(3, size(lambda_1), size(lambda_2)))
 
-      allocate(tmp(3, 2, max_num_triplets))
-      allocate(iq_tmp(2, max_num_triplets))
-
-      num_unique_triplet = 0
+      !! Initialize all element of M to a known integer value -1: mean that the triplet has not been assigned yet
+      M = -1_i64
 
       all_perms = permutations(3_i64)
 
@@ -280,7 +294,7 @@ contains
          call demux_state(lambda_1(ilambda1), nbands, iband1, ik1)
 
          ! Demux vector to get q1
-         call demux_vector(ik1, q1, mesh_size, base = 0_i64)
+         call demux_vector(ik1, q1, mesh_size, base=0_i64)
 
          do ilambda2 = 1, size(lambda_2)
 
@@ -288,70 +302,47 @@ contains
             call demux_state(lambda_2(ilambda2), nbands, iband2, ik2)
 
             ! Demux vector to get q1
-            call demux_vector(ik2, q2, mesh_size, base = 0_i64)
+            call demux_vector(ik2, q2, mesh_size, base=0_i64)
 
-            ! Compute q3 using modular arithmetic: such that momentum is conserved: q1 - q2 - q3 ≡ 0 mod G
+            ! Compute q3 using modular arithmetic: such that momentum is conserved: q1 - q2 - q3 = 0 mod G
             q3 = modulo(q1 - q2, mesh_size)
 
             ! Compute ik3 using mux_vector
-            ik3 = mux_vector(q3, mesh_size, base = 0_i64)
+            ik3 = mux_vector(q3, mesh_size, base=0_i64)
+
+            ! Initialize the canonical triplet with a high value, so any triplet I compare against will be smaller
+            canonical_triplet = [huge(0_i64), huge(0_i64), huge(0_i64)]
 
             ! Iterate over all possible bands for third state: to have (iband3, ik3)
             do iband3 = 1, nbands
-               triplet(:, 1) = [iband1, iband2, iband3]
-               triplet(:, 2) = [ik1, ik2, ik3]
+               triplet_full = [mux_state(nbands, iband1, ik1), &
+                  mux_state(nbands, iband2, ik2), &
+                  mux_state(nbands, iband3, ik3)]
 
-               sorted = triplet
+               !! Initialize the canonical form of the triplet to the original (unpermuted) triplet, before trying other triplet
+               !! triplet_full is a 3x2 array: ((iband1, ik1), (iband2, ik2), (iband3, ik3))
+               canonical_triplet = triplet_full
 
-               ! Generate all permutations using Johnson–Trotter, compare them, and finds the lexicographically smallest triplet
                do i = 1, size(all_perms, 2)
-                  perm = all_perms(:, i)
-
                   do j = 1, 3
-                     permuted(j, 1) = triplet(perm(j), 1)
-                     permuted(j, 2) = triplet(perm(j), 2)
+                     permuted_triplet(j) = triplet_full(all_perms(j, i))
                   end do
 
-                  if(lex_less(permuted, sorted)) sorted = permuted
+                  !! Use a lexicographic comparison function to keep the smallest permutation
+                  if (lex_less_1d(permuted_triplet, canonical_triplet)) canonical_triplet = permuted_triplet
                end do
 
-               ! Check and store unique triplets to avoid redundant triplet
-               triplet_exists = .false.
-               do k = 1, num_unique_triplet
-                  if (all(sorted == tmp(:, :, k))) then
-                     triplet_exists = .true.
-                     exit
-                  end if
-               end do
+               !! after elaborating the triplet (lambda1, lambda2, lambda3) as linear state indices
+               !! and after generating all 6 permutations
+               !! keep only the lexicographically smallest permutation (the irreducible triplet)
+               !! Store it in M(:, ilambda1, ilambda2)
 
-               if(.not. triplet_exists) then
-                  num_unique_triplet = num_unique_triplet + 1
-                  tmp(:, :, num_unique_triplet) = sorted
-                  iq_tmp(:, num_unique_triplet) = [ilambda1, ilambda2]
-               end if
+               M(:, ilambda1, ilambda2) = canonical_triplet
+               exit
             end do
          end do
       end do
-
-      allocate(triplet_data%canonical_representative(3, 2, num_unique_triplet))
-      allocate(triplet_data%iq_pairs(2, num_unique_triplet))
-      triplet_data%canonical_representative = tmp(:, :, 1:num_unique_triplet)
-      triplet_data%iq_pairs = iq_tmp(:, 1:num_unique_triplet)
-
-   end subroutine generate_triplets
-
-   subroutine triplet_result(result)
-      type(Triplet_Set), intent(in) :: result
-      integer(i64) :: k
-
-      do k = 1, size(result%iq_pairs, 2)
-         write(*,'(A,"((",I0,",",I0,"),(",I0,",",I0,"),(",I0,",",I0,")) = (",I0,",",I0,")")') &
-            'M', result%canonical_representative(1,1,k), result%canonical_representative(1,2,k), &
-            result%canonical_representative(2,1,k), result%canonical_representative(2,2,k), &
-            result%canonical_representative(3,1,k), result%canonical_representative(3,2,k), &
-            result%iq_pairs(1,k), result%iq_pairs(2,k)
-      end do
-   end subroutine triplet_result
+   end subroutine map_triplet_full_to_reduced
 
    subroutine linspace(grid, min, max, num)
       !! Create equidistant grid.
