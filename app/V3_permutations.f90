@@ -21,6 +21,15 @@ program V3_permutations
 
   call triplet_test()
 
+  if(this_image() == 1) then
+     write(*, '(A)')  'V3 permutations playground'
+     write(*, '(A, I5)') 'Number of coarray images = ', num_images()
+  end if
+
+  !NHP: The following has to be called, or else the program will not
+  !print anything useful.
+  call triplet_test
+
 contains
 
   subroutine triplet_test()
@@ -136,5 +145,4 @@ contains
        end do
     end do
   end subroutine map_triplet_full_to_reduced
-
 end program V3_permutations

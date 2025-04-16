@@ -29,6 +29,7 @@ program test_misc
   real(r64), allocatable :: hfx1_even(:), hfx1_odd(:), hfx2_even(:), hfx2_odd(:), &
        ind_even(:), ind_odd(:), x_even(:), x_odd(:), xmin, xmax
   integer(i64) :: n_even, n_odd
+
   logical :: lex_order_2d, lex_order_1d
 
   print*, '<<module misc unit tests>>'
