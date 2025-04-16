@@ -21,7 +21,7 @@ program test_misc
        nbands, mesh_size(3)
   integer(i64), allocatable :: index_mesh_0(:, :), index_mesh_1(:, :), &
        ksint(:, :), idc(:, :), ik_interp(:), array_of_ints(:), perm(:, :), &
-       lambda_1(:), lambda_2(:), M(:, :, :)
+       lambda1_list(:), lambda2_list(:), M(:, :, :)
   real(r64) :: pauli1(2, 2), ipauli2(2, 2), pauli3(2, 2), &
        real_array(5), result, q1(3, 4), q2(3, 4), q3(3, 4)
   real(r64), allocatable :: integrand(:), domain(:), im_axis(:), real_func(:), &
@@ -110,10 +110,10 @@ program test_misc
   test_array(itest) = testify("map_triplet_full_to_reduced: M(1, 1) should be [1, 1, 1]")
   nbands = 2
   mesh_size = [2, 2, 2]*1_i64
-  allocate(lambda_1(2), lambda_2(16))
-  lambda_1 = [1, 2]*1_i64
-  lambda_2 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]*1_i64
-  call map_triplet_full_to_reduced(nbands, mesh_size, lambda_1, lambda_2, M)
+  allocate(lambda1_list(2), lambda2_list(16))
+  lambda1_list = [1, 2]*1_i64
+  lambda2_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]*1_i64
+  call map_triplet_full_to_reduced(nbands, mesh_size, lambda1_list, lambda2_list, M)
   call test_array(itest)%assert(reshape(M(:, 1, 1), [3]), [1, 1, 1]*1_i64)
 
   itest = itest + 1
