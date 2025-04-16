@@ -106,7 +106,7 @@ program test_misc
 
   ! map_triplet_full_to_reduced(ilambda2, ilambda1) = canonical representative of triplet (lambda1, lambda2, lambda3)
   itest = itest + 1
-  test_array(itest) = testify("map_triplet_full_to_reduced: M(1,1) should be [1, 1, 1]")
+  test_array(itest) = testify("map_triplet_full_to_reduced: M(1, 1) should be [1, 1, 1]")
   nbands = 2
   mesh_size = [2, 2, 2]*1_i64
   allocate(lambda_1(2), lambda_2(16))
@@ -116,11 +116,11 @@ program test_misc
   call test_array(itest)%assert(reshape(M(:, 1, 1), [3]), [1, 1, 1]*1_i64)
 
   itest = itest + 1
-  test_array(itest) = testify("map_triplet_full_to_reduced: M(9,1) should be [1, 9, 9]")
+  test_array(itest) = testify("map_triplet_full_to_reduced: M(9, 1) should be [1, 9, 9]")
   call test_array(itest)%assert(reshape(M(:, 9, 1), [3]), [1, 9, 9]*1_i64)
 
   itest = itest + 1
-  test_array(itest) = testify("map_triplet_full_to_reduced: M(16,2) should be [2, 15, 16]")
+  test_array(itest) = testify("map_triplet_full_to_reduced: M(16, 2) should be [2, 15, 16]")
   call test_array(itest)%assert(reshape(M(:, 16, 2), [3]), [2, 15, 16]*1_i64)
 
   !distribute_points
