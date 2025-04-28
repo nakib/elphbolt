@@ -668,8 +668,8 @@ contains
     !Locals
     real(r64) :: ph_kappa_scalar, ph_kappa_scalar_old, ph_alphabyT_scalar, ph_alphabyT_scalar_old, &
          el_kappa0_scalar, el_kappa0_scalar_old, el_alphabyT_scalar, el_alphabyT_scalar_old, &
-         el_sigma_scalar, el_sigma_scalar_old, el_sigmaS_scalar, el_sigmaS_scalar_old, KO_dev, lambda, &
-         tot_alphabyT_scalar
+         el_sigma_scalar, el_sigma_scalar_old, el_sigmaS_scalar, el_sigmaS_scalar_old, KO_dev, &
+         lambda, lambda_diag(3), tot_alphabyT_scalar
     real(r64), allocatable :: I_diff(:,:,:), I_drag(:,:,:), &
          ph_drag_term_T(:,:,:), ph_drag_term_E(:,:,:), widc(:,:)
     integer(i64), allocatable :: idc(:,:) , ksint(:,:)
@@ -781,6 +781,10 @@ contains
           I_drag = self%el_response_T - I_diff
           call correct_I_drag(I_drag, trace(sum(trans%ph_alphabyT, dim = 1))/crys%dim, lambda)
           self%el_response_T = I_diff + lambda*I_drag
+!!$          call correct_I_drag_expt(I_drag, sum(trans%ph_alphabyT, dim = 1), lambda_diag)
+!!$          self%el_response_T = I_diff + &
+!!$               I_drag*spread(spread(lambda_diag, dim = 1, ncopies = size(I_drag, 1)), &
+!!$               dim = 2, ncopies = size(I_drag, 2))
 
           !Calculate electron transport coefficients
           call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
@@ -875,21 +879,23 @@ contains
 
   contains
 
-    subroutine correct_I_drag(I_drag, constraint, lambda)
+     subroutine correct_I_drag(I_drag, constraint, lambda)
       !! Subroutine to find scaling correction to I_drag.
 
-      real(r64), intent(in) :: I_drag(:,:,:), constraint
+      real(r64), intent(in) :: I_drag(:, :, :), constraint
       real(r64), intent(out) :: lambda
 
       !Internal variables
       integer(i64) :: it, maxiter
-      real(r64) :: a, b, sigmaS(size(I_drag(1,:,1)), 3, 3),&
-           thresh, sigmaS_scalar, dummy(size(I_drag(1,:,1)), 3, 3)
+      real(r64) :: a, b, sigmaS(size(I_drag(1, :, 1)), 3, 3),&
+           thresh, sigmaS_scalar, dummy(size(I_drag(1, :, 1)), 3, 3)
 
       a = 0.0_r64 !lower bound
       b = 2.0_r64 !upper bound
-      maxiter = 100
-      thresh = 1.0e-6_r64
+
+      maxiter = 100 !maximum number of iterations to try
+      thresh = 1.0e-6_r64 !convergence threshold
+      
       do it = 1, maxiter
          lambda = 0.5_r64*(a + b)
          !Calculate electron transport coefficients
@@ -906,8 +912,55 @@ contains
             b = lambda
          end if
       end do
-    end subroutine correct_I_drag
+     end subroutine correct_I_drag
 
+     subroutine correct_I_drag_expt(I_drag, constraint, lambda)
+       !! Subroutine to find scaling correction to I_drag.
+       !
+       ! This generalized the previous one by considering each
+       ! diagonal element separately. [NOT FULLY TESTED!]
+
+       real(r64), intent(in) :: I_drag(:, :, :), constraint(3, 3)
+       real(r64), intent(out) :: lambda(3)
+
+       !Internal variables
+       integer(i64) :: it, maxiter, j
+       real(r64) :: a(3), b(3), sigmaS(size(I_drag(1, :, 1)), 3, 3), &
+            thresh, sigmaS_mat(3, 3), dummy(size(I_drag(1, :, 1)), 3, 3)
+       logical :: flag_conv
+
+       a = [0, 0, 0]*0.0_r64 !lower bound
+       b = [2, 2, 2]*1.0_r64 !upper bound
+
+       maxiter = 100 !maximum number of iterations to try
+       thresh = 1.0e-6_r64 !convergence threshold
+       
+       do it = 1, maxiter
+          lambda = 0.5_r64*(a + b)
+
+          !Calculate electron transport coefficients
+          call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
+               el%ens, el%vels, crys%volume, el%wvmesh, &
+               I_drag*spread(spread(lambda, dim = 1, ncopies = size(I_drag, 1)), dim = 2, ncopies = size(I_drag, 2)), &
+               sym, dummy, sigmaS)
+          sigmaS_mat = sum(sigmaS, dim = 1)
+          
+          flag_conv = .true.
+          do j = 1,3 
+             if(abs(sigmaS_mat(j, j) - constraint(j, j)) < thresh) then
+                cycle  
+             else if(abs(sigmaS_mat(j, j)) < abs(constraint(j, j))) then
+                a(j) = lambda(j)
+             else
+                b(j) = lambda(j)
+             end if
+             
+             flag_conv = .false.
+          end do
+
+          if(flag_conv) exit
+       end do
+     end subroutine correct_I_drag_expt
   end subroutine dragfull_ephbtes
   
   subroutine calculate_field_term(species, field, nequiv, ibz2fbz_map, &

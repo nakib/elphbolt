@@ -1,6 +1,7 @@
 - Core team
   - Nakib H. Protik (maintainer)
   - Dwaipayan Paul
+  - Sally Issa
 
 - External contributors
    - Xavier Cartoixà Soler
@@ -14,3 +15,5 @@
 	 - [PR #138](https://github.com/nakib/elphbolt/pull/138): Periodic table of elements represented as a hashtable.
    - Pritam Sarkar
 	 - [PR #158](https://github.com/nakib/elphbolt/pull/158): Better handling of tetrahedra vertices that lie outside the Fermi shell.
+   - Elena Trukhan
+	 - [PR #177](https://github.com/nakib/elphbolt/pull/177): Diagonal elementwise Kelvin-Onsager enforcer.

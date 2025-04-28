@@ -1495,6 +1495,7 @@ contains
                          TP_istate(count) = g2_istate(count)*occup_fac*delta
                       end if
 
+                      !TODO: Check if these are actually every needed later
                       !Save initial and final electron states
                       istate1(count) = mux_state(el%numbands, m, ik)
                       istate2(count) = mux_state(el%numbands, n, ikp_window)
