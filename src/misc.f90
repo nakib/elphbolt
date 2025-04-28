@@ -1799,7 +1799,7 @@ contains
     x_hilbert = x_fft*cmplx(0.0_r64, 1.0_r64)
     x_hilbert(1) = x_fft(1)*cmplx(0.0_r64, 0.0_r64)
     do i = 2, N/2+1
-      x_hilbert(i) = x_hilbert(i)*(-1.0_r64)
+       x_hilbert(i) = x_hilbert(i)*(-1.0_r64)
     end do
     
     ! inverse FFTW
@@ -1811,7 +1811,6 @@ contains
     call fftw_destroy_plan(plan_fwd)
     call fftw_destroy_plan(plan_bwd)
     call fftw_cleanup()
-
   end subroutine Hilbert_transform
 
   pure function interpolator_1d(samp, cont, f_cont) result(f_samp)
