@@ -19,12 +19,8 @@ module misc
 
   use precision, only: r128, r64, i64
   use params, only: kB, twopi, pi
-<<<<<<< HEAD
   use fftw3
   
-=======
-
->>>>>>> prot
   implicit none
 
   public :: operator(.umklapp.)
