@@ -16,13 +16,14 @@ Using /ab initio/ electron-phonon and a fully wave vector and electron band/phon
 - anisotropic and isotropic Eliashberg spectral function and
 - phonon-mediated superconducting transition temperature.
 
-To date (Jan 7, 2025), ~elphbolt~ / ~superconda~ has been used in the following works:
+To date (April 28, 2025), ~elphbolt~ / ~superconda~ has been used in the following works:
 | material(s)                        | physics probed                                                                                        | publication                               |
 |------------------------------------+-------------------------------------------------------------------------------------------------------+-------------------------------------------|
+| θ-TaN                              | drag asymmetry and reverse heat flow                                                                  | [[https://doi.org/10.1016/j.mtphys.2025.101706][Mat. Tod. Phys 53, 101706]]                 |
 | MoS_{2}                            | coupled electron-phonon hydrodynamics                                                                 | [[https://arxiv.org/abs/2411.14649][preprint]]                                  |
 | NbGe_{2} & NbSe_{2}                | drag                                                                                                  | [[https://cpl.iphy.ac.cn/en/article/doi/10.1088/0256-307X/41/12/126301?viewType=HTML][Chin. Phys. Lett. > 2024 > 41(12), 126301]] |
 | wGaN                               | thermal analysis of GaN-based photonic membranes for optoelectronics                                  | [[https://arxiv.org/abs/2410.12515][preprint]]                                  |
-| Surface halogenated Ti_{2}O Moenes | drag enhancement of thermoelectric transport                                                          | [[https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4954648][preprint]]                                  |
+| Surface halogenated Ti_{2}O Moenes | drag enhancement of thermoelectric transport                                                          | [[https://doi.org/10.1016/j.apsusc.2024.161766][Appl. Surf. Sci. 683, 161766]]              |
 | TiSe_{2}                           | phonon transport manipulation via reversible charge density wave melting                              | [[https://www.nature.com/articles/s41699-024-00501-9][npj 2D mat. & app. 8, 64]]                  |
 | MoS_{2}, silicene, & AlN           | electron drag enhancement of phonon thermal conductivity in 2D materials                              | [[https://pubs.acs.org/doi/full/10.1021/acs.nanolett.4c02097][Nano Lett. 20, 26]]                         |
 | Ti_{2}OX_{2} (X = F, Cl) MOene     | thermoelectric performance                                                                            | [[https://doi.org/10.1063/5.0196117][J. Appl. Phys. 135, 125106]]                |
