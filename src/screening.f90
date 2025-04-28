@@ -56,6 +56,7 @@ contains
        ! qTF**2 = spindeg*e^2*beta/nptq/vol_pcell/perm0*Sum_{BZ}f0_{k}(1-f0_{k})
        crys%qTF = sqrt(1.0e9_r64*crys%qTF*el%spindeg*beta*qe**2/product(el%wvmesh)&
             /crys%volume/perm0) !nm^-1
+       if(crys%twod) crys%qTF = crys%thickness*crys%qTF**2/2  ! nm^-1
 
        if(this_image() == 1) then
           write(*, "(A, 1E16.8, A)") ' Thomas-Fermi screening wave vector = ', crys%qTF, ' 1/nm'
@@ -149,12 +150,14 @@ contains
        end do
     end do
 
-    do iOmega = 1, nOmegas
-       !Recall that the resolvent is already normalized in the full wave vector mesh.
-       !As such, the 1/product(el%wvmesh) is not needed in the expression below.
-       spec_eps(iOmega) = spec_eps(iOmega)*el%spindeg/crys%volume
-    end do
-    !At this point [spec_eps] = nm^-3.eV^-1
+!   do iOmega = 1, nOmegas
+!      !Recall that the resolvent is already normalized in the full wave vector mesh.
+!      !As such, the 1/product(el%wvmesh) is not needed in the expression below.
+!      spec_eps(iOmega) = spec_eps(iOmega)*el%spindeg/crys%volume
+!   end do
+    spec_eps = spec_eps*el%spindeg/crys%volume
+    if(crys%twod) spec_eps = spec_eps*crys%thickness
+    !At this point [spec_eps] = nm^-3.eV^-1 or nm^-2.eV^-1 for 3D or 2D case
 
     !The negative energy sector
     do iOmega = 1, nOmegas/2

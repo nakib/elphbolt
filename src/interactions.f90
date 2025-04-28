@@ -88,6 +88,9 @@ contains
     prefac = 1.0e-3_r64/crys%volume/perm0**2*&
          (el%chimp_conc_n*(qe*el%Zn)**2 + el%chimp_conc_p*(qe*el%Zp)**2)
 
+    ! gchimp normalised by area in 2D case (extra 2 square factor comes from V_2D)
+    if(crys%twod) prefac = prefac*crys%thickness/4
+    
     Gsum = 0.0_r64
     !Use a safe range for the G vector sums
     !This is likely a severe overkill...
@@ -98,11 +101,18 @@ contains
 
        !Following Eq. 7 of Nat. Comm. 12:2222 (2021)
        !G + q dependent TF dielectric function
-       eps_3x3 = (crys%epsilon0 + (crys%qTF/twonorm(Gplusq))**2)*eye(3_i64)
+       eps_3x3 = (crys%epsilon0 + (crys%qTF/twonorm(Gplusq))**(crys%dim-1))*eye(3_i64)
 
        !Only want G /= -q in the sum over G
-       if(all(Gplusq /= 0)) Gsum = Gsum + &
-            1.0_r64/(dot_product(Gplusq, matmul(eps_3x3, Gplusq)))**2
+       if(all(Gplusq /= 0)) then
+          if(crys%twod) then 
+             Gsum = Gsum + &
+                    1.0_r64/twonorm(matmul(eps_3x3, Gplusq))**2
+          else
+             Gsum = Gsum + &
+                    1.0_r64/(dot_product(Gplusq, matmul(eps_3x3, Gplusq)))**2
+          end if
+       end if
     end do
 
     gchimp2_TF = prefac*overlap*Gsum !ev^2
@@ -129,6 +139,9 @@ contains
     prefac = 1.0e-3_r64/crys%volume/perm0**2*&
          (el%chimp_conc_n*(qe*el%Zn)**2 + el%chimp_conc_p*(qe*el%Zp)**2)
 
+    ! gchimp normalised by area in 2D case (extra 2 square factor comes from V_2D)
+    if(crys%twod) prefac = prefac*crys%thickness/4
+    
     Gsum = 0.0_r64
     !Use a safe range for the G vector sums
     !This is likely a severe overkill...
@@ -138,11 +151,18 @@ contains
             + ik3*crys%reclattvecs(:, 3)  ) + qcart
 
        !G + q dependent RPA dielectric function
-       eps_3x3 = (crys%epsilon0 - qe/perm0*X0_qw/twonorm(Gplusq)**2)*eye(3_i64)
+       eps_3x3 = (crys%epsilon0 - qe/perm0*X0_qw/twonorm(Gplusq)**(crys%dim-1))*eye(3_i64)
 
        !Only want G /= -q in the sum over G
-       if(all(Gplusq /= 0)) Gsum = Gsum + &
-                 abs(1.0_r64/dot_product(Gplusq, matmul(eps_3x3, Gplusq)))**2
+       if(all(Gplusq /= 0)) then
+          if(crys%twod) then 
+             Gsum = Gsum + &
+                    1.0_r64/sum(matmul(eps_3x3, Gplusq))**2
+          else
+             Gsum = Gsum + &
+                    1.0_r64/(dot_product(Gplusq, matmul(eps_3x3, Gplusq)))**2
+          end if
+       end if
     end do
 
     gchimp2_RPA = prefac*overlap*Gsum !ev^2
@@ -157,7 +177,7 @@ contains
     real(r64), intent(in) :: qcart(3)
     complex(r64), intent(in) :: evec_k(:), evec_kp(:)
 
-    real(r64) :: prefac, overlap, screened_qTF_sq
+    real(r64) :: prefac, overlap, screened_qTF
     real(r64) :: Gsum, Gplusq(3)
     integer :: ik1, ik2, ik3
 
@@ -169,8 +189,11 @@ contains
     !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
     overlap = (abs(dot_product(evec_kp, evec_k)))**2
 
-    ! Pre screened Thomas Fermi wavevector squared, to match Sanborn's prescription 
-    screened_qTF_sq = crys%qTF**2/crys%epsiloninf
+    ! Pre screened Thomas Fermi wavevector squared, to match Sanborn's prescription
+    screened_qTF = crys%qTF**(crys%dim-1)/crys%epsiloninf
+
+    ! gcoul normalised by area in 2D case (extra 2 square factor comes from V_2D)
+    if(crys%twod) prefac = prefac*crys%thickness**2/4
 
     !Here ignore local field effects. That is, epsilon^{-1}(G /= G') = 0. 
     Gsum = 0.0_r64
@@ -180,7 +203,7 @@ contains
                + ik3*crys%reclattvecs(:, 3)) + qcart
 
        Gsum = Gsum + &
-            1.0_r64/(twonorm(Gplusq)**2 + screened_qTF_sq)**2 !eV^2
+            1.0_r64/(twonorm(Gplusq)**(crys%dim-1) + screened_qTF)**2 !eV^2
     end do
 
     gCoul2_TF = Gsum*prefac*overlap
@@ -197,7 +220,7 @@ contains
 
     real(r64) :: prefac, W_qw_msq, overlap
     complex(r64) :: diel_qw
-    real(r64) :: Gplusq(3), Gplusq_2normsq 
+    real(r64) :: Gplusq(3), Gplusq_2norm, dim_norm 
     integer(i64) :: ik1, ik2, ik3
 
     prefac = 1.0e9_r64*qe/(perm0*crys%epsiloninf) ! ev.nm
@@ -206,6 +229,13 @@ contains
     !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
     overlap = (abs(dot_product(evec_kp, evec_k)))**2
     
+    if(crys%twod) then
+       prefac = prefac/2
+       dim_norm = (crys%volume/crys%thickness)**2 ! norm for 2D
+    else
+       dim_norm = crys%volume**2      ! norm for 3D
+    end if
+
     !Here ignore local field effects. That is, epsilon^{-1}(G /= G') = 0. 
     W_qw_msq = 0.0_r64
     do concurrent(ik1 = -1:1, ik2 = -1:1, ik3 = -1:1)
@@ -213,17 +243,17 @@ contains
                + ik2*crys%reclattvecs(:, 2) &
                + ik3*crys%reclattvecs(:, 3)) + qcart
 
-       !|G + q|^2
-       Gplusq_2normsq = twonorm(Gplusq)**2
+       !|G + q|^2 or |G + q|, for 3D or 2D case
+       Gplusq_2norm = twonorm(Gplusq)**(crys%dim-1)
 
        !Dielectric matrix elements 
-       diel_qw = 1.0_r64 - prefac*X0_qw/Gplusq_2normsq
+       diel_qw = 1.0_r64 - prefac*X0_qw/Gplusq_2norm
 
        !Squared Coulomb matrix elements without the prefactor
-       W_qw_msq = W_qw_msq + abs(1.0_r64/diel_qw/Gplusq_2normsq)**2
+       W_qw_msq = W_qw_msq + abs(1.0_r64/diel_qw/Gplusq_2norm)**2
     end do
 
-    gCoul2_RPA = W_qw_msq*prefac**2*overlap/crys%volume**2 ! eV^2 
+    gCoul2_RPA = W_qw_msq*prefac**2*overlap/dim_norm ! eV^2 
   end function gCoul2_RPA
 
   pure real(r64) function Vm2_3ph(ev1_s1, ev2_s2, ev3_s3, &
