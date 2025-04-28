@@ -733,8 +733,9 @@ contains
     ph_drag_term = ph_drag_term_reduce
   end subroutine calculate_phonon_drag
 
-  subroutine calculate_ph_coherenece(num, el, ph, coarse_mesh_corners, weights_coarse_mesh_corners, sym, rta_rates_ibz, &
-       coherence_ph, ph_coherence_term)
+  subroutine calculate_ph_coh_term_of_el_BTE(&
+       num, el, ph, coarse_mesh_corners, weights_coarse_mesh_corners, sym, &
+       rta_rates_ibz, coherence_ph, ph_coherence_term)
     !! Computes the phonon coherence term that enters the electron
     !! occupations equation.
     !!
@@ -873,5 +874,6 @@ contains
     !Reduce from all images
     call co_sum(ph_coherence_term_reduce)
     ph_coherence_term = ph_coherence_term_reduce
-  end subroutine calculate_ph_coherenece
+  end subroutine calculate_ph_coh_term_of_el_BTE
+  
 end module SEPE_module

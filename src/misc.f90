@@ -16,17 +16,21 @@
 
 module misc
   !! Module containing miscellaneous math and numerics related functions and subroutines.
-  
+
   use precision, only: r128, r64, i64
   use params, only: kB, twopi, pi
+<<<<<<< HEAD
   use fftw3
   
+=======
+
+>>>>>>> prot
   implicit none
-  
+
   public :: operator(.umklapp.)
   private :: sort_int, sort_real, Pade_coeffs, twonorm_real_rank1, twonorm_real_rank2, &
        invert_complex_square, add_and_fold, add_and_fold_array, shrink_int, shrink_real
-  
+
   type timer
      !! Container for timing related data and procedures.
 
@@ -63,7 +67,7 @@ module misc
   interface shrink
      module procedure :: shrink_int, shrink_real
   end interface shrink
-  
+
   interface operator(.umklapp.)
      module procedure add_and_fold
      module procedure add_and_fold_array
@@ -117,7 +121,7 @@ contains
        write(*, "(A)") ".............."
     end if
   end subroutine end_timer
-  
+
   pure function eye(N)
     !! Returns an NxN identity matrix.
 
@@ -130,7 +134,7 @@ contains
        eye(i, i) = 1
     end do
   end function eye
-  
+
   pure function permutations(N) result(perms)
     !! Returns the permutations of a list of N elements.
     !! Each consecutive permutation in the sequence is formed by swapping two adjacent elements from the previous one
@@ -140,21 +144,21 @@ contains
 
     integer(i64), intent(in) :: N
     integer(i64) :: num_perms, perm_count
-    integer(i64), allocatable :: perms(:, :)  
+    integer(i64), allocatable :: perms(:, :)
     integer(i64) :: perm_array(N), dir(N)
     integer(i64) :: i, largest_mobile_index, largest_mobile_value, swap_index, temp_value
 
     ! Gamma function to compute number of permutations(N) as Gamma(N) = (N - 1)!
     num_perms = int(Gamma(real(N + 1)))
 
-    allocate(perms(N, num_perms))  
+    allocate(perms(N, num_perms))
 
     ! Initialize permutation array
     perm_array = [(i, i = 1, N)]
     dir = -1
 
     perm_count = 1
-    perms(:, perm_count) = perm_array  
+    perms(:, perm_count) = perm_array
 
     do while(perm_count < num_perms)
        largest_mobile_value = 0
@@ -195,7 +199,7 @@ contains
        dir(swap_index) = temp_value
 
        perm_count = perm_count + 1
-       perms(:, perm_count) = perm_array 
+       perms(:, perm_count) = perm_array
 
        ! Reverse direction of all elements larger than the largest mobile value
        do i = 1, N
@@ -203,6 +207,143 @@ contains
        end do
     end do
   end function permutations
+
+  pure logical function lex_less_2d(a, b)
+    !! lex_less_2d is a comparison function -- boolean comparator
+    !!
+    !! compare two triplets a and b lexicographically
+    !! this function returns .true. if triplet a comes before triplet b
+    !! in lexicographic order, and .false. otherwise.
+    !! each a and b is a 3×2 array
+    !! a(3, 2): first triplet to compare. Each row represents a (s, iq) pair.
+    !! b(3, 2): Second triplet to compare. Same structure as a.
+
+    integer(i64), intent(in) :: a(3, 2), b(3, 2)
+
+    !Local
+    integer :: i
+
+    do i = 1, 3
+       if(a(i, 1) < b(i, 1)) then
+          lex_less_2d = .true.
+          return
+       else if(a(i, 1) > b(i, 1)) then
+          lex_less_2d = .false.
+          return
+       else if(a(i, 2) < b(i, 2)) then
+          lex_less_2d = .true.
+          return
+       else if(a(i, 2) > b(i, 2)) then
+          lex_less_2d = .false.
+          return
+       end if
+    end do
+
+    lex_less_2d = .false.
+  end function lex_less_2d
+
+  pure logical function lex_less_1d(c, d)
+    !! lex_less_1d is a comparison function -- boolean comparator
+    !!
+    !! this function performs a lexicographic comparison of two integer triplets c and d, each of shape (3).
+    !! it returns .t. if c is lexicographically less than d, and .f. otherwise
+
+    integer(i64), intent(in) :: c(3), d(3)
+
+    ! Local
+    integer :: i
+
+    do i = 1, 3
+       if(c(i) < d(i)) then
+          lex_less_1d = .true.
+          return
+       else if(c(i) > d(i)) then
+          lex_less_1d = .false.
+          return
+       end if
+    end do
+
+    lex_less_1d = .false.
+  end function lex_less_1d
+  
+  subroutine map_triplet_full_to_reduced(nbands, mesh_size, lambda1_list, lambda2_list, M)
+    !! This subroutine maps the canonical triplet back to (ilambda2, ilambda1) and stores it in M(:, ilambda2, ilambda1).
+    !!
+    !! nbands Number of bands
+    !! mesh_size Wavevector discretization
+    !! lambda1_list The smaller list of states
+    !! lambda2_list The larger list of states
+    !! M Mapping of every interaction triplet of states to its canonical representative
+
+    integer(i64), intent(in) :: nbands, mesh_size(3)
+    integer(i64), intent(in) :: lambda1_list(:), lambda2_list(:)
+    integer(i64), allocatable, intent(out) :: M(:, :, :)
+
+    integer(i64) :: ilambda1, ilambda2, iband1, iband2, iband3, ik1, ik2, ik3
+    integer(i64) :: q1(3), q2(3), q3(3)
+    integer(i64), allocatable :: all_perms(:, :)
+    integer(i64) :: triplet_full(3), permuted_triplet(3), canonical_triplet(3)
+    integer(i64) :: i, j
+
+    allocate(M(3, size(lambda2_list), size(lambda1_list)))
+
+    ! Initialize all element of M to a known integer value -1: mean that the triplet has not been assigned yet
+    M = -1_i64
+
+    ! Get all permutations of 3 indices
+    all_perms = permutations(3_i64)
+    do ilambda1 = 1, size(lambda1_list)
+       ! Demux state for lambda_1: for each lambda_1 value, convert its index to (iband1, ik1)
+       call demux_state(lambda1_list(ilambda1), nbands, iband1, ik1)
+
+       ! Demux vector to get q1
+       call demux_vector(ik1, q1, mesh_size, base = 0_i64)
+       do ilambda2 = 1, size(lambda2_list)
+          ! Demux state for lambda_2: for each lambda_2 value, convert its index to (iband2, ik2)
+          call demux_state(lambda2_list(ilambda2), nbands, iband2, ik2)
+
+          ! Demux vector to get q1
+          call demux_vector(ik2, q2, mesh_size, base = 0_i64)
+
+          ! Compute q3 using modular arithmetic: such that momentum is conserved: q1 - q2 - q3 = 0 mod G
+          q3 = modulo(q1 - q2, mesh_size)
+
+          ! Compute ik3 using mux_vector
+          ik3 = mux_vector(q3, mesh_size, base = 0_i64)
+
+          ! Iterate over all possible bands for third state: to have (iband3, ik3)
+          do iband3 = 1, nbands
+             triplet_full = [mux_state(nbands, iband1, ik1), &
+                  mux_state(nbands, iband2, ik2), &
+                  mux_state(nbands, iband3, ik3)]
+
+             ! Initialize the canonical form of the triplet to the original (unpermuted) triplet, before trying other triplet
+             ! triplet_full is a 3x2 array: ((iband1, ik1), (iband2, ik2), (iband3, ik3))
+             canonical_triplet = triplet_full
+
+             do i = 1, size(all_perms, 2)
+                do j = 1, 3
+                   permuted_triplet(j) = triplet_full(all_perms(j, i))
+                end do
+
+                ! Use a lexicographic comparison function to keep the smallest permutation
+                if(lex_less_1d(permuted_triplet, canonical_triplet)) canonical_triplet = permuted_triplet
+             end do
+
+             ! after elaborating the triplet (lambda1, lambda2, lambda3) as linear state indices
+             ! and after generating all 6 permutations
+             ! keep only the lexicographically smallest permutation (the irreducible triplet)
+             ! Store it in M(:, ilambda2, ilambda1)
+
+             M(:, ilambda2, ilambda1) = canonical_triplet
+
+             ! once the first valid canonical triplet is found (for a given lambda1 and lambda2, we can store it and skip checking (with exit) other values of iband3
+             ! symmetry will handle all others, we only interested in one representative triplet identified using lex_less_1d
+             exit
+          end do
+       end do
+    end do
+  end subroutine map_triplet_full_to_reduced
 
   subroutine linspace(grid, min, max, num)
     !! Create equidistant grid.
@@ -229,7 +370,7 @@ contains
 
   subroutine shrink_int(data, len)
     !! Returns integer data(1:n)
-    
+
     integer(i64), intent(inout), allocatable :: data(:)
     integer(i64), intent(in) :: len
 
@@ -246,9 +387,9 @@ contains
     data = tmp
   end subroutine shrink_int
 
-  subroutine shrink_real(data, len)    
+  subroutine shrink_real(data, len)
     !! Returns real data(1:n)
-    
+
     real(r64), intent(inout), allocatable :: data(:)
     integer(i64), intent(in) :: len
 
@@ -264,7 +405,7 @@ contains
     !Copy over from temporary
     data = tmp
   end subroutine shrink_real
-  
+
   subroutine exit_with_message(message)
     !! Exit with error message.
 
@@ -278,12 +419,12 @@ contains
 
   subroutine print_message(message)
     !! Print message.
-    
+
     character(len = *), intent(in) :: message
 
     if(this_image() == 1) write(*, "(A)") trim(message)
   end subroutine print_message
-  
+
   subroutine write2file_rank1_real(filename, data)
     !! Write rank-1 data to file.
 
@@ -303,7 +444,7 @@ contains
     end if
     sync all
   end subroutine write2file_rank1_real
-  
+
   subroutine write2file_rank2_real(filename, data)
     !! Write rank-2 data to file.
 
@@ -326,7 +467,7 @@ contains
     end if
     sync all
   end subroutine write2file_rank2_real
-  
+
   subroutine write2file_rank2_complex(filename, data)
     !! Write rank-2 data to file.
 
@@ -435,7 +576,7 @@ contains
     integer :: ib, ibstart, ibend, nb, dim
     character(len = 128)  :: numcols
     character(len = 1024) :: bandtag
-    
+
     nk = size(data(:, 1, 1))
     if(present(bandlist)) then
        nb = size(bandlist)
@@ -460,7 +601,7 @@ contains
     end do
     sync all
   end subroutine readfile_response
-  
+
   subroutine append2file_transport_tensor(filename, it, data, bandlist)
     !! Append 3x3 tensor to band/branch resolved files.
 
@@ -524,11 +665,11 @@ contains
     character(len = 128)  :: numcols
     character(len = 1024) :: bandtag
     real(r64) :: aux(3,3)
-    
+
     if(this_image() == 1) then
        !Number of energy points on grid
        ne = size(data(1, 1, 1, :))
-       
+
        !Number of bands/branches and bounds
        if(present(bandlist)) then
           nb = size(bandlist)
@@ -569,14 +710,14 @@ contains
 
   subroutine int_div(num, denom, q, r)
     !! Quotient(q) and remainder(r) of the integer division num/denom.
-    
+
     integer(i64), intent(in) :: num, denom
     integer(i64), intent(out) :: q, r
 
     q = num/denom
     r = mod(num, denom)
   end subroutine int_div
-  
+
   subroutine distribute_points(npts, chunk, istart, iend, num_active_images)
     !! Distribute points among images
 
@@ -612,7 +753,7 @@ contains
        iend = 0
     end if
   end subroutine distribute_points
-  
+
   pure function cross_product(A, B)
     !! Cross product of A and B.
 
@@ -628,18 +769,18 @@ contains
     !! Kronecker delta
 
     integer(i64), intent(in) :: i, j
-    
+
     if(i == j) then
        kronecker = 1
     else
        kronecker = 0
     end if
   end function kronecker
-  
+
   subroutine outer(A, B, C)
     !! Outer product of A and B
     !!
-    !! C_ij = A_i.B_j 
+    !! C_ij = A_i.B_j
 
     real(r64), intent(in) :: A(:), B(:)
     real(r64), intent(out) :: C(:, :)
@@ -658,7 +799,7 @@ contains
        C(:, j) = A(:)*B(j)
     end do
   end subroutine outer
-  
+
   pure complex(r64) function expi(x)
     !! Calculate exp(i*x) = cos(x) + isin(x)
 
@@ -675,7 +816,7 @@ contains
     real(r64) :: q3(3)
 
     integer :: icart
-    
+
     q3 = q1 + q2
     do icart = 1, 3
        if(q3(icart) >= 1.0_r64) q3(icart) = q3(icart) - 1.0_r64
@@ -691,7 +832,7 @@ contains
     real(r64) :: q3(3, size(q1, 2))
 
     integer :: iq, nq
-    
+
     nq = size(q3, 2)
 
     do iq = 1, nq
@@ -721,7 +862,7 @@ contains
 
     s1 = size(T(:, 1))
     s2 = size(T(1, :))
-    
+
     twonorm_real_rank2 = 0.0_r64
     do i = 1, s1
        do j = 1, s2
@@ -751,7 +892,7 @@ contains
     end do
     qdist = minval(distfromcorners)
   end function qdist
-  
+
   pure real(r64) function trace(mat)
     !! Trace of square matrix
 
@@ -771,7 +912,7 @@ contains
     integer(i64), intent(inout) :: list(:)
     integer(i64) :: i, j, n
     integer(i64) :: aux, tmp
-    
+
     n = size(list)
 
     do i = 1, n
@@ -789,7 +930,7 @@ contains
 
   subroutine sort_real(list)
     !! Swap sort list of reals
-    
+
     real(r64), intent(inout) :: list(:)
     real(r64) :: aux, tmp
     integer(i64) :: i, j, n
@@ -811,7 +952,7 @@ contains
 
   subroutine binsearch(array, e, m)
     !! Binary search in a list of integers and return index.
-    
+
     integer(i64), intent(in) :: array(:), e
     integer(i64), intent(out) :: m
     integer(i64) :: a, b, mid
@@ -850,7 +991,7 @@ contains
     real(r64) :: a, b
 
     n = size(f)
-    
+
     s = 0.0_r64
 
     a = f(1)
@@ -885,7 +1026,7 @@ contains
        s = s + 0.5_r64*(f(n) + f(n - 1))*h
     end if
   end subroutine compsimps
-  
+
   pure function unique(A)
     !! Returns an array of unique elements of A.
     !! In other words, creates and returns a set from A.
@@ -900,14 +1041,14 @@ contains
     do i = size(A), 1, -1
        is_unique(i) = .not. any(A(1 : i - 1) == A(i))
     end do
-    
+
     allocate(unique(count(is_unique)))
     unique = pack(A, mask = is_unique)
   end function unique
 
   subroutine create_set_int(A, uniqueA)
     !! Subroutine version of the pure function unique.
-    
+
     integer(i64), intent(in) :: A(:)
     integer(i64), allocatable, intent(out) :: uniqueA(:)
 
@@ -943,7 +1084,7 @@ contains
     allocate(uniqueA(count(is_unique)))
     uniqueA = pack(A, mask = is_unique)
   end subroutine create_set_char
-  
+
   integer(i64) function coarse_grained(iwv_fine, coarsening_factor, mesh_fine)
     !! Given a 1-based muxed wave vector on the fine mesh,
     !! calculates a 1-based muxed coarse-grained wave vector on the
@@ -976,14 +1117,14 @@ contains
        iwv_coarse_list(i) = coarse_grained(iwv_fine_list(i), coarsening_factor, mesh_fine)
     end do
   end subroutine coarse_grain
-  
+
   pure function mux_vector(v, mesh, base)
     !! Multiplex index of a single wave vector.
     !! Output is always 1-based.
     !! v is the demultiplexed triplet of a wave vector.
     !! mesh is the number of wave vectors along the three reciprocal lattice vectors.
     !! base states whether v has 0- or 1-based indexing.
-    
+
     integer(i64), intent(in) :: v(3), mesh(3), base
     integer(i64) :: mux_vector
 
@@ -1000,7 +1141,7 @@ contains
     !! v is the demultiplexed triplet of a wave vector.
     !! mesh is the number of wave vectors along the three reciprocal lattice vectors.
     !! base chooses whether v has 0- or 1-based indexing.
-    
+
     integer(i64), intent(in) :: i, mesh(3), base
     integer(i64), intent(out) :: v(3)
     integer(i64) :: aux
@@ -1012,9 +1153,9 @@ contains
     call int_div(aux, mesh(2), v(3), v(2))
     if(base == 1) v = v + 1
   end subroutine demux_vector
-  
+
   subroutine demux_mesh(index_mesh, mesh, base, indexlist)
-    !! Demultiplex all wave vector indices 
+    !! Demultiplex all wave vector indices
     !! (optionally, from a list of indices).
     !! Internally uses demux_vector.
 
@@ -1035,13 +1176,13 @@ contains
   end subroutine demux_mesh
 
   pure integer(i64) function mux_state(nbands, iband, ik)
-    !! Multiplex a (band index, wave vector index) pair into a state index 
+    !! Multiplex a (band index, wave vector index) pair into a state index
     !!
     !! nbands is the number of bands
     !! iband is the band index
     !! ik is the wave vector index
-    
-    integer(i64), intent(in) :: nbands, ik, iband 
+
+    integer(i64), intent(in) :: nbands, ik, iband
 
     mux_state = (ik - 1)*nbands + iband
   end function mux_state
@@ -1053,9 +1194,9 @@ contains
     !! nbands is the number of bands
     !! iband is the band index
     !! ik is the wave vector index
-    
+
     integer(i64), intent(in) :: m, nbands
-    integer(i64), intent(out) :: ik, iband 
+    integer(i64), intent(out) :: ik, iband
 
     iband = modulo(m - 1, nbands) + 1
     ik = int((m - 1)/nbands) + 1
@@ -1066,7 +1207,7 @@ contains
     !! T temperature in K
 
     real(r64), intent(in) :: e, T
-    
+
     Bose = 1.0_r64/expm1(e/kB/T)
   end function Bose
 
@@ -1084,9 +1225,9 @@ contains
     !! High accuracy evaluation of exp(x) - 1.
     !! This is more accurate than the real64 evaluation when x is "small".
     !! Numpy equivalent: https://numpy.org/doc/stable/reference/generated/numpy.expm1.html
-    
+
     real(r64), intent(in) :: x
-    
+
     expm1 = exp(x + 0.0_r128) - 1.0_r128
   end function expm1
 
@@ -1118,7 +1259,7 @@ contains
 
     !k-mesh spacing between opposite stencil points (fractional)
     diff = 2.0_r64/kmesh
-    
+
     !Calculate Jacobian using a nearest neighbor stencil
     gradf = 0.0_r64
     do ik = 1, nk !Run over all wave vectors in FBZ
@@ -1131,7 +1272,7 @@ contains
        i = center(1)
        j = center(2)
        k = center(3)
-       
+
        ! Contruct nearest neighbot stencil, taking into account
        ! the periodic boundary condition
        sten_count = 0
@@ -1159,7 +1300,7 @@ contains
              stencil(sten_count + 1) = mux_vector([i, j, this_minus1], kmesh, 1_i64)
              stencil(sten_count + 2) = mux_vector([i, j, this_plus1], kmesh, 1_i64)
           end if
-          sten_count = sten_count + 2   
+          sten_count = sten_count + 2
        end do
 
        ! Get function values on the stencil
@@ -1189,7 +1330,7 @@ contains
                   (f_stencil(2*dim_k, :, dim_f) - f_stencil(2*dim_k - 1, :, dim_f)) &
                   /diff(dim_k)
           end do
-          
+
           ! Convert to cartesian coordinates
           do ib = 1, nb
              gradf(ik, ib, :, dim_f) = matmul(lattvecs, gradf(ik, ib, :, dim_f))/twopi
@@ -1297,7 +1438,7 @@ contains
              if(r1(ipol) .eq. r0(ipol)) then
                 equalpol = ipol
              else
-             v(count) = q(ipol)/dble(refinement(ipol)*coarsemesh(ipol))
+                v(count) = q(ipol)/dble(refinement(ipol)*coarsemesh(ipol))
                 v0(count) = floor(q(ipol)/dble(refinement(ipol)))/dble(coarsemesh(ipol))
                 v1(count) = ceiling(q(ipol)/dble(refinement(ipol)))/dble(coarsemesh(ipol))
                 count = count+1
@@ -1350,16 +1491,16 @@ contains
           call exit_with_message("Can't find point to interpolate on. Exiting.")
        end select
 
-   end do !iq
+    end do !iq
 
-   !Reduce from all images
-   sync all
-   call co_sum(weights_reduce)
-   call co_sum(idcorners_reduce)
-   sync all
-   
-   weights   = weights_reduce
-   idcorners = idcorners_reduce
+    !Reduce from all images
+    sync all
+    call co_sum(weights_reduce)
+    call co_sum(idcorners_reduce)
+    sync all
+
+    weights   = weights_reduce
+    idcorners = idcorners_reduce
   end subroutine precompute_interpolation_corners_and_weights
 
   subroutine interpolate_using_precomputed_3vector(idc, widc, f, interpolation)
@@ -1378,29 +1519,29 @@ contains
 
     !Locals
     real(r64) :: c00(size(f,2)), c01(size(f,2)), c10(size(f,2)), &
-                c11(size(f,2)), c0(size(f,2)), c1(size(f,2))
+         c11(size(f,2)), c0(size(f,2)), c1(size(f,2))
 
     select case(idc(1))
     case (0) !3d
-      !First we interpolate along first axis, then second, to finish with last one
-      c00 = f(idc(2),:) * widc(4) + f(idc(3),:) * widc(1)
-      c10 = f(idc(4),:) * widc(4) + f(idc(5),:) * widc(1)
-      c01 = f(idc(6),:) * widc(4) + f(idc(7),:) * widc(1)
-      c11 = f(idc(8),:) * widc(4) + f(idc(9),:) * widc(1)
-      c0  = c00 * widc(5) + c10 * widc(2)
-      c1  = c01 * widc(5) + c11 * widc(2)
-      interpolation = c0 * widc(6) + c1 * widc(3)
+       !First we interpolate along first axis, then second, to finish with last one
+       c00 = f(idc(2),:) * widc(4) + f(idc(3),:) * widc(1)
+       c10 = f(idc(4),:) * widc(4) + f(idc(5),:) * widc(1)
+       c01 = f(idc(6),:) * widc(4) + f(idc(7),:) * widc(1)
+       c11 = f(idc(8),:) * widc(4) + f(idc(9),:) * widc(1)
+       c0  = c00 * widc(5) + c10 * widc(2)
+       c1  = c01 * widc(5) + c11 * widc(2)
+       interpolation = c0 * widc(6) + c1 * widc(3)
     case (1) !2d
-      !First we interpolate along first axis, then second
-      c0 = f(idc(2),:) * widc(3) + f(idc(4),:) * widc(1)
-      c1 = f(idc(3),:) * widc(3) + f(idc(5),:) * widc(1)
-      interpolation = c0 * widc(4) + c1 * widc(2)
+       !First we interpolate along first axis, then second
+       c0 = f(idc(2),:) * widc(3) + f(idc(4),:) * widc(1)
+       c1 = f(idc(3),:) * widc(3) + f(idc(5),:) * widc(1)
+       interpolation = c0 * widc(4) + c1 * widc(2)
     case (2) !1d
-      interpolation = f(idc(2),:) * widc(2) + f(idc(3),:) * widc(1)
+       interpolation = f(idc(2),:) * widc(2) + f(idc(3),:) * widc(1)
     case (3)!no iterpolation
-      interpolation = f(idc(2),:)
+       interpolation = f(idc(2),:)
     case default
-      call exit_with_message("Can't find point to interpolate on. Exiting.")
+       call exit_with_message("Can't find point to interpolate on. Exiting.")
     end select
   end subroutine interpolate_using_precomputed_3vector
 
@@ -1423,25 +1564,25 @@ contains
 
     select case(idc(1))
     case (0) !3d
-      !First we interpolate along first axis, then second, to finish with last one
-      c00 = f(idc(2)) * widc(4) + f(idc(3)) * widc(1)
-      c10 = f(idc(4)) * widc(4) + f(idc(5)) * widc(1)
-      c01 = f(idc(6)) * widc(4) + f(idc(7)) * widc(1)
-      c11 = f(idc(8)) * widc(4) + f(idc(9)) * widc(1)
-      c0  = c00 * widc(5) + c10 * widc(2)
-      c1  = c01 * widc(5) + c11 * widc(2)
-      interpolation = c0 * widc(6) + c1 * widc(3)
+       !First we interpolate along first axis, then second, to finish with last one
+       c00 = f(idc(2)) * widc(4) + f(idc(3)) * widc(1)
+       c10 = f(idc(4)) * widc(4) + f(idc(5)) * widc(1)
+       c01 = f(idc(6)) * widc(4) + f(idc(7)) * widc(1)
+       c11 = f(idc(8)) * widc(4) + f(idc(9)) * widc(1)
+       c0  = c00 * widc(5) + c10 * widc(2)
+       c1  = c01 * widc(5) + c11 * widc(2)
+       interpolation = c0 * widc(6) + c1 * widc(3)
     case (1) !2d
-      !First we interpolate along first axis, then second
-      c0 = f(idc(2)) * widc(3) + f(idc(4)) * widc(1)
-      c1 = f(idc(3)) * widc(3) + f(idc(5)) * widc(1)
-      interpolation = c0 * widc(4) + c1 * widc(2)
+       !First we interpolate along first axis, then second
+       c0 = f(idc(2)) * widc(3) + f(idc(4)) * widc(1)
+       c1 = f(idc(3)) * widc(3) + f(idc(5)) * widc(1)
+       interpolation = c0 * widc(4) + c1 * widc(2)
     case (2) !1d
-      interpolation = f(idc(2)) * widc(2) + f(idc(3)) * widc(1)
-    case (3)!no iterpolation  
-      interpolation = f(idc(2))
+       interpolation = f(idc(2)) * widc(2) + f(idc(3)) * widc(1)
+    case (3)!no iterpolation
+       interpolation = f(idc(2))
     case default
-      call exit_with_message("Can't find point to interpolate on. Exiting.")
+       call exit_with_message("Can't find point to interpolate on. Exiting.")
     end select
   end subroutine interpolate_using_precomputed_scalar
 
@@ -1453,11 +1594,11 @@ contains
     !! f The coarse mesh function to be interpolated.
     !! q The 0-based index vector where to evaluate f.
     !! interpolation The result
-    
+
     integer(i64), intent(in) :: coarsemesh(3), q(3), refinement(3)
     real(r64), intent(in) :: f(:)
     real(r64), intent(out) :: interpolation
-    
+
     integer(i64) :: info, r0(3), r1(3), ipol, mode, count
     integer(i64), allocatable :: pivot(:)
     integer(i64) :: i000, i100, i010, i110, i001, i101, i011, i111, equalpol
@@ -1467,7 +1608,7 @@ contains
 
     !External procedures
     external :: dgesv
-    
+
     aux = 0.0_r64
     equalpol = 0_i64
 
@@ -1481,7 +1622,7 @@ contains
           mode = mode + 1
        end if
     end do
-    
+
     !mode = 0: 3d interpolation
     !mode = 1: 2d interpolation
     !mode = 2: 1d interpolation
@@ -1513,7 +1654,7 @@ contains
        i011 = (r1(3)*coarsemesh(2)+r1(2))*coarsemesh(1)+r0(1)+1
        i111 = (r1(3)*coarsemesh(2)+r1(2))*coarsemesh(1)+r1(1)+1
 
-       !Evaluate functions at the corners and form rhs    
+       !Evaluate functions at the corners and form rhs
        c = [f(i000), f(i100), f(i010), f(i110), &
             f(i001), f(i101), f(i011), f(i111)]
 
@@ -1546,7 +1687,7 @@ contains
              v(count) = q(ipol)/dble(refinement(ipol)*coarsemesh(ipol))
              v0(count) = floor(q(ipol)/dble(refinement(ipol)))/dble(coarsemesh(ipol))
              v1(count) = ceiling(q(ipol)/dble(refinement(ipol)))/dble(coarsemesh(ipol))
-             count = count+1 
+             count = count+1
           end if
        end do
 
@@ -1601,12 +1742,12 @@ contains
     case default
        call exit_with_message("Can't find point to interpolate on. Exiting.")
     end select
-    
+
     interpolation = aux
-  end subroutine interpolate    
-  
+  end subroutine interpolate
+
   pure function Pade_coeffs(iomegas, us)
-    !! Evaluate eqs. A2 from the following article: 
+    !! Evaluate eqs. A2 from the following article:
     !! Solving the Eliashberg equations by means of N-point Pade' approximants
     !! Vidberg and Serene Journal of Low Temperature Physics, Vol. 29, Nos. 3/4, 1977
 
@@ -1617,7 +1758,7 @@ contains
     !Local variables
     integer(i64) :: N, p, i
     complex(r64), allocatable :: g(:, :)
-    
+
     N = size(iomegas)
 
     allocate(g(N, N))
@@ -1658,7 +1799,7 @@ contains
     allocate(A(0:N_matsubara), B(0:N_matsubara))
 
     as = Pade_coeffs(iomegas, us)
-    
+
     !Base conditions
     A(0) = 0.0_r64
     A(1) = as(1)
@@ -1693,29 +1834,29 @@ contains
     if(N /= size(mat, 2)) &
          call exit_with_message("invert_complex_square called with non-square matrix. Exiting.")
 
-    !Set and allocate zgetr* variables             
+    !Set and allocate zgetr* variables
     lwork = 32*N
     allocate(work(lwork), ipivot(N))
 
     call zgetrf(N, N, mat, N, ipivot, info)
     if(info /= 0) &
          call exit_with_message("Matrix is singular in invert_complex_square. Exiting.")
-    
+
     call zgetri(N, mat, N, ipivot, work, lwork, info)
     if(info /= 0) &
          call exit_with_message("Matrix inversion failed in invert_complex_square. Exiting.")
-    
+
   end subroutine invert_complex_square
-  
+
   subroutine subtitle(text)
     !! Subroutine to print a subtitle.
-    
+
     character(len = *), intent(in) :: text
     integer(i64) :: length
     character(len = 75) :: string2print
-    
+
     length = len(text)
-    
+
     string2print = '___________________________________________________________________________'
     if(this_image() == 1) write(*,'(A75)') string2print
     string2print(75 - length + 1 : 75) = text
@@ -1815,13 +1956,13 @@ contains
 
   pure function interpolator_1d(samp, cont, f_cont) result(f_samp)
     !! linear interpolation from 1d array evaluated on a fine, continuous mesh
-    !! to a sample mesh, where the former mesh should cover the full range of the latter. 
+    !! to a sample mesh, where the former mesh should cover the full range of the latter.
     !!
     !! samp Sample mesh
     !! cont Continuous mesh
     !! f_cont 1D array evaluated on cont
     !! f_samp Interpolated array on samp
-    
+
     real(r64), intent(in) :: samp(:), cont(:)
     real(r64), intent(in) :: f_cont(:)
     real(r64), allocatable :: f_samp(:)
@@ -1831,15 +1972,15 @@ contains
 
     ncont = size(cont)
     nsamp = size(samp)
-    
+
     allocate(f_samp(nsamp))
 
     dcont = cont(2) - cont(1)
-    
+
     do isamp = 1, nsamp
        w = samp(isamp)
        ileft = minloc(abs(cont - w), dim = 1) ! Find the left index in cont closest to samp
-       if(ileft == ncont) then    ! If the index is the last point, use its value 
+       if(ileft == ncont) then    ! If the index is the last point, use its value
           f_samp(isamp) = f_cont(ileft)
        else
           iright = ileft + 1  ! right neighbouring index

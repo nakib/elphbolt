@@ -58,6 +58,11 @@ name="V3offload"
 source-dir="app"
 main="V3offload.f90"
 
+[[executable]]
+name="V3_permutations"
+source-dir="app"
+main="V3_permutations.f90"
+
 #[[executable]]
 #name = "screening_comparison"
 #source-dir="src"
