@@ -88,7 +88,7 @@ module electron_module
      real(r64), allocatable :: scissor(:)
      !! Scissor operator (eV)
      real(r64), allocatable :: split_off(:)
-     !! Splitt off operator (eV)
+     !! Split off operator (eV)
      logical :: metallic
      !! Is the system metallic?
      character(len = 1) :: dopingtype
