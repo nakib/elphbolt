@@ -250,13 +250,13 @@ contains
             V2_val = V2_minimal_set(s3, iq3_minus, s2, iq2, istate1)
 
             ! Only print non-zero or significant entries
-            !if (abs(V2_val) > 1e-4_r64) then
-            !if (V2_val /= 0.0_r64) then
-            !write(*,'(3(I8,1X),F16.8)') lambda1, lambda2, lambda3, V2_val
-            write(*,'(A,I6,A,I6,A,I6,A,I6,A,I6,3(A,I6),A,F16.8)') &
-               's3=',s3,' iq3_minus=',iq3_minus,' s2=',s2,' iq2=',iq2,' istate1=',istate1, &
-               ' lambda1=',lambda1,' lambda2=',lambda2,' lambda3=',lambda3,' V2=',V2_val
-            !end if
+            if (abs(V2_val) > 1e-2_r64) then
+               !if (V2_val /= 0.0_r64) then
+               !write(*,'(3(I8,1X),F16.8)') lambda1, lambda2, lambda3, V2_val
+               write(*,'(A,I6,A,I6,A,I6,A,I6,A,I6,3(A,I6),A,F16.8)') &
+                  's3=',s3,' iq3_minus=',iq3_minus,' s2=',s2,' iq2=',iq2,' istate1=',istate1, &
+                  ' lambda1=',lambda1,' lambda2=',lambda2,' lambda3=',lambda3,' V2=',V2_val
+            end if
          end do
       end do
 
