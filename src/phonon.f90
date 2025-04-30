@@ -24,7 +24,7 @@ module phonon_module
   use particle_module, only: particle
   use misc, only: print_message, subtitle, expi, distribute_points, &
        write2file_rank2_real, exit_with_message, create_set, coarse_grain, &
-       mux_state, write2file_rank3_real
+       mux_state, write2file_rank3_real, int_div
   use numerics_module, only: numerics
   use crystal_module, only: crystal, calculate_wavevectors_full
   use symmetry_module, only: symmetry, find_irred_wedge, create_fbz2ibz_map
@@ -37,7 +37,6 @@ module phonon_module
   private
   public phonon
 
-  
   type Xmassvar
      !! Type to contain the phonon mass var scattering matrix elements
      !! number of matrix elements
@@ -382,66 +381,134 @@ contains
 
     !Local variables
     integer(i64) :: qscell(3), tipo(crys%numatoms), t1, t2, t3, i, j, &
-         iat, jat, ibrav, ipol, jpol, m1, m2, m3, ntype, nat, nfc2 
+         iat, jat, ibrav, ipol, jpol, m1, m2, m3, ntype, nat, nfc2, ntot, &
+         ucell1(3), ucell2(3), at1_sc, at2_sc, ntensors_phonopy
     real(r64) :: r(crys%numatoms, 3), wscell(3,0:3), celldm(6), at(3,3), &
-         mass(crys%numelements), zeff(crys%numatoms, 3, 3), eps(3, 3), &
          dnrm2
     character(len = 1) :: polar_key
     character(len = 6) :: label(crys%numelements)
-    real(r64), parameter :: massfactor=1.8218779_r64*6.022e-4_r64
+    real(r64), parameter :: massfactor = 1.8218779_r64*6.022e-4_r64
+    logical :: espresso_format_file_exists, phonopy_format_file_exists
     
     allocate(self%mm(crys%numatoms, crys%numatoms))
     allocate(self%rr(crys%numatoms, crys%numatoms, 3))
-    
-    open(1,file="espresso.ifc2",status="old")
-    !Read some stuff that will not be used in the code.
-    read(1,*) ntype, nat, ibrav, celldm(1:6)
-    if (ibrav==0) then
-       read(1,*) ((at(i,j),i=1,3),j=1,3)
-    end if
 
-    do i = 1, ntype
-       read(1, *) j, label(i), mass(i)
-    end do
-    mass = crys%masses/massfactor
+    !Check which 2nd order force constants format has been provided in the run directory
+    espresso_format_file_exists = .false.
+    phonopy_format_file_exists = .false.
+    inquire(file = 'FORCE_CONSTANTS', exist = phonopy_format_file_exists)
+    inquire(file = 'espresso.ifc2', exist = espresso_format_file_exists)
+
+    if(.not. (espresso_format_file_exists .or. phonopy_format_file_exists)) &
+         call exit_with_message('2nd order force constant file not provided. Exiting.')
+
+    if(espresso_format_file_exists .and. phonopy_format_file_exists) &
+         call exit_with_message('Different types of 2nd order force constant file provided. Exiting.')
     
-    do i = 1, nat
-       read(1, *) j, tipo(i), r(i, 1:3)
-    end do
-    r = transpose(matmul(crys%lattvecs, crys%basis))/bohr2nm
+    if(espresso_format_file_exists) &
+         call print_message('Reading espresso format 2nd order force constants...')
+
+    if(phonopy_format_file_exists) &
+         call print_message('Reading phonopy format 2nd order force constants...')
     
-    read(1, *) polar_key
-    if(polar_key == "T") then
-       do i = 1, 3
-          read(1, *) eps(i, 1:3)
+    !Espresso format:
+    if(espresso_format_file_exists) then
+       open(1, file= "espresso.ifc2", status = "old")
+       
+       !Read some stuff that will not be used in the code.
+       read(1, *) ntype, nat, ibrav, celldm(1:6)
+       if (ibrav == 0) then
+          read(1, *) ((at(i, j), i = 1, 3), j = 1, 3)
+       end if
+
+       do i = 1, ntype
+          read(1, *) !not needed j, label(i), mass(i)
        end do
+
        do i = 1, nat
-          read(1, *)
-          do j = 1, 3
-             read(1, *) zeff(i, j, 1:3)
+          read(1, *) !not needed j, tipo(i), r(i, 1:3)
+       end do
+
+       read(1, *) polar_key
+       if(polar_key == "T") then
+          do i = 1, 3
+             read(1, *) !eps(i, 1:3)
+          end do
+          do i = 1, nat
+             read(1, *)
+             do j = 1, 3
+                read(1, *) !zeff(i, j, 1:3)
+             end do
+          end do
+       end if
+
+       !These are actually parsed:
+       
+       read(1,*) qscell(1:3)
+       self%scell = qscell
+
+       !Read the force constants.
+       allocate(self%ifc2(3, 3, nat, nat, self%scell(1), self%scell(2), self%scell(3)))
+       nfc2 = 3*3*nat*nat
+       do i = 1, nfc2
+          read(1, *) ipol, jpol, iat, jat
+          do j = 1, product(self%scell)
+             read(1, *) t1, t2, t3, &
+                  self%ifc2(ipol, jpol, iat, jat, t1, t2, t3)
           end do
        end do
+       close(1)
     end if
-    read(1,*) qscell(1:3)
 
-    self%scell = qscell
-    
-    !Read the force constants.
-    allocate(self%ifc2(3, 3, nat, nat, self%scell(1), self%scell(2), self%scell(3)))
-    nfc2 = 3*3*nat*nat
-    do i = 1, nfc2
-       read(1, *) ipol, jpol, iat, jat
-       do j = 1, self%scell(1)*self%scell(2)*self%scell(3)
-          read(1, *) t1, t2, t3, &
-               self%ifc2(ipol, jpol, iat, jat, t1, t2, t3)
-       end do
-    end do
-    close(1)
+!!$    !Phonopy format:
+!!$    if(phonopy_format_file_exists) then
+!!$       r = transpose(matmul(crys%lattvecs, crys%basis))/bohr2nm
+!!$       
+!!$       open(1, file = "FORCE_CONSTANTS", status = "old")
+!!$
+!!$       read(1, *) ntensors_phonopy
+!!$
+!!$       !DEBUG
+!!$       self%scell = [5, 5, 5]
+!!$
+!!$       allocate(self%ifc2(3, 3, crys%numatoms, crys%numatoms, self%scell(1), self%scell(2), self%scell(3)))
+!!$       
+!!$       if(ntensors_phonopy /= product(self%scell)*crys%numatoms) &
+!!$            call exit_with_message('Wrong number of force constant tensors in file. Exiting.')
+!!$       
+!!$       do i = 1, ntensors_phonopy
+!!$          do j = 1, ntensors_phonopy
+!!$             read(1,*) at1_sc, at2_sc
+!!$
+!!$             call phonopy_demux_atom_position(at1_sc, &
+!!$                  self%scell, ucell1, iat)
+!!$
+!!$             call phonopy_demux_atom_position(at2_sc, &
+!!$                  self%scell, ucell2, jat)
+!!$
+!!$             !We may fix the first atom in the central unitcell
+!!$             if(all(ucell1 == 1)) then
+!!$                do ipol = 1, 3
+!!$                   read(1, *) self%ifc2(ipol, :, iat, jat, &
+!!$                        ucell2(1), ucell2(2), ucell2(3))
+!!$                end do
+!!$             else !this info is redundant for elphbolt, so read but don't save
+!!$                do ipol = 1, 3
+!!$                   read(1, *)
+!!$                end do
+!!$             end if
+!!$          end do
+!!$       end do
+!!$       close(1)
+!!$
+!!$       !Convert from phonopy units [eV.A^-2] to our internal units [Ry.Bohr^-2]
+!!$       self%ifc2 = self%ifc2/Ryd2eV*(Bohr2nm*10.0_r64)**2
+!!$    end if
     
     !Enforce the conservation of momentum in the simplest way possible.
     do i = 1, 3
        do j = 1, 3
-          do iat = 1, nat
+          do iat = 1, crys%numatoms
              self%ifc2(i, j, iat, iat, 1, 1, 1) = self%ifc2(i, j, iat, iat, 1, 1, 1) - &
                   sum(self%ifc2(i, j, iat, :, :, :, :))
           end do
@@ -452,6 +519,7 @@ contains
     do i = 1, 3
        self%cell_r(i, 0) = dnrm2(3, self%cell_r(i, 1:3), 1)
     end do
+    
     self%cell_g(:, 1:3) = transpose(crys%reclattvecs)*bohr2nm
     do i = 1, 3
        self%cell_g(i, 0) = dnrm2(3, self%cell_g(i, 1:3), 1)
@@ -465,28 +533,68 @@ contains
     do m1 = -2, 2
        do m2 = -2, 2
           do m3 = -2, 2
-             if(all((/m1, m2, m3/).eq.0)) then
+             if(all([m1, m2, m3] == 0)) then
                 cycle
              end if
              do i = 1, 3
                 self%rws(j, i) = wscell(1, i)*m1 + wscell(2, i)*m2 + wscell(3, i)*m3
              end do
-             self%rws(j, 0) = 0.5*dot_product(self%rws(j, 1:3), self%rws(j, 1:3))
+             self%rws(j, 0) = 0.5_r64*dot_product(self%rws(j, 1:3), self%rws(j, 1:3))
              j = j + 1
           end do
        end do
     end do
 
-    do i = 1, nat
-       self%mm(i, i) = mass(tipo(i))
-       self%rr(i, i, :) = 0
-       do j = i + 1, nat
-          self%mm(i, j) = sqrt(mass(tipo(i))*mass(tipo(j)))
+    !Basis atoms in Cartesian coordinates and in Bohr.
+    !This is used in the section below to construct the r(i) - r(j) vectors
+    r = transpose(matmul(crys%lattvecs, crys%basis))/bohr2nm
+    
+    do i = 1, crys%numatoms
+       self%mm(i, i) = crys%masses(crys%atomtypes(i))
+       self%rr(i, i, :) = 0.0_r64
+       do j = i + 1, crys%numatoms
+          self%mm(i, j) = &
+               sqrt(crys%masses(crys%atomtypes(i))*&
+               crys%masses(crys%atomtypes(j)))
           self%rr(i, j, 1:3) = r(i, 1:3) - r(j, 1:3)
           self%mm(j, i) = self%mm(i, j)
           self%rr(j, i, 1:3) = -self%rr(i, j, 1:3)
        end do
     end do
+
+    !Our internal format uses Espresso units for the mass matrix.
+    self%mm = self%mm/massfactor
+
+  contains
+
+    subroutine phonopy_demux_atom_position(atom_in_supercell_muxed, &
+         supercell_size, unitcell_indvec, atom_in_unitcell_muxed)
+      !! This splits the atom position in the supercell into the unitcell
+      !! position (integer triplet) and atom index in that unitcell.
+      !! Everything is 1-based.
+      !!
+      !! Didn't see the point of providing this subroutine in a global scope
+      !! as it really only useful in the context of parsing the phonopy
+      !! format 2nd order force constants file.
+     
+      integer(i64), intent(in) :: atom_in_supercell_muxed, &
+           supercell_size(3)
+      integer(i64), intent(out) :: unitcell_indvec(3), &
+           atom_in_unitcell_muxed
+
+      !Local
+      integer(i64) :: tmp1, tmp2
+
+      call int_div(atom_in_supercell_muxed - 1, supercell_size(1), &
+           tmp1, unitcell_indvec(1))
+      call int_div(tmp1, supercell_size(2), tmp2, unitcell_indvec(2))
+      call int_div(tmp2, supercell_size(3), atom_in_unitcell_muxed, &
+           unitcell_indvec(3))
+
+      !Since the outputs should all be 1-based:
+      unitcell_indvec = unitcell_indvec + 1
+      atom_in_unitcell_muxed = atom_in_unitcell_muxed + 1
+    end subroutine phonopy_demux_atom_position
     
   end subroutine read_ifc2
   
