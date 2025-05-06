@@ -19,7 +19,7 @@ module SEPE_module
   !! Semiconductor Electron-Phonon Equations (SEPE) a la Stefanucci & Perfetto.
 
   use precision, only: r64, i64
-  use params, only: qe, kB, hbar_eVps
+  use params, only: qe, kB, hbar_eVps, oneI, complex_zero
   use misc, only: Bose, mux_vector, binsearch, timer, subtitle, &
        print_message, distribute_points, demux_state
 !!$  use misc, only: print_message, exit_with_message, write2file_rank2_real, &
@@ -48,6 +48,8 @@ module SEPE_module
      !! Phonon RTA scattering rates on the IBZ due to ph-e interactions.
      real(r64), allocatable :: ph_rta_rates_ibz(:,:)
      !! Phonon RTA scattering rates on the IBZ.
+     real(r64), allocatable :: ph_rta_coherence_rates_ibz(:,:)
+     !! Phonon RTA coherence rates on the IBZ.
      real(r64), allocatable :: ph_field_term_T(:,:,:)
      !! Phonon field coupling term for gradT field on the FBZ.
      real(r64), allocatable :: ph_response_T(:,:,:)
@@ -401,7 +403,7 @@ contains
 
           !Set file tag
           write(tag, '(I9)') istate1
-          
+
           !RTA lifetime
           tau_ibz = 0.0_r64
           if(rta_rates_ibz(iq1_ibz, s1) /= 0.0_r64) then
@@ -529,79 +531,182 @@ contains
     end do
   end subroutine iterate_ph_occupations_eqn
   
-!!$  subroutine iterate_ph_coherence_eqn(T, num, crys, ph, el, rta_rates_ibz, &
-!!$       field_term, response_ph, response_el, coherence_ph)
-!!$    !! Subroutine to calculate the phonon coherence equation.
-!!$    !! 
-!!$    !! T Temperature in K
-!!$    !! num Numerics object
-!!$    !! crys Crystal object
-!!$    !! ph Phonon object
-!!$    !! el Electron object
-!!$    !! rta_rates_ibz Phonon RTA scattering rates
-!!$    !! field_term Phonon field coupling term
-!!$    !! response_ph Phonon response function
-!!$    !! response_el Electron response function
-!!$    !! coherence_ph Phonon coherence term
+  subroutine iterate_ph_coherence_eqn(num, crys, ph, el, &
+       rta_coherence_rates_ibz, response_ph, response_el, coherence_ph)
+    !! Subroutine to calculate the phonon coherence equation.
+    !! 
+    !! num Numerics object
+    !! crys Crystal object
+    !! ph Phonon object
+    !! el Electron object
+    !! rta_coherence_rates_ibz Phonon RTA coherence rates
+    !! response_ph Phonon response function
+    !! response_el Electron response function
+    !! coherence_ph Phonon coherence term
+
+    type(numerics), intent(in) :: num
+    type(crystal), intent(in) :: crys
+    type(phonon), intent(in) :: ph
+    type(electron), intent(in) :: el
+    real(r64), intent(in) :: rta_coherence_rates_ibz(:, :)
+    real(r64), intent(in) :: response_el(:, :, :)
+    real(r64), intent(in) :: response_ph(:, :, :)
+    complex(r64), intent(inout) :: coherence_ph(:, :, :)
+
+    !Local variables
+    integer(i64) :: el_nstates_irred, chunk, istate, numbranches, s, &
+         ik_ibz, m, ieq, ik_sym, ik_fbz, ikp_fbz_rot, iproc, ikp, n, nk, &
+         iq_fbz, iq_ibz, nq, numbands, &
+         num_active_images, start, end, nprocs
+    integer(i64), allocatable :: istate_el(:), istate_ph(:)
+    real(r64) :: ph_en, coherence_rate
+    complex(r64) :: prefactor
+    real(r64), allocatable :: Xphplus(:), Xphminus(:)
+    complex(r64), allocatable :: coherence_ph_reduce(:, :, :)
+    character(len = 1024) :: filepath_Xphplus, filepath_Xphminus, tag
+
+    !Set output directory of transition probilities
+    write(tag, "(E9.3)") crys%T
+
+    !Number of electron bands
+    numbands = el%numbands
+
+    !Number of in-window FBZ wave vectors
+    nk = el%nwv
+
+    !Number of phonon FBZ wave vectors
+    nq = ph%nwv
+
+    !Total number of IBZ electron states
+    el_nstates_irred = el%nwv*numbands
+    
+    !Allocate and initialize response reduction array
+    allocate(coherence_ph_reduce(nq, numbranches, 3))
+    coherence_ph_reduce(:,:,:) = 0.0_r64
+
+    !Divide electron states among images
+    call distribute_points(el_nstates_irred, chunk, start, end, num_active_images)
+
+    !Only work with the active images
+    if(this_image() <= num_active_images) then
+       !Run over electron IBZ states
+       do istate = start, end
+          !Demux state index into band (m) and wave vector (ik_ibz) indices
+          call demux_state(istate, numbands, m, ik_ibz)
+
+          !Apply energy window to initial (IBZ blocks) electron
+          if(abs(el%ens_irred(ik_ibz, m) - el%enref) > el%fsthick) cycle
+
+          !Read the state resolved transition rates and the states involved
+          !in the e-ph scattering:
+
+          !Set X+ filename
+          write(tag, '(I9)') istate
+          filepath_Xphplus = trim(adjustl(num%Xdir))//'/Xplus.istate'//trim(adjustl(tag))
+
+          !Read X+ from file
+          call read_transition_probs_e(trim(adjustl(filepath_Xphplus)), nprocs, &
+               Xphplus, istate_el, istate_ph)
+
+          !Set X- filename
+          write(tag, '(I9)') istate
+          filepath_Xphminus = trim(adjustl(num%Xdir))//'/Xminus.istate'//trim(adjustl(tag))
+
+          !Read X- from file
+          call read_transition_probs_e(trim(adjustl(filepath_Xphminus)), nprocs, &
+               Xphminus)
+
+          !Sum over the number of equivalent k-points of the IBZ point
+          do ieq = 1, el%nequiv(ik_ibz)
+             ik_sym = el%ibz2fbz_map(ieq, ik_ibz, 1) !symmetry
+             call binsearch(el%indexlist, el%ibz2fbz_map(ieq, ik_ibz, 2), ik_fbz)
+
+             !The e-ph population bit:
+
+             !Sum over scattering processes
+             do iproc = 1, nprocs
+                !Grab the final electron
+                call demux_state(istate_el(iproc), numbands, n, ikp)
+
+                !Self contribution:
+
+                !Find image of final electron wave vector due to the current symmetry
+                call binsearch(el%indexlist, el%equiv_map(ik_sym, ikp), ikp_fbz_rot)
+
+                !Recall that phonons that are not on the coarser q-mesh
+                !were tagged with a negative index.
+                !Below, I only care about those q-vectors that live on the
+                !coarser q-mesh.
+                if(istate_ph(iproc) >= 0) then
+                   call demux_state(istate_ph(iproc), numbranches, s, iq_fbz)
+
+                   !Compute the prefactor
+                   iq_ibz = ph%fbz2ibz_map(iq_fbz)
+                   coherence_rate = rta_coherence_rates_ibz(iq_ibz, s)
+                   ph_en = ph%ens_irred(iq_ibz, s)
+                   prefactor = (hbar_eVps*coherence_rate - 4.0_r64*ph_en*oneI)/&
+                        ((hbar_eVps*coherence_rate)**2 + 16.0_r64*ph_en**2)
+                   
+                   !Here accumulate contribution to \mathbf{R}_{\lambda}
+                   !from the 1st term of the RHS
+                   coherence_ph_reduce(iq_fbz, s, :) = coherence_ph_reduce(iq_fbz, s, :) + &
+                        prefactor*(Xphplus(iproc) - Xphminus(iproc))*&
+                        (response_el(ik_fbz, m, :) - response_el(ikp_fbz_rot, n, :))
+
+                   !And, similarly, accumulate the 2nd term
+                   coherence_ph_reduce(iq_fbz, s, :) = coherence_ph_reduce(iq_fbz, s, :) + &
+                        prefactor*(Xphplus(iproc) - Xphminus(iproc))*&
+                        response_ph(iq_fbz, s, :)
+                end if
+                
+!!$                !Get q = k' - k (represented w.r.t. electron k-grid)
+!!$                !q_vec_wrt_elmesh = vec(el%indexlist(ikp_fbz_rot), el%wvmesh, crys%reclattvecs)
 !!$
-!!$    type(phonon), intent(in) :: ph
-!!$    type(electron), intent(in) :: el
-!!$    type(numerics), intent(in) :: num
-!!$    type(crystal), intent(in) :: crys
-!!$    real(r64), intent(in) :: T, rta_rates_ibz(:, :), field_term(:, :, :)
-!!$    real(r64), intent(in) :: response_el(:, :, :)
-!!$    real(r64), intent(in) :: response_ph(:, :, :)
-!!$    complex(r64), intent(inout) :: coherence_ph(:, :, :)
+!!$                !Check if the q_vec is in the FBZ q-list.
+!!$                !We have to do this since the phonon and electon
+!!$                !wave vector meshes are in general different
+!!$                compatible_iq_frac = 0
+!!$                do iq_dummy = 1, ph%nwv
+!!$                   if(all(q_vec_wrt_elmesh%frac == ph%wavevecs(iq_dummy, :))) then
+!!$                      compatible_iq_frac = iq_dummy
+!!$                   else
+!!$                      cycle
+!!$                   end if
+!!$                end do
+                
+!!$                if(compatible_iq_frac > 0) then
+!!$                   !Compute the prefactor
+!!$                   !TODO
+!!$                   
+!!$                   !Here accumulate contribution to \mathbf{R}_{\lambda}
+!!$                   !from the 1st term of the RHS
+!!$                   R_reduce(compatible_iq_frac, s, :) = R_reduce(ik_fbz, m, :) + &
+!!$                        prefactor*(Xphplus(iproc) - Xphminus(iproc))*&
+!!$                        (response_el(ik_fbz, m, :) - response_el(ikp_fbz_rot, n, :))
 !!$
-!!$    !Local variables
-!!$    integer(i64) :: nstates_irred, chunk, istate1, numbranches, s1, &
-!!$         iq1_ibz, ieq, iq1_sym, iq1_fbz, iproc, iq2, s2, iq3, s3, nq, &
-!!$         num_active_images, numbands, ik, ikp, m, n, nprocs_phe, aux1, aux2, &
-!!$         nprocs_3ph_plus, nprocs_3ph_minus, start, end, nprocs_phcoh
-!!$    integer(i64), allocatable :: istate2_plus(:), istate3_plus(:), &
-!!$         istate2_minus(:), istate3_minus(:), istate_el1(:), istate_el2(:)
-!!$    real(r64) :: tau_ibz
-!!$    real(r64), allocatable :: Y(:), U(:), response_ph_reduce(:, :, :), &
-!!$         coherence_ph_real(:, :, :)
-!!$    character(len = 1024) :: filepath_Wm, filepath_Wp, filepath_Y, filepath_U, tag
-!!$
-!!$    !Set output directory of transition probilities
-!!$    write(tag, "(E9.3)") T
-!!$    
-!!$    !Number of electron bands
-!!$    numbands = size(response_el(1,:,1))
-!!$    
-!!$    !Number of phonon branches
-!!$    numbranches = size(rta_rates_ibz(1,:))
-!!$
-!!$    !Number of FBZ wave vectors
-!!$    nq = size(field_term(:,1,1))
-!!$    
-!!$    !Total number of IBZ states
-!!$    nstates_irred = size(rta_rates_ibz(:,1))*numbranches
-!!$    
-!!$    !Allocate and initialize response reduction array
-!!$    allocate(response_ph_reduce(nq, numbranches, 3))
-!!$    response_ph_reduce(:,:,:) = 0.0_r64
-!!$    
-!!$    !Divide phonon states among images
-!!$    call distribute_points(nstates_irred, chunk, start, end, num_active_images)
-!!$
-!!$    !Only work with the active images
-!!$    if(this_image() <= num_active_images) then
-!!$       !TODO
-!!$    end if
-!!$
-!!$    !Update the response function
-!!$    call co_sum(response_ph_reduce)
-!!$    response_ph = response_ph_reduce
-!!$
-!!$    !Symmetrize response function
-!!$    do iq1_fbz = 1, nq
-!!$       response_ph(iq1_fbz,:,:)=transpose(&
-!!$            matmul(ph%symmetrizers(:,:,iq1_fbz),transpose(response_ph(iq1_fbz,:,:))))
-!!$    end do    
-!!$  end subroutine iterate_ph_coherence_eqn
+!!$                   !And, similarly, accumulate the 2nd term
+!!$                   R_reduce(compatible_iq_frac, s, :) = R_reduce(ik_fbz, m, :) + &
+!!$                        prefactor*(Xphplus(iproc) - Xphminus(iproc))*&
+!!$                        (response_ph(ik_fbz, m, :) - response_el(ikp_fbz_rot, n, :))
+!!$                else
+!!$                   cycle
+!!$                end if
+             end do             
+          end do
+       end do
+    end if
+    
+    !Update the response function
+    call co_sum(coherence_ph_reduce)
+    coherence_ph = coherence_ph_reduce
+
+    !Symmetrize response function
+    do iq_fbz = 1, nq
+       coherence_ph(iq_fbz, :, :)=transpose(&
+            matmul(ph%symmetrizers(:, :, iq_fbz), &
+            transpose(coherence_ph(iq_fbz, :, :))))
+    end do    
+  end subroutine iterate_ph_coherence_eqn
 
   subroutine calculate_phonon_drag(num, el, ph, idc, widc, sym, rta_rates_ibz, &
        response_ph, ph_drag_term)
