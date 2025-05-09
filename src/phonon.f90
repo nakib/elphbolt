@@ -168,7 +168,6 @@ contains
     integer(i64) :: i, iq, ii, jj, kk, l, il, s, ib, im, chunk, &
          num_active_images
     integer(i64), allocatable :: start[:], end[:]
-    integer(i64) , allocatable :: fbz2ibz_map(:)
     real(r64), allocatable :: ens_chunk(:,:)[:], vels_chunk(:,:,:)[:], &
          symmetrizers_chunk(:,:,:)[:]
     complex(r64), allocatable :: evecs_chunk(:,:,:)[:]
@@ -281,12 +280,12 @@ contains
     if(this_image() <= num_active_images) deallocate(symmetrizers_chunk)
 
     !Create fbz2ibz_map
-    allocate(fbz2ibz_map(self%nwv))
-    fbz2ibz_map = -1
+    allocate(self%fbz2ibz_map(self%nwv))
+    self%fbz2ibz_map = -1
     do iq = 1, self%nwv
        do i = 1, self%nwv_irred !an irreducible point
           do l = 1, self%nequiv(i) !number of equivalent points of i
-             if(self%ibz2fbz_map(l, i, 2) == iq) fbz2ibz_map(iq) = i
+             if(self%ibz2fbz_map(l, i, 2) == iq) self%fbz2ibz_map(iq) = i
           end do
        end do
     end do
@@ -336,7 +335,7 @@ contains
     if(this_image() == 1) then
        open(1, file = "ph.fbz2ibz_map", status = "replace")
        do iq = 1, self%nwv
-          write(1, "(I10)") fbz2ibz_map(iq)
+          write(1, "(I10)") self%fbz2ibz_map(iq)
        end do
        close(1)
     end if
@@ -491,8 +490,8 @@ contains
 
              !We may fix the first atom in the central unitcell
              if(all(ucell1 == 1)) then
-                do ipol = 1, 3
-                   read(1, *) self%ifc2(ipol, :, iat, jat, &
+                do jpol = 1, 3
+                   read(1, *) self%ifc2(:, jpol, jat, iat, &
                         ucell2(1), ucell2(2), ucell2(3))
                 end do
              else !this info is redundant for elphbolt, so read but don't save
@@ -983,7 +982,7 @@ contains
   end subroutine read_ifc3
 
   subroutine phonon_espresso_precompute(self, crys)
-    !! Subroutine to precompute q-indepent quantities related to the dynamical matrix
+    !! Subroutine to precompute q-independent quantities related to the dynamical matrix
 
     class(phonon), intent(inout) :: self
     type(crystal), intent(in) :: crys
@@ -1016,7 +1015,7 @@ contains
                       !Supercell image
                       t(i) = m1*self%cell_r(1, i) + m2*self%cell_r(2, i) + m3*self%cell_r(3, i)
 
-                      !Position of basis atom in supercell image
+                      !Position of pair of atoms in supercell image
                       r_ws(i) = t(i) + self%rr(iat, jat, i)
                    end do
                    
@@ -1320,7 +1319,6 @@ contains
 
     !nk=size(kpoints,1)
 
-    allocate(mm(crys%numatoms,crys%numatoms))
     allocate(omega2(self%numbands))
     allocate(rwork(max(1, 9*crys%numatoms - 2)))
 
@@ -1332,18 +1330,18 @@ contains
     allocate(fc_total(3, 3, crys%numatoms, crys%numatoms, &
          self%scell(1),self%scell(2),self%scell(3)))
 
-    do i=1,crys%numatoms
-       mm(i,i)=crys%masses(crys%atomtypes(i))
-       do j=i+1,crys%numatoms
-          mm(i,j)=sqrt(crys%masses(crys%atomtypes(i))*crys%masses(crys%atomtypes(j)))
-          mm(j,i)=mm(i,j)
-       end do
-    end do
+!!$    do i=1,crys%numatoms
+!!$       mm(i,i)=crys%masses(crys%atomtypes(i))
+!!$       do j=i+1,crys%numatoms
+!!$          mm(i,j)=sqrt(crys%masses(crys%atomtypes(i))*crys%masses(crys%atomtypes(j)))
+!!$          mm(j,i)=mm(i,j)
+!!$       end do
+!!$    end do
 
     ! Read FORCE_CONSTANTS_2ND and reduce the constants using mm.
     !call read2fc(fc_short)
-
-    !Grab the internal ifc2s that are not mass normalized 
+    
+    !Grab the internal ifc2s that are not mass normalized
     fc_short = self%ifc2
 
     !Now mass normalize them
@@ -1461,7 +1459,7 @@ contains
                                     iy2*self%scell(2)*crys%lattvecs(:, 2) + &
                                     iz2*self%scell(3)*crys%lattvecs(:, 3)
                                
-                               Rnorm=dnrm2(3, rl + r, 1)
+                               Rnorm = dnrm2(3, rl + r, 1)
 
                                if(abs(Rnorm - dmin) > 1e-5) then
                                   if(Rnorm < dmin) then
@@ -1548,8 +1546,7 @@ contains
 
     !Units conversion
     omegas = omegas*Ryd2eV !eV
-    !TODO check units!
-    if(present(velocities)) velocities = velocities*toTHz*bohr2nm !Km/s
+    if(present(velocities)) velocities = velocities*toTHz !Km/s
   end subroutine phonon_phonopy
 
   subroutine allocate_xmassvar(self, ph, usetetra, Tmat)
