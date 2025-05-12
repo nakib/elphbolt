@@ -48,42 +48,30 @@ program V3offload
       write(*, '(A, I5)') 'Number of coarray images = ', num_images()
    end if
 
-   !Set up crystal
-   call crys%initialize
+   ! !Set up crystal
+   ! call crys%initialize
 
-   !Set up numerics data
-   call num%initialize(crys)
+   ! !Set up numerics data
+   ! call num%initialize(crys)
 
-   !Calculate crystal and BZ symmetries
-   call sym%calculate_symmetries(crys, num%qmesh)
+   ! !Calculate crystal and BZ symmetries
+   ! call sym%calculate_symmetries(crys, num%qmesh)
 
-   !Calculate phonons
-   call ph%initialize(crys, sym, num)
+   ! !Calculate phonons
+   ! call ph%initialize(crys, sym, num)
 
    !Calculate ph-ph vertex (cpu, original)
-   Vm2_calculator => Vm2_3ph_reference
+   !Vm2_calculator => Vm2_3ph_reference
    call t_event%start_timer('reference V- on cpu')
    call calculate_3ph_interaction(ph, crys, num, V2, Vm2_calculator)
    call t_event%end_timer('reference V- on cpu')
    print*, 'value = ', twonorm(pack(V2, .true.))
+   ! print*, V2(3, 1, 2, 3, 3)
+   ! print*, V2(3, 2, 4, 3, 2)
+   ! print*, V2(4, 1, 4, 1, 4)
+   ! print*, V2(5, 1, 5, 1, 5)
+   ! print*, V2(6, 1, 6, 1, 6)
 
-   !Calculate ph-ph vertex (cpu, refactor)
-   Vm2_calculator => Vm2_3ph_refactor
-   call t_event%start_timer('refactored V- on cpu')
-   call calculate_3ph_interaction(ph, crys, num, V2, Vm2_calculator)
-   call t_event%end_timer('refactored V- on cpu')
-   print*, 'value = ', twonorm(pack(V2, .true.))
-
-   !Calculate ph-ph vertex (gpu, algo 1)
-   call t_event%start_timer('V- on gpu, algo 1')
-   call calculate_3ph_interaction_gpu(ph, crys, num, V2)
-   call t_event%end_timer('V- on gpu, algo 1')
-   print*, 'value = ', twonorm(pack(V2, .true.))
-   print*, V2(3, 1, 2, 3, 3)
-   print*, V2(3, 2, 4, 3, 2)
-   print*, V2(4, 1, 4, 1, 4)
-   print*, V2(5, 1, 5, 1, 5)
-   print*, V2(6, 1, 6, 1, 6)
    count_full = 0
    print *, '---------------------------------------------------------------'
    print *, '   lambda1    lambda2    lambda3      Value'
@@ -115,17 +103,30 @@ program V3offload
    end do
    print *, 'Number of V2 elements:', count_full
 
+   !Calculate ph-ph vertex (cpu, refactor)
+   !Vm2_calculator => Vm2_3ph_refactor
+   call t_event%start_timer('refactored V- on cpu')
+   call calculate_3ph_interaction(ph, crys, num, V2, Vm2_calculator)
+   call t_event%end_timer('refactored V- on cpu')
+   print*, 'value = ', twonorm(pack(V2, .true.))
+
+   !Calculate ph-ph vertex (gpu, algo 1)
+   ! call t_event%start_timer('V- on gpu, algo 1')
+   ! call calculate_3ph_interaction_gpu(ph, crys, num, V2)
+   ! call t_event%end_timer('V- on gpu, algo 1')
+   ! print*, 'value = ', twonorm(pack(V2, .true.))
+
    !Calculate V2_minimal_set (reference)
-   Vm2_calculator => Vm2_3ph_reference
+   !Vm2_calculator => Vm2_3ph_reference
    call t_event%start_timer('reference V2 minimal set')
    call calculate_3ph_interaction_minimalset(ph, crys, num, V2_minimal_set, Vm2_calculator)
    call t_event%end_timer('reference V2 minimal set')
    !print*, 'value = ', twonorm(pack(V2_minimal_set, .true.))
-   print*, V2_minimal_set(3, 1, 2, 3, 3)
-   print*, V2_minimal_set(3, 2, 4, 3, 2)
-   print*, V2_minimal_set(4, 1, 4, 1, 4)
-   print*, V2_minimal_set(5, 1, 5, 1, 5)
-   print*, V2_minimal_set(6, 1, 6, 1, 6)
+   ! print*, V2_minimal_set(3, 1, 2, 3, 3)
+   ! print*, V2_minimal_set(3, 2, 4, 3, 2)
+   ! print*, V2_minimal_set(4, 1, 4, 1, 4)
+   ! print*, V2_minimal_set(5, 1, 5, 1, 5)
+   ! print*, V2_minimal_set(6, 1, 6, 1, 6)
 
    count_minimal = 0
    print *, '---------------------------------------------------------------'
@@ -162,92 +163,13 @@ program V3offload
    print *, 'Symmetry saving (%):', (1.0 - real(count_minimal)/real(count_full)) * 100.0
 
    !Calculate V2_minimal_set (refactored)
-   Vm2_calculator => Vm2_3ph_refactor
+   !Vm2_calculator => Vm2_3ph_refactor
    call t_event%start_timer('refactored V2 minimal set')
    call calculate_3ph_interaction_minimalset(ph, crys, num, V2_minimal_set, Vm2_calculator)
    call t_event%end_timer('refactored V2 minimal set')
    !print*, 'value = ', twonorm(pack(V2_minimal_set, .true.))
 
-!!$  !Calculate ph-ph vertex (gpu, algo 2)
-!!$  call t_event%start_timer('V- on gpu, algo 2')
-!!$  call calculate_3ph_interaction_gpu_algo2(ph, crys, num, V2)
-!!$  call t_event%end_timer('V- on gpu, algo 2')
-!!$  print*, 'value = ', twonorm(pack(V2, .true.))
-
-!!$  !Calculate ph-ph vertex (gpu, algo 3)
-!!$  call t_event%start_timer('V- on gpu, algo 3')
-!!$  call calculate_3ph_interaction_gpu_algo3(ph, crys, num, V2)
-!!$  call t_event%end_timer('V- on gpu, algo 3')
-!!$  print*, 'value = ', twonorm(pack(V2, .true.))
-
-   ! call V2minimal()
-
 contains
-
-   ! subroutine V2minimal()
-   !    integer(i64) :: nbands, mesh_size(3), nstates_irred
-   !    integer(i64), allocatable :: lambda1_list(:), lambda2_list(:)
-   !    integer(i64), allocatable :: M(:, :, :)
-   !    integer :: istate1, istate2
-   !    integer(i64) :: lambda1, lambda2, lambda3
-   !    integer(i64) :: iq1, iq2, iq3_minus, s1, s2, s3, iq1_ibz
-   !    real(r64)    :: V2_val
-
-
-   !    if(this_image() == 1) then
-   !       print *, "V3 permutations to canonical (lambda1, lambda2, lambda3) form"
-   !       print *, "Number of coarray images =", num_images()
-   !    end if
-
-   !    nbands = 2
-   !    mesh_size = [2, 2, 2]*1_i64
-
-   !    allocate(lambda1_list(2)); lambda1_list = [1, 2]*1_i64
-   !    allocate(lambda2_list(6)); lambda2_list = [1, 2, 3, 4, 5, 6]*1_i64
-
-   !    call calculate_3ph_interaction_minimalset(ph, crys, num, V2_minimal_set, Vm2_calculator)
-   !    call map_triplet_full_to_reduced(nbands, mesh_size, lambda1_list, lambda2_list, M)
-
-   !    print *, "M(istate2, istate1) → canonical triplet: (lambda1, lambda2, lambda3)"
-
-   !    do istate1 = 1, size(lambda1_list)
-   !       do istate2 = 1, size(lambda2_list)
-   !          write(*,'(A,I0,A,I0,A,I0,A,I0,A,I0,A)') 'M(', istate2, ',', istate1, ') = (', &
-   !             M(1, istate2, istate1), ',', M(2, istate2, istate1), ',', M(3, istate2, istate1), ')'
-   !       end do
-   !    end do
-
-   !    print *, ""
-   !    print *, "Canonical triplets (lambda1, lambda2, lambda3) and V2 values:"
-   !    print *, "--------------------------------------------------------------"
-   !    !print *, " lambda1  lambda2  lambda3        V2"
-   !    print *, " s3   iq3_minus   s2   iq2   istate1   lambda1  lambda2  lambda3        V2"
-
-   !    do istate1 = 1, size(lambda1_list)
-   !       do istate2 = 1, size(lambda2_list)
-   !          ! for canonical triplet
-   !          lambda1 = M(1, istate2, istate1)
-   !          lambda2 = M(2, istate2, istate1)
-   !          lambda3 = M(3, istate2, istate1)
-
-   !          ! Demux each lambda into (band, iq) that help me calculate V2
-   !          call demux_state(lambda1, ph%numbands, s1, iq1)
-   !          call demux_state(lambda2, ph%numbands, s2, iq2)
-   !          call demux_state(lambda3, ph%numbands, s3, iq3_minus)
-
-   !          ! V2 value
-   !          V2_val = V2_minimal_set(s3, iq3_minus, s2, iq2, istate1)
-
-   !          ! print non-zero values
-   !          !if (abs(V2_val) > 1e-2_r64) then
-   !          !write(*,'(3(I8,1X),F16.8)') lambda1, lambda2, lambda3, V2_val
-   !          write(*,'(A,I6,A,I6,A,I6,A,I6,A,I6,3(A,I6),A,F16.8)') &
-   !             's3=',s3,' iq3_minus=',iq3_minus,' s2=',s2,' iq2=',iq2,' istate1=',istate1, &
-   !             ' lambda1=',lambda1,' lambda2=',lambda2,' lambda3=',lambda3,' V2=',V2_val
-   !          !end if
-   !       end do
-   !    end do
-   ! end subroutine V2minimal
 
    subroutine calculate_3ph_interaction(ph, crys, num, V2, Vm2_calculator)
       type(phonon), intent(in) :: ph
