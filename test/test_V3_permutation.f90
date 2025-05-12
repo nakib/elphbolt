@@ -38,7 +38,7 @@ program V3offload
    real(r64), allocatable :: V2_minimal_set(:, :, :, :, :)
    integer(i64), allocatable :: M(:, :, :)
    integer :: count_full, count_minimal
-   integer(i64) :: lambda1, lambda2, lambda3
+   integer(i64) :: lambda1, lambda2, lambda3, nstates_full
    integer(i64) :: istate1, iq2, iq3_minus, s2, s3, nstates_irred, s1, iq1_ibz, &
       iq1
    real(r64) :: val
@@ -48,20 +48,20 @@ program V3offload
       write(*, '(A, I5)') 'Number of coarray images = ', num_images()
    end if
 
-   ! !Set up crystal
-   ! call crys%initialize
+   !Set up crystal
+   !call crys%initialize
 
-   ! !Set up numerics data
-   ! call num%initialize(crys)
+   !Set up numerics data
+   !call num%initialize(crys)
 
-   ! !Calculate crystal and BZ symmetries
-   ! call sym%calculate_symmetries(crys, num%qmesh)
+   !Calculate crystal and BZ symmetries
+   !call sym%calculate_symmetries(crys, num%qmesh)
 
-   ! !Calculate phonons
-   ! call ph%initialize(crys, sym, num)
+   !Calculate phonons
+   !call ph%initialize(crys, sym, num)
 
    !Calculate ph-ph vertex (cpu, original)
-   !Vm2_calculator => Vm2_3ph_reference
+   Vm2_calculator => Vm2_3ph_reference
    call t_event%start_timer('reference V- on cpu')
    call calculate_3ph_interaction(ph, crys, num, V2, Vm2_calculator)
    call t_event%end_timer('reference V- on cpu')
@@ -77,23 +77,25 @@ program V3offload
    print *, '   lambda1    lambda2    lambda3      Value'
    print *, '---------------------------------------------------------------'
 
-   do lambda1 = 1, 5
+   nstates_full = ph%nwv * ph%numbands
+
+   do lambda1 = 1, min(5, nstates_full)
       call demux_state(lambda1, ph%numbands, s1, iq1)
 
-      do lambda2 = 1, 16
+      do lambda2 = 1, min(16, nstates_full)
          call demux_state(lambda2, ph%numbands, s2, iq2)
 
-         do lambda3 = 1, 16
+         do lambda3 = 1, min(16, nstates_full)
             call demux_state(lambda3, ph%numbands, s3, iq3_minus)
 
-            if(s3 <= size(V2,1) .and. iq3_minus <= size(V2,2) .and. &
-               s2 <= size(V2,3) .and. iq2 <= size(V2,4) .and. &
-               lambda1 <= size(V2,5)) then
+            if(s3 <= size(V2, 1) .and. iq3_minus <= size(V2, 2) .and. &
+               s2 <= size(V2, 3) .and. iq2 <= size(V2, 4) .and. &
+               lambda1 <= size(V2, 5)) then
 
                val = V2(s3, iq3_minus, s2, iq2, lambda1)
 
                if(abs(val) > 1.0e-7_r64) then
-                  write(*,'(3I10,2X,F16.8)') lambda1, lambda2, lambda3, val
+                  write(*,'(3I10, 2X, F16.8)') lambda1, lambda2, lambda3, val
                   count_full = count_full + 1
                end if
 
@@ -103,21 +105,8 @@ program V3offload
    end do
    print *, 'Number of V2 elements:', count_full
 
-   !Calculate ph-ph vertex (cpu, refactor)
-   !Vm2_calculator => Vm2_3ph_refactor
-   call t_event%start_timer('refactored V- on cpu')
-   call calculate_3ph_interaction(ph, crys, num, V2, Vm2_calculator)
-   call t_event%end_timer('refactored V- on cpu')
-   print*, 'value = ', twonorm(pack(V2, .true.))
-
-   !Calculate ph-ph vertex (gpu, algo 1)
-   ! call t_event%start_timer('V- on gpu, algo 1')
-   ! call calculate_3ph_interaction_gpu(ph, crys, num, V2)
-   ! call t_event%end_timer('V- on gpu, algo 1')
-   ! print*, 'value = ', twonorm(pack(V2, .true.))
-
    !Calculate V2_minimal_set (reference)
-   !Vm2_calculator => Vm2_3ph_reference
+   Vm2_calculator => Vm2_3ph_reference
    call t_event%start_timer('reference V2 minimal set')
    call calculate_3ph_interaction_minimalset(ph, crys, num, V2_minimal_set, Vm2_calculator)
    call t_event%end_timer('reference V2 minimal set')
@@ -133,23 +122,25 @@ program V3offload
    print *, '   lambda1    lambda2    lambda3      Value'
    print *, '---------------------------------------------------------------'
 
-   do lambda1 = 1, 5
+   nstates_full = ph%nwv * ph%numbands
+
+   do lambda1 = 1, min(5, nstates_full)
       call demux_state(lambda1, ph%numbands, s1, iq1)
 
-      do lambda2 = 1, 16
+      do lambda2 = 1, min(16, nstates_full)
          call demux_state(lambda2, ph%numbands, s2, iq2)
 
-         do lambda3 = 1, 16
+         do lambda3 = 1, min(16, nstates_full)
             call demux_state(lambda3, ph%numbands, s3, iq3_minus)
 
-            if(s3 <= size(V2_minimal_set,1) .and. iq3_minus <= size(V2_minimal_set,2) .and. &
-               s2 <= size(V2_minimal_set,3) .and. iq2 <= size(V2_minimal_set,4) .and. &
-               lambda1 <= size(V2_minimal_set,5)) then
+            if(s3 <= size(V2_minimal_set, 1) .and. iq3_minus <= size(V2_minimal_set, 2) .and. &
+               s2 <= size(V2_minimal_set, 3) .and. iq2 <= size(V2_minimal_set, 4) .and. &
+               lambda1 <= size(V2_minimal_set, 5)) then
 
                val = V2_minimal_set(s3, iq3_minus, s2, iq2, lambda1)
 
                if(abs(val) > 1.0e-7_r64) then
-                  write(*,'(3I10,2X,F16.8)') lambda1, lambda2, lambda3, val
+                  write(*,'(3I10, 2X, F16.8)') lambda1, lambda2, lambda3, val
                   count_minimal = count_minimal + 1
                end if
 
@@ -160,14 +151,7 @@ program V3offload
    end do
    print *, 'Number of V2 minimal set elements:', count_minimal
    print *, 'Reduction factor (minimal/full):', real(count_minimal)/real(count_full)
-   print *, 'Symmetry saving (%):', (1.0 - real(count_minimal)/real(count_full)) * 100.0
-
-   !Calculate V2_minimal_set (refactored)
-   !Vm2_calculator => Vm2_3ph_refactor
-   call t_event%start_timer('refactored V2 minimal set')
-   call calculate_3ph_interaction_minimalset(ph, crys, num, V2_minimal_set, Vm2_calculator)
-   call t_event%end_timer('refactored V2 minimal set')
-   !print*, 'value = ', twonorm(pack(V2_minimal_set, .true.))
+   print *, 'Symmetry saving (in %):', (1.0 - real(count_minimal)/real(count_full)) * 100.0
 
 contains
 
@@ -242,7 +226,7 @@ contains
 
                   aux = Vm2_calculator(ph%evecs(iq1, s1, :), &
                      ph%evecs(iq2, s2, :), ph%evecs(iq3_minus, s3, :), &
-                     ph%Index_i(:), ph%Index_j(:), ph%Index_k(:), ph%ifc3(:,:,:,:), &
+                     ph%Index_i(:), ph%Index_j(:), ph%Index_k(:), ph%ifc3(:, :, :, :), &
                      phases(:), ph%numtriplets, ph%numbands)
 
                   V2(s3, iq3_minus, s2, iq2, istate1) = aux
@@ -256,7 +240,7 @@ contains
       type(phonon), intent(in) :: ph
       type(crystal), intent(in) :: crys
       type(numerics), intent(in) :: num
-      real(r64), allocatable, intent(out) :: V2_minimal_set(:,:,:,:,:)
+      real(r64), allocatable, intent(out) :: V2_minimal_set(:, :, :, :, :)
       !integer(i64), allocatable, intent(out) :: M(:, :, :) ! M(3, istate2, istate1)
       procedure(Vm2_3ph), pointer, intent(in) :: Vm2_calculator
 
@@ -362,5 +346,42 @@ contains
          end do
       end do
    end subroutine calculate_3ph_interaction_minimalset
+
+   real(r64) function Vm2_3ph_reference(ev1_s1, ev2_s2, ev3_s3, &
+      Index_i, Index_j, Index_k, ifc3, phases_q2q3, ntrip, nb)
+      !! Function to calculate the squared 3-ph interaction vertex |V-|^2.
+
+      integer(i64), intent(in) :: ntrip, Index_i(ntrip), Index_j(ntrip), Index_k(ntrip), nb
+      complex(r64), intent(in) :: phases_q2q3(ntrip), ev1_s1(nb), ev2_s2(nb), ev3_s3(nb)
+      real(r64), intent(in) :: ifc3(3, 3, 3, ntrip)
+
+      !Local variables
+      integer(i64) :: it, a, b, c, aind, bind, cind
+      complex(r64) :: aux1, aux2, aux3, V0
+
+      !$acc routine seq
+
+      aux1 = (0.0_r64, 0.0_r64)
+      do it = 1, ntrip
+         aind = 3*(Index_k(it) - 1)
+         bind = 3*(Index_j(it) - 1)
+         cind = 3*(Index_i(it) - 1)
+         V0 = (0.0_r64, 0.0_r64)
+         do a = 1, 3
+            aux2 = conjg(ev3_s3(a + aind))
+            do b = 1, 3
+               aux3 = aux2*conjg(ev2_s2(b + bind))
+               do c = 1, 3
+                  if(ifc3(c, b, a, it) /= 0.0_r64) then
+                     V0 = V0 + ifc3(c, b, a, it)*ev1_s1(c + cind)*aux3
+                  end if
+               end do
+            end do
+         end do
+         aux1 = aux1 + V0*phases_q2q3(it)
+      end do
+
+      Vm2_3ph_reference = abs(aux1)**2
+   end function Vm2_3ph_reference
 
 end program V3offload

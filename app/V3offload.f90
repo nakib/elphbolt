@@ -66,19 +66,6 @@ program V3offload
    call calculate_3ph_interaction(ph, crys, num, V2, Vm2_calculator)
    call t_event%end_timer('reference V- on cpu')
    print*, 'value = ', twonorm(pack(V2, .true.))
-
-   !Calculate ph-ph vertex (cpu, refactor)
-   Vm2_calculator => Vm2_3ph_refactor
-   call t_event%start_timer('refactored V- on cpu')
-   call calculate_3ph_interaction(ph, crys, num, V2, Vm2_calculator)
-   call t_event%end_timer('refactored V- on cpu')
-   print*, 'value = ', twonorm(pack(V2, .true.))
-
-   !Calculate ph-ph vertex (gpu, algo 1)
-   call t_event%start_timer('V- on gpu, algo 1')
-   call calculate_3ph_interaction_gpu(ph, crys, num, V2)
-   call t_event%end_timer('V- on gpu, algo 1')
-   print*, 'value = ', twonorm(pack(V2, .true.))
    print*, V2(3, 1, 2, 3, 3)
    print*, V2(3, 2, 4, 3, 2)
    print*, V2(4, 1, 4, 1, 4)
@@ -98,14 +85,14 @@ program V3offload
          do lambda3 = 1, 16
             call demux_state(lambda3, ph%numbands, s3, iq3_minus)
 
-            if(s3 <= size(V2,1) .and. iq3_minus <= size(V2,2) .and. &
-               s2 <= size(V2,3) .and. iq2 <= size(V2,4) .and. &
-               lambda1 <= size(V2,5)) then
+            if(s3 <= size(V2, 1) .and. iq3_minus <= size(V2, 2) .and. &
+               s2 <= size(V2, 3) .and. iq2 <= size(V2, 4) .and. &
+               lambda1 <= size(V2, 5)) then
 
                val = V2(s3, iq3_minus, s2, iq2, lambda1)
 
                if(abs(val) > 1.0e-7_r64) then
-                  write(*,'(3I10,2X,F16.8)') lambda1, lambda2, lambda3, val
+                  write(*,'(3I10, 2X, F16.8)') lambda1, lambda2, lambda3, val
                   count_full = count_full + 1
                end if
 
@@ -114,6 +101,19 @@ program V3offload
       end do
    end do
    print *, 'Number of V2 elements:', count_full
+
+   !Calculate ph-ph vertex (cpu, refactor)
+   Vm2_calculator => Vm2_3ph_refactor
+   call t_event%start_timer('refactored V- on cpu')
+   call calculate_3ph_interaction(ph, crys, num, V2, Vm2_calculator)
+   call t_event%end_timer('refactored V- on cpu')
+   print*, 'value = ', twonorm(pack(V2, .true.))
+
+   !Calculate ph-ph vertex (gpu, algo 1)
+   call t_event%start_timer('V- on gpu, algo 1')
+   call calculate_3ph_interaction_gpu(ph, crys, num, V2)
+   call t_event%end_timer('V- on gpu, algo 1')
+   print*, 'value = ', twonorm(pack(V2, .true.))
 
    !Calculate V2_minimal_set (reference)
    Vm2_calculator => Vm2_3ph_reference
@@ -141,14 +141,14 @@ program V3offload
          do lambda3 = 1, 16
             call demux_state(lambda3, ph%numbands, s3, iq3_minus)
 
-            if(s3 <= size(V2_minimal_set,1) .and. iq3_minus <= size(V2_minimal_set,2) .and. &
-               s2 <= size(V2_minimal_set,3) .and. iq2 <= size(V2_minimal_set,4) .and. &
-               lambda1 <= size(V2_minimal_set,5)) then
+            if(s3 <= size(V2_minimal_set, 1) .and. iq3_minus <= size(V2_minimal_set, 2) .and. &
+               s2 <= size(V2_minimal_set, 3) .and. iq2 <= size(V2_minimal_set, 4) .and. &
+               lambda1 <= size(V2_minimal_set, 5)) then
 
                val = V2_minimal_set(s3, iq3_minus, s2, iq2, lambda1)
 
                if(abs(val) > 1.0e-7_r64) then
-                  write(*,'(3I10,2X,F16.8)') lambda1, lambda2, lambda3, val
+                  write(*,'(3I10, 2X, F16.8)') lambda1, lambda2, lambda3, val
                   count_minimal = count_minimal + 1
                end if
 
@@ -159,7 +159,7 @@ program V3offload
    end do
    print *, 'Number of V2 minimal set elements:', count_minimal
    print *, 'Reduction factor (minimal/full):', real(count_minimal)/real(count_full)
-   print *, 'Symmetry saving (%):', (1.0 - real(count_minimal)/real(count_full)) * 100.0
+   print *, 'Symmetry saving (in %):', (1.0 - real(count_minimal)/real(count_full)) * 100.0
 
    !Calculate V2_minimal_set (refactored)
    Vm2_calculator => Vm2_3ph_refactor
@@ -334,7 +334,7 @@ contains
       type(phonon), intent(in) :: ph
       type(crystal), intent(in) :: crys
       type(numerics), intent(in) :: num
-      real(r64), allocatable, intent(out) :: V2_minimal_set(:,:,:,:,:)
+      real(r64), allocatable, intent(out) :: V2_minimal_set(:, :, :, :, :)
       !integer(i64), allocatable, intent(out) :: M(:, :, :) ! M(3, istate2, istate1)
       procedure(Vm2_3ph), pointer, intent(in) :: Vm2_calculator
 
