@@ -1270,12 +1270,10 @@ contains
   end subroutine phonon_espresso
 
   subroutine phonon_phonopy(self, crys, nq, qpoints, omegas, eigenvect, velocities)
-      !! Subroutine to calculate phonons from the 2nd order force constants.
-      !
-      ! This is adapted from ShengBTE's subroutine of the same name.
-      ! ShengBTE is distributed under GPL v3 or later.
-    
-  !subroutine phonon_phonopy(kpoints,omegas,velocities,eigenvect)
+    !! Subroutine to calculate phonons from the 2nd order force constants.
+    !
+    ! This is adapted from ShengBTE's subroutine of the same name.
+    ! ShengBTE is distributed under GPL v3 or later.
 
     class(phonon), intent(in) :: self
     type(crystal), intent(in) :: crys

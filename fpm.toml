@@ -53,10 +53,10 @@ name="superconda"
 source-dir="app"
 main="superconda.f90"
 
-[[executable]]
-name="elphbolt_with_coherence"
-source-dir="app"
-main="elphbolt_with_coherence.f90"
+#[[executable]]
+#name="elphbolt_with_coherence"
+#source-dir="app"
+#main="elphbolt_with_coherence.f90"
 
 [[executable]]
 name="V3offload"
