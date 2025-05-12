@@ -1,0 +1,444 @@
+program V3offload
+
+#ifdef _OPENACC
+   use openacc
+#endif
+
+   use precision, only: i64, r64
+   use misc, only: print_message, subtitle, timer, exit_with_message, mux_vector, demux_state, &
+      mux_state, twonorm, demux_vector, permutations, lex_less_1d, map_triplet_full_to_reduced
+   use numerics_module, only: numerics
+   use crystal_module, only: crystal
+   use symmetry_module, only: symmetry
+   use phonon_module, only: phonon
+
+   implicit none
+
+   abstract interface
+      real(r64) function Vm2_3ph(ev1_s1, ev2_s2, ev3_s3, &
+         Index_i, Index_j, Index_k, ifc3, phases_q2q3, ntrip, nb)
+         import r64, i64
+
+         integer(i64), intent(in) :: ntrip, Index_i(ntrip), Index_j(ntrip), Index_k(ntrip), nb
+         complex(r64), intent(in) :: phases_q2q3(ntrip), ev1_s1(nb), ev2_s2(nb), ev3_s3(nb)
+         real(r64), intent(in) :: ifc3(3, 3, 3, ntrip)
+      end function Vm2_3ph
+   end interface
+
+   type(numerics) :: num
+   type(crystal) :: crys
+   type(symmetry) :: sym
+   type(phonon) :: ph
+   type(timer) :: t_event
+   procedure(Vm2_3ph), pointer :: Vm2_calculator
+   complex(r64), allocatable :: R1(:, :, :), R3(:)
+   complex(r64) :: ev1(3, 2), ev2(3, 2), ev3(3, 2)
+
+   real(r64), allocatable :: V2(:, :, :, :, :)
+   real(r64), allocatable :: V2_minimal_set(:, :, :, :, :)
+   integer(i64), allocatable :: M(:, :, :)
+   integer :: count_full, count_minimal
+   integer(i64) :: lambda1, lambda2, lambda3
+   integer(i64) :: istate1, iq2, iq3_minus, s2, s3, nstates_irred, s1, iq1_ibz, &
+      iq1
+   real(r64) :: val
+
+   if(this_image() == 1) then
+      write(*, '(A)')  'V3offload playground'
+      write(*, '(A, I5)') 'Number of coarray images = ', num_images()
+   end if
+
+   !Set up crystal
+   call crys%initialize
+
+   !Set up numerics data
+   call num%initialize(crys)
+
+   !Calculate crystal and BZ symmetries
+   call sym%calculate_symmetries(crys, num%qmesh)
+
+   !Calculate phonons
+   call ph%initialize(crys, sym, num)
+
+   !Calculate ph-ph vertex (cpu, original)
+   Vm2_calculator => Vm2_3ph_reference
+   call t_event%start_timer('reference V- on cpu')
+   call calculate_3ph_interaction(ph, crys, num, V2, Vm2_calculator)
+   call t_event%end_timer('reference V- on cpu')
+   print*, 'value = ', twonorm(pack(V2, .true.))
+
+   !Calculate ph-ph vertex (cpu, refactor)
+   Vm2_calculator => Vm2_3ph_refactor
+   call t_event%start_timer('refactored V- on cpu')
+   call calculate_3ph_interaction(ph, crys, num, V2, Vm2_calculator)
+   call t_event%end_timer('refactored V- on cpu')
+   print*, 'value = ', twonorm(pack(V2, .true.))
+
+   !Calculate ph-ph vertex (gpu, algo 1)
+   call t_event%start_timer('V- on gpu, algo 1')
+   call calculate_3ph_interaction_gpu(ph, crys, num, V2)
+   call t_event%end_timer('V- on gpu, algo 1')
+   print*, 'value = ', twonorm(pack(V2, .true.))
+   print*, V2(3, 1, 2, 3, 3)
+   print*, V2(3, 2, 4, 3, 2)
+   print*, V2(4, 1, 4, 1, 4)
+   print*, V2(5, 1, 5, 1, 5)
+   print*, V2(6, 1, 6, 1, 6)
+   count_full = 0
+   print *, '---------------------------------------------------------------'
+   print *, '   lambda1    lambda2    lambda3      Value'
+   print *, '---------------------------------------------------------------'
+
+   do lambda1 = 1, 5
+      call demux_state(lambda1, ph%numbands, s1, iq1)
+
+      do lambda2 = 1, 16
+         call demux_state(lambda2, ph%numbands, s2, iq2)
+
+         do lambda3 = 1, 16
+            call demux_state(lambda3, ph%numbands, s3, iq3_minus)
+
+            if(s3 <= size(V2,1) .and. iq3_minus <= size(V2,2) .and. &
+               s2 <= size(V2,3) .and. iq2 <= size(V2,4) .and. &
+               lambda1 <= size(V2,5)) then
+
+               val = V2(s3, iq3_minus, s2, iq2, lambda1)
+
+               if(abs(val) > 1.0e-7_r64) then
+                  write(*,'(3I10,2X,F16.8)') lambda1, lambda2, lambda3, val
+                  count_full = count_full + 1
+               end if
+
+            end if
+         end do
+      end do
+   end do
+   print *, 'Number of V2 elements:', count_full
+
+   !Calculate V2_minimal_set (reference)
+   Vm2_calculator => Vm2_3ph_reference
+   call t_event%start_timer('reference V2 minimal set')
+   call calculate_3ph_interaction_minimalset(ph, crys, num, V2_minimal_set, Vm2_calculator)
+   call t_event%end_timer('reference V2 minimal set')
+   !print*, 'value = ', twonorm(pack(V2_minimal_set, .true.))
+   print*, V2_minimal_set(3, 1, 2, 3, 3)
+   print*, V2_minimal_set(3, 2, 4, 3, 2)
+   print*, V2_minimal_set(4, 1, 4, 1, 4)
+   print*, V2_minimal_set(5, 1, 5, 1, 5)
+   print*, V2_minimal_set(6, 1, 6, 1, 6)
+
+   count_minimal = 0
+   print *, '---------------------------------------------------------------'
+   print *, '   lambda1    lambda2    lambda3      Value'
+   print *, '---------------------------------------------------------------'
+
+   do lambda1 = 1, 5
+      call demux_state(lambda1, ph%numbands, s1, iq1)
+
+      do lambda2 = 1, 16
+         call demux_state(lambda2, ph%numbands, s2, iq2)
+
+         do lambda3 = 1, 16
+            call demux_state(lambda3, ph%numbands, s3, iq3_minus)
+
+            if(s3 <= size(V2_minimal_set,1) .and. iq3_minus <= size(V2_minimal_set,2) .and. &
+               s2 <= size(V2_minimal_set,3) .and. iq2 <= size(V2_minimal_set,4) .and. &
+               lambda1 <= size(V2_minimal_set,5)) then
+
+               val = V2_minimal_set(s3, iq3_minus, s2, iq2, lambda1)
+
+               if(abs(val) > 1.0e-7_r64) then
+                  write(*,'(3I10,2X,F16.8)') lambda1, lambda2, lambda3, val
+                  count_minimal = count_minimal + 1
+               end if
+
+            end if
+
+         end do
+      end do
+   end do
+   print *, 'Number of V2 minimal set elements:', count_minimal
+   print *, 'Reduction factor (minimal/full):', real(count_minimal)/real(count_full)
+   print *, 'Symmetry saving (%):', (1.0 - real(count_minimal)/real(count_full)) * 100.0
+
+   !Calculate V2_minimal_set (refactored)
+   Vm2_calculator => Vm2_3ph_refactor
+   call t_event%start_timer('refactored V2 minimal set')
+   call calculate_3ph_interaction_minimalset(ph, crys, num, V2_minimal_set, Vm2_calculator)
+   call t_event%end_timer('refactored V2 minimal set')
+   !print*, 'value = ', twonorm(pack(V2_minimal_set, .true.))
+
+!!$  !Calculate ph-ph vertex (gpu, algo 2)
+!!$  call t_event%start_timer('V- on gpu, algo 2')
+!!$  call calculate_3ph_interaction_gpu_algo2(ph, crys, num, V2)
+!!$  call t_event%end_timer('V- on gpu, algo 2')
+!!$  print*, 'value = ', twonorm(pack(V2, .true.))
+
+!!$  !Calculate ph-ph vertex (gpu, algo 3)
+!!$  call t_event%start_timer('V- on gpu, algo 3')
+!!$  call calculate_3ph_interaction_gpu_algo3(ph, crys, num, V2)
+!!$  call t_event%end_timer('V- on gpu, algo 3')
+!!$  print*, 'value = ', twonorm(pack(V2, .true.))
+
+   ! call V2minimal()
+
+contains
+
+   ! subroutine V2minimal()
+   !    integer(i64) :: nbands, mesh_size(3), nstates_irred
+   !    integer(i64), allocatable :: lambda1_list(:), lambda2_list(:)
+   !    integer(i64), allocatable :: M(:, :, :)
+   !    integer :: istate1, istate2
+   !    integer(i64) :: lambda1, lambda2, lambda3
+   !    integer(i64) :: iq1, iq2, iq3_minus, s1, s2, s3, iq1_ibz
+   !    real(r64)    :: V2_val
+
+
+   !    if(this_image() == 1) then
+   !       print *, "V3 permutations to canonical (lambda1, lambda2, lambda3) form"
+   !       print *, "Number of coarray images =", num_images()
+   !    end if
+
+   !    nbands = 2
+   !    mesh_size = [2, 2, 2]*1_i64
+
+   !    allocate(lambda1_list(2)); lambda1_list = [1, 2]*1_i64
+   !    allocate(lambda2_list(6)); lambda2_list = [1, 2, 3, 4, 5, 6]*1_i64
+
+   !    call calculate_3ph_interaction_minimalset(ph, crys, num, V2_minimal_set, Vm2_calculator)
+   !    call map_triplet_full_to_reduced(nbands, mesh_size, lambda1_list, lambda2_list, M)
+
+   !    print *, "M(istate2, istate1) → canonical triplet: (lambda1, lambda2, lambda3)"
+
+   !    do istate1 = 1, size(lambda1_list)
+   !       do istate2 = 1, size(lambda2_list)
+   !          write(*,'(A,I0,A,I0,A,I0,A,I0,A,I0,A)') 'M(', istate2, ',', istate1, ') = (', &
+   !             M(1, istate2, istate1), ',', M(2, istate2, istate1), ',', M(3, istate2, istate1), ')'
+   !       end do
+   !    end do
+
+   !    print *, ""
+   !    print *, "Canonical triplets (lambda1, lambda2, lambda3) and V2 values:"
+   !    print *, "--------------------------------------------------------------"
+   !    !print *, " lambda1  lambda2  lambda3        V2"
+   !    print *, " s3   iq3_minus   s2   iq2   istate1   lambda1  lambda2  lambda3        V2"
+
+   !    do istate1 = 1, size(lambda1_list)
+   !       do istate2 = 1, size(lambda2_list)
+   !          ! for canonical triplet
+   !          lambda1 = M(1, istate2, istate1)
+   !          lambda2 = M(2, istate2, istate1)
+   !          lambda3 = M(3, istate2, istate1)
+
+   !          ! Demux each lambda into (band, iq) that help me calculate V2
+   !          call demux_state(lambda1, ph%numbands, s1, iq1)
+   !          call demux_state(lambda2, ph%numbands, s2, iq2)
+   !          call demux_state(lambda3, ph%numbands, s3, iq3_minus)
+
+   !          ! V2 value
+   !          V2_val = V2_minimal_set(s3, iq3_minus, s2, iq2, istate1)
+
+   !          ! print non-zero values
+   !          !if (abs(V2_val) > 1e-2_r64) then
+   !          !write(*,'(3(I8,1X),F16.8)') lambda1, lambda2, lambda3, V2_val
+   !          write(*,'(A,I6,A,I6,A,I6,A,I6,A,I6,3(A,I6),A,F16.8)') &
+   !             's3=',s3,' iq3_minus=',iq3_minus,' s2=',s2,' iq2=',iq2,' istate1=',istate1, &
+   !             ' lambda1=',lambda1,' lambda2=',lambda2,' lambda3=',lambda3,' V2=',V2_val
+   !          !end if
+   !       end do
+   !    end do
+   ! end subroutine V2minimal
+
+   subroutine calculate_3ph_interaction(ph, crys, num, V2, Vm2_calculator)
+      type(phonon), intent(in) :: ph
+      type(crystal), intent(in) :: crys
+      type(numerics), intent(in) :: num
+      real(r64), allocatable, intent(out) :: V2(:, :, :, :, :)
+      procedure(Vm2_3ph), pointer, intent(in) :: Vm2_calculator
+
+      !Local variables
+      integer(i64) :: istate1, nstates_irred, &
+         nprocs, s1, s2, s3, iq1_ibz, iq1, iq2, iq3_minus, it, &
+         q1_indvec(3), q2_indvec(3), q3_minus_indvec(3), &
+         idim, jdim, s2s3
+      real(r64) :: en1, en2, en3, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
+         aux
+      complex(r64) :: phases(ph%numtriplets)
+
+      !Total number of IBZ blocks states
+      nstates_irred = ph%nwv_irred*ph%numbands
+
+      allocate(V2(ph%numbands, ph%nwv, ph%numbands, ph%nwv, nstates_irred))
+
+      V2 = 0.0
+
+      !Run over first phonon IBZ states
+      !do istate1 = 1, nstates_irred
+      !Demux state index into branch (s) and wave vector (iq) indices
+      !call demux_state(istate1, ph%numbands, s1, iq1_ibz)
+
+      do iq1_ibz = 1, ph%nwv_irred
+
+         !Muxed index of wave vector from the IBZ index list.
+         !This will be used to access IBZ information from the FBZ quantities.
+         iq1 = ph%indexlist_irred(iq1_ibz)
+
+         !Initial (IBZ blocks) wave vector (crystal coords.)
+         q1 = ph%wavevecs(iq1, :)
+
+         !Convert from crystal to 0-based index vector
+         q1_indvec = nint(q1*ph%wvmesh)
+
+         do iq2 = 1, ph%nwv
+            !Initial (IBZ blocks) wave vector (crystal coords.)
+            q2 = ph%wavevecs(iq2, :)
+
+            !Convert from crystal to 0-based index vector
+            q2_indvec = nint(q2*ph%wvmesh)
+
+            !Folded final phonon wave vector
+            q3_minus_indvec = modulo(q1_indvec - q2_indvec, ph%wvmesh) !0-based index vector
+            q3_minus = q3_minus_indvec/dble(ph%wvmesh) !crystal coords.
+
+            !Muxed index of q3_minus
+            iq3_minus = mux_vector(q3_minus_indvec, ph%wvmesh, 0_i64)
+
+            q2_cart = matmul(crys%reclattvecs, q2)
+            q3_minus_cart = matmul(crys%reclattvecs, q3_minus)
+
+            phases = exp((0.0_r64, -1.0_r64)* &
+               (matmul(q2_cart, ph%R_j) + matmul(q3_minus_cart, ph%R_k)))
+
+            do s1 = 1, ph%numbands
+
+               istate1 = mux_state(ph%numbands, s1, iq1_ibz)
+
+               !Combined loop over the 2nd and 3rd phonon bands
+               do s2s3 = 1, ph%numbands**2
+                  s2 = int((s2s3 - 1)/ph%numbands) + 1 !changes slow
+                  s3 = modulo(s2s3 - 1, ph%numbands) + 1 !changes fast
+
+                  aux = Vm2_calculator(ph%evecs(iq1, s1, :), &
+                     ph%evecs(iq2, s2, :), ph%evecs(iq3_minus, s3, :), &
+                     ph%Index_i(:), ph%Index_j(:), ph%Index_k(:), ph%ifc3(:,:,:,:), &
+                     phases(:), ph%numtriplets, ph%numbands)
+
+                  V2(s3, iq3_minus, s2, iq2, istate1) = aux
+               end do
+            end do
+         end do
+      end do
+   end subroutine calculate_3ph_interaction
+
+   subroutine calculate_3ph_interaction_minimalset(ph, crys, num, V2_minimal_set, Vm2_calculator)
+      type(phonon), intent(in) :: ph
+      type(crystal), intent(in) :: crys
+      type(numerics), intent(in) :: num
+      real(r64), allocatable, intent(out) :: V2_minimal_set(:,:,:,:,:)
+      !integer(i64), allocatable, intent(out) :: M(:, :, :) ! M(3, istate2, istate1)
+      procedure(Vm2_3ph), pointer, intent(in) :: Vm2_calculator
+
+      !Local variables
+      integer(i64) :: istate1, istate2, nstates_irred, &
+         nprocs, s1, s2, s3, iq1_ibz, iq1, iq2, iq3_minus, it, &
+         q1_indvec(3), q2_indvec(3), q3_minus_indvec(3), &
+         idim, jdim, s2s3, lambda1, lambda2, lambda3
+      real(r64) :: en1, en2, en3, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
+         aux
+      integer(i64), allocatable :: all_perms(:, :)
+      integer(i64) :: triplet_full(3), permuted_triplet(3), canonical_triplet(3)
+      integer(i64) :: i, j
+      complex(r64) :: phases(ph%numtriplets)
+
+      !Total number of IBZ blocks states
+      nstates_irred = ph%nwv_irred*ph%numbands
+
+      all_perms = permutations(3_i64)
+
+      allocate(V2_minimal_set(ph%numbands, ph%nwv, ph%numbands, ph%nwv, nstates_irred))
+
+      V2_minimal_set = 0.0
+
+      !M(3, istate2, istate1) stores the canonical triplet for each pair of states (lambda1, lambda2)
+      !istate1 runs over irreducible states: nstates_irred
+      !istate2 runs over all full states
+
+      !Run over first phonon IBZ states
+      !do istate1 = 1, nstates_irred
+      !Demux state index into branch (s) and wave vector (iq) indices
+      !call demux_state(istate1, ph%numbands, s1, iq1_ibz)
+
+      do iq1_ibz = 1, ph%nwv_irred
+
+         !Muxed index of wave vector from the IBZ index list.
+         !This will be used to access IBZ information from the FBZ quantities.
+         iq1 = ph%indexlist_irred(iq1_ibz)
+
+         !Initial (IBZ blocks) wave vector (crystal coords.)
+         q1 = ph%wavevecs(iq1, :)
+
+         !Convert from crystal to 0-based index vector
+         q1_indvec = nint(q1*ph%wvmesh)
+
+         do iq2 = 1, ph%nwv
+            !Initial (IBZ blocks) wave vector (crystal coords.)
+            q2 = ph%wavevecs(iq2, :)
+
+            !Convert from crystal to 0-based index vector
+            q2_indvec = nint(q2*ph%wvmesh)
+
+            !Folded final phonon wave vector
+            q3_minus_indvec = modulo(q1_indvec - q2_indvec, ph%wvmesh) !0-based index vector
+            q3_minus = q3_minus_indvec/dble(ph%wvmesh) !crystal coords.
+
+            !Muxed index of q3_minus
+            iq3_minus = mux_vector(q3_minus_indvec, ph%wvmesh, 0_i64)
+
+            q2_cart = matmul(crys%reclattvecs, q2)
+            q3_minus_cart = matmul(crys%reclattvecs, q3_minus)
+
+            phases = exp((0.0_r64, -1.0_r64)* &
+               (matmul(q2_cart, ph%R_j) + matmul(q3_minus_cart, ph%R_k)))
+
+            do s1 = 1, ph%numbands
+
+               istate1 = mux_state(ph%numbands, s1, iq1_ibz)
+
+               !Combined loop over the 2nd and 3rd phonon bands
+               !do s2s3 = 1, ph%numbands**2
+               !s2 = int((s2s3 - 1)/ph%numbands) + 1 !changes slow
+               !s3 = modulo(s2s3 - 1, ph%numbands) + 1 !changes fast
+               do s2 = 1, ph%numbands
+                  istate2 = mux_state(ph%numbands, s2, iq2) !istate2 spans the FBZ, that makes it the long list
+                  do s3 = 1, ph%numbands
+
+                     lambda1 = mux_state(ph%numbands, s1, iq1)
+                     lambda2 = mux_state(ph%numbands, s2, iq2)
+                     lambda3 = mux_state(ph%numbands, s3, iq3_minus)
+                     triplet_full = [lambda1, lambda2, lambda3]
+
+                     canonical_triplet = triplet_full
+
+                     do i = 1, size(all_perms, 2)
+                        do j = 1, 3
+                           permuted_triplet(j) = triplet_full(all_perms(j, i))
+                        end do
+                        if(lex_less_1d(permuted_triplet, canonical_triplet)) canonical_triplet = permuted_triplet
+                     end do
+
+                     if(all(triplet_full == canonical_triplet)) then
+                        aux = Vm2_calculator(ph%evecs(iq1, s1, :), &
+                           ph%evecs(iq2, s2, :), ph%evecs(iq3_minus, s3, :), &
+                           ph%Index_i(:), ph%Index_j(:), ph%Index_k(:), ph%ifc3(:,:,:,:), &
+                           phases(:), ph%numtriplets, ph%numbands)
+
+                        V2_minimal_set(s3, iq3_minus, s2, iq2, istate1) = aux
+                     end if
+                  end do
+               end do
+            end do
+         end do
+      end do
+   end subroutine calculate_3ph_interaction_minimalset
+
+end program V3offload
