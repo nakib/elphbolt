@@ -90,10 +90,10 @@ program V3offload
 
                val = V2(s3, iq3_minus, s2, iq2, lambda1)
 
-               if(abs(val) > 1.0e-7_r64) then
-                  write(*,'(3I10, 2X, F16.8)') lambda1, lambda2, lambda3, val
-                  count_full = count_full + 1
-               end if
+               !if(abs(val) > 1.0e-7_r64) then
+               write(*,'(3I10, 2X, F16.8)') lambda1, lambda2, lambda3, val
+               count_full = count_full + 1
+               !end if
             end if
          end do
       end do
@@ -131,7 +131,7 @@ program V3offload
 
                val = V2_minimal_set(s3, iq3_minus, s2, iq2, lambda1)
 
-               if(abs(val) > 1.0e-7_r64) then
+               if(abs(val) /= 1.0_r64) then
                   write(*,'(3I10, 2X, F16.8)') lambda1, lambda2, lambda3, val
                   count_minimal = count_minimal + 1
                end if
@@ -256,7 +256,7 @@ contains
 
       allocate(V2_minimal_set(ph%numbands, ph%nwv, ph%numbands, ph%nwv, nstates_irred))
 
-      V2_minimal_set = 0.0
+      V2_minimal_set = 1.0
 
       !M(3, istate2, istate1) stores the canonical triplet for each pair of states (lambda1, lambda2)
       !istate1 runs over irreducible states: nstates_irred
