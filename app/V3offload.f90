@@ -41,7 +41,7 @@ program V3offload
    integer(i64) :: lambda1, lambda2, lambda3
    integer(i64) :: istate1, iq2, iq3_minus, s2, s3, nstates_irred, s1, iq1_ibz, &
       iq1
-   real(r64) :: val
+   real(r64) :: val !value
 
    if(this_image() == 1) then
       write(*, '(A)')  'V3offload playground'
@@ -66,23 +66,23 @@ program V3offload
    call calculate_3ph_interaction(ph, crys, num, V2, Vm2_calculator)
    call t_event%end_timer('reference V- on cpu')
    print*, 'value = ', twonorm(pack(V2, .true.))
-   print*, V2(3, 1, 2, 3, 3)
-   print*, V2(3, 2, 4, 3, 2)
-   print*, V2(4, 1, 4, 1, 4)
-   print*, V2(5, 1, 5, 1, 5)
-   print*, V2(6, 1, 6, 1, 6)
+   ! print*, V2(3, 1, 2, 3, 3)
+   ! print*, V2(3, 2, 4, 3, 2)
+   ! print*, V2(4, 1, 4, 1, 4)
+   ! print*, V2(5, 1, 5, 1, 5)
+   ! print*, V2(6, 1, 6, 1, 6)
    count_full = 0
    print *, '---------------------------------------------------------------'
    print *, '   lambda1    lambda2    lambda3      Value'
    print *, '---------------------------------------------------------------'
 
-   do lambda1 = 1, 5
+   do lambda1 = 1, 6
       call demux_state(lambda1, ph%numbands, s1, iq1)
 
-      do lambda2 = 1, 16
+      do lambda2 = 1, 10
          call demux_state(lambda2, ph%numbands, s2, iq2)
 
-         do lambda3 = 1, 16
+         do lambda3 = 1, 10
             call demux_state(lambda3, ph%numbands, s3, iq3_minus)
 
             if(s3 <= size(V2, 1) .and. iq3_minus <= size(V2, 2) .and. &
@@ -91,11 +91,10 @@ program V3offload
 
                val = V2(s3, iq3_minus, s2, iq2, lambda1)
 
-               if(abs(val) > 1.0e-7_r64) then
-                  write(*,'(3I10, 2X, F16.8)') lambda1, lambda2, lambda3, val
-                  count_full = count_full + 1
-               end if
-
+               !if(abs(val) > 1.0e-7_r64) then
+               write(*,'(3I10, 2X, F16.12)') lambda1, lambda2, lambda3, val
+               count_full = count_full + 1
+               !end if
             end if
          end do
       end do
@@ -118,53 +117,54 @@ program V3offload
    !Calculate V2_minimal_set (reference)
    Vm2_calculator => Vm2_3ph_reference
    call t_event%start_timer('reference V2 minimal set')
-   call calculate_3ph_interaction_minimalset(ph, crys, num, V2_minimal_set, Vm2_calculator)
+   call calculate_3ph_interaction_minimalset(ph, crys, num, V2_minimal_set, M, Vm2_calculator)
    call t_event%end_timer('reference V2 minimal set')
    !print*, 'value = ', twonorm(pack(V2_minimal_set, .true.))
-   print*, V2_minimal_set(3, 1, 2, 3, 3)
-   print*, V2_minimal_set(3, 2, 4, 3, 2)
-   print*, V2_minimal_set(4, 1, 4, 1, 4)
-   print*, V2_minimal_set(5, 1, 5, 1, 5)
-   print*, V2_minimal_set(6, 1, 6, 1, 6)
+   ! print*, V2_minimal_set(3, 1, 2, 3, 3)
+   ! print*, V2_minimal_set(3, 2, 4, 3, 2)
+   ! print*, V2_minimal_set(4, 1, 4, 1, 4)
+   ! print*, V2_minimal_set(5, 1, 5, 1, 5)
+   ! print*, V2_minimal_set(6, 1, 6, 1, 6)
 
    count_minimal = 0
    print *, '---------------------------------------------------------------'
    print *, '   lambda1    lambda2    lambda3      Value'
    print *, '---------------------------------------------------------------'
 
-   do lambda1 = 1, 5
+   do lambda1 = 1, 6
       call demux_state(lambda1, ph%numbands, s1, iq1)
 
-      do lambda2 = 1, 16
+      do lambda2 = 1, 10
          call demux_state(lambda2, ph%numbands, s2, iq2)
 
-         do lambda3 = 1, 16
+         do lambda3 = 1, 10
             call demux_state(lambda3, ph%numbands, s3, iq3_minus)
 
+            !canonical value from V2_minimal_set
             if(s3 <= size(V2_minimal_set, 1) .and. iq3_minus <= size(V2_minimal_set, 2) .and. &
                s2 <= size(V2_minimal_set, 3) .and. iq2 <= size(V2_minimal_set, 4) .and. &
                lambda1 <= size(V2_minimal_set, 5)) then
 
                val = V2_minimal_set(s3, iq3_minus, s2, iq2, lambda1)
 
-               if(abs(val) > 1.0e-7_r64) then
-                  write(*,'(3I10, 2X, F16.8)') lambda1, lambda2, lambda3, val
+               if(abs(val) /= 1.0_r64) then
+                  write(*,'(3I10, 2X, F16.12)') lambda1, lambda2, lambda3, val
                   count_minimal = count_minimal + 1
                end if
-
             end if
-
          end do
       end do
    end do
    print *, 'Number of V2 minimal set elements:', count_minimal
+
+   ! Reduction factor between V2 and V2 minimal set
    print *, 'Reduction factor (minimal/full):', real(count_minimal)/real(count_full)
    print *, 'Symmetry saving (in %):', (1.0 - real(count_minimal)/real(count_full)) * 100.0
 
    !Calculate V2_minimal_set (refactored)
    Vm2_calculator => Vm2_3ph_refactor
    call t_event%start_timer('refactored V2 minimal set')
-   call calculate_3ph_interaction_minimalset(ph, crys, num, V2_minimal_set, Vm2_calculator)
+   call calculate_3ph_interaction_minimalset(ph, crys, num, V2_minimal_set, M, Vm2_calculator)
    call t_event%end_timer('refactored V2 minimal set')
    !print*, 'value = ', twonorm(pack(V2_minimal_set, .true.))
 
@@ -320,7 +320,7 @@ contains
 
                   aux = Vm2_calculator(ph%evecs(iq1, s1, :), &
                      ph%evecs(iq2, s2, :), ph%evecs(iq3_minus, s3, :), &
-                     ph%Index_i(:), ph%Index_j(:), ph%Index_k(:), ph%ifc3(:,:,:,:), &
+                     ph%Index_i(:), ph%Index_j(:), ph%Index_k(:), ph%ifc3(:, :, :, :), &
                      phases(:), ph%numtriplets, ph%numbands)
 
                   V2(s3, iq3_minus, s2, iq2, istate1) = aux
@@ -330,16 +330,16 @@ contains
       end do
    end subroutine calculate_3ph_interaction
 
-   subroutine calculate_3ph_interaction_minimalset(ph, crys, num, V2_minimal_set, Vm2_calculator)
+   subroutine calculate_3ph_interaction_minimalset(ph, crys, num, V2_minimal_set, M, Vm2_calculator)
       type(phonon), intent(in) :: ph
       type(crystal), intent(in) :: crys
       type(numerics), intent(in) :: num
       real(r64), allocatable, intent(out) :: V2_minimal_set(:, :, :, :, :)
-      !integer(i64), allocatable, intent(out) :: M(:, :, :) ! M(3, istate2, istate1)
+      integer(i64), allocatable, intent(out) :: M(:, :, :) ! M(3, istate2, istate1)
       procedure(Vm2_3ph), pointer, intent(in) :: Vm2_calculator
 
       !Local variables
-      integer(i64) :: istate1, istate2, nstates_irred, &
+      integer(i64) :: istate1, istate2, nstates_irred, nstates_full, &
          nprocs, s1, s2, s3, iq1_ibz, iq1, iq2, iq3_minus, it, &
          q1_indvec(3), q2_indvec(3), q3_minus_indvec(3), &
          idim, jdim, s2s3, lambda1, lambda2, lambda3
@@ -352,12 +352,14 @@ contains
 
       !Total number of IBZ blocks states
       nstates_irred = ph%nwv_irred*ph%numbands
+      nstates_full  = ph%nwv * ph%numbands
 
+      ! Get all permutations of 3 indices
       all_perms = permutations(3_i64)
-
       allocate(V2_minimal_set(ph%numbands, ph%nwv, ph%numbands, ph%nwv, nstates_irred))
+      allocate(M(3, nstates_full, nstates_irred))
 
-      V2_minimal_set = 0.0
+      V2_minimal_set = 1.0
 
       !M(3, istate2, istate1) stores the canonical triplet for each pair of states (lambda1, lambda2)
       !istate1 runs over irreducible states: nstates_irred
@@ -412,6 +414,7 @@ contains
                   istate2 = mux_state(ph%numbands, s2, iq2) !istate2 spans the FBZ, that makes it the long list
                   do s3 = 1, ph%numbands
 
+                     !Convert (s, iq) indices to canonical triplet (lambda1, lambda2, lambda3)
                      lambda1 = mux_state(ph%numbands, s1, iq1)
                      lambda2 = mux_state(ph%numbands, s2, iq2)
                      lambda3 = mux_state(ph%numbands, s3, iq3_minus)
@@ -423,13 +426,19 @@ contains
                         do j = 1, 3
                            permuted_triplet(j) = triplet_full(all_perms(j, i))
                         end do
+
+                        ! Use a lexicographic comparison function to keep the smallest permutation
                         if(lex_less_1d(permuted_triplet, canonical_triplet)) canonical_triplet = permuted_triplet
                      end do
 
+                     ! Store the first valid canonical triplet found in M(:, istate2, istate1)
+                     !M(:, istate2, istate1) = canonical_triplet
+
+                     !only compute and store the value for the canonical triplet
                      if(all(triplet_full == canonical_triplet)) then
                         aux = Vm2_calculator(ph%evecs(iq1, s1, :), &
                            ph%evecs(iq2, s2, :), ph%evecs(iq3_minus, s3, :), &
-                           ph%Index_i(:), ph%Index_j(:), ph%Index_k(:), ph%ifc3(:,:,:,:), &
+                           ph%Index_i(:), ph%Index_j(:), ph%Index_k(:), ph%ifc3(:, :, :, :), &
                            phases(:), ph%numtriplets, ph%numbands)
 
                         V2_minimal_set(s3, iq3_minus, s2, iq2, istate1) = aux
@@ -606,7 +615,7 @@ contains
                   !$acc update device(ev3)
 
                   aux = Vm2_3ph_gpu_algo2(ev1, ev2, ev3, &
-                     ph%Index_i(:), ph%Index_j(:), ph%Index_k(:), ph%ifc3(:,:,:,:), &
+                     ph%Index_i(:), ph%Index_j(:), ph%Index_k(:), ph%ifc3(:, :, :, :), &
                      phases, ph%numtriplets, ph%numbands, R1, R3)
 
                   V2(s3, iq3_minus, s2, iq2, istate1) = aux
