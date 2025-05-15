@@ -49,7 +49,7 @@ module interactions
        calculate_bound_scatt_rates, calculate_thinfilm_scatt_rates, &
        calculate_4ph_rta_rates, calculate_coarse_grained_3ph_vertex, &
        calculate_W_fromcgV2, calculate_W3ph_OTF, calculate_Y_OTF, &
-       Vm2_3ph, calculate_Xee_OTF, calculate_Xee_13_OTF
+       Vm2_3ph, calculate_Xee_OTF, calculate_Xee_13_OTF, calculate_ph_rta_coherence_rates
 
   !external chdir, system
 
@@ -2278,7 +2278,7 @@ contains
              close(1)
           end if
 
-          if(key == 'X') then
+          if(key == 'X') then             
              write (filename_plus, '(I9)') istate
              write (filename_minus, '(I9)') istate
              filename_plus = 'Xplus.istate'//trim(adjustl(filename_plus))
@@ -3065,6 +3065,106 @@ contains
        sync all
     end if
   end subroutine calculate_ph_rta_rates
+
+  subroutine calculate_ph_rta_coherence_rates(rta_rates_phe, num, crys, ph, el)
+    !! Subroutine for parallel coherence transition probabilities
+    !! from disk and calculating the relaxation time approximation (RTA)
+    !! coherence rates in the ph-e channel.
+    
+    real(r64), allocatable, intent(out) :: rta_rates_phe(:, :)
+    type(numerics), intent(in) :: num
+    type(crystal), intent(in) :: crys
+    type(phonon), intent(in) :: ph
+    type(electron), intent(in), optional :: el
+
+    !Local variables
+    integer(i64) :: nstates_irred, istate, nprocs_plus, nprocs_minus, &
+         nprocs_phe, iproc, chunk, num_active_images, start, end, &
+         ieq, ik_ibz, iq_fbz, iq_ibz, s, m, n, nprocs!, &
+         !ik_sym, ikp, ikp_fbz_rot!, ik_fbz, iq_fbz, iq_ibz, &
+         
+    integer(i64), allocatable :: istate_el(:), istate_ph(:)
+    real(r64), allocatable :: Omegap(:), Omegam(:), rta_rates_phe_fbz(:, :)
+    character(len = 1024) :: filepath_Omegap, filepath_Omegam, filepath_Wm, tag
+
+    !Set output directory of transition probilities
+    write(tag, "(E9.3)") crys%T
+
+    !Allocate and initialize reduction array
+    allocate(rta_rates_phe_fbz(ph%nwv, ph%numbands))
+    rta_rates_phe_fbz(:, :) = 0.0_r64
+
+    !Divide electron states among images
+    call distribute_points(el%nwv_irred*el%numbands, chunk, start, end, num_active_images)
+
+    !Only work with the active images
+    if(this_image() <= num_active_images) then
+       !Run over electron IBZ states
+       do istate = start, end
+          !Demux state index into band (m) and wave vector (ik_ibz) indices
+          call demux_state(istate, el%numbands, m, ik_ibz)
+
+          !Apply energy window to initial (IBZ blocks) electron
+          if(abs(el%ens_irred(ik_ibz, m) - el%enref) > el%fsthick) cycle
+          
+          !Set Omega+ filename
+          write(tag, '(I9)') istate
+          filepath_Omegap = trim(adjustl(num%Xdir))//'/Omegaplus.istate'//trim(adjustl(tag))
+
+          !Read Omega+ from file
+          call read_transition_probs_e(trim(adjustl(filepath_Omegap)), nprocs, Omegap, &
+               istate_el, istate_ph)
+
+          !Set Omega- filename
+          write(tag, '(I9)') istate
+          filepath_Omegam = trim(adjustl(num%Xdir))//'/Omegaminus.istate'//trim(adjustl(tag))
+
+          !Read Omega- from file
+          call read_transition_probs_e(trim(adjustl(filepath_Omegam)), nprocs, Omegam)
+
+          !Sum over the number of equivalent k-points of the IBZ point
+          do ieq = 1, el%nequiv(ik_ibz)
+             !ik_sym = el%ibz2fbz_map(ieq, ik_ibz, 1) !symmetry
+             !call binsearch(el%indexlist, el%ibz2fbz_map(ieq, ik_ibz, 2), ik_fbz)
+
+             !Sum over scattering processes
+             do iproc = 1, nprocs
+                !Grab the final electron
+                !call demux_state(istate_el(iproc), el%numbands, n, ikp)
+
+                !Find image of final electron wave vector due to the current symmetry
+                !call binsearch(el%indexlist, el%equiv_map(ik_sym, ikp), ikp_fbz_rot)
+
+                !if(ikp_fbz_rot < 0) cycle
+
+                !Recall that phonons that are not on the coarser q-mesh
+                !were tagged with a negative index.
+                !Below, I only care about those q-vectors that live on the
+                !coarser q-mesh.
+                if(istate_ph(iproc) >= 0) then
+                   call demux_state(istate_ph(iproc), ph%numbands, s, iq_fbz)
+
+                   !iq_ibz = ph%fbz2ibz_map(iq_fbz)
+
+                   rta_rates_phe_fbz(iq_fbz, s) = rta_rates_phe_fbz(iq_fbz, s) + &
+                        el%spindeg*(Omegap(iproc) - Omegam(iproc))
+                end if
+             end do
+          end do
+       end do
+    end if
+    
+    !Reduce partial sums
+    call co_sum(rta_rates_phe_fbz)
+    
+    !Need this on the IBZ
+    allocate(rta_rates_phe(ph%nwv_irred, ph%numbands))
+    do iq_fbz = 1, ph%nwv
+       iq_ibz = ph%fbz2ibz_map(iq_fbz)
+       rta_rates_phe(iq_ibz, :) = rta_rates_phe_fbz(iq_fbz, :)
+    end do
+    sync all
+  end subroutine calculate_ph_rta_coherence_rates
 
   subroutine calculate_4ph_rta_rates(rta_rates, num, crys, ph)
     !! Subroutine for interporlating 4-ph scattering rates from an

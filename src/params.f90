@@ -53,7 +53,8 @@ module params
   real(r64), parameter :: bohr2nm = 0.052917721092_r64 !Bohr to nm
   
   !Miscellaneous
-  complex(r64), parameter :: oneI = (0.0_r64,1.0_r64)
+  complex(r64), parameter :: oneI = (0.0_r64, 1.0_r64)
+  complex(r64), parameter :: complex_zero = (0.0_r64, 0.0_r64)
   complex(r64), parameter :: twopiI = twopi*oneI
 
   !Not parameters, but effectively behaves as parameters

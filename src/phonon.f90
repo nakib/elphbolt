@@ -24,7 +24,7 @@ module phonon_module
   use particle_module, only: particle
   use misc, only: print_message, subtitle, expi, distribute_points, &
        write2file_rank2_real, exit_with_message, create_set, coarse_grain, &
-       mux_state, write2file_rank3_real
+       mux_state, write2file_rank3_real, int_div
   use numerics_module, only: numerics
   use crystal_module, only: crystal, calculate_wavevectors_full
   use symmetry_module, only: symmetry, find_irred_wedge, create_fbz2ibz_map
@@ -37,7 +37,6 @@ module phonon_module
   private
   public phonon
 
-  
   type Xmassvar
      !! Type to contain the phonon mass var scattering matrix elements
      !! number of matrix elements
@@ -169,7 +168,6 @@ contains
     integer(i64) :: i, iq, ii, jj, kk, l, il, s, ib, im, chunk, &
          num_active_images
     integer(i64), allocatable :: start[:], end[:]
-    integer(i64) , allocatable :: fbz2ibz_map(:)
     real(r64), allocatable :: ens_chunk(:,:)[:], vels_chunk(:,:,:)[:], &
          symmetrizers_chunk(:,:,:)[:]
     complex(r64), allocatable :: evecs_chunk(:,:,:)[:]
@@ -210,8 +208,11 @@ contains
           call wann%ph_wann(crys, chunk, self%wavevecs(start:end, :), &
                ens_chunk, evecs_chunk, vels_chunk)
        else
+          !DBG
           call phonon_espresso(self, crys, chunk, self%wavevecs(start:end, :), &
                ens_chunk, evecs_chunk, vels_chunk)
+!!$          call phonon_phonopy(self, crys, chunk, self%wavevecs(start:end, :), &
+!!$               ens_chunk, evecs_chunk, vels_chunk)
        end if
     end if
     
@@ -279,12 +280,12 @@ contains
     if(this_image() <= num_active_images) deallocate(symmetrizers_chunk)
 
     !Create fbz2ibz_map
-    allocate(fbz2ibz_map(self%nwv))
-    fbz2ibz_map = -1
+    allocate(self%fbz2ibz_map(self%nwv))
+    self%fbz2ibz_map = -1
     do iq = 1, self%nwv
        do i = 1, self%nwv_irred !an irreducible point
           do l = 1, self%nequiv(i) !number of equivalent points of i
-             if(self%ibz2fbz_map(l, i, 2) == iq) fbz2ibz_map(iq) = i
+             if(self%ibz2fbz_map(l, i, 2) == iq) self%fbz2ibz_map(iq) = i
           end do
        end do
     end do
@@ -334,7 +335,7 @@ contains
     if(this_image() == 1) then
        open(1, file = "ph.fbz2ibz_map", status = "replace")
        do iq = 1, self%nwv
-          write(1, "(I10)") fbz2ibz_map(iq)
+          write(1, "(I10)") self%fbz2ibz_map(iq)
        end do
        close(1)
     end if
@@ -382,66 +383,134 @@ contains
 
     !Local variables
     integer(i64) :: qscell(3), tipo(crys%numatoms), t1, t2, t3, i, j, &
-         iat, jat, ibrav, ipol, jpol, m1, m2, m3, ntype, nat, nfc2 
+         iat, jat, ibrav, ipol, jpol, m1, m2, m3, ntype, nat, nfc2, ntot, &
+         ucell1(3), ucell2(3), at1_sc, at2_sc, ntensors_phonopy
     real(r64) :: r(crys%numatoms, 3), wscell(3,0:3), celldm(6), at(3,3), &
-         mass(crys%numelements), zeff(crys%numatoms, 3, 3), eps(3, 3), &
          dnrm2
     character(len = 1) :: polar_key
     character(len = 6) :: label(crys%numelements)
-    real(r64), parameter :: massfactor=1.8218779_r64*6.022e-4_r64
+    real(r64), parameter :: massfactor = 1.8218779_r64*6.022e-4_r64
+    logical :: espresso_format_file_exists, phonopy_format_file_exists
     
     allocate(self%mm(crys%numatoms, crys%numatoms))
     allocate(self%rr(crys%numatoms, crys%numatoms, 3))
-    
-    open(1,file="espresso.ifc2",status="old")
-    !Read some stuff that will not be used in the code.
-    read(1,*) ntype, nat, ibrav, celldm(1:6)
-    if (ibrav==0) then
-       read(1,*) ((at(i,j),i=1,3),j=1,3)
-    end if
 
-    do i = 1, ntype
-       read(1, *) j, label(i), mass(i)
-    end do
-    mass = crys%masses/massfactor
+    !Check which 2nd order force constants format has been provided in the run directory
+    espresso_format_file_exists = .false.
+    phonopy_format_file_exists = .false.
+    inquire(file = 'FORCE_CONSTANTS', exist = phonopy_format_file_exists)
+    inquire(file = 'espresso.ifc2', exist = espresso_format_file_exists)
+
+    if(.not. (espresso_format_file_exists .or. phonopy_format_file_exists)) &
+         call exit_with_message('2nd order force constant file not provided. Exiting.')
+
+    if(espresso_format_file_exists .and. phonopy_format_file_exists) &
+         call exit_with_message('Different types of 2nd order force constant file provided. Exiting.')
     
-    do i = 1, nat
-       read(1, *) j, tipo(i), r(i, 1:3)
-    end do
-    r = transpose(matmul(crys%lattvecs, crys%basis))/bohr2nm
+    if(espresso_format_file_exists) &
+         call print_message('Reading espresso format 2nd order force constants...')
+
+    if(phonopy_format_file_exists) &
+         call print_message('Reading phonopy format 2nd order force constants...')
     
-    read(1, *) polar_key
-    if(polar_key == "T") then
-       do i = 1, 3
-          read(1, *) eps(i, 1:3)
+    !Espresso format:
+    if(espresso_format_file_exists) then
+       open(1, file= "espresso.ifc2", status = "old")
+       
+       !Read some stuff that will not be used in the code.
+       read(1, *) ntype, nat, ibrav, celldm(1:6)
+       if (ibrav == 0) then
+          read(1, *) ((at(i, j), i = 1, 3), j = 1, 3)
+       end if
+
+       do i = 1, ntype
+          read(1, *) !not needed j, label(i), mass(i)
        end do
+
        do i = 1, nat
-          read(1, *)
-          do j = 1, 3
-             read(1, *) zeff(i, j, 1:3)
+          read(1, *) !not needed j, tipo(i), r(i, 1:3)
+       end do
+
+       read(1, *) polar_key
+       if(polar_key == "T") then
+          do i = 1, 3
+             read(1, *) !not needed eps(i, 1:3)
+          end do
+          do i = 1, nat
+             read(1, *)
+             do j = 1, 3
+                read(1, *) !not needed zeff(i, j, 1:3)
+             end do
+          end do
+       end if
+
+       !These are actually parsed:
+       
+       read(1,*) qscell(1:3)
+       self%scell = qscell
+
+       !Read the force constants.
+       allocate(self%ifc2(3, 3, nat, nat, self%scell(1), self%scell(2), self%scell(3)))
+       nfc2 = 3*3*nat*nat
+       do i = 1, nfc2
+          read(1, *) ipol, jpol, iat, jat
+          do j = 1, product(self%scell)
+             read(1, *) t1, t2, t3, &
+                  self%ifc2(ipol, jpol, iat, jat, t1, t2, t3)
           end do
        end do
+       close(1)
     end if
-    read(1,*) qscell(1:3)
 
-    self%scell = qscell
-    
-    !Read the force constants.
-    allocate(self%ifc2(3, 3, nat, nat, self%scell(1), self%scell(2), self%scell(3)))
-    nfc2 = 3*3*nat*nat
-    do i = 1, nfc2
-       read(1, *) ipol, jpol, iat, jat
-       do j = 1, self%scell(1)*self%scell(2)*self%scell(3)
-          read(1, *) t1, t2, t3, &
-               self%ifc2(ipol, jpol, iat, jat, t1, t2, t3)
+    !Phonopy format:
+    if(phonopy_format_file_exists) then
+       r = transpose(matmul(crys%lattvecs, crys%basis))/bohr2nm
+       
+       open(1, file = "FORCE_CONSTANTS", status = "old")
+
+       read(1, *) ntensors_phonopy
+
+       !DEBUG
+       self%scell = [5, 5, 5]
+
+       allocate(self%ifc2(3, 3, crys%numatoms, crys%numatoms, self%scell(1), self%scell(2), self%scell(3)))
+       
+       if(ntensors_phonopy /= product(self%scell)*crys%numatoms) &
+            call exit_with_message('Wrong number of force constant tensors in file. Exiting.')
+       
+       do i = 1, ntensors_phonopy
+          do j = 1, ntensors_phonopy
+             read(1,*) at1_sc, at2_sc
+
+             call phonopy_demux_atom_position(at1_sc, &
+                  self%scell, ucell1, iat)
+
+             call phonopy_demux_atom_position(at2_sc, &
+                  self%scell, ucell2, jat)
+
+             !We may fix the first atom in the central unitcell
+             if(all(ucell1 == 1)) then
+                do jpol = 1, 3
+                   read(1, *) self%ifc2(:, jpol, jat, iat, &
+                        ucell2(1), ucell2(2), ucell2(3))
+                end do
+             else !this info is redundant for elphbolt, so read but don't save
+                do ipol = 1, 3
+                   read(1, *)
+                end do
+             end if
+          end do
        end do
-    end do
-    close(1)
+       close(1)
+
+       !Convert from phonopy units [eV.A^-2] to our internal units [Ry.Bohr^-2]
+       self%ifc2 = self%ifc2/Ryd2eV*(Bohr2nm*10.0_r64)**2
+    end if
     
     !Enforce the conservation of momentum in the simplest way possible.
     do i = 1, 3
        do j = 1, 3
-          do iat = 1, nat
+          do iat = 1, crys%numatoms
              self%ifc2(i, j, iat, iat, 1, 1, 1) = self%ifc2(i, j, iat, iat, 1, 1, 1) - &
                   sum(self%ifc2(i, j, iat, :, :, :, :))
           end do
@@ -452,6 +521,7 @@ contains
     do i = 1, 3
        self%cell_r(i, 0) = dnrm2(3, self%cell_r(i, 1:3), 1)
     end do
+    
     self%cell_g(:, 1:3) = transpose(crys%reclattvecs)*bohr2nm
     do i = 1, 3
        self%cell_g(i, 0) = dnrm2(3, self%cell_g(i, 1:3), 1)
@@ -465,28 +535,68 @@ contains
     do m1 = -2, 2
        do m2 = -2, 2
           do m3 = -2, 2
-             if(all((/m1, m2, m3/).eq.0)) then
+             if(all([m1, m2, m3] == 0)) then
                 cycle
              end if
              do i = 1, 3
                 self%rws(j, i) = wscell(1, i)*m1 + wscell(2, i)*m2 + wscell(3, i)*m3
              end do
-             self%rws(j, 0) = 0.5*dot_product(self%rws(j, 1:3), self%rws(j, 1:3))
+             self%rws(j, 0) = 0.5_r64*dot_product(self%rws(j, 1:3), self%rws(j, 1:3))
              j = j + 1
           end do
        end do
     end do
 
-    do i = 1, nat
-       self%mm(i, i) = mass(tipo(i))
-       self%rr(i, i, :) = 0
-       do j = i + 1, nat
-          self%mm(i, j) = sqrt(mass(tipo(i))*mass(tipo(j)))
+    !Basis atoms in Cartesian coordinates and in Bohr.
+    !This is used in the section below to construct the r(i) - r(j) vectors
+    r = transpose(matmul(crys%lattvecs, crys%basis))/bohr2nm
+    
+    do i = 1, crys%numatoms
+       self%mm(i, i) = crys%masses(crys%atomtypes(i))
+       self%rr(i, i, :) = 0.0_r64
+       do j = i + 1, crys%numatoms
+          self%mm(i, j) = &
+               sqrt(crys%masses(crys%atomtypes(i))*&
+               crys%masses(crys%atomtypes(j)))
           self%rr(i, j, 1:3) = r(i, 1:3) - r(j, 1:3)
           self%mm(j, i) = self%mm(i, j)
           self%rr(j, i, 1:3) = -self%rr(i, j, 1:3)
        end do
     end do
+
+    !Our internal format uses Espresso units for the mass matrix.
+    self%mm = self%mm/massfactor
+
+  contains
+
+    subroutine phonopy_demux_atom_position(atom_in_supercell_muxed, &
+         supercell_size, unitcell_indvec, atom_in_unitcell_muxed)
+      !! This splits the atom position in the supercell into the unitcell
+      !! position (integer triplet) and atom index in that unitcell.
+      !! Everything is 1-based.
+      !!
+      !! Didn't see the point of providing this subroutine in a global scope
+      !! as it really only useful in the context of parsing the phonopy
+      !! format 2nd order force constants file.
+     
+      integer(i64), intent(in) :: atom_in_supercell_muxed, &
+           supercell_size(3)
+      integer(i64), intent(out) :: unitcell_indvec(3), &
+           atom_in_unitcell_muxed
+
+      !Local
+      integer(i64) :: tmp1, tmp2
+
+      call int_div(atom_in_supercell_muxed - 1, supercell_size(1), &
+           tmp1, unitcell_indvec(1))
+      call int_div(tmp1, supercell_size(2), tmp2, unitcell_indvec(2))
+      call int_div(tmp2, supercell_size(3), atom_in_unitcell_muxed, &
+           unitcell_indvec(3))
+
+      !Since the outputs should all be 1-based:
+      unitcell_indvec = unitcell_indvec + 1
+      atom_in_unitcell_muxed = atom_in_unitcell_muxed + 1
+    end subroutine phonopy_demux_atom_position
     
   end subroutine read_ifc2
   
@@ -872,7 +982,7 @@ contains
   end subroutine read_ifc3
 
   subroutine phonon_espresso_precompute(self, crys)
-    !! Subroutine to precompute q-indepent quantities related to the dynamical matrix
+    !! Subroutine to precompute q-independent quantities related to the dynamical matrix
 
     class(phonon), intent(inout) :: self
     type(crystal), intent(in) :: crys
@@ -905,7 +1015,7 @@ contains
                       !Supercell image
                       t(i) = m1*self%cell_r(1, i) + m2*self%cell_r(2, i) + m3*self%cell_r(3, i)
 
-                      !Position of basis atom in supercell image
+                      !Position of pair of atoms in supercell image
                       r_ws(i) = t(i) + self%rr(iat, jat, i)
                    end do
                    
@@ -1158,6 +1268,296 @@ contains
     omegas = omegas*Ryd2eV !eV
     if(present(velocities)) velocities = velocities*toTHz*bohr2nm !Km/s
   end subroutine phonon_espresso
+
+  subroutine phonon_phonopy(self, crys, nq, qpoints, omegas, eigenvect, velocities)
+    !! Subroutine to calculate phonons from the 2nd order force constants.
+    !
+    ! This is adapted from ShengBTE's subroutine of the same name.
+    ! ShengBTE is distributed under GPL v3 or later.
+
+    class(phonon), intent(in) :: self
+    type(crystal), intent(in) :: crys
+    integer(i64), intent(in) :: nq
+    real(r64), intent(in) :: qpoints(nq, 3)
+    real(r64), intent(out) :: omegas(nq, self%numbands)
+    real(r64), optional, intent(out) :: velocities(nq, self%numbands, 3)
+    complex(r64), optional, intent(out) :: eigenvect(nq, self%numbands, self%numbands)
+
+    ! Our 2nd-order files are in Ryd units. So will need this units converter.
+    real(r64), parameter :: toTHz = 20670.687_r64
+    
+    !External procedures
+    external :: zheev
+    
+    !real(kind=8),intent(in) :: kpoints(:,:)
+    !real(kind=8),intent(out) :: omegas(:,:),velocities(:,:,:)
+    !complex(kind=8),intent(out),optional :: eigenvect(:,:,:)
+
+    !real(r64),parameter :: prefactor=1745.91429109 ! THz^2 * amu * nm^3
+
+    !real(r64),allocatable :: mm(:,:)
+    complex(r64), allocatable :: dyn_total(:, :), dyn_nac(:, :)
+    complex(r64), allocatable :: ddyn_total(:, :, :), ddyn_nac(:, :, :)
+    real(r64), allocatable :: fc_short(:, :, :, :, :, :, :)
+    real(r64), allocatable :: fc_diel(:, :, :, :, :, :, :)
+    real(r64), allocatable :: fc_total(:, :, :, :, :, :, :)
+
+    integer(i64) :: i, j, ip, iq, neq
+    integer(i64) :: ix1, iy1, iz1, iatom1, ix2, iy2, iz2, iatom2
+    real(r64) :: tmp1, tmp2, qeq, dmin, Rnorm
+    real(r64) :: rcell(3), r(3), rl(3), rr(3,27), qr(27), qcart(nq, 3)
+    complex(r64) :: ztmp, star
+
+    real(r64), allocatable :: shortest(:, :)
+    real(r64), allocatable :: omega2(:), rwork(:)
+    complex(r64), allocatable :: work(:)
+    integer(i64) :: nwork=1
+
+    real(r64) :: dnrm2
+
+    real(r64) :: fac
+
+    fac = 8.0_r64*pi/crys%volume/bohr2nm**3
+    
+    allocate(omega2(self%numbands))
+    allocate(rwork(max(1, 9*crys%numatoms - 2)))
+    
+    allocate(fc_diel(3, 3, crys%numatoms, crys%numatoms, &
+         self%scell(1), self%scell(2), self%scell(3)))
+    allocate(fc_total(3, 3, crys%numatoms, crys%numatoms, &
+         self%scell(1), self%scell(2), self%scell(3)))
+    
+    !Grab the internal (short-ranged [?]) ifc2s that are not mass normalized
+    fc_short = self%ifc2
+
+    !Now mass normalize them
+    do iatom1 = 1, crys%numatoms
+       do iatom2 = 1, crys%numatoms
+          fc_short(:, :, iatom1, iatom2, :, :, :) = &
+               fc_short(:, :, iatom1, iatom2, :, :, :)/&
+               self%mm(iatom1, iatom2)
+       end do
+    end do
+
+    do iq = 1, nq
+       qcart(iq, :) = matmul(crys%reclattvecs, qpoints(iq, :))
+    end do
+    qcart = qcart*bohr2nm !Bohr^-1
+
+    !volume_r = crys%volume/bohr2nm**3
+    
+    allocate(dyn_total(self%numbands,self%numbands))
+    allocate(dyn_nac(self%numbands,self%numbands))
+    allocate(ddyn_total(self%numbands,self%numbands,3))
+    allocate(ddyn_nac(self%numbands,self%numbands,3))
+    allocate(work(nwork))
+    allocate(shortest(3, nq))
+    
+    ! Use the 1st BZ image of each q point to improve the behavior of
+    ! the non-analytic correction.
+    do iq = 1, nq
+       shortest(:, iq) = qcart(iq, :) !Bohr
+       
+       tmp1 = dnrm2(3, shortest(:, iq), 1)
+
+       do ix1 = -2, 2
+          do iy1 = -2, 2
+             do iz1 = -2, 2
+                r = qcart(iq, :) + &
+                     (ix1*crys%reclattvecs(:, 1) + &
+                     iy1*crys%reclattvecs(:, 2) + &
+                     iz1*crys%reclattvecs(:, 3))/bohr2nm !Bohr
+                
+                tmp2 = dnrm2(3, r, 1)
+                if(tmp2 < tmp1) then
+                   tmp1 = tmp2
+                   shortest(:, iq) = r !Bohr
+                end if
+             end do
+          end do
+       end do
+    end do
+
+    do iq = 1, nq
+       dyn_total = 0.0_r64
+       dyn_nac = 0.0_r64
+       ddyn_total = 0.0_r64
+       ddyn_nac = 0.0_r64
+       fc_diel = 0.0_r64
+       
+       ! If the polar flag is set, we add the electrostatic
+       ! correction. No correction is applied exactly at \Gamma in
+       ! order not to rely on guesses about directions.
+       if(crys%polar .and. .not. all(shortest(:, iq) == 0.0_r64)) then
+          qeq = dot_product(shortest(:, iq), &
+               matmul(crys%epsilon, shortest(:, iq)))
+
+          do iatom1 = 1, crys%numatoms
+             do iatom2 = 1, crys%numatoms
+                do i = 1, 3
+                   do j = 1, 3
+                      tmp1 = dot_product(shortest(:, iq), crys%born(:, i, iatom1))
+                      tmp2 = dot_product(shortest(:, iq), crys%born(:, j, iatom2))
+                      
+                      dyn_nac((iatom1 - 1)*3 + i, (iatom2 - 1)*3 + j) = &
+                           tmp1*tmp2/self%mm(iatom1, iatom2)
+                      
+                      ! The derivatives of the nonanalytic correction
+                      ! will be needed later to make group velocities
+                      ! and frequencies completely consistent.
+                      do ip = 1, 3
+                         ddyn_nac((iatom1 - 1)*3 + i, (iatom2 - 1)*3 + j, ip) = &
+                              tmp1*crys%born(ip, j, iatom2) + &
+                              tmp2*crys%born(ip, i, iatom1) - &
+                              2.0_r64*tmp1*tmp2* &
+                              dot_product(crys%epsilon(ip, :), shortest(:, iq))/qeq
+                      end do
+                      
+                      ddyn_nac((iatom1 - 1)*3 + i, (iatom2 - 1)*3 + j, :) = &
+                           ddyn_nac((iatom1 - 1)*3 + i, (iatom2 - 1)*3 + j, :)/&
+                           self%mm(iatom1, iatom2)
+                   end do
+                end do
+             end do
+          end do
+          
+          !dyn_nac = prefactor*dyn_nac/qeq/V
+          !ddyn_nac = prefactor*ddyn_nac/qeq/V
+
+          dyn_nac = fac*dyn_nac/qeq
+          ddyn_nac = fac*ddyn_nac/qeq
+          
+          ! Transform back to real space to obtain a correction to the
+          ! short-range force constants.
+          do iatom2 = 1, crys%numatoms
+             do iatom1 = 1, crys%numatoms
+                do j = 1, 3
+                   do i = 1, 3
+                      fc_diel(i, j, iatom1, iatom2, :, :, :) = &
+                           real(dyn_nac((iatom1 - 1)*3 + i, (iatom2 - 1)*3 + j))
+                   end do
+                end do
+             end do
+          end do
+       end if
+
+       ! Force constants with long-range correction.
+       fc_total = fc_short + fc_diel/product(self%scell)
+       
+       ! Build the dynamical matrix and its derivatives.
+       do iatom1 = 1, crys%numatoms
+          do iatom2 = 1, crys%numatoms
+             do ix1 = 1, self%scell(1)
+                do iy1 = 1, self%scell(2)
+                   do iz1 = 1, self%scell(3)
+                      rcell = matmul(crys%lattvecs, [ix1, iy1, iz1] - [1, 1, 1])/bohr2nm !Bohr
+
+                      !r = self%rr(iatom1, iatom2, :)*bohr2nm + rcell
+                      r = self%rr(iatom1, iatom2, :) + rcell !Bohr
+
+                      dmin = huge(dmin)
+
+                      !TODO Check if the previously calculated Wigner-Seitz
+                      !weights can be used here.
+                      do ix2 = -2, 2
+                         do iy2 = -2, 2
+                            do iz2 = -2, 2
+                               rl = (ix2*self%scell(1)*crys%lattvecs(:, 1) + &
+                                    iy2*self%scell(2)*crys%lattvecs(:, 2) + &
+                                    iz2*self%scell(3)*crys%lattvecs(:, 3))/bohr2nm !Bohr
+                               
+                               Rnorm = dnrm2(3, rl + r, 1)
+
+                               if(abs(Rnorm - dmin) > 1e-5) then
+                                  if(Rnorm < dmin) then
+                                     neq = 1
+                                     dmin = Rnorm
+                                     qr(neq) = dot_product(qcart(iq, :) , rl + rcell)
+                                     rr(:, neq) = rl + rcell
+                                  end if
+                               else
+                                  neq = neq + 1
+                                  qr(neq) = dot_product(qcart(iq, :), rl + rcell)
+                                  rr(:, neq) = rl + rcell
+                               endif
+                            end do
+                         end do
+                      end do
+                      
+                      star = 0.0_r64
+
+                      do ip = 1, neq
+                         ztmp = expi(-qr(ip))/neq
+                         star = star + ztmp
+
+                         do i = 1, 3
+                            do j = 1, 3
+                               dyn_total(3*(iatom1 - 1) + i, 3*(iatom2 - 1) + j) = &
+                                    dyn_total(3*(iatom1 - 1) + i, 3*(iatom2 - 1) + j) + &
+                                    ztmp*fc_total(i, j, iatom1, iatom2, ix1, iy1, iz1)
+                               
+                               ddyn_total(3*(iatom1 - 1) + i, 3*(iatom2 - 1) + j, :) = &
+                                    ddyn_total(3*(iatom1 - 1) + i, 3*(iatom2 - 1) + j, :) -&
+                                    oneI*ztmp*rr(:, ip)*&
+                                    fc_total(i, j, iatom1, iatom2, ix1, iy1, iz1)
+                            end do
+                         end do
+                      end do
+                      
+                      if(crys%polar .and. .not. all(qcart(iq, :) == 0.0_r64)) then
+                         do i = 1, 3
+                            do j = 1, 3
+                               ddyn_total((iatom1 - 1)*3 + i, (iatom2 - 1)*3 + j, :) = &
+                                    ddyn_total((iatom1 - 1)*3 + i, (iatom2 - 1)*3 + j, :) + &
+                                    star*ddyn_nac((iatom1 - 1)*3 + i, (iatom2 - 1)*3 + j, :)/&
+                                    product(self%scell)
+                            end do
+                         end do
+                      end if
+                   end do
+                end do
+             end do
+          end do
+       end do
+
+       ! Frequencies squared result from a diagonalization of the
+       ! dynamical matrix. The first call to zheev serves to ensure that
+       ! enough space has been allocated for this.
+       call zheev("V", "U", self%numbands, dyn_total, self%numbands, omega2, &
+            work, -1_i64, rwork, i)
+
+       if(real(work(1)) > nwork) then
+          nwork = nint(2*real(work(1)))
+          deallocate(work)
+          allocate(work(nwork))
+       end if
+       
+       call zheev("V", "U", self%numbands, dyn_total, self%numbands, omega2, &
+            work, nwork, rwork, i)
+
+       ! Eigenvectors are also returned if required.
+       if(present(eigenvect)) then
+          eigenvect(iq, :, :) = transpose(dyn_total)
+       end if
+       
+       ! As is conventional, imaginary frequencies are returned as negative.
+       omegas(iq, :) = sign(sqrt(abs(omega2)), omega2)
+
+       ! Group velocities are obtained perturbatively. This is very
+       ! advatageous with respect to finite differences.
+       do i = 1, self%numbands
+          do ip = 1, 3
+             velocities(iq, i, ip)=real(dot_product(dyn_total(:, i), &
+                  matmul(ddyn_total(:, :, ip), dyn_total(:, i))))
+          end do
+          velocities(iq, i, :) = velocities(iq, i, :)/(2.0_r64*omegas(iq, i))
+       end do
+    end do
+
+    !Units conversion
+    omegas = omegas*Ryd2eV !eV
+    if(present(velocities)) velocities = velocities*bohr2nm*toTHz !Km/s
+  end subroutine phonon_phonopy
 
   subroutine allocate_xmassvar(self, ph, usetetra, Tmat)
    !! Intializes the xmass var matrix elements size (for that image)
