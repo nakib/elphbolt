@@ -1,172 +1,163 @@
 program V3offload
 
 #ifdef _OPENACC
-   use openacc
+  use openacc
 #endif
 
-   use precision, only: i64, r64
-   use misc, only: print_message, subtitle, timer, exit_with_message, mux_vector, demux_state, &
-      mux_state, twonorm, demux_vector, permutations, lex_less_1d, map_triplet_full_to_reduced
-   use numerics_module, only: numerics
-   use crystal_module, only: crystal
-   use symmetry_module, only: symmetry
-   use phonon_module, only: phonon
+  use precision, only: i64, r64
+  use misc, only: print_message, subtitle, timer, exit_with_message, mux_vector, demux_state, &
+       mux_state, twonorm, demux_vector, permutations, lex_less_1d, map_triplet_full_to_reduced
+  use numerics_module, only: numerics
+  use crystal_module, only: crystal
+  use symmetry_module, only: symmetry
+  use phonon_module, only: phonon
 
-   implicit none
+  implicit none
 
-   abstract interface
-      real(r64) function Vm2_3ph(ev1_s1, ev2_s2, ev3_s3, &
-         Index_i, Index_j, Index_k, ifc3, phases_q2q3, ntrip, nb)
-         import r64, i64
+  abstract interface
+     real(r64) function Vm2_3ph(ev1_s1, ev2_s2, ev3_s3, &
+          Index_i, Index_j, Index_k, ifc3, phases_q2q3, ntrip, nb)
+       import r64, i64
 
-         integer(i64), intent(in) :: ntrip, Index_i(ntrip), Index_j(ntrip), Index_k(ntrip), nb
-         complex(r64), intent(in) :: phases_q2q3(ntrip), ev1_s1(nb), ev2_s2(nb), ev3_s3(nb)
-         real(r64), intent(in) :: ifc3(3, 3, 3, ntrip)
-      end function Vm2_3ph
-   end interface
+       integer(i64), intent(in) :: ntrip, Index_i(ntrip), Index_j(ntrip), Index_k(ntrip), nb
+       complex(r64), intent(in) :: phases_q2q3(ntrip), ev1_s1(nb), ev2_s2(nb), ev3_s3(nb)
+       real(r64), intent(in) :: ifc3(3, 3, 3, ntrip)
+     end function Vm2_3ph
+  end interface
 
-   type(numerics) :: num
-   type(crystal) :: crys
-   type(symmetry) :: sym
-   type(phonon) :: ph
-   type(timer) :: t_event
-   procedure(Vm2_3ph), pointer :: Vm2_calculator
-   complex(r64), allocatable :: R1(:, :, :), R3(:)
-   complex(r64) :: ev1(3, 2), ev2(3, 2), ev3(3, 2)
+  type(numerics) :: num
+  type(crystal) :: crys
+  type(symmetry) :: sym
+  type(phonon) :: ph
+  type(timer) :: t_event
+  procedure(Vm2_3ph), pointer :: Vm2_calculator
+  complex(r64), allocatable :: R1(:, :, :), R3(:)
+  complex(r64) :: ev1(3, 2), ev2(3, 2), ev3(3, 2)
 
-   real(r64), allocatable :: V2(:, :, :, :, :)
-   real(r64), allocatable :: V2_minimal_set(:, :, :, :, :)
-   integer(i64), allocatable :: M(:, :, :)
-   integer :: count_full, count_minimal
-   integer(i64) :: lambda1, lambda2, lambda3
-   integer(i64) :: istate1, iq2, iq3_minus, s2, s3, nstates_irred, s1, iq1_ibz, &
-      iq1
-   real(r64) :: val !value
+  real(r64), allocatable :: V2(:, :, :, :, :)
+  real(r64), allocatable :: V2_minimal_set(:, :, :, :, :)
+  integer(i64), allocatable :: M(:, :, :)
+  integer :: count_full, count_minimal
+  integer(i64) :: lambda1, lambda2, lambda3
+  integer(i64) :: istate1, iq2, iq3_minus, s2, s3, nstates_irred, s1, iq1_ibz, &
+       iq1
+  real(r64) :: val !value
 
-   if(this_image() == 1) then
-      write(*, '(A)')  'V3offload playground'
-      write(*, '(A, I5)') 'Number of coarray images = ', num_images()
-   end if
+  if(this_image() == 1) then
+     write(*, '(A)')  'V3offload playground'
+     write(*, '(A, I5)') 'Number of coarray images = ', num_images()
+  end if
 
-   !Set up crystal
-   call crys%initialize
+  !Set up crystal
+  call crys%initialize
 
-   !Set up numerics data
-   call num%initialize(crys)
+  !Set up numerics data
+  call num%initialize(crys)
 
-   !Calculate crystal and BZ symmetries
-   call sym%calculate_symmetries(crys, num%qmesh)
+  !Calculate crystal and BZ symmetries
+  call sym%calculate_symmetries(crys, num%qmesh)
 
-   !Calculate phonons
-   call ph%initialize(crys, sym, num)
+  !Calculate phonons
+  call ph%initialize(crys, sym, num)
 
-   !Calculate ph-ph vertex (cpu, original)
-   Vm2_calculator => Vm2_3ph_reference
-   call t_event%start_timer('reference V- on cpu')
-   call calculate_3ph_interaction(ph, crys, num, V2, Vm2_calculator)
-   call t_event%end_timer('reference V- on cpu')
-   print*, 'value = ', twonorm(pack(V2, .true.))
-   ! print*, V2(3, 1, 2, 3, 3)
-   ! print*, V2(3, 2, 4, 3, 2)
-   ! print*, V2(4, 1, 4, 1, 4)
-   ! print*, V2(5, 1, 5, 1, 5)
-   ! print*, V2(6, 1, 6, 1, 6)
-   count_full = 0
-   print *, '---------------------------------------------------------------'
-   print *, '   lambda1    lambda2    lambda3      Value'
-   print *, '---------------------------------------------------------------'
+  !Calculate ph-ph vertex (cpu, original)
+  Vm2_calculator => Vm2_3ph_reference
+  call t_event%start_timer('reference V- on cpu')
+  call calculate_3ph_interaction(ph, crys, num, V2, Vm2_calculator)
+  call t_event%end_timer('reference V- on cpu')
+  print*, 'value = ', twonorm(pack(V2, .true.))
 
-   do lambda1 = 1, 6
-      call demux_state(lambda1, ph%numbands, s1, iq1)
+  count_full = 0
+  print *, '---------------------------------------------------------------'
+  print *, '   lambda1    lambda2    lambda3      Value'
+  print *, '---------------------------------------------------------------'
 
-      do lambda2 = 1, 10
-         call demux_state(lambda2, ph%numbands, s2, iq2)
+  do lambda1 = 1, 6
+     call demux_state(lambda1, ph%numbands, s1, iq1)
 
-         do lambda3 = 1, 10
-            call demux_state(lambda3, ph%numbands, s3, iq3_minus)
+     do lambda2 = 1, 10
+        call demux_state(lambda2, ph%numbands, s2, iq2)
 
-            if(s3 <= size(V2, 1) .and. iq3_minus <= size(V2, 2) .and. &
-               s2 <= size(V2, 3) .and. iq2 <= size(V2, 4) .and. &
-               lambda1 <= size(V2, 5)) then
+        do lambda3 = 1, 10
+           call demux_state(lambda3, ph%numbands, s3, iq3_minus)
 
-               val = V2(s3, iq3_minus, s2, iq2, lambda1)
+           if(s3 <= size(V2, 1) .and. iq3_minus <= size(V2, 2) .and. &
+                s2 <= size(V2, 3) .and. iq2 <= size(V2, 4) .and. &
+                lambda1 <= size(V2, 5)) then
 
-               !if(abs(val) > 1.0e-7_r64) then
-               write(*,'(3I10, 2X, F16.12)') lambda1, lambda2, lambda3, val
-               count_full = count_full + 1
-               !end if
-            end if
-         end do
-      end do
-   end do
-   print *, 'Number of V2 elements:', count_full
+              val = V2(s3, iq3_minus, s2, iq2, lambda1)
 
-   !Calculate ph-ph vertex (cpu, refactor)
-   Vm2_calculator => Vm2_3ph_refactor
-   call t_event%start_timer('refactored V- on cpu')
-   call calculate_3ph_interaction(ph, crys, num, V2, Vm2_calculator)
-   call t_event%end_timer('refactored V- on cpu')
-   print*, 'value = ', twonorm(pack(V2, .true.))
+              !if(abs(val) > 1.0e-7_r64) then
+              write(*,'(3I10, 2X, F16.12)') lambda1, lambda2, lambda3, val
+              count_full = count_full + 1
+              !end if
+           end if
+        end do
+     end do
+  end do
+  print *, 'Number of V2 elements:', count_full
 
-   !Calculate ph-ph vertex (gpu, algo 1)
-   call t_event%start_timer('V- on gpu, algo 1')
-   call calculate_3ph_interaction_gpu(ph, crys, num, V2)
-   call t_event%end_timer('V- on gpu, algo 1')
-   print*, 'value = ', twonorm(pack(V2, .true.))
+  !Calculate ph-ph vertex (cpu, refactor)
+  Vm2_calculator => Vm2_3ph_refactor
+  call t_event%start_timer('refactored V- on cpu')
+  call calculate_3ph_interaction(ph, crys, num, V2, Vm2_calculator)
+  call t_event%end_timer('refactored V- on cpu')
+  print*, 'value = ', twonorm(pack(V2, .true.))
 
-   !Calculate V2_minimal_set (reference)
-   Vm2_calculator => Vm2_3ph_reference
-   call t_event%start_timer('reference V2 minimal set')
-   call calculate_3ph_interaction_minimalset(ph, crys, num, V2_minimal_set, M, Vm2_calculator)
-   call t_event%end_timer('reference V2 minimal set')
-   !print*, 'value = ', twonorm(pack(V2_minimal_set, .true.))
-   ! print*, V2_minimal_set(3, 1, 2, 3, 3)
-   ! print*, V2_minimal_set(3, 2, 4, 3, 2)
-   ! print*, V2_minimal_set(4, 1, 4, 1, 4)
-   ! print*, V2_minimal_set(5, 1, 5, 1, 5)
-   ! print*, V2_minimal_set(6, 1, 6, 1, 6)
+  !Calculate ph-ph vertex (gpu, algo 1)
+  call t_event%start_timer('V- on gpu, algo 1')
+  call calculate_3ph_interaction_gpu(ph, crys, num, V2)
+  call t_event%end_timer('V- on gpu, algo 1')
+  print*, 'value = ', twonorm(pack(V2, .true.))
 
-   count_minimal = 0
-   print *, '---------------------------------------------------------------'
-   print *, '   lambda1    lambda2    lambda3      Value'
-   print *, '---------------------------------------------------------------'
+  !Calculate V2_minimal_set (reference)
+  Vm2_calculator => Vm2_3ph_reference
+  call t_event%start_timer('reference V2 minimal set')
+  call calculate_3ph_interaction_minimalset(ph, crys, num, V2_minimal_set, M, Vm2_calculator)
+  call t_event%end_timer('reference V2 minimal set')
+  !print*, 'value = ', twonorm(pack(V2_minimal_set, .true.))
 
-   do lambda1 = 1, 6
-      call demux_state(lambda1, ph%numbands, s1, iq1)
+  count_minimal = 0
+  print *, '---------------------------------------------------------------'
+  print *, '   lambda1    lambda2    lambda3      Value'
+  print *, '---------------------------------------------------------------'
 
-      do lambda2 = 1, 10
-         call demux_state(lambda2, ph%numbands, s2, iq2)
+  do lambda1 = 1, 6
+     call demux_state(lambda1, ph%numbands, s1, iq1)
 
-         do lambda3 = 1, 10
-            call demux_state(lambda3, ph%numbands, s3, iq3_minus)
+     do lambda2 = 1, 10
+        call demux_state(lambda2, ph%numbands, s2, iq2)
 
-            !canonical value from V2_minimal_set
-            if(s3 <= size(V2_minimal_set, 1) .and. iq3_minus <= size(V2_minimal_set, 2) .and. &
-               s2 <= size(V2_minimal_set, 3) .and. iq2 <= size(V2_minimal_set, 4) .and. &
-               lambda1 <= size(V2_minimal_set, 5)) then
+        do lambda3 = 1, 10
+           call demux_state(lambda3, ph%numbands, s3, iq3_minus)
 
-               val = V2_minimal_set(s3, iq3_minus, s2, iq2, lambda1)
+           !canonical value from V2_minimal_set
+           if(s3 <= size(V2_minimal_set, 1) .and. iq3_minus <= size(V2_minimal_set, 2) .and. &
+                s2 <= size(V2_minimal_set, 3) .and. iq2 <= size(V2_minimal_set, 4) .and. &
+                lambda1 <= size(V2_minimal_set, 5)) then
 
-               if(abs(val) /= 1.0_r64) then
-                  write(*,'(3I10, 2X, F16.12)') lambda1, lambda2, lambda3, val
-                  count_minimal = count_minimal + 1
-               end if
-            end if
-         end do
-      end do
-   end do
-   print *, 'Number of V2 minimal set elements:', count_minimal
+              val = V2_minimal_set(s3, iq3_minus, s2, iq2, lambda1)
 
-   ! Reduction factor between V2 and V2 minimal set
-   print *, 'Reduction factor (minimal/full):', real(count_minimal)/real(count_full)
-   print *, 'Symmetry saving (in %):', (1.0 - real(count_minimal)/real(count_full)) * 100.0
+              if(abs(val) /= 1.0_r64) then
+                 write(*,'(3I10, 2X, F16.12)') lambda1, lambda2, lambda3, val
+                 count_minimal = count_minimal + 1
+              end if
+           end if
+        end do
+     end do
+  end do
+  print *, 'Number of V2 minimal set elements:', count_minimal
 
-   !Calculate V2_minimal_set (refactored)
-   Vm2_calculator => Vm2_3ph_refactor
-   call t_event%start_timer('refactored V2 minimal set')
-   call calculate_3ph_interaction_minimalset(ph, crys, num, V2_minimal_set, M, Vm2_calculator)
-   call t_event%end_timer('refactored V2 minimal set')
-   !print*, 'value = ', twonorm(pack(V2_minimal_set, .true.))
+  ! Reduction factor between V2 and V2 minimal set
+  print *, 'Reduction factor (minimal/full):', real(count_minimal)/real(count_full)
+  print *, 'Symmetry saving (in %):', (1.0 - real(count_minimal)/real(count_full)) * 100.0
+
+  !Calculate V2_minimal_set (refactored)
+  Vm2_calculator => Vm2_3ph_refactor
+  call t_event%start_timer('refactored V2 minimal set')
+  call calculate_3ph_interaction_minimalset(ph, crys, num, V2_minimal_set, M, Vm2_calculator)
+  call t_event%end_timer('refactored V2 minimal set')
+  !print*, 'value = ', twonorm(pack(V2_minimal_set, .true.))
 
 !!$  !Calculate ph-ph vertex (gpu, algo 2)
 !!$  call t_event%start_timer('V- on gpu, algo 2')
@@ -180,453 +171,387 @@ program V3offload
 !!$  call t_event%end_timer('V- on gpu, algo 3')
 !!$  print*, 'value = ', twonorm(pack(V2, .true.))
 
-   ! call V2minimal()
-
 contains
 
-   ! subroutine V2minimal()
-   !    integer(i64) :: nbands, mesh_size(3), nstates_irred
-   !    integer(i64), allocatable :: lambda1_list(:), lambda2_list(:)
-   !    integer(i64), allocatable :: M(:, :, :)
-   !    integer :: istate1, istate2
-   !    integer(i64) :: lambda1, lambda2, lambda3
-   !    integer(i64) :: iq1, iq2, iq3_minus, s1, s2, s3, iq1_ibz
-   !    real(r64)    :: V2_val
+  subroutine calculate_3ph_interaction(ph, crys, num, V2, Vm2_calculator)
+    type(phonon), intent(in) :: ph
+    type(crystal), intent(in) :: crys
+    type(numerics), intent(in) :: num
+    real(r64), allocatable, intent(out) :: V2(:, :, :, :, :)
+    procedure(Vm2_3ph), pointer, intent(in) :: Vm2_calculator
 
-
-   !    if(this_image() == 1) then
-   !       print *, "V3 permutations to canonical (lambda1, lambda2, lambda3) form"
-   !       print *, "Number of coarray images =", num_images()
-   !    end if
-
-   !    nbands = 2
-   !    mesh_size = [2, 2, 2]*1_i64
-
-   !    allocate(lambda1_list(2)); lambda1_list = [1, 2, 3, 4, 5]*1_i64
-   !    allocate(lambda2_list(6)); lambda2_list = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]*1_i64
-
-   !    call calculate_3ph_interaction_minimalset(ph, crys, num, V2_minimal_set, Vm2_calculator)
-   !    call map_triplet_full_to_reduced(nbands, mesh_size, lambda1_list, lambda2_list, M)
-
-   !    print *, "M(istate2, istate1) → canonical triplet: (lambda1, lambda2, lambda3)"
-
-   !    do istate1 = 1, size(lambda1_list)
-   !       do istate2 = 1, size(lambda2_list)
-   !          write(*,'(A,I0,A,I0,A,I0,A,I0,A,I0,A)') 'M(', istate2, ',', istate1, ') = (', &
-   !             M(1, istate2, istate1), ',', M(2, istate2, istate1), ',', M(3, istate2, istate1), ')'
-   !       end do
-   !    end do
-
-   !    print *, ""
-   !    print *, "Canonical triplets (lambda1, lambda2, lambda3) and V2 values:"
-   !    print *, "--------------------------------------------------------------"
-   !    !print *, " lambda1  lambda2  lambda3        V2"
-   !    print *, " s3   iq3_minus   s2   iq2   istate1   lambda1  lambda2  lambda3        V2"
-
-   !    do istate1 = 1, size(lambda1_list)
-   !       do istate2 = 1, size(lambda2_list)
-   !          ! for canonical triplet
-   !          lambda1 = M(1, istate2, istate1)
-   !          lambda2 = M(2, istate2, istate1)
-   !          lambda3 = M(3, istate2, istate1)
-
-   !          ! Demux each lambda into (band, iq) that help me calculate V2
-   !          call demux_state(lambda1, ph%numbands, s1, iq1)
-   !          call demux_state(lambda2, ph%numbands, s2, iq2)
-   !          call demux_state(lambda3, ph%numbands, s3, iq3_minus)
-
-   !          ! V2 value
-   !          V2_val = V2_minimal_set(s3, iq3_minus, s2, iq2, istate1)
-
-   !          ! print non-zero values
-   !          if (abs(V2_val) > 1e-7_r64) then
-   !             write(*,'(3(I8,1X),F16.8)') lambda1, lambda2, lambda3, V2_val
-   !             !write(*,'(A,I6,A,I6,A,I6,A,I6,A,I6,3(A,I6),A,F16.8)') &
-   !             !'s3=',s3,' iq3_minus=',iq3_minus,' s2=',s2,' iq2=',iq2,' istate1=',istate1, &
-   !             !' lambda1=',lambda1,' lambda2=',lambda2,' lambda3=',lambda3,' V2=',V2_val
-   !          end if
-   !       end do
-   !    end do
-   ! end subroutine V2minimal
-
-   subroutine calculate_3ph_interaction(ph, crys, num, V2, Vm2_calculator)
-      type(phonon), intent(in) :: ph
-      type(crystal), intent(in) :: crys
-      type(numerics), intent(in) :: num
-      real(r64), allocatable, intent(out) :: V2(:, :, :, :, :)
-      procedure(Vm2_3ph), pointer, intent(in) :: Vm2_calculator
-
-      !Local variables
-      integer(i64) :: istate1, nstates_irred, &
+    !Local variables
+    integer(i64) :: istate1, nstates_irred, &
          nprocs, s1, s2, s3, iq1_ibz, iq1, iq2, iq3_minus, it, &
          q1_indvec(3), q2_indvec(3), q3_minus_indvec(3), &
          idim, jdim, s2s3
-      real(r64) :: en1, en2, en3, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
+    real(r64) :: en1, en2, en3, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
          aux
-      complex(r64) :: phases(ph%numtriplets)
+    complex(r64) :: phases(ph%numtriplets)
 
-      !Total number of IBZ blocks states
-      nstates_irred = ph%nwv_irred*ph%numbands
+    !Total number of IBZ blocks states
+    nstates_irred = ph%nwv_irred*ph%numbands
 
-      allocate(V2(ph%numbands, ph%nwv, ph%numbands, ph%nwv, nstates_irred))
+    allocate(V2(ph%numbands, ph%nwv, ph%numbands, ph%nwv, nstates_irred))
 
-      V2 = 0.0
+    V2 = 0.0
 
-      !Run over first phonon IBZ states
-      !do istate1 = 1, nstates_irred
-      !Demux state index into branch (s) and wave vector (iq) indices
-      !call demux_state(istate1, ph%numbands, s1, iq1_ibz)
+    !Run over first phonon IBZ states
+    !do istate1 = 1, nstates_irred
+    !Demux state index into branch (s) and wave vector (iq) indices
+    !call demux_state(istate1, ph%numbands, s1, iq1_ibz)
 
-      do iq1_ibz = 1, ph%nwv_irred
+    do iq1_ibz = 1, ph%nwv_irred
 
-         !Muxed index of wave vector from the IBZ index list.
-         !This will be used to access IBZ information from the FBZ quantities.
-         iq1 = ph%indexlist_irred(iq1_ibz)
+       !Muxed index of wave vector from the IBZ index list.
+       !This will be used to access IBZ information from the FBZ quantities.
+       iq1 = ph%indexlist_irred(iq1_ibz)
 
-         !Initial (IBZ blocks) wave vector (crystal coords.)
-         q1 = ph%wavevecs(iq1, :)
+       !Initial (IBZ blocks) wave vector (crystal coords.)
+       q1 = ph%wavevecs(iq1, :)
 
-         !Convert from crystal to 0-based index vector
-         q1_indvec = nint(q1*ph%wvmesh)
+       !Convert from crystal to 0-based index vector
+       q1_indvec = nint(q1*ph%wvmesh)
 
-         do iq2 = 1, ph%nwv
-            !Initial (IBZ blocks) wave vector (crystal coords.)
-            q2 = ph%wavevecs(iq2, :)
+       do iq2 = 1, ph%nwv
+          !Initial (IBZ blocks) wave vector (crystal coords.)
+          q2 = ph%wavevecs(iq2, :)
 
-            !Convert from crystal to 0-based index vector
-            q2_indvec = nint(q2*ph%wvmesh)
+          !Convert from crystal to 0-based index vector
+          q2_indvec = nint(q2*ph%wvmesh)
 
-            !Folded final phonon wave vector
-            q3_minus_indvec = modulo(q1_indvec - q2_indvec, ph%wvmesh) !0-based index vector
-            q3_minus = q3_minus_indvec/dble(ph%wvmesh) !crystal coords.
+          !Folded final phonon wave vector
+          q3_minus_indvec = modulo(q1_indvec - q2_indvec, ph%wvmesh) !0-based index vector
+          q3_minus = q3_minus_indvec/dble(ph%wvmesh) !crystal coords.
 
-            !Muxed index of q3_minus
-            iq3_minus = mux_vector(q3_minus_indvec, ph%wvmesh, 0_i64)
+          !Muxed index of q3_minus
+          iq3_minus = mux_vector(q3_minus_indvec, ph%wvmesh, 0_i64)
 
-            q2_cart = matmul(crys%reclattvecs, q2)
-            q3_minus_cart = matmul(crys%reclattvecs, q3_minus)
+          q2_cart = matmul(crys%reclattvecs, q2)
+          q3_minus_cart = matmul(crys%reclattvecs, q3_minus)
 
-            phases = exp((0.0_r64, -1.0_r64)* &
+          phases = exp((0.0_r64, -1.0_r64)* &
                (matmul(q2_cart, ph%R_j) + matmul(q3_minus_cart, ph%R_k)))
 
-            do s1 = 1, ph%numbands
+          do s1 = 1, ph%numbands
 
-               istate1 = mux_state(ph%numbands, s1, iq1_ibz)
+             istate1 = mux_state(ph%numbands, s1, iq1_ibz)
 
-               !Combined loop over the 2nd and 3rd phonon bands
-               do s2s3 = 1, ph%numbands**2
-                  s2 = int((s2s3 - 1)/ph%numbands) + 1 !changes slow
-                  s3 = modulo(s2s3 - 1, ph%numbands) + 1 !changes fast
+             !Combined loop over the 2nd and 3rd phonon bands
+             do s2s3 = 1, ph%numbands**2
+                s2 = int((s2s3 - 1)/ph%numbands) + 1 !changes slow
+                s3 = modulo(s2s3 - 1, ph%numbands) + 1 !changes fast
 
-                  aux = Vm2_calculator(ph%evecs(iq1, s1, :), &
+                aux = Vm2_calculator(ph%evecs(iq1, s1, :), &
                      ph%evecs(iq2, s2, :), ph%evecs(iq3_minus, s3, :), &
                      ph%Index_i(:), ph%Index_j(:), ph%Index_k(:), ph%ifc3(:, :, :, :), &
                      phases(:), ph%numtriplets, ph%numbands)
 
-                  V2(s3, iq3_minus, s2, iq2, istate1) = aux
-               end do
-            end do
-         end do
-      end do
-   end subroutine calculate_3ph_interaction
+                V2(s3, iq3_minus, s2, iq2, istate1) = aux
+             end do
+          end do
+       end do
+    end do
+  end subroutine calculate_3ph_interaction
 
-   subroutine calculate_3ph_interaction_minimalset(ph, crys, num, V2_minimal_set, M, Vm2_calculator)
-      type(phonon), intent(in) :: ph
-      type(crystal), intent(in) :: crys
-      type(numerics), intent(in) :: num
-      real(r64), allocatable, intent(out) :: V2_minimal_set(:, :, :, :, :)
-      integer(i64), allocatable, intent(out) :: M(:, :, :) ! M(3, istate2, istate1)
-      procedure(Vm2_3ph), pointer, intent(in) :: Vm2_calculator
+  subroutine calculate_3ph_interaction_minimalset(ph, crys, num, V2_minimal_set, M, Vm2_calculator)
+    type(phonon), intent(in) :: ph
+    type(crystal), intent(in) :: crys
+    type(numerics), intent(in) :: num
+    real(r64), allocatable, intent(out) :: V2_minimal_set(:, :, :, :, :)
+    integer(i64), allocatable, intent(out) :: M(:, :, :) ! M(3, istate2, istate1)
+    procedure(Vm2_3ph), pointer, intent(in) :: Vm2_calculator
 
-      !Local variables
-      integer(i64) :: istate1, istate2, nstates_irred, nstates_full, &
+    !Local variables
+    integer(i64) :: istate1, istate2, nstates_irred, nstates_full, &
          nprocs, s1, s2, s3, iq1_ibz, iq1, iq2, iq3_minus, it, &
          q1_indvec(3), q2_indvec(3), q3_minus_indvec(3), &
          idim, jdim, s2s3, lambda1, lambda2, lambda3
-      real(r64) :: en1, en2, en3, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
+    real(r64) :: en1, en2, en3, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
          aux
-      integer(i64), allocatable :: all_perms(:, :)
-      integer(i64) :: triplet_full(3), permuted_triplet(3), canonical_triplet(3)
-      integer(i64) :: i, j
-      complex(r64) :: phases(ph%numtriplets)
+    integer(i64), allocatable :: all_perms(:, :)
+    integer(i64) :: triplet_full(3), permuted_triplet(3), canonical_triplet(3)
+    integer(i64) :: i, j
+    complex(r64) :: phases(ph%numtriplets)
 
-      !Total number of IBZ blocks states
-      nstates_irred = ph%nwv_irred*ph%numbands
-      nstates_full  = ph%nwv * ph%numbands
+    !Total number of IBZ blocks states
+    nstates_irred = ph%nwv_irred*ph%numbands
+    nstates_full  = ph%nwv * ph%numbands
 
-      ! Get all permutations of 3 indices
-      all_perms = permutations(3_i64)
-      allocate(V2_minimal_set(ph%numbands, ph%nwv, ph%numbands, ph%nwv, nstates_irred))
-      allocate(M(3, nstates_full, nstates_irred))
+    ! Get all permutations of 3 indices
+    all_perms = permutations(3_i64)
 
-      V2_minimal_set = 1.0
+    allocate(V2_minimal_set(ph%numbands, ph%nwv, ph%numbands, ph%nwv, nstates_irred))
+    allocate(M(3, nstates_full, nstates_irred))
 
-      !M(3, istate2, istate1) stores the canonical triplet for each pair of states (lambda1, lambda2)
-      !istate1 runs over irreducible states: nstates_irred
-      !istate2 runs over all full states
+    V2_minimal_set = 1.0
 
-      !Run over first phonon IBZ states
-      !do istate1 = 1, nstates_irred
-      !Demux state index into branch (s) and wave vector (iq) indices
-      !call demux_state(istate1, ph%numbands, s1, iq1_ibz)
+    !M(3, istate2, istate1) stores the canonical triplet for each pair of states (lambda1, lambda2)
+    !istate1 runs over irreducible states: nstates_irred
+    !istate2 runs over all full states
 
-      do iq1_ibz = 1, ph%nwv_irred
+    !Run over first phonon IBZ states
+    !do istate1 = 1, nstates_irred
+    !Demux state index into branch (s) and wave vector (iq) indices
+    !call demux_state(istate1, ph%numbands, s1, iq1_ibz)
 
-         !Muxed index of wave vector from the IBZ index list.
-         !This will be used to access IBZ information from the FBZ quantities.
-         iq1 = ph%indexlist_irred(iq1_ibz)
+    do iq1_ibz = 1, ph%nwv_irred
 
-         !Initial (IBZ blocks) wave vector (crystal coords.)
-         q1 = ph%wavevecs(iq1, :)
+       !Muxed index of wave vector from the IBZ index list.
+       !This will be used to access IBZ information from the FBZ quantities.
+       iq1 = ph%indexlist_irred(iq1_ibz)
 
-         !Convert from crystal to 0-based index vector
-         q1_indvec = nint(q1*ph%wvmesh)
+       !Initial (IBZ blocks) wave vector (crystal coords.)
+       q1 = ph%wavevecs(iq1, :)
 
-         do iq2 = 1, ph%nwv
-            !Initial (IBZ blocks) wave vector (crystal coords.)
-            q2 = ph%wavevecs(iq2, :)
+       !Convert from crystal to 0-based index vector
+       q1_indvec = nint(q1*ph%wvmesh)
 
-            !Convert from crystal to 0-based index vector
-            q2_indvec = nint(q2*ph%wvmesh)
+       do iq2 = 1, ph%nwv
+          !Initial (IBZ blocks) wave vector (crystal coords.)
+          q2 = ph%wavevecs(iq2, :)
 
-            !Folded final phonon wave vector
-            q3_minus_indvec = modulo(q1_indvec - q2_indvec, ph%wvmesh) !0-based index vector
-            q3_minus = q3_minus_indvec/dble(ph%wvmesh) !crystal coords.
+          !Convert from crystal to 0-based index vector
+          q2_indvec = nint(q2*ph%wvmesh)
 
-            !Muxed index of q3_minus
-            iq3_minus = mux_vector(q3_minus_indvec, ph%wvmesh, 0_i64)
+          !Folded final phonon wave vector
+          q3_minus_indvec = modulo(q1_indvec - q2_indvec, ph%wvmesh) !0-based index vector
+          q3_minus = q3_minus_indvec/dble(ph%wvmesh) !crystal coords.
 
-            q2_cart = matmul(crys%reclattvecs, q2)
-            q3_minus_cart = matmul(crys%reclattvecs, q3_minus)
+          !Muxed index of q3_minus
+          iq3_minus = mux_vector(q3_minus_indvec, ph%wvmesh, 0_i64)
 
-            phases = exp((0.0_r64, -1.0_r64)* &
+          q2_cart = matmul(crys%reclattvecs, q2)
+          q3_minus_cart = matmul(crys%reclattvecs, q3_minus)
+
+          phases = exp((0.0_r64, -1.0_r64)* &
                (matmul(q2_cart, ph%R_j) + matmul(q3_minus_cart, ph%R_k)))
 
-            do s1 = 1, ph%numbands
+          do s1 = 1, ph%numbands
 
-               istate1 = mux_state(ph%numbands, s1, iq1_ibz)
+             istate1 = mux_state(ph%numbands, s1, iq1_ibz)
 
-               !Combined loop over the 2nd and 3rd phonon bands
-               !do s2s3 = 1, ph%numbands**2
-               !s2 = int((s2s3 - 1)/ph%numbands) + 1 !changes slow
-               !s3 = modulo(s2s3 - 1, ph%numbands) + 1 !changes fast
-               do s2 = 1, ph%numbands
-                  istate2 = mux_state(ph%numbands, s2, iq2) !istate2 spans the FBZ, that makes it the long list
-                  do s3 = 1, ph%numbands
+             !Combined loop over the 2nd and 3rd phonon bands
+             !do s2s3 = 1, ph%numbands**2
+             !s2 = int((s2s3 - 1)/ph%numbands) + 1 !changes slow
+             !s3 = modulo(s2s3 - 1, ph%numbands) + 1 !changes fast
+             do s2 = 1, ph%numbands
+                istate2 = mux_state(ph%numbands, s2, iq2) !istate2 spans the FBZ, that makes it the long list
+                do s3 = 1, ph%numbands
 
-                     !Convert (s, iq) indices to canonical triplet (lambda1, lambda2, lambda3)
-                     lambda1 = mux_state(ph%numbands, s1, iq1)
-                     lambda2 = mux_state(ph%numbands, s2, iq2)
-                     lambda3 = mux_state(ph%numbands, s3, iq3_minus)
-                     triplet_full = [lambda1, lambda2, lambda3]
+                   !Convert (s, iq) indices to canonical triplet (lambda1, lambda2, lambda3)
+                   lambda1 = mux_state(ph%numbands, s1, iq1)
+                   lambda2 = mux_state(ph%numbands, s2, iq2)
+                   lambda3 = mux_state(ph%numbands, s3, iq3_minus)
+                   triplet_full = [lambda1, lambda2, lambda3]
 
-                     canonical_triplet = triplet_full
+                   canonical_triplet = triplet_full
 
-                     do i = 1, size(all_perms, 2)
-                        do j = 1, 3
-                           permuted_triplet(j) = triplet_full(all_perms(j, i))
-                        end do
+                   do i = 1, size(all_perms, 2)
+                      do j = 1, 3
+                         permuted_triplet(j) = triplet_full(all_perms(j, i))
+                      end do
 
-                        ! Use a lexicographic comparison function to keep the smallest permutation
-                        if(lex_less_1d(permuted_triplet, canonical_triplet)) canonical_triplet = permuted_triplet
-                     end do
+                      ! Use a lexicographic comparison function to keep the smallest permutation
+                      if(lex_less_1d(permuted_triplet, canonical_triplet)) canonical_triplet = permuted_triplet
+                   end do
 
-                     ! Store the first valid canonical triplet found in M(:, istate2, istate1)
-                     !M(:, istate2, istate1) = canonical_triplet
+                   ! Store the first valid canonical triplet found in M(:, istate2, istate1)
+                   !M(:, istate2, istate1) = canonical_triplet
 
-                     !only compute and store the value for the canonical triplet
-                     if(all(triplet_full == canonical_triplet)) then
-                        aux = Vm2_calculator(ph%evecs(iq1, s1, :), &
+                   !only compute and store the value for the canonical triplet
+                   if(all(triplet_full == canonical_triplet)) then
+                      aux = Vm2_calculator(ph%evecs(iq1, s1, :), &
                            ph%evecs(iq2, s2, :), ph%evecs(iq3_minus, s3, :), &
                            ph%Index_i(:), ph%Index_j(:), ph%Index_k(:), ph%ifc3(:, :, :, :), &
                            phases(:), ph%numtriplets, ph%numbands)
 
-                        V2_minimal_set(s3, iq3_minus, s2, iq2, istate1) = aux
-                     end if
-                  end do
-               end do
-            end do
-         end do
-      end do
-   end subroutine calculate_3ph_interaction_minimalset
+                      V2_minimal_set(s3, iq3_minus, s2, iq2, istate1) = aux
+                   end if
+                end do
+             end do
+          end do
+       end do
+    end do
+  end subroutine calculate_3ph_interaction_minimalset
 
-   subroutine calculate_3ph_interaction_gpu(ph, crys, num, V2)
-      type(phonon), intent(in) :: ph
-      type(crystal), intent(in) :: crys
-      type(numerics), intent(in) :: num
-      real(r64), allocatable, intent(out) :: V2(:, :, :, :, :)
+  subroutine calculate_3ph_interaction_gpu(ph, crys, num, V2)
+    type(phonon), intent(in) :: ph
+    type(crystal), intent(in) :: crys
+    type(numerics), intent(in) :: num
+    real(r64), allocatable, intent(out) :: V2(:, :, :, :, :)
 
-      !Local variables
-      integer(i64) :: istate1, nstates_irred, &
+    !Local variables
+    integer(i64) :: istate1, nstates_irred, &
          nprocs, s1, s2, s3, iq1_ibz, iq1, iq2, iq3_minus, it, &
          q1_indvec(3), q2_indvec(3), q3_minus_indvec(3), &
          idim, jdim, s2s3
-      real(r64) :: en1, en2, en3, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
+    real(r64) :: en1, en2, en3, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
          aux
-      complex(r64) :: phases(ph%numtriplets)
+    complex(r64) :: phases(ph%numtriplets)
 
-      complex(r64) :: R1(3, 3, ph%numtriplets), R3(ph%numtriplets)
+    complex(r64) :: R1(3, 3, ph%numtriplets), R3(ph%numtriplets)
 
-      !$acc data copyin(ph%ifc3, ph%Index_i, ph%Index_j, ph%Index_k) &
-      !$acc      create(R1, R3, ev1, ev2, ev3)
+    !$acc data copyin(ph%ifc3, ph%Index_i, ph%Index_j, ph%Index_k) &
+    !$acc      create(R1, R3, ev1, ev2, ev3)
 
-      !Total number of IBZ blocks states
-      nstates_irred = ph%nwv_irred*ph%numbands
+    !Total number of IBZ blocks states
+    nstates_irred = ph%nwv_irred*ph%numbands
 
-      allocate(V2(ph%numbands, ph%nwv, ph%numbands, ph%nwv, nstates_irred))
+    allocate(V2(ph%numbands, ph%nwv, ph%numbands, ph%nwv, nstates_irred))
 
-      V2 = 0.0
+    V2 = 0.0
 
-      !Run over first phonon IBZ states
-      !do istate1 = 1, nstates_irred
-      !Demux state index into branch (s) and wave vector (iq) indices
-      !call demux_state(istate1, ph%numbands, s1, iq1_ibz)
-      do iq1_ibz = 1, ph%nwv_irred
+    !Run over first phonon IBZ states
+    !do istate1 = 1, nstates_irred
+    !Demux state index into branch (s) and wave vector (iq) indices
+    !call demux_state(istate1, ph%numbands, s1, iq1_ibz)
+    do iq1_ibz = 1, ph%nwv_irred
 
-         !Muxed index of wave vector from the IBZ index list.
-         !This will be used to access IBZ information from the FBZ quantities.
-         iq1 = ph%indexlist_irred(iq1_ibz)
+       !Muxed index of wave vector from the IBZ index list.
+       !This will be used to access IBZ information from the FBZ quantities.
+       iq1 = ph%indexlist_irred(iq1_ibz)
 
-         !Initial (IBZ blocks) wave vector (crystal coords.)
-         q1 = ph%wavevecs(iq1, :)
+       !Initial (IBZ blocks) wave vector (crystal coords.)
+       q1 = ph%wavevecs(iq1, :)
 
-         !Convert from crystal to 0-based index vector
-         q1_indvec = nint(q1*ph%wvmesh)
+       !Convert from crystal to 0-based index vector
+       q1_indvec = nint(q1*ph%wvmesh)
 
-         do iq2 = 1, ph%nwv
-            !Initial (IBZ blocks) wave vector (crystal coords.)
-            q2 = ph%wavevecs(iq2, :)
+       do iq2 = 1, ph%nwv
+          !Initial (IBZ blocks) wave vector (crystal coords.)
+          q2 = ph%wavevecs(iq2, :)
 
-            !Convert from crystal to 0-based index vector
-            q2_indvec = nint(q2*ph%wvmesh)
+          !Convert from crystal to 0-based index vector
+          q2_indvec = nint(q2*ph%wvmesh)
 
-            !Folded final phonon wave vector
-            q3_minus_indvec = modulo(q1_indvec - q2_indvec, ph%wvmesh) !0-based index vector
-            q3_minus = q3_minus_indvec/dble(ph%wvmesh) !crystal coords.
+          !Folded final phonon wave vector
+          q3_minus_indvec = modulo(q1_indvec - q2_indvec, ph%wvmesh) !0-based index vector
+          q3_minus = q3_minus_indvec/dble(ph%wvmesh) !crystal coords.
 
-            !Muxed index of q3_minus
-            iq3_minus = mux_vector(q3_minus_indvec, ph%wvmesh, 0_i64)
+          !Muxed index of q3_minus
+          iq3_minus = mux_vector(q3_minus_indvec, ph%wvmesh, 0_i64)
 
-            q2_cart = matmul(crys%reclattvecs, q2)
-            q3_minus_cart = matmul(crys%reclattvecs, q3_minus)
+          q2_cart = matmul(crys%reclattvecs, q2)
+          q3_minus_cart = matmul(crys%reclattvecs, q3_minus)
 
-            phases = exp((0.0_r64, -1.0_r64)* &
+          phases = exp((0.0_r64, -1.0_r64)* &
                (matmul(q2_cart, ph%R_j) + matmul(q3_minus_cart, ph%R_k)))
 
-            do s1 = 1, ph%numbands
+          do s1 = 1, ph%numbands
 
-               istate1 = mux_state(ph%numbands, s1, iq1_ibz)
+             istate1 = mux_state(ph%numbands, s1, iq1_ibz)
 
-               ev1 = reshape(ph%evecs(iq1, s1, :), shape = [3, int(crys%numatoms, 4)])
-               !$acc update device(ev1)
+             ev1 = reshape(ph%evecs(iq1, s1, :), shape = [3, int(crys%numatoms, 4)])
+             !$acc update device(ev1)
 
-               do s2 = 1, ph%numbands
-                  ev2 = reshape(ph%evecs(iq2, s2, :), shape = [3, int(crys%numatoms, 4)])
-                  !$acc update device(ev2)
+             do s2 = 1, ph%numbands
+                ev2 = reshape(ph%evecs(iq2, s2, :), shape = [3, int(crys%numatoms, 4)])
+                !$acc update device(ev2)
 
-                  do s3 = 1, ph%numbands
-                     ev3 = reshape(ph%evecs(iq3_minus, s3, :), shape = [3, int(crys%numatoms, 4)])
-                     !$acc update device(ev3)
+                do s3 = 1, ph%numbands
+                   ev3 = reshape(ph%evecs(iq3_minus, s3, :), shape = [3, int(crys%numatoms, 4)])
+                   !$acc update device(ev3)
 
-                     aux = Vm2_3ph_gpu(ev1, ev2, ev3, &
+                   aux = Vm2_3ph_gpu(ev1, ev2, ev3, &
                         ph%Index_i(:), ph%Index_j(:), ph%Index_k(:), ph%ifc3(:,:,:,:), &
                         phases(:), ph%numtriplets, ph%numbands, R1, R3)
 
-                     V2(s3, iq3_minus, s2, iq2, istate1) = aux
-                  end do
-               end do
-            end do
-         end do
-      end do
-      !$acc end data
-   end subroutine calculate_3ph_interaction_gpu
+                   V2(s3, iq3_minus, s2, iq2, istate1) = aux
+                end do
+             end do
+          end do
+       end do
+    end do
+    !$acc end data
+  end subroutine calculate_3ph_interaction_gpu
 
-   subroutine calculate_3ph_interaction_gpu_algo2(ph, crys, num, V2)
-      type(phonon), intent(in) :: ph
-      type(crystal), intent(in) :: crys
-      type(numerics), intent(in) :: num
-      real(r64), allocatable, intent(out) :: V2(:, :, :, :, :)
+  subroutine calculate_3ph_interaction_gpu_algo2(ph, crys, num, V2)
+    type(phonon), intent(in) :: ph
+    type(crystal), intent(in) :: crys
+    type(numerics), intent(in) :: num
+    real(r64), allocatable, intent(out) :: V2(:, :, :, :, :)
 
-      !Local variables
-      integer(i64) :: istate1, nstates_irred, &
+    !Local variables
+    integer(i64) :: istate1, nstates_irred, &
          nprocs, s1, s2, s3, iq1_ibz, iq1, iq2, iq3_minus, it, &
          q1_indvec(3), q2_indvec(3), q3_minus_indvec(3), &
          idim, jdim, s2s3
-      real(r64) :: en1, en2, en3, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
+    real(r64) :: en1, en2, en3, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
          aux
-      complex(r64) :: phases(ph%numtriplets)
+    complex(r64) :: phases(ph%numtriplets)
 
-      complex(r64) :: R1(3, 3, ph%numtriplets), R3(ph%numtriplets)
+    complex(r64) :: R1(3, 3, ph%numtriplets), R3(ph%numtriplets)
 
-      !$acc data copyin(ph%ifc3, ph%Index_i, ph%Index_j, ph%Index_k, ph%R_j, ph%R_k) &
-      !$acc      create(R1, R3, ev1, ev2, ev3, phases, q2_cart, q3_minus_cart)
+    !$acc data copyin(ph%ifc3, ph%Index_i, ph%Index_j, ph%Index_k, ph%R_j, ph%R_k) &
+    !$acc      create(R1, R3, ev1, ev2, ev3, phases, q2_cart, q3_minus_cart)
 
-      !Total number of IBZ blocks states
-      nstates_irred = ph%nwv_irred*ph%numbands
+    !Total number of IBZ blocks states
+    nstates_irred = ph%nwv_irred*ph%numbands
 
-      allocate(V2(ph%numbands, ph%nwv, ph%numbands, ph%nwv, nstates_irred))
+    allocate(V2(ph%numbands, ph%nwv, ph%numbands, ph%nwv, nstates_irred))
 
-      V2 = 0.0
+    V2 = 0.0
 
-      !Run over first phonon IBZ states
-      do istate1 = 1, nstates_irred
-         !Demux state index into branch (s) and wave vector (iq) indices
-         call demux_state(istate1, ph%numbands, s1, iq1_ibz)
+    !Run over first phonon IBZ states
+    do istate1 = 1, nstates_irred
+       !Demux state index into branch (s) and wave vector (iq) indices
+       call demux_state(istate1, ph%numbands, s1, iq1_ibz)
 
-         !Muxed index of wave vector from the IBZ index list.
-         !This will be used to access IBZ information from the FBZ quantities.
-         iq1 = ph%indexlist_irred(iq1_ibz)
+       !Muxed index of wave vector from the IBZ index list.
+       !This will be used to access IBZ information from the FBZ quantities.
+       iq1 = ph%indexlist_irred(iq1_ibz)
 
-         !Initial (IBZ blocks) wave vector (crystal coords.)
-         q1 = ph%wavevecs(iq1, :)
+       !Initial (IBZ blocks) wave vector (crystal coords.)
+       q1 = ph%wavevecs(iq1, :)
 
-         !Convert from crystal to 0-based index vector
-         q1_indvec = nint(q1*ph%wvmesh)
+       !Convert from crystal to 0-based index vector
+       q1_indvec = nint(q1*ph%wvmesh)
 
-         ev1 = reshape(ph%evecs(iq1, s1, :), shape = [3, int(crys%numatoms, 4)])
-         !$acc update device(ev1)
+       ev1 = reshape(ph%evecs(iq1, s1, :), shape = [3, int(crys%numatoms, 4)])
+       !$acc update device(ev1)
 
-         do iq2 = 1, ph%nwv
-            !Initial (IBZ blocks) wave vector (crystal coords.)
-            q2 = ph%wavevecs(iq2, :)
+       do iq2 = 1, ph%nwv
+          !Initial (IBZ blocks) wave vector (crystal coords.)
+          q2 = ph%wavevecs(iq2, :)
 
-            !Convert from crystal to 0-based index vector
-            q2_indvec = nint(q2*ph%wvmesh)
+          !Convert from crystal to 0-based index vector
+          q2_indvec = nint(q2*ph%wvmesh)
 
-            !Folded final phonon wave vector
-            q3_minus_indvec = modulo(q1_indvec - q2_indvec, ph%wvmesh) !0-based index vector
-            q3_minus = q3_minus_indvec/dble(ph%wvmesh) !crystal coords.
+          !Folded final phonon wave vector
+          q3_minus_indvec = modulo(q1_indvec - q2_indvec, ph%wvmesh) !0-based index vector
+          q3_minus = q3_minus_indvec/dble(ph%wvmesh) !crystal coords.
 
-            !Muxed index of q3_minus
-            iq3_minus = mux_vector(q3_minus_indvec, ph%wvmesh, 0_i64)
+          !Muxed index of q3_minus
+          iq3_minus = mux_vector(q3_minus_indvec, ph%wvmesh, 0_i64)
 
-            q2_cart = matmul(crys%reclattvecs, q2)
-            q3_minus_cart = matmul(crys%reclattvecs, q3_minus)
-            !$acc update device(q2_cart, q3_minus_cart)
+          q2_cart = matmul(crys%reclattvecs, q2)
+          q3_minus_cart = matmul(crys%reclattvecs, q3_minus)
+          !$acc update device(q2_cart, q3_minus_cart)
 
-            call calculate_phases_on_gpu(q2_cart, q3_minus_cart, ph%R_j, ph%R_k, phases, ph%numtriplets)
+          call calculate_phases_on_gpu(q2_cart, q3_minus_cart, ph%R_j, ph%R_k, phases, ph%numtriplets)
 
-            do s2 = 1, ph%numbands
-               ev2 = reshape(ph%evecs(iq2, s2, :), shape = [3, int(crys%numatoms, 4)])
-               !$acc update device(ev2)
+          do s2 = 1, ph%numbands
+             ev2 = reshape(ph%evecs(iq2, s2, :), shape = [3, int(crys%numatoms, 4)])
+             !$acc update device(ev2)
 
-               do s3 = 1, ph%numbands
-                  ev3 = reshape(ph%evecs(iq3_minus, s3, :), shape = [3, int(crys%numatoms, 4)])
-                  !$acc update device(ev3)
+             do s3 = 1, ph%numbands
+                ev3 = reshape(ph%evecs(iq3_minus, s3, :), shape = [3, int(crys%numatoms, 4)])
+                !$acc update device(ev3)
 
-                  aux = Vm2_3ph_gpu_algo2(ev1, ev2, ev3, &
+                aux = Vm2_3ph_gpu_algo2(ev1, ev2, ev3, &
                      ph%Index_i(:), ph%Index_j(:), ph%Index_k(:), ph%ifc3(:, :, :, :), &
                      phases, ph%numtriplets, ph%numbands, R1, R3)
 
-                  V2(s3, iq3_minus, s2, iq2, istate1) = aux
-               end do
-            end do
-         end do
-      end do
-      !$acc end data
+                V2(s3, iq3_minus, s2, iq2, istate1) = aux
+             end do
+          end do
+       end do
+    end do
+    !$acc end data
 
-      !end associate
-   end subroutine calculate_3ph_interaction_gpu_algo2
+    !end associate
+  end subroutine calculate_3ph_interaction_gpu_algo2
 
 !!$  subroutine calculate_3ph_interaction_gpu_algo3(ph, crys, num, V2)
 !!$    type(phonon), intent(in) :: ph
@@ -742,194 +667,194 @@ contains
 !!$    end associate
 !!$  end subroutine calculate_3ph_interaction_gpu_algo3
 
-   real(r64) function Vm2_3ph_reference(ev1_s1, ev2_s2, ev3_s3, &
-      Index_i, Index_j, Index_k, ifc3, phases_q2q3, ntrip, nb)
-      !! Function to calculate the squared 3-ph interaction vertex |V-|^2.
+  real(r64) function Vm2_3ph_reference(ev1_s1, ev2_s2, ev3_s3, &
+       Index_i, Index_j, Index_k, ifc3, phases_q2q3, ntrip, nb)
+    !! Function to calculate the squared 3-ph interaction vertex |V-|^2.
 
-      integer(i64), intent(in) :: ntrip, Index_i(ntrip), Index_j(ntrip), Index_k(ntrip), nb
-      complex(r64), intent(in) :: phases_q2q3(ntrip), ev1_s1(nb), ev2_s2(nb), ev3_s3(nb)
-      real(r64), intent(in) :: ifc3(3, 3, 3, ntrip)
+    integer(i64), intent(in) :: ntrip, Index_i(ntrip), Index_j(ntrip), Index_k(ntrip), nb
+    complex(r64), intent(in) :: phases_q2q3(ntrip), ev1_s1(nb), ev2_s2(nb), ev3_s3(nb)
+    real(r64), intent(in) :: ifc3(3, 3, 3, ntrip)
 
-      !Local variables
-      integer(i64) :: it, a, b, c, aind, bind, cind
-      complex(r64) :: aux1, aux2, aux3, V0
+    !Local variables
+    integer(i64) :: it, a, b, c, aind, bind, cind
+    complex(r64) :: aux1, aux2, aux3, V0
 
-      !$acc routine seq
+    !$acc routine seq
 
-      aux1 = (0.0_r64, 0.0_r64)
-      do it = 1, ntrip
-         aind = 3*(Index_k(it) - 1)
-         bind = 3*(Index_j(it) - 1)
-         cind = 3*(Index_i(it) - 1)
-         V0 = (0.0_r64, 0.0_r64)
-         do a = 1, 3
-            aux2 = conjg(ev3_s3(a + aind))
-            do b = 1, 3
-               aux3 = aux2*conjg(ev2_s2(b + bind))
-               do c = 1, 3
-                  if(ifc3(c, b, a, it) /= 0.0_r64) then
-                     V0 = V0 + ifc3(c, b, a, it)*ev1_s1(c + cind)*aux3
-                  end if
-               end do
-            end do
-         end do
-         aux1 = aux1 + V0*phases_q2q3(it)
-      end do
+    aux1 = (0.0_r64, 0.0_r64)
+    do it = 1, ntrip
+       aind = 3*(Index_k(it) - 1)
+       bind = 3*(Index_j(it) - 1)
+       cind = 3*(Index_i(it) - 1)
+       V0 = (0.0_r64, 0.0_r64)
+       do a = 1, 3
+          aux2 = conjg(ev3_s3(a + aind))
+          do b = 1, 3
+             aux3 = aux2*conjg(ev2_s2(b + bind))
+             do c = 1, 3
+                if(ifc3(c, b, a, it) /= 0.0_r64) then
+                   V0 = V0 + ifc3(c, b, a, it)*ev1_s1(c + cind)*aux3
+                end if
+             end do
+          end do
+       end do
+       aux1 = aux1 + V0*phases_q2q3(it)
+    end do
 
-      Vm2_3ph_reference = abs(aux1)**2
-   end function Vm2_3ph_reference
+    Vm2_3ph_reference = abs(aux1)**2
+  end function Vm2_3ph_reference
 
-   real(r64) function Vm2_3ph_refactor(ev1_s1, ev2_s2, ev3_s3, &
-      Index_i, Index_j, Index_k, ifc3, phases_q2q3, ntrip, nb)
-      !! Function to calculate the squared 3-ph interaction vertex |V-|^2.
+  real(r64) function Vm2_3ph_refactor(ev1_s1, ev2_s2, ev3_s3, &
+       Index_i, Index_j, Index_k, ifc3, phases_q2q3, ntrip, nb)
+    !! Function to calculate the squared 3-ph interaction vertex |V-|^2.
 
-      integer(i64), intent(in) :: ntrip, Index_i(ntrip), Index_j(ntrip), Index_k(ntrip), nb
-      complex(r64), intent(in) :: phases_q2q3(ntrip), ev1_s1(nb), ev2_s2(nb), ev3_s3(nb)
-      real(r64), intent(in) :: ifc3(3, 3, 3, ntrip)
+    integer(i64), intent(in) :: ntrip, Index_i(ntrip), Index_j(ntrip), Index_k(ntrip), nb
+    complex(r64), intent(in) :: phases_q2q3(ntrip), ev1_s1(nb), ev2_s2(nb), ev3_s3(nb)
+    real(r64), intent(in) :: ifc3(3, 3, 3, ntrip)
 
-      !Local variables
-      integer(i64) :: it, a, b, c, aind, bind, cind
-      integer(i64) :: i, j, k, ijk, nijk, ndim, nat
-      complex(r64) :: aux1, aux2, aux3, V0
-      complex(r64) :: ev1(3, nb/3), ev2(3, nb/3), ev3(3, nb/3)
-      complex(r64) :: R1(3, 3, ntrip), R2(3, ntrip), R3(ntrip)
+    !Local variables
+    integer(i64) :: it, a, b, c, aind, bind, cind
+    integer(i64) :: i, j, k, ijk, nijk, ndim, nat
+    complex(r64) :: aux1, aux2, aux3, V0
+    complex(r64) :: ev1(3, nb/3), ev2(3, nb/3), ev3(3, nb/3)
+    complex(r64) :: R1(3, 3, ntrip), R2(3, ntrip), R3(ntrip)
 
-      nijk = ntrip
-      ndim = 3
-      nat = nb/3
-      ev1 = reshape(ev1_s1, shape = [ndim, nat])
-      ev2 = reshape(ev2_s2, shape = [ndim, nat])
-      ev3 = reshape(ev3_s3, shape = [ndim, nat])
+    nijk = ntrip
+    ndim = 3
+    nat = nb/3
+    ev1 = reshape(ev1_s1, shape = [ndim, nat])
+    ev2 = reshape(ev2_s2, shape = [ndim, nat])
+    ev3 = reshape(ev3_s3, shape = [ndim, nat])
 
-      !The tensor contraction section
-      do ijk = 1, nijk
-         i = Index_i(ijk)
-         j = Index_j(ijk)
-         k = Index_k(ijk)
+    !The tensor contraction section
+    do ijk = 1, nijk
+       i = Index_i(ijk)
+       j = Index_j(ijk)
+       k = Index_k(ijk)
 
-         do concurrent (c = 1:ndim, b = 1:ndim)
-            R1(b, c, ijk) = dot_product(ifc3(:, b, c, ijk), ev1(:, i))
-         end do
+       do concurrent (c = 1:ndim, b = 1:ndim)
+          R1(b, c, ijk) = dot_product(ifc3(:, b, c, ijk), ev1(:, i))
+       end do
 
-         do c = 1, ndim
-            R2(c, ijk) = dot_product(ev2(:, j), R1(:, c, ijk))
-         end do
+       do c = 1, ndim
+          R2(c, ijk) = dot_product(ev2(:, j), R1(:, c, ijk))
+       end do
 
-         R3(ijk) = dot_product(ev3(:, k), R2(:, ijk))
-      end do
+       R3(ijk) = dot_product(ev3(:, k), R2(:, ijk))
+    end do
 
-      !And the Fourier transform
-      Vm2_3ph_refactor = abs(dot_product(conjg(R3), phases_q2q3))**2
-   end function Vm2_3ph_refactor
+    !And the Fourier transform
+    Vm2_3ph_refactor = abs(dot_product(conjg(R3), phases_q2q3))**2
+  end function Vm2_3ph_refactor
 
-   real(r64) function Vm2_3ph_gpu(ev1, ev2, ev3, &
-      Index_i, Index_j, Index_k, ifc3, phases, ntrip, nb, R1, R3)
-      !! Function to calculate the squared 3-ph interaction vertex |V-|^2.
+  real(r64) function Vm2_3ph_gpu(ev1, ev2, ev3, &
+       Index_i, Index_j, Index_k, ifc3, phases, ntrip, nb, R1, R3)
+    !! Function to calculate the squared 3-ph interaction vertex |V-|^2.
 
-      integer(i64), intent(in) :: ntrip, Index_i(ntrip), Index_j(ntrip), Index_k(ntrip), nb
-      complex(r64), intent(in) :: phases(ntrip), ev1(3, nb/3), ev2(3, nb/3), ev3(3, nb/3)
-      real(r64), intent(in) :: ifc3(3, 3, 3, ntrip)
-      complex(r64), intent(inout) :: R1(3, 3, ntrip), R3(ntrip)
+    integer(i64), intent(in) :: ntrip, Index_i(ntrip), Index_j(ntrip), Index_k(ntrip), nb
+    complex(r64), intent(in) :: phases(ntrip), ev1(3, nb/3), ev2(3, nb/3), ev3(3, nb/3)
+    real(r64), intent(in) :: ifc3(3, 3, 3, ntrip)
+    complex(r64), intent(inout) :: R1(3, 3, ntrip), R3(ntrip)
 
-      !Local variables
-      integer(i64) :: it, a, b, c, aind, bind, cind
-      integer(i64) :: ijk, nijk, ndim, idim
-      complex(r64) :: aux1, aux2
+    !Local variables
+    integer(i64) :: it, a, b, c, aind, bind, cind
+    integer(i64) :: ijk, nijk, ndim, idim
+    complex(r64) :: aux1, aux2
 
-      nijk = ntrip
-      ndim = 3
+    nijk = ntrip
+    ndim = 3
 
-      !$acc parallel loop
-      do ijk = 1, nijk
-         do c = 1, ndim
-            do b = 1, ndim
-               aux1 = (0.0_r64, 0.0_r64)
-               do idim = 1, ndim
-                  aux1 = aux1 + ifc3(idim, b, c, ijk)*ev1(idim, Index_i(ijk))
-               end do
-               R1(b, c, ijk) = aux1
-            end do
-         end do
+    !$acc parallel loop
+    do ijk = 1, nijk
+       do c = 1, ndim
+          do b = 1, ndim
+             aux1 = (0.0_r64, 0.0_r64)
+             do idim = 1, ndim
+                aux1 = aux1 + ifc3(idim, b, c, ijk)*ev1(idim, Index_i(ijk))
+             end do
+             R1(b, c, ijk) = aux1
+          end do
+       end do
 
-         do c = 1, ndim
-            aux1 = (0.0_r64, 0.0_r64)
-            do idim = 1, ndim
-               aux1 = aux1 + R1(idim, c, ijk)*conjg(ev2(idim, Index_j(ijk)))
-            end do
-            R1(c, 1, ijk) = aux1
-         end do
+       do c = 1, ndim
+          aux1 = (0.0_r64, 0.0_r64)
+          do idim = 1, ndim
+             aux1 = aux1 + R1(idim, c, ijk)*conjg(ev2(idim, Index_j(ijk)))
+          end do
+          R1(c, 1, ijk) = aux1
+       end do
 
-         R3(ijk) = (0.0_r64, 0.0_r64)
-         do idim = 1, ndim
-            R3(ijk) = R3(ijk) + R1(idim, 1, ijk)*conjg(ev3(idim, Index_K(ijk)))
-         end do
-      end do
-      !$acc update host(R3)
+       R3(ijk) = (0.0_r64, 0.0_r64)
+       do idim = 1, ndim
+          R3(ijk) = R3(ijk) + R1(idim, 1, ijk)*conjg(ev3(idim, Index_K(ijk)))
+       end do
+    end do
+    !$acc update host(R3)
 
-      !And the Fourier transform
-      Vm2_3ph_gpu = abs(dot_product(conjg(R3), phases))**2
-   end function Vm2_3ph_gpu
+    !And the Fourier transform
+    Vm2_3ph_gpu = abs(dot_product(conjg(R3), phases))**2
+  end function Vm2_3ph_gpu
 
-   real(r64) function Vm2_3ph_gpu_algo2(ev1, ev2, ev3, &
-      Index_i, Index_j, Index_k, ifc3, phases, ntrip, nb, R1, R3)
-      !! Function to calculate the squared 3-ph interaction vertex |V-|^2.
+  real(r64) function Vm2_3ph_gpu_algo2(ev1, ev2, ev3, &
+       Index_i, Index_j, Index_k, ifc3, phases, ntrip, nb, R1, R3)
+    !! Function to calculate the squared 3-ph interaction vertex |V-|^2.
 
-      integer(i64), intent(in) :: ntrip, Index_i(ntrip), Index_j(ntrip), Index_k(ntrip), nb
-      complex(r64), intent(in) :: phases(ntrip), ev1(3, nb/3), ev2(3, nb/3), ev3(3, nb/3)
-      real(r64), intent(in) :: ifc3(3, 3, 3, ntrip)
-      complex(r64), intent(inout) :: R1(3, 3, ntrip), R3(ntrip)
+    integer(i64), intent(in) :: ntrip, Index_i(ntrip), Index_j(ntrip), Index_k(ntrip), nb
+    complex(r64), intent(in) :: phases(ntrip), ev1(3, nb/3), ev2(3, nb/3), ev3(3, nb/3)
+    real(r64), intent(in) :: ifc3(3, 3, 3, ntrip)
+    complex(r64), intent(inout) :: R1(3, 3, ntrip), R3(ntrip)
 
-      !Local variables
-      integer(i64) :: it, a, b, c, aind, bind, cind
-      integer(i64) :: ijk, nijk, ndim, idim
-      complex(r64) :: aux1, aux2
+    !Local variables
+    integer(i64) :: it, a, b, c, aind, bind, cind
+    integer(i64) :: ijk, nijk, ndim, idim
+    complex(r64) :: aux1, aux2
 
-      nijk = ntrip
-      ndim = 3
+    nijk = ntrip
+    ndim = 3
 
-      !$acc parallel loop
-      do ijk = 1, nijk
-         do concurrent (c = 1:ndim, b = 1:ndim)
-            aux1 = (0.0_r64, 0.0_r64)
-            do idim = 1, ndim
-               aux1 = aux1 + ifc3(idim, b, c, ijk)*ev1(idim, Index_i(ijk))
-            end do
-            R1(b, c, ijk) = aux1
-         end do
+    !$acc parallel loop
+    do ijk = 1, nijk
+       do concurrent (c = 1:ndim, b = 1:ndim)
+          aux1 = (0.0_r64, 0.0_r64)
+          do idim = 1, ndim
+             aux1 = aux1 + ifc3(idim, b, c, ijk)*ev1(idim, Index_i(ijk))
+          end do
+          R1(b, c, ijk) = aux1
+       end do
 
-         do c = 1, ndim
-            aux1 = (0.0_r64, 0.0_r64)
-            do idim = 1, ndim
-               aux1 = aux1 + R1(idim, c, ijk)*conjg(ev2(idim, Index_j(ijk)))
-            end do
-            R1(c, 1, ijk) = aux1
-         end do
+       do c = 1, ndim
+          aux1 = (0.0_r64, 0.0_r64)
+          do idim = 1, ndim
+             aux1 = aux1 + R1(idim, c, ijk)*conjg(ev2(idim, Index_j(ijk)))
+          end do
+          R1(c, 1, ijk) = aux1
+       end do
 
-         R3(ijk) = (0.0_r64, 0.0_r64)
-         do idim = 1, ndim
-            R3(ijk) = R3(ijk) + R1(idim, 1, ijk)*conjg(ev3(idim, Index_k(ijk)))
-         end do
+       R3(ijk) = (0.0_r64, 0.0_r64)
+       do idim = 1, ndim
+          R3(ijk) = R3(ijk) + R1(idim, 1, ijk)*conjg(ev3(idim, Index_k(ijk)))
+       end do
 
-         R3(ijk) = R3(ijk)*phases(ijk)
-      end do
-      !$acc update host(R3)
+       R3(ijk) = R3(ijk)*phases(ijk)
+    end do
+    !$acc update host(R3)
 
-      Vm2_3ph_gpu_algo2 = abs(sum(R3))**2
-   end function Vm2_3ph_gpu_algo2
+    Vm2_3ph_gpu_algo2 = abs(sum(R3))**2
+  end function Vm2_3ph_gpu_algo2
 
-   subroutine calculate_phases_on_gpu(q2_cart, q3_minus_cart, R_j, R_k, phases, ntrip)
-      real(r64), intent(in) :: q2_cart(3), q3_minus_cart(3)
-      real(r64), intent(in) :: R_j(3, ntrip), R_k(3, ntrip)
-      complex(r64), intent(out) :: phases(ntrip)
-      integer(i64), intent(in) :: ntrip
+  subroutine calculate_phases_on_gpu(q2_cart, q3_minus_cart, R_j, R_k, phases, ntrip)
+    real(r64), intent(in) :: q2_cart(3), q3_minus_cart(3)
+    real(r64), intent(in) :: R_j(3, ntrip), R_k(3, ntrip)
+    complex(r64), intent(out) :: phases(ntrip)
+    integer(i64), intent(in) :: ntrip
 
-      integer(i64) :: it
+    integer(i64) :: it
 
-      !$acc parallel loop
-      do it = 1, ntrip
-         phases(it) = exp((0.0_r64, -1.0_r64)* &
+    !$acc parallel loop
+    do it = 1, ntrip
+       phases(it) = exp((0.0_r64, -1.0_r64)* &
             (dot_product(q2_cart, R_j(:, it)) + &
             dot_product(q3_minus_cart, R_k(:, it))))
-      end do
-   end subroutine calculate_phases_on_gpu
+    end do
+  end subroutine calculate_phases_on_gpu
 end program V3offload
