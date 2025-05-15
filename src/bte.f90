@@ -177,9 +177,22 @@ contains
     if(.not. num%onlyebte) &
          call dragless_phbte_RTA(Tdir, self, num, crys, sym, ph, el)
 
-    !Electron RTA
-    if(.not. num%onlyphbte) &
-         call dragless_ebte_RTA(Tdir, self, num, crys, sym, el, ph)
+!$!     !Electron RTA
+!$!     if(.not. num%onlyphbte) &
+!$!          call dragless_ebte_RTA(Tdir, self, num, crys, sym, el, ph)
+
+    !Electron RTA - debugging
+    if(.not. num%onlyphbte) then
+       open(101, file="TF-gsq_by_dielsq")
+       open(102, file="RPA-gsq_by_dielsq")
+       call dragless_ebte_RTA(Tdir, self, num, crys, sym, el, ph)
+       close(101)
+       close(102)
+       if(this_image() == 1) then 
+          print *, crys%dim-1
+          stop
+       end if
+    end if
 
     !Dragful electron-phonon BTEs
     if(num%drag) &
