@@ -188,8 +188,9 @@ contains
        call dragless_ebte_RTA(Tdir, self, num, crys, sym, el, ph)
        close(101)
        close(102)
+       sync all
        if(this_image() == 1) then 
-          print *, crys%dim-1
+          !print *, "Screened qTF",crys%qTF**(crys%dim-1)/crys%epsiloninf
           stop
        end if
     end if
