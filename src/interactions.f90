@@ -2734,7 +2734,7 @@ contains
                       g2 = gCoul2_TF(el, crys, q_vec%cart, &
                            el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :))
                       ! debugging
-                      write(101, *) norm2(q_vec%frac), g2 
+                      if(this_image()==1) write(101, *) norm2(q_vec%cart), g2 
                    else !RPA
                       !Interpolating polarizability from continuous mesh to sampling energy
                       temp = interpolator_1d([(en1 - en3)], Omegas_cont, ReX0_cont) &
@@ -2744,7 +2744,7 @@ contains
                       g2 = gCoul2_RPA(el, crys, q_vec%cart, &
                            el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :), X0_qw)
                       ! debugging
-                      write(102, *) norm2(q_vec%frac), g2 
+                      if(this_image()==1) write(101, *) norm2(q_vec%cart), g2 
                    end if
 
                    g2_computed = .true.

@@ -183,11 +183,9 @@ contains
 
     !Electron RTA - debugging
     if(.not. num%onlyphbte) then
-       open(101, file="TF-gsq_by_dielsq")
-       open(102, file="RPA-gsq_by_dielsq")
+       open(101, file="gsq_by_dielsq")
        call dragless_ebte_RTA(Tdir, self, num, crys, sym, el, ph)
        close(101)
-       close(102)
        sync all
        if(this_image() == 1) then 
           !print *, "Screened qTF",crys%qTF**(crys%dim-1)/crys%epsiloninf
