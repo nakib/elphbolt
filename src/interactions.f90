@@ -645,9 +645,6 @@ contains
     nprocs = ph%nwv*ph%numbands**2
 
     allocate(chunk[*], start[*], end[*])
-
-    ! Distribute ph%nwv
-    call distribute_points(ph%nwv, chunk, start, end, num_active_images)
     
     if(key == 'V') then       
        !Split load among cpus and gpus

@@ -1084,7 +1084,6 @@ contains
     integer(i64) :: i, j, ipol, jpol, iat, jat, idim, jdim, t1, t2, t3, m1, m2, m3, iq
     integer(i64) :: ndim, nwork, ncell_g(3)
     real(r64) :: weight, total_weight
-    real(r64) :: r_ws(3)
     real(r64) :: alpha, geg, gmax, qt, volume_r, dnrm2
     real(r64) :: t(0:3)
     real(r64), allocatable :: omega2(:), rwork(:)
@@ -1151,7 +1150,6 @@ contains
                    
                    do i = 1, 3
                       t(i) = m1*self%cell_r(1, i) + m2*self%cell_r(2, i) + m3*self%cell_r(3, i)
-                      r_ws(i) = t(i) + self%rr(iat, jat, i)
                    end do
                       
                    t1 = self%ws_cell(1, counter)
@@ -1166,6 +1164,7 @@ contains
                             idim = (iat - 1)*3 + ipol
                             do jpol = 1, 3
                                jdim = (jat - 1)*3 + jpol
+                               !Note the use of the "step" convention for the phase
                                dyn_s(iq, idim, jdim) = dyn_s(iq, idim, jdim) + &
                                     self%ifc2(ipol, jpol, iat, jat, t1, t2, t3)* &
                                     expi(-qt)*weight
@@ -1474,6 +1473,7 @@ contains
                                
                                Rnorm = dnrm2(3, rl + r, 1)
 
+                               !Note the "step convection" for the phase
                                if(abs(Rnorm - dmin) > 1.0e-5_r64) then
                                   if(Rnorm < dmin) then
                                      neq = 1
