@@ -34,8 +34,7 @@ program V3offload
   complex(r64), allocatable :: R1(:, :, :), R3(:)
   complex(r64) :: ev1(3, 2), ev2(3, 2), ev3(3, 2)
 
-  real(r64), allocatable :: V2(:, :, :, :, :)
-  
+  real(r64), allocatable :: V2(:, :, :, :, :)  
   real(r64), allocatable :: V2_minimal_set(:, :, :, :, :)
   integer(i64), allocatable :: M(:, :, :)
   integer :: count_full, count_minimal
@@ -194,11 +193,10 @@ contains
          aux
     complex(r64) :: phases(ph%numtriplets)
 
-    !Total number of IBZ blocks states
-    nstates_irred = ph%nwv_irred*ph%numbands
-
       !Total number of IBZ blocks states
       nstates_irred = ph%nwv_irred*ph%numbands
+
+      allocate(V2(ph%numbands, ph%nwv, ph%numbands, ph%nwv, nstates_irred))
 
     V2 = 0.0
 
@@ -400,9 +398,6 @@ contains
 
     !$acc data copyin(ph%ifc3, ph%Index_i, ph%Index_j, ph%Index_k) &
     !$acc      create(R1, R3, ev1, ev2, ev3)
-
-    !Total number of IBZ blocks states
-    nstates_irred = ph%nwv_irred*ph%numbands
 
       !Total number of IBZ blocks states
       nstates_irred = ph%nwv_irred*ph%numbands
