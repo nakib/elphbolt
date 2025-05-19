@@ -24,7 +24,7 @@ module interactions
        twonorm, write2file_rank2_real, demux_vector, interpolate, expm1, &
        precompute_interpolation_corners_and_weights, interpolate_using_precomputed, &
        create_set, coarse_grain, timer, eye, shrink, Hilbert_transform, interpolator_1d, &
-       linspace
+       linspace, qdist ! debugging
   use resource_module, only: resource
   use screening_module, only: spectral_head_polarizability_3d_q
   
@@ -2734,17 +2734,22 @@ contains
                       g2 = gCoul2_TF(el, crys, q_vec%cart, &
                            el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :))
                       ! debugging
-                      if(this_image()==1) write(101, *) norm2(q_vec%cart), g2 
+                      if(this_image()==1) write(101, *) &
+                        qdist(q_vec%frac, crys%reclattvecs), g2 
                    else !RPA
                       !Interpolating polarizability from continuous mesh to sampling energy
-                      temp = interpolator_1d([(en1 - en3)], Omegas_cont, ReX0_cont) &
-                           + oneI*interpolator_1d([(en1 - en3)], Omegas_cont, ImX0_cont)
+                      !temp = interpolator_1d([(en1 - en3)], Omegas_cont, ReX0_cont) &
+                      !     + oneI*interpolator_1d([(en1 - en3)], Omegas_cont, ImX0_cont)
+                      ! debugging
+                      temp = interpolator_1d([0.0_r64], Omegas_cont, ReX0_cont) &
+                           + oneI*interpolator_1d([0.0_r64], Omegas_cont, ImX0_cont)
                       X0_qw = temp(1)
 
                       g2 = gCoul2_RPA(el, crys, q_vec%cart, &
                            el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :), X0_qw)
                       ! debugging
-                      if(this_image()==1) write(101, *) norm2(q_vec%cart), g2 
+                      if(this_image()==1) write(101, *) &
+                        qdist(q_vec%frac, crys%reclattvecs), g2 
                    end if
 
                    g2_computed = .true.
