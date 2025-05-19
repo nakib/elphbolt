@@ -43,12 +43,6 @@ program V3_permutations
        iq1
   real(r64) :: val !value
 
-  type(numerics) :: num
-  type(crystal) :: crys
-  type(symmetry) :: sym
-  type(phonon) :: ph
-
-
   call triplet_test()
 
   if(this_image() == 1) then
@@ -157,7 +151,7 @@ program V3_permutations
 
   ! Reduction factor between V2 and V2 minimal set
   print *, 'Reduction factor (minimal/full):', real(count_minimal)/real(count_full)
-  print *, 'Symmetry saving (in %):', (1.0 - real(count_minimal)/real(count_full)) * 100.0
+  print *, 'Symmetry saving (in %):', (1.0 - real(count_minimal)/real(count_full))*100.0
 
   call triplet_test
 
