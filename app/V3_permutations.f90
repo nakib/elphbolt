@@ -43,6 +43,12 @@ program V3_permutations
        iq1
   real(r64) :: val !value
 
+  type(numerics) :: num
+  type(crystal) :: crys
+  type(symmetry) :: sym
+  type(phonon) :: ph
+
+
   call triplet_test()
 
   if(this_image() == 1) then

@@ -98,6 +98,11 @@ name = "bte_regression"
 source-dir="test"
 main = "bte_regression.f90"
 
+[[test]]
+name = "test_V3_permutation"
+source-dir="test"
+main = "test_V3_permutation.f90"
+
 #
 #[[test]]
 #name = "check_interactions_symmetries"
