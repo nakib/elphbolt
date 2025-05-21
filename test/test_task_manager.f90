@@ -14,15 +14,15 @@ program test_task_manager
 
   itest = 1
   test_array(itest) = testify("num batches and batches range")
-  call job1%distribute_load(num_tasks = 10, num_batches = 12)
+  call job1%distribute_load(num_tasks = 100_i64, num_batches = 4_i64)
   call job1%print_report
 
   print*, job1%get_num_batches()
-  print*, job1%get_batch_range(4)
+  print*, job1%get_batch_range(4_i64)
 
-  call job1%distribute_load(num_tasks = 13333, num_batches = 4)
+  call job1%distribute_load(num_tasks = 13333_i64, num_batches = 3_i64)
   call job1%print_report
 
   print*, job1%get_num_batches()
-  !print*, job1%get_batch_range(3)
+  print*, job1%get_batch_range(3_i64)
 end program test_task_manager
