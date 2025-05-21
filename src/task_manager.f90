@@ -24,26 +24,38 @@ contains
     class(task_manager), intent(out) :: self
     integer, intent(in) :: num_tasks, num_batches
 
-    integer :: base_size, residual_task, ibatch, start_idx, end_idx
+    integer :: batch_size, residual_task, ibatch, start_idx, end_idx
 
-    self%num_batches = num_batches
-    allocate(self%batch_info(num_batches, 3))
+    !this handles cases where batches are more than tasks
+    self%num_batches = min(num_tasks, num_batches)
+    allocate(self%batch_info(self%num_batches, 3))
 
     !divide the total number of tasks in num_batches (subtasks)
-    base_size = num_tasks / num_batches
+    batch_size = num_tasks / num_batches
+
+    !how many tasks are left over
     residual_task = mod(num_tasks, num_batches)
+
+    !the first batch index start is 1 always
     start_idx = 1
 
     !record the start and the end index and the size of each batch
-    do ibatch = 1, num_batches
+    do ibatch = 1, self%num_batches
+
+    !first check if this batch should receive one of the extra tasks
        if (ibatch <= residual_task) then
-          end_idx = start_idx + base_size
+          end_idx = start_idx + batch_size
+          !for the batches after the extra ones, assign exactly the batch_size tasks
        else
-          end_idx = start_idx + base_size - 1
+          end_idx = start_idx + batch_size - 1
        end if
+
+       !save the start, end, and size of the batch
        self%batch_info(ibatch, 1) = start_idx
        self%batch_info(ibatch, 2) = end_idx
        self%batch_info(ibatch, 3) = end_idx - start_idx + 1
+
+       !here the starting point for the next batch
        start_idx = end_idx + 1
     end do
 

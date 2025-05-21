@@ -20,7 +20,7 @@ program test_task_manager
   print*, job1%get_num_batches()
   print*, job1%get_batch_range(4)
 
-  call job1%distribute_load(num_tasks = 13333, num_batches = 5)
+  call job1%distribute_load(num_tasks = 13333, num_batches = 4)
   call job1%print_report
 
   print*, job1%get_num_batches()
