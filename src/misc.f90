@@ -260,7 +260,7 @@ contains
 
     lex_less_1d = .false.
   end function lex_less_1d
-
+  
   subroutine map_triplet_full_to_reduced(nbands, mesh_size, lambda1_list, lambda2_list, M)
     !! This subroutine maps the canonical triplet back to (ilambda2, ilambda1) and stores it in M(:, ilambda2, ilambda1).
     !!
