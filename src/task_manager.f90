@@ -1,5 +1,5 @@
 module task_manager_module
-  !! This module help to manage and distribute a set of tasks across a specified number of batches
+  !! This module help to manage and distribute a set of tasks across a specified number of batches.
 
   use precision, only: i64
 
@@ -9,66 +9,72 @@ module task_manager_module
   public :: task_manager
 
   type :: task_manager
+     !! Container for task batching strategy that assign tasks to batches.
      private
 
-     integer(i64) :: num_batches = 1
+     integer(i64) :: num_batches 
+     !! This is the number of batches. 
      integer(i64), allocatable :: batch_info(:, :)
+     !! This contains the task batching informations. 
+     !! First axis is runs over number of batches. Second axis gives the first index, last index, and size of each batch, respectively.
 
    contains
+
      procedure, public :: distribute_load, print_report, get_num_batches, get_batch_range
   end type task_manager
 
 contains
 
   subroutine distribute_load(self, num_tasks, num_batches)
-    !!Partitions a total number of tasks into number of batches
+    !! Partitions a total number of tasks into number of batches
     !!
-    !!balancing the work as evenly as possible.
-    !!the first few batches can receive one additional task if the 
-    !!total number of task is not divisible evenly by the number of batches
-    !!the number of batches used is limited to min(num_tasks, num_batches), mean no batch is left empty
+    !! balancing the work as evenly as possible.
+    !! The first few batches can receive one additional task if the 
+    !! total number of task is not divisible evenly by the number of batches.
+    !! The number of batches used is limited to min(num_tasks, num_batches), which means no batch is left empty.
 
     class(task_manager), intent(out) :: self
     integer(i64), intent(in) :: num_tasks, num_batches
 
     integer(i64) :: batch_size, residual_task, ibatch, start_idx, end_idx
 
-    !this handles cases where batches are more than tasks
+    !This handles cases where batches are more than tasks.
     self%num_batches = min(num_tasks, num_batches)
     allocate(self%batch_info(self%num_batches, 3))
 
-    !divide the total number of tasks in num_batches (subtasks)
+    !Divide the total number of tasks in num_batches (subtasks).
     batch_size = num_tasks/self%num_batches
 
-    !how many tasks are left over
+    !How many tasks are left over.
     residual_task = mod(num_tasks, self%num_batches)
 
-    !the first batch index start is 1 always
+    !The first batch index start is 1 always.
     start_idx = 1
-    !record the start and the end index and the size of each batch
+
+    !Record the start and the end index and the size of each batch.
     do ibatch = 1, self%num_batches
-       !first check if this batch should receive one of the extra tasks
+       !First check if this batch should receive one of the extra tasks.
        if(ibatch <= residual_task) then
           end_idx = start_idx + batch_size
-          !for the batches after the extra ones, assign exactly the batch_size tasks
        else
+          !For the batches after the extra ones, assign exactly the batch_size tasks.
           end_idx = start_idx + batch_size - 1
        end if
 
-       !save the start, end, and size of the batch
+       !Save the start, end, and size of the batch.
        self%batch_info(ibatch, 1) = start_idx
        self%batch_info(ibatch, 2) = end_idx
        self%batch_info(ibatch, 3) = end_idx - start_idx + 1
 
-       !here the starting point for the next batch
+       !Here the starting point for the next batch.
        start_idx = end_idx + 1
     end do
   end subroutine distribute_load
 
   subroutine print_report(self)
-    !!print the resume of the task distribution across different batches
+    !! Print the resume of the task distribution across different batches.
     !!
-    !!the total number of batches, the first and last indices for each batch, and number of task in each batch
+    !! Print the total number of batches, the first and last indices for each batch, and number of task in each batch.
 
     class(task_manager), intent(in) :: self
 
@@ -82,7 +88,7 @@ contains
   end subroutine print_report
 
   pure integer function get_num_batches(self)
-    !!returns the number of batches
+    !! Returns the number of batches.
 
     class(task_manager), intent(in) :: self
 
@@ -90,7 +96,7 @@ contains
   end function get_num_batches
 
   pure function get_batch_range(self, batch) result(batch_range)
-    !!gives the range and size of a batch as a 3-element array: (start, end, size).
+    !! Gives the range and size of a batch as a 3-element array: (start, end, size).
 
     class(task_manager), intent(in) :: self
     integer(i64), intent(in) :: batch
@@ -98,5 +104,4 @@ contains
 
     batch_range = self%batch_info(batch, :)
   end function get_batch_range
-
 end module task_manager_module
