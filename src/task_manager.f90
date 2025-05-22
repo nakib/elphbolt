@@ -1,5 +1,5 @@
 module task_manager_module
-  !! This module help to manage and distribute a set of tasks across a specified number of batches.
+  !! Module containing the data type related to task batching.
 
   use precision, only: i64
 
@@ -10,13 +10,13 @@ module task_manager_module
 
   type :: task_manager
      !! Container for task batching strategy that assign tasks to batches.
+
      private
 
      integer(i64) :: num_batches 
-     !! This is the number of batches. 
+     !! Number of batches. 
      integer(i64), allocatable :: batch_info(:, :)
-     !! This contains the task batching informations. 
-     !! First axis is runs over number of batches. Second axis gives the first index, last index, and size of each batch, respectively.
+     !! Task batching information. 
 
    contains
 
@@ -27,10 +27,8 @@ contains
 
   subroutine distribute_load(self, num_tasks, num_batches)
     !! Partitions a total number of tasks into number of batches
-    !!
     !! balancing the work as evenly as possible.
-    !! The first few batches can receive one additional task if the 
-    !! total number of task is not divisible evenly by the number of batches.
+    !! We use a shuffling algorithm here.
     !! The number of batches used is limited to min(num_tasks, num_batches), which means no batch is left empty.
 
     class(task_manager), intent(out) :: self
