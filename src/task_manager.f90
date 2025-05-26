@@ -17,15 +17,17 @@ module task_manager_module
      !! Number of batches. 
      integer(i64), allocatable :: batch_info(:, :)
      !! Task batching information. 
+     character(len = :), allocatable :: filename_record
+     !! Saves batch records using write and read record
 
    contains
 
-     procedure, public :: distribute_load, print_report, get_num_batches, get_batch_range
+     procedure, public :: distribute_load, print_report, get_num_batches, get_batch_range, read_record, write_record
   end type task_manager
 
 contains
 
-  subroutine distribute_load(self, num_tasks, num_batches)
+  subroutine distribute_load(self, num_tasks, num_batches, filename)
     !! Partitions a total number of tasks into number of batches
     !! balancing the work as evenly as possible.
     !! We use a shuffling algorithm here.
@@ -33,12 +35,21 @@ contains
 
     class(task_manager), intent(out) :: self
     integer(i64), intent(in) :: num_tasks, num_batches
+    character(len = *), intent(in) :: filename
 
     integer(i64) :: batch_size, residual_task, ibatch, start_idx, end_idx
 
     !This handles cases where batches are more than tasks.
     self%num_batches = min(num_tasks, num_batches)
     allocate(self%batch_info(self%num_batches, 3))
+
+    !Clear old data
+    if(allocated(self%filename_record)) deallocate(self%filename_record)
+    allocate(character(len = len_trim(filename)) :: self%filename_record)
+    self%filename_record = trim(filename)
+
+    open(unit = 10, file = self%filename_record, status = 'replace', action = 'write')
+    close(10)
 
     !Divide the total number of tasks in num_batches (subtasks).
     batch_size = num_tasks/self%num_batches
@@ -102,4 +113,76 @@ contains
 
     batch_range = self%batch_info(batch, :)
   end function get_batch_range
+
+  subroutine write_record(self, batch_number)
+    !! Append a line to the filename for the completed batch with timestamp, batch number, start, end  and size of batch.
+
+    class(task_manager), intent(in) :: self
+    integer(i64), intent(in) :: batch_number
+    character(len = 30) :: timestamp
+    ! Date_time in term of YYYY, MM, DD, HH, MM, SS.
+    integer(i64) :: date_time(8)
+    integer(i64) :: start_idx, end_idx, batch_size
+
+    if(this_image() == 1) then
+       !Formatting timestamp informations.
+       call date_and_time(values = date_time)
+       write(timestamp, '(I4.4, "-", I2.2, "-", I2.2, "T", I2.2, ":", I2.2, ":", I2.2)') &
+            date_time(1), date_time(2), date_time(3), date_time(5), date_time(6), date_time(7)
+
+       ! Append to the batch record file
+       open(unit = 11, file = self%filename_record, status = 'old', position = 'append', action = 'write')
+       write(11, '(A, 1X, I0, 1X, I0, 1X, I0, 1X, I0)') trim(timestamp), batch_number, &
+            self%batch_info(batch_number, 1), self%batch_info(batch_number, 2), self%batch_info(batch_number, 3)
+       close(11)
+
+       call system("echo 'record saved' >> filename")
+    end if
+  end subroutine write_record
+
+  subroutine read_record(self, batch_number, start_idx, end_idx, size_batch)
+    !! Reads the last record from the filename record file.
+
+    class(task_manager), intent(in) :: self
+    integer(i64), intent(out) :: batch_number, start_idx, end_idx, size_batch
+
+    !Holds the last line read from the record file
+    character(len = 512) :: line
+    character(len = 32) :: timestamp
+    character(len = 20)  :: batch_str
+
+    ! ios is an integer variable that stores the result for the read operation.
+    integer :: ios
+    integer(i64) :: last_batch_number, last_start, last_end, last_size_batch
+
+    open(unit = 12, file = self%filename_record, status = 'old', action = 'read')
+    do
+       read(12, '(A)', iostat = ios) line
+       ! Here exit when the end of file is reached
+       if(ios /= 0) exit
+    end do
+    close(12)
+
+    print *, "last line = '", trim(line), "'"
+    read(line, *) timestamp, last_batch_number, last_start, last_end, last_size_batch
+
+    batch_number = last_batch_number
+    start_idx = last_start
+    end_idx = last_end
+    size_batch = last_size_batch
+
+    print*, "Read from log    :"
+    print*, "last batch number:", batch_number
+    print*, "last sttart index:", start_idx
+    print*, "last end index   :", end_idx
+    print*, "last size batch  :", size_batch
+
+    ! Convert batch number to string
+    write(batch_str, '(I0)') batch_number
+
+    if(this_image() == 1) then
+       call system("echo 'Read last record: Batch " // trim(adjustl(batch_str)) // &
+            "from" // trim(self%filename_record) // "' >> filename")
+    end if
+  end subroutine read_record
 end module task_manager_module
