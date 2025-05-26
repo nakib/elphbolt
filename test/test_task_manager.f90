@@ -81,7 +81,7 @@ program test_task_manager
   call job1%write_record(1_i64)
   call job1%read_record(num_batches, start_idx, end_idx, batch_size)
   call test_array(itest)%assert([num_batches, start_idx, end_idx, batch_size], &
-          [1, 1, 1, 1]*1_i64)
+       [1, 1, 1, 1]*1_i64)
   call job1%write_record(3_i64)
   call job1%read_record(num_batches, start_idx, end_idx, batch_size)
   call test_array(itest)%assert([num_batches, start_idx, end_idx, batch_size], &
