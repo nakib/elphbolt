@@ -538,10 +538,13 @@ contains
              if(all([m1, m2, m3] == 0)) then
                 cycle
              end if
+             
              do i = 1, 3
                 self%rws(j, i) = wscell(1, i)*m1 + wscell(2, i)*m2 + wscell(3, i)*m3
              end do
+
              self%rws(j, 0) = 0.5_r64*dot_product(self%rws(j, 1:3), self%rws(j, 1:3))
+
              j = j + 1
           end do
        end do
@@ -554,6 +557,7 @@ contains
     do i = 1, crys%numatoms
        self%mm(i, i) = crys%masses(crys%atomtypes(i))
        self%rr(i, i, :) = 0.0_r64
+       
        do j = i + 1, crys%numatoms
           self%mm(i, j) = &
                sqrt(crys%masses(crys%atomtypes(i))*&
@@ -1294,6 +1298,8 @@ contains
 
     !real(r64),parameter :: prefactor=1745.91429109 ! THz^2 * amu * nm^3
 
+    !real(r64), parameter :: massfactor = 1.8218779_r64*6.022e-4_r64
+
     !real(r64),allocatable :: mm(:,:)
     complex(r64), allocatable :: dyn_total(:, :), dyn_nac(:, :)
     complex(r64), allocatable :: ddyn_total(:, :, :), ddyn_nac(:, :, :)
@@ -1316,7 +1322,6 @@ contains
 
     real(r64) :: fac
 
-    !fac = 8.0_r64*pi/crys%volume/bohr2nm**3
     fac = 8.0_r64*pi/(crys%volume/bohr2nm**3)
     
     allocate(omega2(self%numbands))
@@ -1353,29 +1358,29 @@ contains
     allocate(work(nwork))
     allocate(shortest(3, nq))
     
-!!$    ! Use the 1st BZ image of each q point to improve the behavior of
-!!$    ! the non-analytic correction.
-!!$    shortest = qcart !Bohr^-1
-!!$    do iq = 1, nq
-!!$       tmp1 = dnrm2(3, shortest(:, iq), 1)
-!!$
-!!$       do ix1 = -2, 2
-!!$          do iy1 = -2, 2
-!!$             do iz1 = -2, 2
-!!$                q = qcart(:, iq) + &
-!!$                     (ix1*crys%reclattvecs(:, 1) + &
-!!$                     iy1*crys%reclattvecs(:, 2) + &
-!!$                     iz1*crys%reclattvecs(:, 3))*bohr2nm !Bohr^-1
-!!$                
-!!$                tmp2 = dnrm2(3, q, 1)
-!!$                if(tmp2 < tmp1) then
-!!$                   tmp1 = tmp2
-!!$                   shortest(:, iq) = q !Bohr^-1
-!!$                end if
-!!$             end do
-!!$          end do
-!!$       end do
-!!$    end do
+    ! Use the 1st BZ image of each q point to improve the behavior of
+    ! the non-analytic correction.
+    shortest = qcart !Bohr^-1
+    do iq = 1, nq
+       tmp1 = dnrm2(3, shortest(:, iq), 1)
+
+       do ix1 = -2, 2
+          do iy1 = -2, 2
+             do iz1 = -2, 2
+                q = qcart(:, iq) + &
+                     (ix1*crys%reclattvecs(:, 1) + &
+                     iy1*crys%reclattvecs(:, 2) + &
+                     iz1*crys%reclattvecs(:, 3))*bohr2nm !Bohr^-1
+                
+                tmp2 = dnrm2(3, q, 1)
+                if(tmp2 < tmp1) then
+                   tmp1 = tmp2
+                   shortest(:, iq) = q !Bohr^-1
+                end if
+             end do
+          end do
+       end do
+    end do
 
     do iq = 1, nq
        dyn_total = 0.0_r64
@@ -1384,80 +1389,77 @@ contains
        ddyn_nac = 0.0_r64
        fc_diel = 0.0_r64
        
-!!$       ! If the polar flag is set, we add the electrostatic
-!!$       ! correction. No correction is applied exactly at \Gamma in
-!!$       ! order not to rely on guesses about directions.
-!!$       if(crys%polar .and. .not. all(shortest(:, iq) == 0.0_r64)) then
-!!$          qeq = dot_product(shortest(:, iq), &
-!!$               matmul(crys%epsilon, shortest(:, iq))) !Bohr^-2
-!!$
-!!$          do iatom1 = 1, crys%numatoms
-!!$             do iatom2 = 1, crys%numatoms
-!!$                do i = 1, 3
-!!$                   idim = 3*(iatom1 - 1) + i
-!!$                   
-!!$                   do j = 1, 3
-!!$                      jdim = 3*(iatom2 - 1) + j
-!!$                      
-!!$                      tmp1 = dot_product(shortest(:, iq), crys%born(:, i, iatom1))
-!!$                      tmp2 = dot_product(shortest(:, iq), crys%born(:, j, iatom2))
-!!$
-!!$                      !DBG
-!!$                      !tmp1 = dot_product(shortest(:, iq), crys%born(i, :, iatom1))
-!!$                      !tmp2 = dot_product(shortest(:, iq), crys%born(j, :, iatom2))
-!!$                      
-!!$                      dyn_nac(idim, jdim) = tmp1*tmp2/self%mm(iatom1, iatom2)
-!!$                      
-!!$                      ! The derivatives of the nonanalytic correction
-!!$                      ! will be needed later to make group velocities
-!!$                      ! and frequencies completely consistent.
-!!$                      do ip = 1, 3
-!!$                         ddyn_nac((iatom1 - 1)*3 + i, (iatom2 - 1)*3 + j, ip) = &
-!!$                              tmp1*crys%born(ip, j, iatom2) + &
-!!$                              tmp2*crys%born(ip, i, iatom1) - &
-!!$                              2.0_r64*tmp1*tmp2* &
-!!$                              dot_product(crys%epsilon(ip, :), shortest(:, iq))/qeq
-!!$                      end do
-!!$                      
-!!$                      ddyn_nac((iatom1 - 1)*3 + i, (iatom2 - 1)*3 + j, :) = &
-!!$                           ddyn_nac((iatom1 - 1)*3 + i, (iatom2 - 1)*3 + j, :)/&
-!!$                           self%mm(iatom1, iatom2)
-!!$                   end do
-!!$                end do
-!!$             end do
-!!$          end do
-!!$          
-!!$          !dyn_nac = prefactor*dyn_nac/qeq/V
-!!$          !ddyn_nac = prefactor*ddyn_nac/qeq/V
-!!$
-!!$          dyn_nac = fac*dyn_nac/qeq
-!!$          ddyn_nac = fac*ddyn_nac/qeq
-!!$          
-!!$          ! Transform back to real space to obtain a correction to the
-!!$          ! short-range force constants.
-!!$          do iatom2 = 1, crys%numatoms
-!!$             do iatom1 = 1, crys%numatoms
-!!$                do j = 1, 3
-!!$                   do i = 1, 3
-!!$                      fc_diel(i, j, iatom1, iatom2, :, :, :) = &
-!!$                           real(dyn_nac((iatom1 - 1)*3 + i, (iatom2 - 1)*3 + j))
-!!$                   end do
-!!$                end do
-!!$             end do
-!!$          end do
-!!$       end if
+       ! If the polar flag is set, we add the electrostatic
+       ! correction. No correction is applied exactly at \Gamma in
+       ! order not to rely on guesses about directions.
+       if(crys%polar .and. .not. all(shortest(:, iq) == 0.0_r64)) then
+          qeq = dot_product(shortest(:, iq), &
+               matmul(crys%epsilon, shortest(:, iq))) !Bohr^-2
+
+          do iatom1 = 1, crys%numatoms
+             do i = 1, 3
+                idim = 3*(iatom1 - 1) + i
+
+                tmp1 = dot_product(shortest(:, iq), crys%born(:, i, iatom1))
+                
+                do iatom2 = 1, crys%numatoms                   
+                   do j = 1, 3
+                      jdim = 3*(iatom2 - 1) + j
+                      
+                      tmp2 = dot_product(shortest(:, iq), crys%born(:, j, iatom2))
+                      
+                      dyn_nac(idim, jdim) = tmp1*tmp2/self%mm(iatom1, iatom2)
+                                            
+                      ! The derivatives of the nonanalytic correction
+                      ! will be needed later to make group velocities
+                      ! and frequencies completely consistent.
+                      do ip = 1, 3
+                         ddyn_nac(idim, jdim, ip) = &
+                              tmp1*crys%born(ip, j, iatom2) + &
+                              tmp2*crys%born(ip, i, iatom1) - &
+                              2.0_r64*tmp1*tmp2* &
+                              dot_product(crys%epsilon(ip, :), shortest(:, iq))/qeq
+                      end do
+                      
+                      ddyn_nac(idim, jdim, :) = ddyn_nac(idim, jdim, :)/self%mm(iatom1, iatom2)
+                   end do
+                end do
+             end do
+          end do
+
+          dyn_nac = fac*dyn_nac/qeq
+          ddyn_nac = fac*ddyn_nac/qeq
+          
+          ! Transform back to real space to obtain a correction to the
+          ! short-range force constants.
+          do iatom2 = 1, crys%numatoms
+             do iatom1 = 1, crys%numatoms
+                do j = 1, 3
+                   do i = 1, 3
+                      fc_diel(i, j, iatom1, iatom2, :, :, :) = &
+                           real(dyn_nac((iatom1 - 1)*3 + i, (iatom2 - 1)*3 + j), r64)
+                   end do
+                end do
+             end do
+          end do
+       end if
 
        ! Force constants with long-range correction.
        fc_total = fc_short + fc_diel/product(self%scell)
        
        ! Build the dynamical matrix and its derivatives.
-       do iatom1 = 1, crys%numatoms
-          do iatom2 = 1, crys%numatoms
-             do ix1 = 1, self%scell(1)
-                do iy1 = 1, self%scell(2)
-                   do iz1 = 1, self%scell(3)
-                      rcell = matmul(crys%lattvecs, [ix1, iy1, iz1] - [1, 1, 1])/bohr2nm !Bohr
+       !do iatom1 = 1, crys%numatoms
+       !   do iatom2 = 1, crys%numatoms
+       !      do ix1 = 1, self%scell(1)
+       !         do iy1 = 1, self%scell(2)
 
+       do ix1 = 1, self%scell(1)
+          do iy1 = 1, self%scell(2)
+             do iz1 = 1, self%scell(3)
+                rcell = matmul(crys%lattvecs, [ix1, iy1, iz1] - [1, 1, 1])/bohr2nm !Bohr
+                
+                do iatom1 = 1, crys%numatoms
+                   do iatom2 = 1, crys%numatoms
                       r = self%rr(iatom1, iatom2, :) + rcell !Bohr
 
                       dmin = huge(dmin)
@@ -1478,14 +1480,14 @@ contains
                                   if(Rnorm < dmin) then
                                      neq = 1
                                      dmin = Rnorm
-                                     qr(neq) = dot_product(qcart(:, iq) , rl + rcell)
                                      rr(:, neq) = rl + rcell
+                                     qr(neq) = dot_product(qcart(:, iq) , rr(:, neq))
                                   end if
                                else
                                   neq = neq + 1
-                                  qr(neq) = dot_product(qcart(:, iq), rl + rcell)
                                   rr(:, neq) = rl + rcell
-                               endif
+                                  qr(neq) = dot_product(qcart(:, iq), rr(:, neq))
+                               end if
                             end do
                          end do
                       end do
@@ -1498,31 +1500,35 @@ contains
 
                          do i = 1, 3
                             idim = 3*(iatom1 - 1) + i
+                            
                             do j = 1, 3
                                jdim = 3*(iatom2 - 1) + j
                                
                                dyn_total(idim, jdim) = &
                                     dyn_total(idim, jdim) + &
-                                    ztmp*fc_total(i, j, iatom1, iatom2, ix1, iy1, iz1)
+                                    ztmp*fc_total(j, i, iatom2, iatom1, ix1, iy1, iz1)
                                
                                ddyn_total(idim, jdim, :) = &
                                     ddyn_total(idim, jdim, :) - &
-                                    oneI*ztmp*rr(:, ip)*&
-                                    fc_total(i, j, iatom1, iatom2, ix1, iy1, iz1)
+                                    oneI*ztmp*rr(:, ip)* &
+                                    fc_total(j, i, iatom2, iatom1, ix1, iy1, iz1)
                             end do
                          end do
                       end do
                       
-!!$                      if(crys%polar .and. .not. all(qcart(:, iq) == 0.0_r64)) then
-!!$                         do i = 1, 3
-!!$                            do j = 1, 3
-!!$                               ddyn_total((iatom1 - 1)*3 + i, (iatom2 - 1)*3 + j, :) = &
-!!$                                    ddyn_total((iatom1 - 1)*3 + i, (iatom2 - 1)*3 + j, :) + &
-!!$                                    star*ddyn_nac((iatom1 - 1)*3 + i, (iatom2 - 1)*3 + j, :)/&
-!!$                                    product(self%scell)
-!!$                            end do
-!!$                         end do
-!!$                      end if
+                      if(crys%polar .and. .not. all(qcart(:, iq) == 0.0_r64)) then
+                         do i = 1, 3
+                            idim = 3*(iatom1 - 1) + i
+                            
+                            do j = 1, 3
+                               jdim = 3*(iatom2 - 1) + j
+                               
+                               ddyn_total(idim, jdim, :) = &
+                                    ddyn_total(idim, jdim, :) + &
+                                    star*ddyn_nac(idim, jdim, :)/product(self%scell)
+                            end do
+                         end do
+                      end if
                    end do
                 end do
              end do
