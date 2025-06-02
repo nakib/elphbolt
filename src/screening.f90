@@ -529,7 +529,7 @@ contains
     call sort(qmaglist)
 
     !Create energy grid
-    numomega = 1001 !601 !6 !5 !1001
+    numomega = 1501 !601 !6 !5 !1001
     allocate(energylist(numomega))
     call linspace(energylist, -3.5_r64, 3.5_r64, numomega)
     
