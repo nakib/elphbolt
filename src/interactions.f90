@@ -256,6 +256,45 @@ contains
     gCoul2_RPA = W_qw_msq*prefac**2*overlap/dim_norm ! eV^2 
   end function gCoul2_RPA
 
+!$!   subroutine RPA_dielwriter(el, crys, qcart, evec_k, evec_kp, X0_qw, omega)
+!$!     !! Writes RPA diels for q and omega, only for debugging.
+!$! 
+!$!     type(crystal), intent(in) :: crys
+!$!     type(electron), intent(in) :: el
+!$!     real(r64), intent(in) :: qcart(3)
+!$!     real(r64), intent(in) :: omega
+!$!     complex(r64), intent(in) :: X0_qw
+!$!     complex(r64), intent(in) :: evec_k(:), evec_kp(:)
+!$! 
+!$!     real(r64) :: prefac, W_qw_msq, overlap
+!$!     real(r64) :: Gplusq(3), Gplusq_2norm, dim_norm 
+!$!     integer(i64) :: ik1, ik2, ik3
+!$!     complex(r64) :: diel_qw
+!$! 
+!$!     prefac = 1.0e9_r64*qe/(perm0*crys%epsiloninf) ! ev.nm
+!$! 
+!$!     overlap = (abs(dot_product(evec_kp, evec_k)))**2
+!$!     
+!$!     if(crys%twod) then
+!$!        prefac = prefac/2
+!$!        dim_norm = (crys%volume/crys%thickness)**2 ! norm for 2D
+!$!     else
+!$!        dim_norm = crys%volume**2      ! norm for 3D
+!$!     end if
+!$! 
+!$!     Gplusq = qcart
+!$! 
+!$!     !|G + q|^2 or |G + q|, for 3D or 2D case
+!$!     Gplusq_2norm = twonorm(Gplusq)**(crys%dim-1)
+!$! 
+!$!     !Dielectric matrix elements 
+!$!     diel_qw = 1.0_r64 - prefac*X0_qw/Gplusq_2norm
+!$! 
+!$!     write(201,*) twonorm(qcart), omega, &
+!$!       real(diel_qw), imag(diel_qw)
+!$!     
+!$!   end subroutine RPA_dielwriter
+
   pure real(r64) function Vm2_3ph(ev1_s1, ev2_s2, ev3_s3, &
     Index_i, Index_j, Index_k, ifc3, phases_q2q3, ntrip, nb)
     !! Function to calculate the squared 3-ph interaction vertex |V-|^2.
@@ -2734,22 +2773,29 @@ contains
                       g2 = gCoul2_TF(el, crys, q_vec%cart, &
                            el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :))
                       ! debugging
-                      if(this_image()==1) write(101, *) &
-                        qdist(q_vec%frac, crys%reclattvecs), g2 
+!$!                       if(this_image()==1) write(101, *) &
+!$!                         qdist(q_vec%frac, crys%reclattvecs), g2 
+!$!                       if(num%Coulomb_screening_type == 'RPA') &
+!$!                         call RPA_dielwriter(el, crys, q_vec%cart, &
+!$!                         el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :),&
+!$!                         X0_qw, en1-en3) 
                    else !RPA
                       !Interpolating polarizability from continuous mesh to sampling energy
-                      !temp = interpolator_1d([(en1 - en3)], Omegas_cont, ReX0_cont) &
-                      !     + oneI*interpolator_1d([(en1 - en3)], Omegas_cont, ImX0_cont)
+                      temp = interpolator_1d([(en1 - en3)], Omegas_cont, ReX0_cont) &
+                           + oneI*interpolator_1d([(en1 - en3)], Omegas_cont, ImX0_cont)
                       ! debugging
-                      temp = interpolator_1d([0.0_r64], Omegas_cont, ReX0_cont) &
-                           + oneI*interpolator_1d([0.0_r64], Omegas_cont, ImX0_cont)
+!$!                       temp = interpolator_1d([0.0_r64], Omegas_cont, ReX0_cont) &
+!$!                            + oneI*interpolator_1d([0.0_r64], Omegas_cont, ImX0_cont)
                       X0_qw = temp(1)
 
                       g2 = gCoul2_RPA(el, crys, q_vec%cart, &
                            el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :), X0_qw)
                       ! debugging
-                      if(this_image()==1) write(101, *) &
-                        qdist(q_vec%frac, crys%reclattvecs), g2 
+!$!                       if(this_image()==1) write(101, *) &
+!$!                         qdist(q_vec%frac, crys%reclattvecs), g2 
+!$!                       call RPA_dielwriter(el, crys, q_vec%cart, &
+!$!                       el%evecs_irred(ik1, n1, :), el%evecs(ik3, n3, :),&
+!$!                       X0_qw, en1-en3) 
                    end if
 
                    g2_computed = .true.

@@ -8,7 +8,7 @@ module screening_module
   use misc, only: linspace, mux_vector, binsearch, Fermi, print_message, &
        compsimps, twonorm, write2file_rank2_real, write2file_rank1_real, &
        distribute_points, sort, qdist, operator(.umklapp.), Bose, &
-       Hilbert_transform
+       Hilbert_transform, demux_vector
   use wannier_module, only: wannier
   use delta, only: delta_fn, get_delta_fn_pointer
   use vector_allreps_module, only: vec=>vector_allreps, &
@@ -18,7 +18,7 @@ module screening_module
 
   private
   public calculate_qTF, &
-       spectral_head_polarizability_3d_q!, &
+       spectral_head_polarizability_3d_q, calculate_RPA_dielectric_2d_model!, &
        !calculate_RPA_dielectric_3d_G0_scratch, &
   
 contains
@@ -281,6 +281,118 @@ contains
     if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
   end subroutine spectral_head_polarizability_3d_qpath
 
+  subroutine spectral_head_polarizability_2d_qpath_old(spec_eps, Omegas, qcrys, &
+       el, wann, crys, tetrahedra)
+    !! Spectral head of the bare polarizability of the 3d Kohn-Sham system using
+    !! Eq. 16 of Shishkin and Kresse Phys. Rev. B 74, 035101 (2006).
+    !!
+    !! Here we calculate the diagonal in G-G' space. Moreover,
+    !! we use the approximation G.r -> 0.
+    !!
+    !! spec_eps Spectral head of the bare polarizability
+    !! Omega Energy of excitation in the electron gas
+    !! qvec Wave vector (fractional) of excitation in the electron gas
+    !! el Electron data type
+
+    real(r64), intent(in) :: Omegas(:), qcrys(3)
+    type(electron), intent(in) :: el
+    type(wannier), intent(in) :: wann
+    type(crystal), intent(in) :: crys
+
+    real(r64), allocatable, intent(out) :: spec_eps(:)
+    logical, intent(in) :: tetrahedra
+
+    !Locals
+    integer(i64) :: m, n, ik, iOmega, nOmegas, k_indvec(3), kp_indvec(3)
+    real(r64) :: overlap, ek, ekp, delta, Omega_l, Omega_r, &
+         el_ens_kp(1, el%numbands), kppathvecs(1, 3)
+    complex(r64) :: el_evecs_kp(1, el%numbands, el%numbands)
+    procedure(delta_fn), pointer :: delta_fn_ptr => null()
+
+    nOmegas = size(Omegas)
+
+    allocate(spec_eps(nOmegas))
+
+    !Associate delta function procedure pointer
+    delta_fn_ptr => get_delta_fn_pointer(tetrahedra)
+
+    spec_eps = 0.0
+    do ik = 1, el%nwv
+       kppathvecs(1, :) = el%wavevecs(ik, :).umklapp.qcrys
+       call wann%el_wann(crys = crys, &
+            nk = 1_i64, &
+            kvecs = kppathvecs, &
+            energies = el_ens_kp, &
+            evecs = el_evecs_kp, &
+            scissor = el%scissor)
+
+       !Below, we will sum out m, n, and k
+       do m = 1, wann%numwannbands
+
+          ek = el%ens(ik, m)
+
+          !Apply energy window to initial electron
+          if(abs(ek - el%enref) > el%fsthick) cycle
+
+          do iOmega = nOmegas/2 + 2, nOmegas
+             do n = 1, wann%numwannbands
+
+                ekp = el_ens_kp(1, n)
+
+                !Apply energy window to final electron
+                if(abs(ekp - el%enref) > el%fsthick) cycle
+
+                !This is |U(k')U^\dagger(k)|_nm squared
+                !(Recall that U^\dagger(k) is the diagonalizer of the electronic hamiltonian.)
+                overlap = (abs(dot_product(el_evecs_kp(1, n, :), el%evecs(ik, m, :))))**2
+
+!!$                spec_eps(iOmega) = spec_eps(iOmega) + &
+!!$                     (Fermi(ek, el%chempot, crys%T) - &
+!!$                     Fermi(ekp, el%chempot, crys%T))*overlap* &
+!!$                     delta_fn_ptr(ekp - Omegas(iOmega), ik, m, &
+!!$                     el%wvmesh, el%simplex_map, &
+!!$                     el%simplex_count, el%simplex_evals)
+
+!!$                spec_eps(iOmega) = spec_eps(iOmega) + &
+!!$                     (Fermi(ek, el%chempot, crys%T) - &
+!!$                     Fermi(ek + Omegas(iOmega), el%chempot, crys%T))*overlap* &
+!!$                     delta_fn_ptr(ekp - Omegas(iOmega), ik, m, &
+!!$                     el%wvmesh, el%simplex_map, &
+!!$                     el%simplex_count, el%simplex_evals)
+!!$
+                spec_eps(iOmega) = spec_eps(iOmega) + &
+                     (Fermi(ekp - Omegas(iOmega), el%chempot, crys%T) - &
+                     Fermi(ekp, el%chempot, crys%T))*overlap* &
+                     delta_fn_ptr(ekp - Omegas(iOmega), ik, m, &
+                     el%wvmesh, el%simplex_map, &
+                     el%simplex_count, el%simplex_evals)
+
+!!$                spec_eps(iOmega) = spec_eps(iOmega) + &
+!!$                     Fermi(ekp, el%chempot, crys%T)* &
+!!$                     (1.0_r64 - Fermi(ekp - Omegas(iOmega), el%chempot, crys%T))/ &
+!!$                     Bose(Omegas(iOmega), crys%T)* &
+!!$                     overlap* &
+!!$                     delta_fn_ptr(ekp - Omegas(iOmega), ik, m, &
+!!$                     el%wvmesh, el%simplex_map, &
+!!$                     el%simplex_count, el%simplex_evals)
+             end do
+          end do
+       end do
+    end do
+
+    spec_eps = spec_eps*el%spindeg/crys%volume*crys%thickness
+    
+    do iOmega = 1, nOmegas/2 ! negative sector
+       !Recall that the resolvent is already normalized in the full wave vector mesh.
+       !As such, the 1/product(el%wvmesh) is not needed in the expression below.
+       spec_eps(iOmega) = -spec_eps(nOmegas + 1 -iOmega)
+    end do
+    !At this point [spec_eps] = nm^-2.eV^-1
+
+    if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
+  end subroutine spectral_head_polarizability_2d_qpath_old
+
+
 !!$  !DEBUG/TEST
 !!$  subroutine calculate_RPA_dielectric_3d_G0_scratch(el, crys, num, wann)
 !!$    !! ??
@@ -370,4 +482,113 @@ contains
 !!$    call write2file_rank2_real("RPA_dielectric_3D_G0_real", real(diel))
 !!$    call write2file_rank2_real("RPA_dielectric_3D_G0_imag", imag(diel))
 !!$  end subroutine calculate_RPA_dielectric_3d_G0_scratch
+
+! debugging
+  subroutine calculate_RPA_dielectric_2d_model(el, crys, num, wann)
+    !! ??
+    !!
+    !! el Electron data type
+    !! crys Crystal data type
+    !! num Numerics data type
+
+    type(electron), intent(in) :: el
+    type(crystal), intent(in) :: crys
+    type(numerics), intent(in) :: num
+    type(wannier), intent(in) :: wann
+
+    !Locals
+    real(r64), allocatable :: energylist(:), qlist(:, :), qmaglist(:)
+    real(r64) :: qcrys(3), qcart(3)
+    integer(i64) :: iq, io, iOmega, numomega, numq, &
+         start, end, chunk, num_active_images, qxmesh
+    real(r64), allocatable :: spec_X0(:), ImX0(:), ReX0(:), Ls(:, :)
+    complex(r64), allocatable :: diel(:, :), X0_qw(:)
+    character(len = 1024) :: filename
+    real(r64) :: omega_plasma, prefac, Gplusq_2norm, dim_norm
+
+    !Silicon
+    !omega_plasma = 1.0e-9_r64*hbar*sqrt(el%conc_el/perm0/crys%epsiloninf/(0.267*me)) !eV
+
+    !wGaN
+    !omega_plasma = 1.0e-9_r64*hbar*sqrt(el%conc_el/perm0/crys%epsiloninf/(0.259_r64*me)) !eV
+        
+    !if(this_image() == 1) then
+    !   print*, "plasmon energy = ", omega_plasma
+    !   print*, "epsilon infinity = ", crys%epsiloninf
+    !end if
+
+    !TEST
+    numq = el%wvmesh(1)
+    qxmesh = numq
+    !Create qlist in crystal coordinates
+    allocate(qlist(numq, 3), qmaglist(numq))
+    do iq = 1, numq
+       qlist(iq, :) = [(iq - 1.0_r64)/qxmesh, (iq - 1.0_r64)/qxmesh, 0.0_r64]
+       qmaglist(iq) = twonorm(matmul(crys%reclattvecs, qlist(iq, :)))
+    end do
+    call sort(qmaglist)
+
+    !Create energy grid
+    numomega = 1001 !601 !6 !5 !1001
+    allocate(energylist(numomega))
+    call linspace(energylist, -3.5_r64, 3.5_r64, numomega)
+    
+    !Allocate diel_ik to hold maximum possible Omega
+    allocate(diel(numq, numomega), Ls(numq, numomega))
+    diel = 0.0_r64
+
+    !Allocate spectral and imaginary X0 (defined on uniform frequency mesh)
+    allocate(spec_X0(numomega), ImX0(numomega))
+    
+    !Distribute points among images
+    call distribute_points(numq, chunk, start, end, num_active_images)
+
+    if(this_image() == 1) then
+       write(*, "(A, I10)") " #q-vecs = ", numq
+       write(*, "(A, I10)") " #q-vecs/image <= ", chunk
+    end if
+
+    prefac = 1.0e9_r64*qe/perm0 ! ev.nm 
+    if(crys%twod) prefac = prefac/2
+
+    do iq = start, end !Over IBZ k points
+       qcrys = qlist(iq, :) !crystal coordinates
+       qcart = matmul(crys%reclattvecs, qcrys)
+
+       !|G + q|^2 or |G + q|, for 3D or 2D case
+       Gplusq_2norm = twonorm(qcart)**(crys%dim-1)
+
+       call spectral_head_polarizability_2d_qpath_old(&
+            spec_X0, energylist, qcrys, el, wann, crys, num%tetrahedra)
+       
+       ImX0 = -pi*spec_X0
+       call hilbert_transform(-ImX0, ReX0)
+       X0_qw = ReX0 + oneI*ImX0
+          
+       !Calculate RPA dielectric (diagonal in G-G' space)
+       !diel(iq, :) = crys%epsiloninf - &
+       !     1.0_r64/qmaglist(iq)**2* &
+       !     (ReX0 + oneI*ImX0)/perm0*qe*1.0e9_r64
+
+       diel(iq, :) = crys%epsiloninf - prefac*X0_qw/Gplusq_2norm
+       Ls(iq, :) = prefac*Gplusq_2norm*ImX0/((Gplusq_2norm*crys%epsiloninf - &
+         prefac*ReX0)**2 + (prefac*ImX0)**2)
+       if(iq==1) Ls(iq, :) = 1e-20_r64
+       do io=1, numomega
+         if(Ls(iq, io)<1e-50_r64) Ls(iq, io) = 1e-50_r64
+       end do
+
+    end do
+
+    call co_sum(diel)
+    call co_sum(Ls)
+    
+    !Print to file
+    call write2file_rank2_real("RPA_dielectric_2D_G0_qpath", qlist)
+    call write2file_rank1_real("RPA_dielectric_2D_G0_qmagpath", qmaglist)
+    call write2file_rank1_real("RPA_dielectric_2D_G0_Omega", energylist)
+    call write2file_rank2_real("RPA_dielectric_2D_G0_real", real(diel))
+    call write2file_rank2_real("RPA_dielectric_2D_G0_imag", imag(diel))
+    call write2file_rank2_real("RPA_dielectric_2D_G0_loss", Ls)
+  end subroutine calculate_RPA_dielectric_2d_model
 end module screening_module

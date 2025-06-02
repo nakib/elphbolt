@@ -39,6 +39,7 @@ program elphbolt
   use Green_function, only: calculate_retarded_phonon_D0
   use nano_module, only: nanostructure
   use bte_nano_module, only: bte_nano
+  use screening_module, only: calculate_RPA_dielectric_2d_model
   
   implicit none
   
@@ -152,7 +153,16 @@ program elphbolt
      end if
      
      call subtitle("Calculating interactions...")
-     
+    
+     !TEST/DUBUG
+     !Calculate RPA dielectric for q over Gamma-Gamma along x over a uniform boson energy mesh
+     call t_event%start_timer('RPA dielectric')
+     !call calculate_RPA_dielectric_3d_G0_scratch(el, crys, num, wann)
+     call calculate_RPA_dielectric_2d_model(el, crys, num, wann)
+     call t_event%end_timer('RPA dielectric')
+     call exit
+     !!
+
      if(num%phdef_Tmat) then
         !Calculate phonon-defect interactions
         call t_event%start_timer("Phonon-defect transition rates")

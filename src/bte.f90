@@ -177,21 +177,21 @@ contains
     if(.not. num%onlyebte) &
          call dragless_phbte_RTA(Tdir, self, num, crys, sym, ph, el)
 
-!$!     !Electron RTA
-!$!     if(.not. num%onlyphbte) &
-!$!          call dragless_ebte_RTA(Tdir, self, num, crys, sym, el, ph)
+    !Electron RTA
+    if(.not. num%onlyphbte) &
+         call dragless_ebte_RTA(Tdir, self, num, crys, sym, el, ph)
 
     !Electron RTA - debugging
-    if(.not. num%onlyphbte) then
-       open(101, file="gsq_by_dielsq")
-       call dragless_ebte_RTA(Tdir, self, num, crys, sym, el, ph)
-       close(101)
-       sync all
-       if(this_image() == 1) then 
-          !print *, "Screened qTF",crys%qTF**(crys%dim-1)/crys%epsiloninf
-          stop
-       end if
-    end if
+!$!     if(.not. num%onlyphbte) then
+!$!        open(101, file="gsq_by_dielsq")
+!$!        call dragless_ebte_RTA(Tdir, self, num, crys, sym, el, ph)
+!$!        close(101)
+!$!        sync all
+!$!        if(this_image() == 1) then 
+!$!           !print *, "Screened qTF",crys%qTF**(crys%dim-1)/crys%epsiloninf
+!$!           stop
+!$!        end if
+!$!     end if
 
     !Dragful electron-phonon BTEs
     if(num%drag) &
@@ -230,10 +230,16 @@ contains
     
     call t%start_timer('RTA e BTE')
 
+    ! debugging
+    if(this_image()==1) open(201, file='diel_data')
+    sync all
     !Calculate RTA scattering rates
     ! e-ph and e-impurity
     call calculate_el_rta_rates(self%el_rta_rates_eph_ibz, self%el_rta_rates_echimp_ibz, &
          self%el_rta_rates_ee_ibz, num, crys, el)
+    sync all
+    close(201)
+    call exit
 
     ! e-boundary
     call calculate_bound_scatt_rates(el%prefix, num%elbound, crys%bound_length, &
