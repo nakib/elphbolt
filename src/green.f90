@@ -25,14 +25,14 @@ module Green_function
   use delta, only: real_tetra, delta_fn, get_delta_fn_pointer
   use misc, only: exit_with_message, distribute_points, expi, demux_state, invert, &
        write2file_rank2_real, kronecker, mux_state
-  
+
   implicit none
 
   private
   public calculate_retarded_phonon_D0, resolvent
-  
+
 contains
-  
+
   complex(r64) function resolvent(species, ib, iwv, sampling_point)
     !! Calculate the resolvant
     !!   electron: 1/[z - E(k)], lim z -> E + i0^{+}.
@@ -51,10 +51,10 @@ contains
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
 
     !TODO Pass delta_fn_ptr to this function.
-    
+
     !Associate delta function procedure pointer
     delta_fn_ptr => get_delta_fn_pointer(tetrahedra = .true.)
-    
+
     select type(species)
     class is(phonon)
        !Imaginary part of resolvent
@@ -111,9 +111,9 @@ contains
     integer(i64), intent(in) :: pcell_atom_label(:)
 
     integer(i64), intent(in) :: dimp_cell_pos_intvec(:, :), pcell_atom_dof(:)
-    
+
     complex(r64), allocatable, intent(out) :: D0(:, :, :)
-    
+
     !Local variables
     integer(i64) :: nstates_irred, chunk, start, end, num_active_images, &
          istate1, s1, iq1_ibz, iq1, s2, iq2, j, num_dof_def, dof_counter, iq, &
@@ -124,16 +124,16 @@ contains
 
     !Total number of atoms in the defective block of the supercell
     def_numatoms = size(pcell_atom_label)
-    
+
     !Total number of IBZ blocks states
     nstates_irred = ph%nwv_irred*ph%numbands
 
     !Total number of degrees of freedom in defective supercell
     num_dof_def = def_numatoms*3
-    
+
     !Number of primitive unit cells in the defective supercell    
     def_numcells = num_dof_def/crys%numatoms/3
-    
+
     allocate(phi(num_dof_def, ph%numbands, ph%nwv), phi_internal(num_dof_def), &
          D0(num_dof_def, num_dof_def, nstates_irred))
 
@@ -146,7 +146,7 @@ contains
           phase = expi( &
                twopi*dot_product(ph%wavevecs(iq, :), &
                dimp_cell_pos_intvec(:, dof_counter)) )
-          
+
           phi(dof_counter, :, iq) = &
                phase*ev(:, pcell_atom_dof(dof_counter))
        end do
@@ -154,10 +154,10 @@ contains
 
     !Divide phonon states among images
     call distribute_points(nstates_irred, chunk, start, end, num_active_images)
-    
+
     !Initialize D0
     D0 = 0.0_r64
-    
+
     !Only work with the active images
     if(this_image() <= num_active_images) then
        !Run over first (IBZ) phonon states

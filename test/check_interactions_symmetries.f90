@@ -28,16 +28,16 @@ program check_interactions_symmetries
 
   !Set up crystal
   call crys%initialize
-  
+
   !Set up numerics data
   call num%initialize(crys)
-  
+
   !Calculate crystal and BZ symmetries
   call sym%calculate_symmetries(crys, num%qmesh)
-  
+
   !Calculate phonons
   call ph%initialize(crys, sym, num)
-  
+
   !A trivial case.
   !iq1_ibz = 2
   !iq2 = 1
@@ -86,9 +86,9 @@ program check_interactions_symmetries
 
   ik1_ibz = 4
   ik2 = 10
-  
+
   allocate(g2(wann%numwannbands, wann%numwannbands, ph%numbands, &
-         el%nequiv(ik1_ibz)))
+       el%nequiv(ik1_ibz)))
   g2 = g2_on_star(ik1_ibz, ik2, el, ph, wann, crys, num)
 
 !!$  do ieq = 1, el%nequiv(ik1_ibz)
@@ -103,7 +103,7 @@ program check_interactions_symmetries
 !!$  end do
 !!$
 !!$  print*, '...'
-  
+
   do m = 1, wann%numwannbands
      print*, 'band number:', m
      print*, '              image#  \sum_{s n}|g(mk,nk+q|sq)|^2'
@@ -117,7 +117,7 @@ program check_interactions_symmetries
         print*, ieq, aux
      end do
   end do
-  
+
 contains
 
   function V2_on_star(iwv1_ibz, iwv2, ph, crys) result(intstar)
@@ -152,7 +152,7 @@ contains
 
        !Convert from crystal to 0-based index vector
        q1_indvec = nint(q1*ph%wvmesh)
-       
+
        !2nd wave vector (crystal coords.) under this symmetry
        iwv2_image = ph%equiv_map(isym, iwv2)
        q2 = ph%wavevecs(iwv2_image, :)
@@ -164,7 +164,7 @@ contains
        q3_indvec = modulo(q1_indvec - q2_indvec, &
             ph%wvmesh) !0-based index vector
        q3 = q3_indvec/dble(ph%wvmesh) !crystal coords.
-       
+
        !Muxed index of q3
        iwv3 = mux_vector(q3_indvec, ph%wvmesh, 0_i64)
 
@@ -173,9 +173,9 @@ contains
        do it = 1, ph%numtriplets
           phases(it) = &
                expi(-dot_product(q2_cart, (ph%R_j(:, it))) &
-                    -dot_product(q3_cart, (ph%R_k(:, it))))
+               -dot_product(q3_cart, (ph%R_k(:, it))))
        end do
-       
+
        do s3 = 1, ph%numbands
           do s2 = 1, ph%numbands       
              do s1 = 1, ph%numbands
@@ -226,7 +226,7 @@ contains
     !Conform gwann to the best shape for the contraction in gkRp.
     call wann%reshape_gwann_for_gkRp
     sync all
-    
+
     print*, 'Initial IBZ wave vector', el%wavevecs_irred(iwv1_ibz, :)
     print*, 'Number of equivalent points', el%nequiv(iwv1_ibz)
     do ieq = 1, el%nequiv(iwv1_ibz)
@@ -254,7 +254,7 @@ contains
 
        !Convert from crystal to 0-based index vector
        k1_indvec = nint(k1*el%wvmesh)
-       
+
        !2nd wave vector (crystal coords.) under this symmetry
        !print*, isym, iwv2, el%equiv_map(isym, iwv2)
        call binsearch(el%indexlist, el%equiv_map(isym, iwv2), &
@@ -270,16 +270,16 @@ contains
           el_ens_ik1 = el%ens(iwv1_image, :)
           el_ens_ik2 = el%ens(iwv2_image, :)
        end if
-       
+
        !Folded final phonon wave vector
        q_indvec = modulo(k2_indvec - k1_indvec, el%wvmesh) !0-based index vector
        q = q_indvec/dble(el%wvmesh) !crystal coords.
-       
+
        !Muxed index of q
        iq = mux_vector(q_indvec, el%wvmesh, 0_i64)
 
        qlist(1, :) = q
-       
+
        !This is the crudest way to symmetrize the phonon energies.
        !Note that the eigenvectors will not be the same.
        if(ieq == 1) then
@@ -287,7 +287,7 @@ contains
        else
           call wann%ph_wann(crys, 1_i64, qlist, discardible, ph_evecs_iq)
        end if
-              
+
        do s = 1, ph%numbands !band index of phonon
           do n = 1, wann%numwannbands !band index of final electron
              do m = 1, wann%numwannbands !band index of initial electron
@@ -302,7 +302,7 @@ contains
        call average_over_degenerate_subspace(intstar(:, :, :, ieq), &
             ph_ens_iq(1, :), el_ens_ik1, el_ens_ik2)
     end do
-    
+
     !Put gwann back to original shape
     call wann%reshape_gwann_for_gkRp(revert = .true.)
     sync all
@@ -324,7 +324,7 @@ contains
     integer :: m, mp, n, np, s, sp, deg_count
 
     thres = 1.0e-6_r64 !closeness
-    
+
     numbands = size(el_ens_k1)
     numbranches = size(ph_ens_q)
 
@@ -345,7 +345,7 @@ contains
           end do
        end do
     end do
-    
+
     !Average over initial electron bands
     do s = 1, numbranches
        do n = 1, numbands
@@ -381,6 +381,6 @@ contains
           end do
        end do
     end do
-end subroutine average_over_degenerate_subspace
-  
+  end subroutine average_over_degenerate_subspace
+
 end program check_interactions_symmetries

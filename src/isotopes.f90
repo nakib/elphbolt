@@ -1,12 +1,12 @@
 module isotopes_module
-  
+
   use precision, only: r64
-  
+
   implicit none
 
   private
   public :: isotopes
-  
+
   type isotopes
      !! Datatype for storing information related to isotopes of a species
      integer :: numisotopes = 0
@@ -27,9 +27,9 @@ module isotopes_module
      !! Create new collection of isotopes 
      module procedure :: constructor
   end interface isotopes
-       
+
 contains
-  
+
   function constructor(masses, abundances) result(this)
     real(r64), intent(in) :: masses(:)
     !! Array containing the mass of each isotope in atomic mass units

@@ -17,7 +17,7 @@
 module eliashberg
   !! Module containing the procedures related to the computation of the Eliashberg
   !! spectral function a2F and the e-ph coupling factor lambda.
-  
+
   use precision, only: i64, r64
   use misc, only: exit_with_message, print_message, distribute_points, &
        demux_state, mux_vector, write2file_rank1_real, write2file_rank2_real, &
@@ -51,7 +51,7 @@ contains
     !In the FBZ and IBZ blocks a wave vector was retained when at least one
     !band belonged within the energy window. Here the bands outside the energy
     !window will be skipped in the calculation as they are irrelevant for transport.
-    
+
     type(wannier), intent(in) :: wann
     type(electron), intent(in) :: el
     type(phonon), intent(in) :: ph
@@ -77,19 +77,19 @@ contains
 
     !Boson energy difference
     domega = omegas(2) - omegas(1)
-    
+
     !Precalculate the phonon delta functions.
     call print_message("Precalculating FBZ phonon delta functions...")
 
     !Associate delta function procedure pointer
     delta_fn_ptr => get_delta_fn_pointer(num%tetrahedra)
-    
+
     ! Allocate and initialize
     allocate(ph_deltas(wann%numbranches, ph%nwv, numomega))
     ph_deltas = 0.0_r64
 
     call distribute_points(numomega, chunk, start, end, num_active_images)
-    
+
     !Only work with the active images
     if(this_image() <= num_active_images) then
        do iomega = start, end
@@ -102,21 +102,21 @@ contains
           end do
        end do
     end if
-    
+
     if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
-   
+
     ! The delta weights above were supercell number normalized.
     ! Taking this fact into account here:
     ph_deltas = ph_deltas*product(ph%wvmesh)
 
     ! Absorb DOS(Ef) in the definition of ph_deltas
     ph_deltas = ph_deltas*el%spinnormed_dos_fermi
-    
+
     ! Reduce ph_deltas
     sync all
     call co_sum(ph_deltas)
     sync all
-    
+
     call print_message("Calculating a2F for all IBZ electrons...")
 
     if(present(external_eps_switch) .and. external_eps_switch) then
@@ -139,7 +139,7 @@ contains
        call co_broadcast(eps_squared, 1)
        sync all
     end if
-    
+
     !Total number of IBZ blocks states
     nstates_irred = el%nwv_irred*wann%numwannbands
 
@@ -203,7 +203,7 @@ contains
              !Find interacting phonon wave vector
              ! Note that q, k, and k' are all on the same mesh
              q_indvec = modulo(kp_indvec - k_indvec, el%wvmesh)
-             
+
              ! Muxed index of q
              iq = mux_vector(q_indvec, el%wvmesh, 0_i64)
 
@@ -222,7 +222,7 @@ contains
 
                    !Note that the phonon branch index iterates last for a2F_istate
                    a2F_istate(count, :) = g2_istate(count)*ph_deltas(s, iq, :)
-                   
+
                    !Sum contribuion to the isotropic a2F
                    iso_a2F_branches(:, s) = iso_a2F_branches(:, s) + &
                         a2F_istate(count, :)*WWp
@@ -255,12 +255,12 @@ contains
           iso_a2F_branches(:, s) = iso_a2F_branches(:, s)/eps_squared(:)
        end do
     end if
-    
+
     !Reduce iso_a2F_branches
     sync all
     call co_sum(iso_a2F_branches)
     sync all
-    
+
     !Write isotropic a2F to file
     call chdir(num%cwd)
     call write2file_rank2_real('a2F_iso_branch_resolved', iso_a2F_branches)
@@ -296,7 +296,7 @@ contains
 
     ! Print cumulative lambda to file
     call write2file_rank2_real('cum_lambda_iso_branch_resolved', cum_iso_lambda_branches)
-    
+
     sync all
   end subroutine calculate_a2F
 
@@ -304,7 +304,7 @@ contains
        iso_matsubara_lambda)
     !! Calculate the isotropic Matsubara electron-phonon coupling, lambda(l).
     !! Here l is the Bosonic Matsubara energy index. 
-    
+
     type(wannier), intent(in) :: wann
     type(numerics), intent(in) :: num
     real(r64), intent(in) :: omegas(:), bose_matsubara_ens(:)
@@ -315,7 +315,7 @@ contains
     real(r64) :: aux, domega
     real(r64), allocatable :: iso_a2F_branches(:, :)
     character(len = 1024) :: filename
-    
+
     !Number of equidistant Boson energy points
     numomega = size(omegas)
 
@@ -341,7 +341,7 @@ contains
     sync all
     call co_broadcast(iso_a2F_branches, 1)
     sync all
-    
+
     !Isotropic theory
     iso_matsubara_lambda = 0.0_r64
 
@@ -369,7 +369,7 @@ contains
     !In the FBZ and IBZ blocks a wave vector was retained when at least one
     !band belonged within the energy window. Here the bands outside the energy
     !window will be skipped in the calculation as they are irrelevant for transport.
-    
+
     type(wannier), intent(in) :: wann
     type(electron), intent(in) :: el
     type(numerics), intent(in) :: num
@@ -382,9 +382,9 @@ contains
     real(r64) :: aux, domega
     real(r64), allocatable :: a2F_istate(:, :), matsubara_lambda_istate(:, :)
     character(len = 1024) :: filename
-    
+
     call print_message("   Calculating lambda for all IBZ electrons...")
-    
+
     !Number of equidistant Boson energy points
     numomega = size(omegas)
 
@@ -478,7 +478,7 @@ contains
           deallocate(a2F_istate, matsubara_lambda_istate)
        end do
     end if
-    
+
     sync all
   end subroutine calculate_aniso_Matsubara_lambda
 end module eliashberg

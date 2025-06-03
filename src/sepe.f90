@@ -39,9 +39,9 @@ module SEPE_module
        calculate_Xee_13_OTF, calculate_ph_rta_coherence_rates
   use bz_sums, only: calculate_transport_coeff, calculate_spectral_transport_coeff, &
        calculate_cumulative_transport_coeff
-  
+
   implicit none
-  
+
   private
   public sepe
 
@@ -100,7 +100,7 @@ module SEPE_module
    contains
 
      procedure :: solve_sepe=>sepe_driver
-     
+
   end type sepe
 
   type transport_coeffs
@@ -121,7 +121,7 @@ module SEPE_module
           initialize_el=>allocate_el_transport_coeffs
 
   end type transport_coeffs
-  
+
 contains
 
   subroutine allocate_ph_transport_coeffs(self, ph_numbands)
@@ -143,7 +143,7 @@ contains
     allocate(self%el_sigma(el_numbands, 3, 3), self%el_sigmaS(el_numbands, 3, 3), &
          self%el_alphabyT(el_numbands, 3, 3), self%el_kappa0(el_numbands, 3, 3))
   end subroutine allocate_el_transport_coeffs
-  
+
   subroutine sepe_driver(self, num, crys, sym, ph, el)
     !! Subroutine to orchestrate the SEPE calculations.
     !!
@@ -173,7 +173,7 @@ contains
        call system('mkdir -p '//trim(adjustl(Tdir)))
     end if
     sync all
-    
+
     !Phonon RTA
     if(.not. num%onlyebte) &
          call dragless_phbte_RTA(Tdir, self, num, crys, sym, ph, el)
@@ -186,7 +186,7 @@ contains
     if(num%drag) &
          call dragfull_ephbtes(Tdir, self, num, crys, sym, ph, el)
   end subroutine sepe_driver
-  
+
   subroutine calculate_field_term(species, field, nequiv, ibz2fbz_map, &
        T, chempot, ens, vels, rta_rates_ibz, field_term, el_indexlist)
     !! Subroutine to calculate the field coupling term of the BTE.
@@ -287,7 +287,7 @@ contains
        sync all
     end if
   end subroutine calculate_field_term
-  
+
   subroutine dragless_phbte_RTA(Tdir, self, num, crys, sym, ph, el)
     !! Dragless phonon BTE calculator in the relaxation time approximation.
     !! It is impure as it mutates the phonon sector of the bte data type and
@@ -348,7 +348,7 @@ contains
 
     !Calculate phonon RTA coherence rates
     call calculate_ph_rta_coherence_rates(self%ph_rta_coherence_rates_ibz, num, crys, ph, el)
-    
+
     !gradT field:
     ! Calculate field term (gradT=>F0)
     call calculate_field_term('ph', 'T', ph%nequiv, ph%ibz2fbz_map, &
@@ -690,13 +690,13 @@ contains
        call calculate_ph_coh_term_of_el_BTE(&
             num, el, ph, idc, widc, sym, &
             self%el_rta_rates_ibz, self%ph_coherence_T, ph_coherence_term_T)
-       
+
        !Iterate phonon coherence equation
        call iterate_ph_coherence_eqn(num, crys, ph, el, &
             self%ph_rta_coherence_rates_ibz, self%ph_response_T, self%el_response_T, self%ph_coherence_T)
        call iterate_ph_coherence_eqn(num, crys, ph, el, &
             self%ph_rta_coherence_rates_ibz, self%ph_response_E, self%el_response_E, self%ph_coherence_E)
-       
+
        !Iterate electron response all the way
        do it_el = 1, num%maxiter
           !E field:
@@ -795,7 +795,7 @@ contains
 !!$            self%ph_rta_coherence_rates_ibz, self%ph_response_T, self%el_response_T, self%ph_coherence_T)
 !!$       call iterate_ph_coherence_eqn(num, crys, ph, el, &
 !!$            self%ph_rta_coherence_rates_ibz, self%ph_response_E, self%el_response_E, self%ph_coherence_E)
-       
+
        !Check convergence
        if(converged(ph_kappa_scalar_old, ph_kappa_scalar, num%conv_thres) .and. &
             converged(ph_alphabyT_scalar_old, ph_alphabyT_scalar, num%conv_thres)) then
@@ -909,7 +909,7 @@ contains
       end do
     end subroutine correct_I_drag_expt
   end subroutine dragfull_ephbtes
-  
+
   subroutine iterate_el_occupations_eqn(num, el, crys, rta_rates_ibz, field_term, &
        response_el, ph_drag_term, ph_coherence_term)
     !! Subroutine to iterate the electron BTE one step.
@@ -983,7 +983,7 @@ contains
           end if
 
           !The e-ph (population) bit:
-          
+
           !Set X+ filename
           write(tag, '(I9)') istate
           filepath_Xphplus = trim(adjustl(num%Xdir))//'/Xplus.istate'//trim(adjustl(tag))
@@ -1000,7 +1000,7 @@ contains
           call read_transition_probs_e(trim(adjustl(filepath_Xphminus)), nprocs, Xphminus)
 
           !The e-ch. imp. bit:
-          
+
           !Read Xchimp from file
           if(num%elchimp) then
              !Set Xchimp filename
@@ -1016,7 +1016,7 @@ contains
              call binsearch(el%indexlist, el%ibz2fbz_map(ieq, ik_ibz, 2), ik_fbz)
 
              !The e-ph population bit:
-             
+
              !Sum over scattering processes
              do iproc = 1, nprocs
                 !Grab the final electron
@@ -1030,7 +1030,7 @@ contains
                 response_el_reduce(ik_fbz, m, :) = response_el_reduce(ik_fbz, m, :) + &
                      response_el(aux, n, :)*(Xphplus(iproc) + Xphminus(iproc))
              end do
-             
+
              !Add charged impurity contribution to the self consistent term
              if(num%elchimp) then
                 do iproc = 1, nprocs_echimp
@@ -1112,19 +1112,19 @@ contains
 
     !Set output directory of transition probilities
     write(tag, "(E9.3)") T
-    
+
     !Number of electron bands
     numbands = size(response_el(1,:,1))
-    
+
     !Number of phonon branches
     numbranches = size(rta_rates_ibz(1,:))
 
     !Number of FBZ wave vectors
     nq = size(field_term(:,1,1))
-    
+
     !Total number of IBZ states
     nstates_irred = size(rta_rates_ibz(:,1))*numbranches
-    
+
     !Allocate and initialize response reduction array
     allocate(response_ph_reduce(nq, numbranches, 3))
     response_ph_reduce(:,:,:) = 0.0_r64
@@ -1132,7 +1132,7 @@ contains
     !Allocate and set the real part of the coherence function
     !allocate(coherence_ph_real(size(coherence_ph, 1), numbranches, 3))
     !coherence_ph_real = real(coherence_ph)
-    
+
     !Divide phonon states among images
     call distribute_points(nstates_irred, chunk, start, end, num_active_images)
 
@@ -1151,7 +1151,7 @@ contains
           if(rta_rates_ibz(iq1_ibz, s1) /= 0.0_r64) then
              tau_ibz = 1.0_r64/rta_rates_ibz(iq1_ibz, s1)
           end if
-          
+
           if(num%W_OTF) then
              call calculate_W3ph_OTF(ph, num, istate1, T, &
                   Wm, Wp, istate2_plus, istate3_plus, istate2_minus, istate3_minus)
@@ -1197,7 +1197,7 @@ contains
 
           !Set U filename
           filepath_U = trim(adjustl(num%Ydir))//'/U.istate'//trim(adjustl(tag))
-          
+
           !Read Y from file
           if(allocated(U)) deallocate(U)
           call read_transition_probs_e(trim(adjustl(filepath_Y)), nprocs_phcoh, U)
@@ -1252,7 +1252,7 @@ contains
                 response_ph_reduce(iq1_fbz, s1, :) = response_ph_reduce(iq1_fbz, s1, :) - &
                      el%spindeg*U(iproc)*real(coherence_ph(iq1_fbz, s1, :))
              end do
-             
+
              !Iterate BTE
              response_ph_reduce(iq1_fbz, s1, :) = field_term(iq1_fbz, s1, :) + &
                   response_ph_reduce(iq1_fbz, s1, :)*tau_ibz          
@@ -1272,7 +1272,7 @@ contains
             matmul(ph%symmetrizers(:,:,iq1_fbz),transpose(response_ph(iq1_fbz,:,:))))
     end do
   end subroutine iterate_ph_occupations_eqn
-  
+
   subroutine iterate_ph_coherence_eqn(num, crys, ph, el, &
        rta_coherence_rates_ibz, response_ph, response_el, coherence_ph)
     !! Subroutine to calculate the phonon coherence equation.
@@ -1312,7 +1312,7 @@ contains
 
     !Number of electron bands
     numbands = el%numbands
-    
+
     !Number of in-window FBZ wave vectors
     nk = el%nwv
 
@@ -1324,7 +1324,7 @@ contains
 
     !Total number of IBZ electron states
     el_nstates_irred = el%nwv_irred*numbands
-    
+
     !Allocate and initialize response reduction array
     allocate(coherence_ph_reduce(nq, numbranches, 3))
     coherence_ph_reduce(:,:,:) = 0.0_r64
@@ -1390,7 +1390,7 @@ contains
                    prefactor = el%spindeg*&
                         (hbar_eVps*coherence_rate - 4.0_r64*ph_en*oneI)/&
                         ((hbar_eVps*coherence_rate)**2 + 16.0_r64*ph_en**2)
-                   
+
                    !Here accumulate contribution to \mathbf{R}_{\lambda}
                    !from the 1st term of the RHS
                    if(prefactor /= complex_zero) then
@@ -1404,7 +1404,7 @@ contains
                            response_ph(iq_fbz, s, :)
                    end if
                 end if
-                
+
 !!$                !Get q = k' - k (represented w.r.t. electron k-grid)
 !!$                !q_vec_wrt_elmesh = vec(el%indexlist(ikp_fbz_rot), el%wvmesh, crys%reclattvecs)
 !!$
@@ -1419,7 +1419,7 @@ contains
 !!$                      cycle
 !!$                   end if
 !!$                end do
-                
+
 !!$                if(compatible_iq_frac > 0) then
 !!$                   !Compute the prefactor
 !!$                   !TODO
@@ -1437,11 +1437,11 @@ contains
 !!$                else
 !!$                   cycle
 !!$                end if
-             end do             
+             end do
           end do
        end do
     end if
-    
+
     !Update the response function
     call co_sum(coherence_ph_reduce)
     coherence_ph = coherence_ph_reduce
@@ -1451,7 +1451,7 @@ contains
        coherence_ph(iq_fbz, :, :)=transpose(&
             matmul(ph%symmetrizers(:, :, iq_fbz), &
             transpose(coherence_ph(iq_fbz, :, :))))
-    end do    
+    end do
   end subroutine iterate_ph_coherence_eqn
 
   subroutine calculate_phonon_drag(num, el, ph, idc, widc, sym, rta_rates_ibz, &
@@ -1620,7 +1620,7 @@ contains
     real(r64), allocatable :: Omegaplus(:), Omegaminus(:), &
          ph_coherence_term_reduce(:, :, :), coherence_ph_real(:, :, :)
     character(1024) :: filepath_Omegaminus, filepath_Omegaplus, tag
-    
+
     !Number of electron bands
     numbands = el%numbands
 
@@ -1629,7 +1629,7 @@ contains
 
     !Total number of IBZ states
     nstates_irred = el%nwv_irred*numbands
-    
+
     !Number of phonon branches
     numbranches = ph%numbands
 
@@ -1678,7 +1678,7 @@ contains
           do ieq = 1, el%nequiv(ik_ibz)
              ik_sym = el%ibz2fbz_map(ieq, ik_ibz, 1) !symmetry
              call binsearch(el%indexlist, el%ibz2fbz_map(ieq, ik_ibz, 2), ik_fbz)
-             
+
              !Sum over scattering processes
              do iproc = 1, nprocs_phcoh
                 if(istate_ph_phcoh(iproc) < 0) then !This phonon is on the (fine) electron mesh
@@ -1740,5 +1740,5 @@ contains
        if(abs(newval - oldval)/abs(oldval) < thres) converged = .True.
     end if
   end function converged
-  
+
 end module SEPE_module

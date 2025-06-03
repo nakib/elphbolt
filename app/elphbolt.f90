@@ -22,7 +22,7 @@ program elphbolt
   !! elphbolt is a program for solving the coupled electron-phonon Boltzmann transport equations
   !! (e-ph BTEs) as formulated in https://arxiv.org/abs/2109.08547 (2021) with both the
   !! electron-phonon and phonon-phonon interactions computed ab initio.
-  
+
   use misc, only: print_message, subtitle, timer, exit_with_message
   use numerics_module, only: numerics
   use crystal_module, only: crystal
@@ -39,9 +39,9 @@ program elphbolt
   use Green_function, only: calculate_retarded_phonon_D0
   use nano_module, only: nanostructure
   use bte_nano_module, only: bte_nano
-  
+
   implicit none
-  
+
   type(numerics) :: num
   type(crystal) :: crys
   type(symmetry) :: sym
@@ -53,29 +53,29 @@ program elphbolt
   type(phonon_defect) :: ph_def
   type(timer) :: t_all, t_event
   type(nanostructure) :: nano
-  
+
   !Print banner and other information
   call welcome
 
   call t_all%start_timer('elphbolt')
 
   call t_event%start_timer('Initialization')
-  
+
   !Set up crystal
   call crys%initialize
-  
+
   !Set up numerics data
   call num%initialize(crys)
-  
+
   !Calculate crystal and BZ symmetries
   call sym%calculate_symmetries(crys, num%qmesh)
 
   sync all
   call t_event%end_timer('Initialization')
-  
+
   if(num%need_Wannier) then
      call t_event%start_timer('Wannier')
-     
+
      !Read EPW Wannier data
      call wann%read(num)
 
@@ -88,9 +88,9 @@ program elphbolt
 
      call t_event%end_timer('Electrons')
   end if
-  
+
   call t_event%start_timer('Phonons')
-  
+
   !Calculate phonons
   if(num%use_Wannier_ifc2s) then
      call ph%initialize(crys, sym, num, wann)
@@ -108,8 +108,8 @@ program elphbolt
      call nano%initialize()
      ! Print geometrical information into a file
      call nano%print_nanogeominfo()
-  end if 
-    
+  end if
+
   select case(num%runlevel)
   case(1) !BTE workflow     
      call t_event%start_timer('Density of states and one-particle scattering rates')
@@ -132,17 +132,17 @@ program elphbolt
      !I will move the phonon-isotope and phonon-isotope scattering stuff to where
      !they belong -- interactions.f90 -- soon.
      call calculate_dos(ph, crys, num%tetrahedra, bt%ph_rta_rates_iso_ibz, bt%ph_rta_rates_subs_ibz, &
-             num%phiso, num%phiso_1B_theory, num%phsubs, num%phiso_Tmat)
+          num%phiso, num%phiso_1B_theory, num%phsubs, num%phiso_Tmat)
      if(num%solve_nano) then
         allocate(bt_nano%ph_rta_rates_iso_ibz, source=bt%ph_rta_rates_iso_ibz)
         allocate(bt_nano%ph_rta_rates_subs_ibz, source=bt%ph_rta_rates_subs_ibz)
      end if
-     
+
      call t_event%end_timer('Density of states and one-particle scattering rates')
-     
+
      if(num%plot_along_path) then
         call t_event%start_timer('Plots along path')
-        
+
         call subtitle("Plotting along high-symmetry path...")
 
         !Plot electron bands, phonon dispersions, and g along path.
@@ -150,9 +150,9 @@ program elphbolt
 
         call t_event%end_timer('Plots along path')
      end if
-     
+
      call subtitle("Calculating interactions...")
-     
+
      if(num%phdef_Tmat) then
         !Calculate phonon-defect interactions
         call t_event%start_timer("Phonon-defect transition rates")
@@ -167,25 +167,25 @@ program elphbolt
 
         call t_event%end_timer("Phonon-defect transition rates")
      end if
-     
+
      !Set chemical potential dependent directory
      call num%create_chempot_dirs(el%chempot)
-     
+
      if(num%onlyphbte .and. num%phe .or. num%drag) then
         if(.not. num%read_gq2) then
            call t_event%start_timer('IBZ q e-ph interactions')
 
            !Calculate mixed Bloch-Wannier space e-ph vertex g(Re,q)
            call calculate_gReq(wann, ph, num)
-           
+
            !Calculate Bloch space e-ph vertex g(k,q) for IBZ q
            call calculate_eph_interaction_ibzq(wann, crys, el, ph, num, 'g')
 
            call t_event%end_timer('IBZ q e-ph interactions')
         end if
-        
+
         call t_event%start_timer('IBZ ph-e transition probilities')
-        
+
         !Calculate ph-e transition probabilities
         if(.not. num%Y_OTF) then
            call t_event%start_timer('IBZ ph-e transition probilities')
@@ -195,11 +195,11 @@ program elphbolt
            call t_event%end_timer('IBZ ph-e transition probilities')
         end if
      end if
-     
+
      if(num%onlyebte .or. num%drag) then
         if(.not. num%read_gk2) then
            call t_event%start_timer('IBZ k e-ph interactions')
-           
+
            !Calculate mixed Bloch-Wannier space e-ph vertex g(k,Rp)
            call calculate_gkRp(wann, el, num)
 
@@ -208,12 +208,12 @@ program elphbolt
 
            call t_event%end_timer('IBZ k e-ph interactions')
         end if
-        
+
         call t_event%start_timer('IBZ e-ph transition probabilities')
 
         !Calculate e-ph transition probabilities
         call calculate_eph_interaction_ibzk(wann, crys, el, ph, num, 'X')
-        
+
         call t_event%end_timer('IBZ e-ph transition probabilities')
      end if
 
@@ -225,7 +225,7 @@ program elphbolt
      if(num%onlyebte .or. num%drag) then
         if(num%elchimp) then
            call t_event%start_timer('e-ch. imp. interactions')
-           
+
            !Calculate e-ch. imp. transition probabilities
            call calculate_echimp_interaction_ibzk(crys, el, num)
 
@@ -238,11 +238,11 @@ program elphbolt
 !!$        !After this point the electron eigenvectors are not needed
 !!$        call el%deallocate_eigenvecs
 !!$     end if
-     
+
      if(num%onlyphbte .or. num%drag) then
         if(.not. num%read_V) then
            call t_event%start_timer('IBZ q ph-ph interactions')
-           
+
            !Calculate ph-ph vertex
            call calculate_3ph_interaction(ph, crys, num, 'V')
 
@@ -263,7 +263,7 @@ program elphbolt
         !After this point the phonon eigenvectors and other quantities are not needed
         call ph%deallocate_phonon_quantities
      end if
-     
+
      !Solve BTEs
      if(num%solve_bulk) then
         if(num%onlyphbte .and. .not. num%phe) then
@@ -275,7 +275,7 @@ program elphbolt
 
      ! Solve BTE for nanostructures  
      if(num%solve_nano) then 
-        
+
         ! Initialize the group velocities in the unbounded (selected) direction for each nanostructure
         if (.not. num%onlyebte)  call nano%compute_transport_vg('ph', ph=ph)
         if (.not. num%onlyphbte) call nano%compute_transport_vg('el', el=el)
@@ -292,7 +292,7 @@ program elphbolt
 
   case(2) !BTE Post-processing case
      call subtitle("Post-processing...")
-        
+
      !Read RTA response functions from finished calculation
      if(num%onlyphbte .and. .not. num%phe) then
         call bt%post_process(num, crys, sym, ph)
@@ -304,7 +304,7 @@ program elphbolt
   end select
 
   call t_all%end_timer('elphbolt')
-  
+
   call print_message('______________________Thanks for using elphbolt. Bye!______________________')
 
 contains
