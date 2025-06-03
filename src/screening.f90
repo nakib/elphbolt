@@ -518,7 +518,7 @@ contains
     !end if
 
     !TEST
-    numq = el%wvmesh(1)
+    numq = el%wvmesh(1)*10
     qxmesh = numq
     !Create qlist in crystal coordinates
     allocate(qlist(numq, 3), qmaglist(numq))
@@ -570,7 +570,8 @@ contains
        !     1.0_r64/qmaglist(iq)**2* &
        !     (ReX0 + oneI*ImX0)/perm0*qe*1.0e9_r64
 
-       diel(iq, :) = crys%epsiloninf - prefac*X0_qw/Gplusq_2norm
+       diel(iq, :) = 1.0_r64 - prefac*X0_qw/Gplusq_2norm
+       ! diel(iq, :) = crys%epsiloninf - prefac*X0_qw/Gplusq_2norm
        Ls(iq, :) = prefac*Gplusq_2norm*ImX0/((Gplusq_2norm*crys%epsiloninf - &
          prefac*ReX0)**2 + (prefac*ImX0)**2)
        if(iq==1) Ls(iq, :) = 1e-20_r64
