@@ -27,6 +27,7 @@ module interactions
        linspace
   use resource_module, only: resource
   use screening_module, only: spectral_head_polarizability_3d_q
+  use task_manager_module, only : task_manager
 
   use wannier_module, only: wannier
   use crystal_module, only: crystal
@@ -599,20 +600,22 @@ contains
     type(crystal), intent(in) :: crys
     type(numerics), intent(in) :: num
     character(len = 1), intent(in) :: key
+    type(task_manager) :: job
 
     !Local variables
     integer(i64) :: istate1, nstates_irred, &
          nprocs, s1, s2, s3, iq1_ibz, iq1, iq2, iq3_minus, it, &
          q1_indvec(3), q2_indvec(3), q3_minus_indvec(3), index_minus, index_plus, &
          neg_iq2, neg_q2_indvec(3), num_active_images, plus_count, minus_count, &
-         idim, jdim, nwv_gpu, ntrips_gpu, s2s3, nbands_gpu, proc_index
+         idim, jdim, nwv_gpu, ntrips_gpu, s2s3, nbands_gpu, proc_index, &
+         ibatch, num_batches, batch_range(3)
     real(r64) :: en1, en2, en3, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
          occup_fac, const, bose2, bose3, delta_minus, delta_plus, aux, load_split
     real(r64), allocatable :: Vm2_1(:), Vm2_2(:), Wm(:), Wp(:)
     integer(i64), allocatable :: istate2_plus(:), istate3_plus(:), istate2_minus(:), istate3_minus(:)
-    integer(i64), allocatable :: chunk[:], start[:], end[:]
+    integer(i64), allocatable :: chunk[:], index_start[:], index_end[:]
     complex(r64) :: phases(ph%numtriplets)
-    character(len = 1024) :: filename, filename_Wm, filename_Wp
+    character(len = 1024) :: filename, filename_Wm, filename_Wp, batch_filename
     logical :: tetrahedra_gpu
     logical, allocatable :: minus_mask(:), plus_mask(:)
     type(resource) :: compute_resource
@@ -641,10 +644,18 @@ contains
     !Total number of IBZ blocks states
     nstates_irred = ph%nwv_irred*ph%numbands
 
+    !Select the appropriate batch record filename based on the simulation key.
+    select case(key)
+    case('V')
+       batch_filename = "V2_batches"
+    case('W')
+       batch_filename = "W2_batches"
+    end select
+
     !Maximum total number of 3-phonon processes for a given initial phonon state
     nprocs = ph%nwv*ph%numbands**2
 
-    allocate(chunk[*], start[*], end[*])
+    allocate(chunk[*], index_start[*], index_end[*])
 
     if(key == 'V') then       
        !Split load among cpus and gpus
@@ -675,124 +686,149 @@ contains
          ! 1. that are non-zero when the minus-type processes are energetically allowed
          ! 2. that are non-zero when the symmetry-related plus-type processes are energetically allowed
 
-         call compute_resource%balance_load(load_split, nstates_irred, &
-              chunk, start, end, num_active_images)
 
-         !Only work with the active images
-         if(this_image() <= num_active_images) then            
-            !Run over first phonon IBZ states
-            do istate1 = start, end
-               !Demux state index into branch (s) and wave vector (iq) indices
-               call demux_state(istate1, ph%numbands, s1, iq1_ibz)
+         !Distribute the total number of states across batches.
+         call job%distribute_load(nstates_irred, num%num_batches, batch_filename)
 
-               !Muxed index of wave vector from the IBZ index list.
-               !This will be used to access IBZ information from the FBZ quantities.
-               iq1 = ph%indexlist_irred(iq1_ibz)
+         !Starting from the next unfinished batch.
+         do ibatch = job%num_finished_batches + 1, num%num_batches
+            if(this_image() == 1) then
+               write(*, '(A, I0, A, I0)') "Processing batch ", ibatch, " of ", num%num_batches
+            end if
 
-               !Energy of phonon 1
-               en1 = ph%ens(iq1, s1)
+            !Get the start, end, and the size of the current batch.
+            batch_range = job%get_batch_range(ibatch)
 
-               !Initial (IBZ blocks) wave vector (crystal coords.)
-               q1 = ph%wavevecs(iq1, :)
+            !Distribute tasks among images and add batch dependent shift.
+            call compute_resource%balance_load(load_split, batch_range(3), &
+                 chunk, index_start, index_end, num_active_images)
+            index_start = index_start + batch_range(1) - 1
+            index_end = index_end + batch_range(1) - 1
 
-               !Convert from crystal to 0-based index vector
-               q1_indvec = nint(q1*ph%wvmesh)
+            if(this_image() == 1) then
+               write(*, "(A, I10)") " batch # ", ibatch
+               write(*, "(A, I10)") " #states = ", nstates_irred/num%num_batches
+               write(*, "(A, I10)") " #states/image <= ", chunk
+            end if
 
-               !Initialize + and - process masks
-               minus_mask = .false.
-               plus_mask = .false.
+            !Only work with the active images
+            if(this_image() <= num_active_images) then            
+               !Run over first phonon IBZ states
+               do istate1 = index_start, index_end
+                  !Demux state index into branch (s) and wave vector (iq) indices
+                  call demux_state(istate1, ph%numbands, s1, iq1_ibz)
 
-               do iq2 = 1, nwv_gpu
+                  !Muxed index of wave vector from the IBZ index list.
+                  !This will be used to access IBZ information from the FBZ quantities.
+                  iq1 = ph%indexlist_irred(iq1_ibz)
+
+                  !Energy of phonon 1
+                  en1 = ph%ens(iq1, s1)
+
                   !Initial (IBZ blocks) wave vector (crystal coords.)
-                  q2 = wavevecs(iq2, :)
+                  q1 = ph%wavevecs(iq1, :)
 
                   !Convert from crystal to 0-based index vector
-                  q2_indvec = nint(q2*wvmesh)
+                  q1_indvec = nint(q1*ph%wvmesh)
 
-                  !Folded final phonon wave vector
-                  q3_minus_indvec = modulo(q1_indvec - q2_indvec, wvmesh) !0-based index vector
-                  q3_minus = q3_minus_indvec/dble(wvmesh) !crystal coords.
+                  !Initialize + and - process masks
+                  minus_mask = .false.
+                  plus_mask = .false.
 
-                  !Muxed index of q3_minus
-                  iq3_minus = mux_vector(q3_minus_indvec, wvmesh, 0_i64)
+                  do iq2 = 1, nwv_gpu
+                     !Initial (IBZ blocks) wave vector (crystal coords.)
+                     q2 = wavevecs(iq2, :)
 
-                  q2_cart = matmul(reclattvecs, q2)
-                  q3_minus_cart = matmul(reclattvecs, q3_minus)
-                  do it = 1, ntrips_gpu
-!!$                     phases(it) = &
-!!$                          expi(-dot_product(q2_cart, (R_j(:, it))) &
-!!$                          -dot_product(q3_minus_cart, (R_k(:, it))))
+                     !Convert from crystal to 0-based index vector
+                     q2_indvec = nint(q2*wvmesh)
 
-                     !Note: expi won't work on the accelerator
-                     phases(it) = exp((0.0_r64, -1.0_r64)* &
-                          (dot_product(q2_cart, (R_j(:, it))) + &
-                          dot_product(q3_minus_cart, (R_k(:, it)))))
+                     !Folded final phonon wave vector
+                     q3_minus_indvec = modulo(q1_indvec - q2_indvec, wvmesh) !0-based index vector
+                     q3_minus = q3_minus_indvec/dble(wvmesh) !crystal coords.
+
+                     !Muxed index of q3_minus
+                     iq3_minus = mux_vector(q3_minus_indvec, wvmesh, 0_i64)
+
+                     q2_cart = matmul(reclattvecs, q2)
+                     q3_minus_cart = matmul(reclattvecs, q3_minus)
+                     do it = 1, ntrips_gpu
+                        !Note: expi won't work on the accelerator
+                        phases(it) = exp((0.0_r64, -1.0_r64)* &
+                             (dot_product(q2_cart, (R_j(:, it))) + &
+                             dot_product(q3_minus_cart, (R_k(:, it)))))
+                     end do
+
+                     !Combined loop over the 2nd and 3rd phonon bands
+                     do s2s3 = 1, nbands_gpu**2
+                        s2 = int((s2s3 - 1)/nbands_gpu) + 1 !changes slow
+                        s3 = modulo(s2s3 - 1, nbands_gpu) + 1 !changes fast
+
+                        proc_index = (iq2 - 1)*nbands_gpu**2 + s2s3
+
+                        !Energy of phonon 2
+                        en2 = ens(iq2, s2)
+
+                        !Get index of -q2
+                        neg_q2_indvec = modulo(-q2_indvec, wvmesh)
+                        neg_iq2 = mux_vector(neg_q2_indvec, wvmesh, 0_i64)
+
+                        !Energy of phonon 3
+                        en3 = ens(iq3_minus, s3)
+
+                        delta_minus = delta_fn_ptr(en1 - en3, iq2, s2, wvmesh, simplex_map, &
+                             simplex_count, simplex_evals) !minus process
+
+                        delta_plus = delta_fn_ptr(en3 - en1, neg_iq2, s2, wvmesh, simplex_map, &
+                             simplex_count, simplex_evals) !plus process      
+
+                        if(en1*en2*en3 == 0.0_r64) cycle
+
+                        if(delta_minus > 0.0_r64 .or. delta_plus > 0.0_r64) &
+                             aux = Vm2_3ph(evecs(iq1, s1, :), &
+                             evecs(iq2, s2, :), evecs(iq3_minus, s3, :), &
+                             Index_i(:), Index_j(:), Index_k(:), ifc3(:,:,:,:), &
+                             phases(:), ntrips_gpu, nbands_gpu)
+
+                        if(delta_minus > 0.0_r64) then
+                           !Record energetically available minus process
+                           minus_mask(proc_index) = .true.
+                           Vm2_1(proc_index) = aux
+                        end if
+
+                        if(delta_plus > 0.0_r64) then
+                           !Record energetically available plus process
+                           plus_mask(proc_index) = .true.
+                           Vm2_2(proc_index) = aux
+                        end if
+                     end do !s2s3
+                  end do !iq2
+
+                  !Change to data output directory
+                  call chdir(trim(adjustl(num%Vdir)))
+
+                  !Write data in binary format
+                  !Note: this will overwrite existing data!
+                  write (filename, '(I9)') istate1
+                  filename = 'Vm2.istate'//trim(adjustl(filename))
+                  open(1, file = trim(filename), status = 'replace', access = 'stream')
+                  write(1) count(minus_mask, kind = i64)
+                  do proc_index = 1, nprocs
+                     if(minus_mask(proc_index)) write(1) Vm2_1(proc_index)
                   end do
+                  write(1) count(plus_mask, kind = i64)
+                  do proc_index = 1, nprocs
+                     if(plus_mask(proc_index)) write(1) Vm2_2(proc_index)
+                  end do
+                  close(1)
 
-                  !Combined loop over the 2nd and 3rd phonon bands
-                  do s2s3 = 1, nbands_gpu**2
-                     s2 = int((s2s3 - 1)/nbands_gpu) + 1 !changes slow
-                     s3 = modulo(s2s3 - 1, nbands_gpu) + 1 !changes fast
+                  !Change back to run directory
+                  call chdir(trim(adjustl(num%cwd)))
+               end do !istate1
+            end if !num_active_images
 
-                     proc_index = (iq2 - 1)*nbands_gpu**2 + s2s3
-
-                     !Energy of phonon 2
-                     en2 = ens(iq2, s2)
-
-                     !Get index of -q2
-                     neg_q2_indvec = modulo(-q2_indvec, wvmesh)
-                     neg_iq2 = mux_vector(neg_q2_indvec, wvmesh, 0_i64)
-
-                     !Energy of phonon 3
-                     en3 = ens(iq3_minus, s3)
-
-                     delta_minus = delta_fn_ptr(en1 - en3, iq2, s2, wvmesh, simplex_map, &
-                          simplex_count, simplex_evals) !minus process
-
-                     delta_plus = delta_fn_ptr(en3 - en1, neg_iq2, s2, wvmesh, simplex_map, &
-                          simplex_count, simplex_evals) !plus process      
-
-                     if(en1*en2*en3 == 0.0_r64) cycle
-
-                     if(delta_minus > 0.0_r64 .or. delta_plus > 0.0_r64) &
-                          aux = Vm2_3ph(evecs(iq1, s1, :), &
-                          evecs(iq2, s2, :), evecs(iq3_minus, s3, :), &
-                          Index_i(:), Index_j(:), Index_k(:), ifc3(:,:,:,:), &
-                          phases(:), ntrips_gpu, nbands_gpu)
-
-                     if(delta_minus > 0.0_r64) then
-                        !Record energetically available minus process
-                        minus_mask(proc_index) = .true.
-                        Vm2_1(proc_index) = aux
-                     end if
-
-                     if(delta_plus > 0.0_r64) then
-                        !Record energetically available plus process
-                        plus_mask(proc_index) = .true.
-                        Vm2_2(proc_index) = aux
-                     end if
-                  end do !s2s3
-               end do !iq2
-
-               !Change to data output directory
-               call chdir(trim(adjustl(num%Vdir)))
-
-               !Write data in binary format
-               !Note: this will overwrite existing data!
-               write (filename, '(I9)') istate1
-               filename = 'Vm2.istate'//trim(adjustl(filename))
-               open(1, file = trim(filename), status = 'replace', access = 'stream')
-               write(1) count(minus_mask, kind = i64)
-               do proc_index = 1, nprocs
-                  if(minus_mask(proc_index)) write(1) Vm2_1(proc_index)
-               end do
-               write(1) count(plus_mask, kind = i64)
-               do proc_index = 1, nprocs
-                  if(plus_mask(proc_index)) write(1) Vm2_2(proc_index)
-               end do
-               close(1)
-            end do !istate1
-         end if !num_active_images
+            sync all
+            if(this_image() == 1) call job%write_record(ibatch)
+         end do !over the batch
 
        end associate
     end if !key
@@ -804,190 +840,210 @@ contains
        allocate(istate2_plus(nprocs), istate3_plus(nprocs),&
             istate2_minus(nprocs),istate3_minus(nprocs))
 
-       call distribute_points(nstates_irred, chunk, start, end, num_active_images)
+       !Distribute the total number of states across batches.
+       call job%distribute_load(nstates_irred, num%num_batches, batch_filename)
 
-       if(this_image() == 1) then
-          write(*, "(A, I10)") " #states = ", nstates_irred
-          write(*, "(A, I10)") " #states/image <= ", chunk
-       end if
+       !Starting from the next unfinished batch.
+       do ibatch = job%num_finished_batches + 1, num%num_batches
+          if(this_image() == 1) then
+             write(*, '(A, I0, A, I0)') "Processing batch ", ibatch, " of ", num%num_batches
+          end if
 
-       !Only work with the active images
-       if(this_image() <= num_active_images) then
-          !Run over first phonon IBZ states
-          do istate1 = start, end
-             !Load |V^-|^2 from disk for scattering rates calculation
+          !Get the start, end, and size of the current batch.
+          batch_range = job%get_batch_range(ibatch)
 
-             !Change to data output directory
-             call chdir(trim(adjustl(num%Vdir)))
+          !Distribute tasks among images and add batch dependent shift.
+          call distribute_points(batch_range(3), chunk, index_start, index_end, num_active_images)
+          index_start = index_start + batch_range(1) - 1
+          index_end = index_end + batch_range(1) - 1
 
-             !Read data in binary format
-             write (filename, '(I9)') istate1
-             filename = 'Vm2.istate'//trim(adjustl(filename))
-             open(1, file = trim(filename), status = 'old', access = 'stream')
+          if(this_image() == 1) then
+             write(*, "(A, I10)") " batch # = ", ibatch
+             write(*, "(A, I10)") " #states = ", nstates_irred/num%num_batches
+             write(*, "(A, I10)") " #states/image <= ", chunk
+          end if
 
-             read(1) minus_count
-             if(allocated(Vm2_1)) deallocate(Vm2_1)
-             allocate(Vm2_1(minus_count))
-             if(minus_count > 0) read(1) Vm2_1
+          !Only work with the active images
+          if(this_image() <= num_active_images) then
+             !Run over first phonon IBZ states
+             do istate1 = index_start, index_end
+                !Load |V^-|^2 from disk for scattering rates calculation
 
-             read(1) plus_count
-             if(allocated(Vm2_2)) deallocate(Vm2_2)
-             allocate(Vm2_2(plus_count))
-             if(plus_count > 0) read(1) Vm2_2
-             close(1)
+                !Change to data output directory
+                call chdir(trim(adjustl(num%Vdir)))
 
-             !Change back to working directory
-             call chdir(num%cwd)
+                !Read data in binary format
+                write (filename, '(I9)') istate1
+                filename = 'Vm2.istate'//trim(adjustl(filename))
+                open(1, file = trim(filename), status = 'old', access = 'stream')
 
-             !Initialize transition probabilities
-             Wp(:) = 0.0_r64
-             Wm(:) = 0.0_r64
-             istate2_plus(:) = 0_i64
-             istate3_plus(:) = 0_i64
-             istate2_minus(:) = 0_i64
-             istate3_minus(:) = 0_i64
+                read(1) minus_count
+                if(allocated(Vm2_1)) deallocate(Vm2_1)
+                allocate(Vm2_1(minus_count))
+                if(minus_count > 0) read(1) Vm2_1
 
-             !Initialize process counters
-             plus_count = 0_i64
-             minus_count = 0_i64
+                read(1) plus_count
+                if(allocated(Vm2_2)) deallocate(Vm2_2)
+                allocate(Vm2_2(plus_count))
+                if(plus_count > 0) read(1) Vm2_2
+                close(1)
 
-             !Demux state index into branch (s) and wave vector (iq) indices
-             call demux_state(istate1, ph%numbands, s1, iq1_ibz)
+                !Change back to working directory
+                call chdir(num%cwd)
 
-             !Muxed index of wave vector from the IBZ index list.
-             !This will be used to access IBZ information from the FBZ quantities.
-             iq1 = ph%indexlist_irred(iq1_ibz)
+                !Initialize transition probabilities
+                Wp(:) = 0.0_r64
+                Wm(:) = 0.0_r64
+                istate2_plus(:) = 0_i64
+                istate3_plus(:) = 0_i64
+                istate2_minus(:) = 0_i64
+                istate3_minus(:) = 0_i64
 
-             !Energy of phonon 1
-             en1 = ph%ens(iq1, s1)
+                !Initialize process counters
+                plus_count = 0_i64
+                minus_count = 0_i64
 
-             !Initial (IBZ blocks) wave vector (crystal coords.)
-             q1 = ph%wavevecs(iq1, :)
+                !Demux state index into branch (s) and wave vector (iq) indices
+                call demux_state(istate1, ph%numbands, s1, iq1_ibz)
 
-             !Convert from crystal to 0-based index vector
-             q1_indvec = nint(q1*ph%wvmesh)
+                !Muxed index of wave vector from the IBZ index list.
+                !This will be used to access IBZ information from the FBZ quantities.
+                iq1 = ph%indexlist_irred(iq1_ibz)
 
-             !Run over second (FBZ) phonon wave vectors
-             do iq2 = 1, ph%nwv
+                !Energy of phonon 1
+                en1 = ph%ens(iq1, s1)
+
                 !Initial (IBZ blocks) wave vector (crystal coords.)
-                q2 = ph%wavevecs(iq2, :)
+                q1 = ph%wavevecs(iq1, :)
 
                 !Convert from crystal to 0-based index vector
-                q2_indvec = nint(q2*ph%wvmesh)
+                q1_indvec = nint(q1*ph%wvmesh)
 
-                !Folded final phonon wave vector
-                q3_minus_indvec = modulo(q1_indvec - q2_indvec, ph%wvmesh) !0-based index vector
-                q3_minus = q3_minus_indvec/dble(ph%wvmesh) !crystal coords.
+                !Run over second (FBZ) phonon wave vectors
+                do iq2 = 1, ph%nwv
+                   !Initial (IBZ blocks) wave vector (crystal coords.)
+                   q2 = ph%wavevecs(iq2, :)
 
-                !Muxed index of q3_minus
-                iq3_minus = mux_vector(q3_minus_indvec, ph%wvmesh, 0_i64)
+                   !Convert from crystal to 0-based index vector
+                   q2_indvec = nint(q2*ph%wvmesh)
 
-                !Combined loop over the 2nd and 3rd phonon bands
-                do s2s3 = 1, ph%numbands**2
-                   s2 = int((s2s3 - 1)/ph%numbands) + 1 !changes slow
-                   s3 = modulo(s2s3 - 1, ph%numbands) + 1 !changes fast
+                   !Folded final phonon wave vector
+                   q3_minus_indvec = modulo(q1_indvec - q2_indvec, ph%wvmesh) !0-based index vector
+                   q3_minus = q3_minus_indvec/dble(ph%wvmesh) !crystal coords.
 
-                   !Energy of phonon 2
-                   en2 = ph%ens(iq2, s2)
+                   !Muxed index of q3_minus
+                   iq3_minus = mux_vector(q3_minus_indvec, ph%wvmesh, 0_i64)
 
-                   !Get index of -q2
-                   neg_q2_indvec = modulo(-q2_indvec, ph%wvmesh)
-                   neg_iq2 = mux_vector(neg_q2_indvec, ph%wvmesh, 0_i64)
+                   !Combined loop over the 2nd and 3rd phonon bands
+                   do s2s3 = 1, ph%numbands**2
+                      s2 = int((s2s3 - 1)/ph%numbands) + 1 !changes slow
+                      s3 = modulo(s2s3 - 1, ph%numbands) + 1 !changes fast
 
-                   !Bose factor for phonon 2
-                   bose2 = Bose(en2, crys%T)
+                      !Energy of phonon 2
+                      en2 = ph%ens(iq2, s2)
 
-                   !Minus process index
-                   index_minus = ((iq2 - 1)*ph%numbands + (s2 - 1))*ph%numbands + s3
+                      !Get index of -q2
+                      neg_q2_indvec = modulo(-q2_indvec, ph%wvmesh)
+                      neg_iq2 = mux_vector(neg_q2_indvec, ph%wvmesh, 0_i64)
 
-                   !Energy of phonon 3
-                   en3 = ph%ens(iq3_minus, s3)
+                      !Bose factor for phonon 2
+                      bose2 = Bose(en2, crys%T)
 
-                   !Evaluate delta functions
-                   delta_minus = delta_fn_ptr(en1 - en3, iq2, s2, ph%wvmesh, ph%simplex_map, &
-                        ph%simplex_count, ph%simplex_evals) !minus process
+                      !Minus process index
+                      index_minus = ((iq2 - 1)*ph%numbands + (s2 - 1))*ph%numbands + s3
 
-                   delta_plus = delta_fn_ptr(en3 - en1, neg_iq2, s2, ph%wvmesh, ph%simplex_map, &
-                        ph%simplex_count, ph%simplex_evals) !plus process
+                      !Energy of phonon 3
+                      en3 = ph%ens(iq3_minus, s3)
 
-                   if(en1*en2*en3 == 0.0_r64) cycle
+                      !Evaluate delta functions
+                      delta_minus = delta_fn_ptr(en1 - en3, iq2, s2, ph%wvmesh, ph%simplex_map, &
+                           ph%simplex_count, ph%simplex_evals) !minus process
 
-                   !Bose factor for phonon 3
-                   bose3 = Bose(en3, crys%T)
+                      delta_plus = delta_fn_ptr(en3 - en1, neg_iq2, s2, ph%wvmesh, ph%simplex_map, &
+                           ph%simplex_count, ph%simplex_evals) !plus process
 
-                   !Calculate W-:
+                      if(en1*en2*en3 == 0.0_r64) cycle
 
-                   !Temperature dependent occupation factor
-                   !(bose1 + 1)*bose2*bose3/(bose1*(bose1 + 1))
-                   ! = (bose2 + bose3 + 1)
-                   occup_fac = (bose2 + bose3 + 1.0_r64)
+                      !Bose factor for phonon 3
+                      bose3 = Bose(en3, crys%T)
 
-                   if(delta_minus > 0.0_r64) then
-                      !Non-zero process counter
-                      minus_count = minus_count + 1
+                      !Calculate W-:
 
-                      !Save W-
-                      Wm(minus_count) = Vm2_1(minus_count)*occup_fac*delta_minus/en1/en2/en3
-                      istate2_minus(minus_count) = mux_state(ph%numbands, s2, iq2)
-                      istate3_minus(minus_count) = mux_state(ph%numbands, s3, iq3_minus)
-                   end if
+                      !Temperature dependent occupation factor
+                      !(bose1 + 1)*bose2*bose3/(bose1*(bose1 + 1))
+                      ! = (bose2 + bose3 + 1)
+                      occup_fac = (bose2 + bose3 + 1.0_r64)
 
-                   !Calculate W+:
+                      if(delta_minus > 0.0_r64) then
+                         !Non-zero process counter
+                         minus_count = minus_count + 1
 
-                   !Grab index of corresponding plus process using
-                   !|V-(s1q1|s2q2,s3q3)|^2 = |V+(s1q1|s2-q2,s3q3)|^2
-                   index_plus = ((neg_iq2 - 1)*ph%numbands + (s2 - 1))*ph%numbands + s3
+                         !Save W-
+                         Wm(minus_count) = Vm2_1(minus_count)*occup_fac*delta_minus/en1/en2/en3
+                         istate2_minus(minus_count) = mux_state(ph%numbands, s2, iq2)
+                         istate3_minus(minus_count) = mux_state(ph%numbands, s3, iq3_minus)
+                      end if
 
-                   !Temperature dependent occupation factor
-                   !(bose1 + 1)*(bose2 + 1)*bose3/(bose1*(bose1 + 1))
-                   ! = bose2 - bose3.
-                   occup_fac = (bose2 - bose3)
+                      !Calculate W+:
 
-                   if(delta_plus > 0.0_r64) then
-                      !Non-zero process counter
-                      plus_count = plus_count + 1
+                      !Grab index of corresponding plus process using
+                      !|V-(s1q1|s2q2,s3q3)|^2 = |V+(s1q1|s2-q2,s3q3)|^2
+                      index_plus = ((neg_iq2 - 1)*ph%numbands + (s2 - 1))*ph%numbands + s3
 
-                      !Save W+
-                      Wp(plus_count) = Vm2_2(plus_count)*occup_fac*delta_plus/en1/en2/en3
-                      istate2_plus(plus_count) = mux_state(ph%numbands, s2, neg_iq2)
-                      istate3_plus(plus_count) = mux_state(ph%numbands, s3, iq3_minus)
-                   end if
-                end do !s2s3
-             end do !iq2
+                      !Temperature dependent occupation factor
+                      !(bose1 + 1)*(bose2 + 1)*bose3/(bose1*(bose1 + 1))
+                      ! = bose2 - bose3.
+                      occup_fac = (bose2 - bose3)
 
-             !Multiply constant factor, unit factor, etc.
-             Wm(:) = const*Wm(:) !THz
-             Wp(:) = const*Wp(:) !THz
+                      if(delta_plus > 0.0_r64) then
+                         !Non-zero process counter
+                         plus_count = plus_count + 1
 
-             !Write W+ and W- to disk
-             !Change to data output directory
-             call chdir(trim(adjustl(num%Wdir)))
+                         !Save W+
+                         Wp(plus_count) = Vm2_2(plus_count)*occup_fac*delta_plus/en1/en2/en3
+                         istate2_plus(plus_count) = mux_state(ph%numbands, s2, neg_iq2)
+                         istate3_plus(plus_count) = mux_state(ph%numbands, s3, iq3_minus)
+                      end if
+                   end do !s2s3
+                end do !iq2
 
-             !Write data in binary format
-             !Note: this will overwrite existing data!
-             write (filename, '(I9)') istate1
+                !Multiply constant factor, unit factor, etc.
+                Wm(:) = const*Wm(:) !THz
+                Wp(:) = const*Wp(:) !THz
 
-             filename_Wm = 'Wm.istate'//trim(adjustl(filename))
-             open(1, file = trim(filename_Wm), status = 'replace', access = 'stream')
-             write(1) minus_count
-             write(1) Wm(1:minus_count)
-             write(1) istate2_minus(1:minus_count)
-             write(1) istate3_minus(1:minus_count)
-             close(1)
+                !Write W+ and W- to disk
+                !Change to data output directory
+                call chdir(trim(adjustl(num%Wdir)))
 
-             filename_Wp = 'Wp.istate'//trim(adjustl(filename))
-             open(1, file = trim(filename_Wp), status = 'replace', access = 'stream')
-             write(1) plus_count
-             write(1) Wp(1:plus_count)
-             write(1) istate2_plus(1:plus_count)
-             write(1) istate3_plus(1:plus_count)
-             close(1)
+                !Write data in binary format
+                !Note: this will overwrite existing data!
+                write (filename, '(I9)') istate1
 
-             !Change back to working directory
-             call chdir(num%cwd)
-          end do
-       end if
-    end if
+                filename_Wm = 'Wm.istate'//trim(adjustl(filename))
+                open(1, file = trim(filename_Wm), status = 'replace', access = 'stream')
+                write(1) minus_count
+                write(1) Wm(1:minus_count)
+                write(1) istate2_minus(1:minus_count)
+                write(1) istate3_minus(1:minus_count)
+                close(1)
+
+                filename_Wp = 'Wp.istate'//trim(adjustl(filename))
+                open(1, file = trim(filename_Wp), status = 'replace', access = 'stream')
+                write(1) plus_count
+                write(1) Wp(1:plus_count)
+                write(1) istate2_plus(1:plus_count)
+                write(1) istate3_plus(1:plus_count)
+                close(1)
+
+                !Change back to working directory
+                call chdir(num%cwd)
+             end do!istate1
+          end if!num_active_image
+
+          sync all
+          if(this_image() == 1) call job%write_record(ibatch)
+       end do!over the batches.
+    end if!key
 
     if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
 
@@ -1290,16 +1346,18 @@ contains
     type(phonon), intent(in) :: ph
     type(numerics), intent(in) :: num
     character(len = 1), intent(in) :: key
+    type(task_manager) :: job
 
     !Local variables
     integer(i64) :: nstates_irred, istate, m, iq, iq_fbz, n, ik, s, &
-         ikp_window, start, end, chunk, nprocs, count, num_active_images
+         ikp_window, index_start, index_end, chunk, nprocs, count, num_active_images, &
+         ibatch, num_batches, batch_range(3)
     integer(i64), allocatable :: istate1(:), istate2(:)
     real(r64) :: en_ph, en_el, en_elp, const, delta, &
          bose1, invboseplus1, invboseboseplus1, fermi1, fermi2, occup_fac
     real(r64), allocatable :: g2_istate(:), TP_istate(:)
     complex(r64), allocatable :: gReq_iq(:,:,:,:)
-    character(len = 1024) :: filename
+    character(len = 1024) :: filename, batch_filename
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
     type(vec) :: q_vec, k_vec, kp_vec
 
@@ -1333,221 +1391,251 @@ contains
     !Total number of IBZ blocks states
     nstates_irred = ph%nwv_irred*ph%numbands
 
-    call distribute_points(nstates_irred, chunk, start, end, num_active_images)
+    !Select the appropriate batch record filename based on the simulation key.
+    select case(key)
+    case('g')
+       batch_filename = "g2_ibzq_batches"
+    case('Y')
+       batch_filename = "Y2_ibzq_batches"
+    case('U') 
+       batch_filename = "U2_ibzq_batches"
+    end select
 
-    if(this_image() == 1) then
-       write(*, "(A, I10)") " #states = ", nstates_irred
-       write(*, "(A, I10)") " #states/image <= ", chunk
-    end if
+    !Distributethe total number of states across batches.
+    call job%distribute_load(nstates_irred, num%num_batches, batch_filename)
 
-    !Only work with the active images
-    if(this_image() <= num_active_images) then
-       do istate = start, end !over IBZ blocks states
-          !Demux state index into branch (s) and wave vector (iq) indices
-          call demux_state(istate, ph%numbands, s, iq)
+    !Starting from the next unfinished batch.
+    do ibatch = job%num_finished_batches + 1, num%num_batches
+       if(this_image() == 1) then
+          write(*, '(A, I0, A, I0)') "Processing batch ", ibatch, " of ", num%num_batches
+       end if
 
-          if(key == 'g') then
-             !Load gReq(iq) here for use inside the loops below
-             call chdir(trim(adjustl(num%g2dir)))
-             write (filename, '(I6)') iq
-             filename = 'gReq.iq'//trim(adjustl(filename))
+       !Get the start, end and size of the current batch.
+       batch_range = job%get_batch_range(ibatch)
 
-             open(1,file=filename,status="old",access='stream')
-             read(1) gReq_iq
-             close(1)
-             call chdir(num%cwd)
-          end if
+       !Distribute tasks among images and add batch dependent shift.
+       call distribute_points(batch_range(3), chunk, index_start, index_end, num_active_images)
+       index_start = index_start + batch_range(1) - 1
+       index_end = index_end + batch_range(1) - 1
 
-          !Get the muxed index of FBZ wave vector from the IBZ index list
-          iq_fbz = ph%indexlist_irred(iq)
+       if(this_image() == 1) then
+          write(*, "(A, I10)") " batch # = ", ibatch
+          write(*, "(A, I10)") " #states = ", nstates_irred/num%num_batches
+          write(*, "(A, I10)") " #states/image <= ", chunk
+       end if
 
-          !Energy of phonon
-          en_ph = ph%ens(iq_fbz, s)
+       !Only work with the active images
+       if(this_image() <= num_active_images) then
+          do istate = index_start, index_end !over IBZ blocks states
+             !Demux state index into branch (s) and wave vector (iq) indices
+             call demux_state(istate, ph%numbands, s, iq)
 
-          !Create phonon wave vector
-          q_vec = vec(iq_fbz, ph%wvmesh, crys%reclattvecs)
+             if(key == 'g') then
+                !Load gReq(iq) here for use inside the loops below
+                call chdir(trim(adjustl(num%g2dir)))
+                write (filename, '(I6)') iq
+                filename = 'gReq.iq'//trim(adjustl(filename))
 
-          !1/(1 + Bose factor) for phonon
-          if(key == 'Y') then
-             if(en_ph /= 0.0_r64) then
-                invboseplus1 = 1.0_r64/(1.0_r64 + Bose(en_ph, crys%T))
-             else
-                invboseplus1 = 0.0_r64
+                open(1,file=filename,status="old",access='stream')
+                read(1) gReq_iq
+                close(1)
+                call chdir(num%cwd)
              end if
-          end if
 
-          !1/Bose/(1 + Bose) for phonon
-          if(key == 'U') then
-             if(en_ph /= 0.0_r64) then
-                bose1 = Bose(en_ph, crys%T)
-                invboseboseplus1 = 1.0_r64/bose1/(1.0_r64 + bose1)
-             else
-                invboseboseplus1 = 0.0_r64
+             !Get the muxed index of FBZ wave vector from the IBZ index list
+             iq_fbz = ph%indexlist_irred(iq)
+
+             !Energy of phonon
+             en_ph = ph%ens(iq_fbz, s)
+
+             !Create phonon wave vector
+             q_vec = vec(iq_fbz, ph%wvmesh, crys%reclattvecs)
+
+             !1/(1 + Bose factor) for phonon
+             if(key == 'Y') then
+                if(en_ph /= 0.0_r64) then
+                   invboseplus1 = 1.0_r64/(1.0_r64 + Bose(en_ph, crys%T))
+                else
+                   invboseplus1 = 0.0_r64
+                end if
              end if
-          end if
 
-          !Load g2_istate from disk for scattering rates calculation
-          if(key /= 'g') then
-             !Change to data output directory
-             call chdir(trim(adjustl(num%g2dir)))
+             !1/Bose/(1 + Bose) for phonon
+             if(key == 'U') then
+                if(en_ph /= 0.0_r64) then
+                   bose1 = Bose(en_ph, crys%T)
+                   invboseboseplus1 = 1.0_r64/bose1/(1.0_r64 + bose1)
+                else
+                   invboseboseplus1 = 0.0_r64
+                end if
+             end if
 
-             !Read data in binary format
-             write (filename, '(I9)') istate
-             filename = 'gq2.istate'//trim(adjustl(filename))
-             open(1, file = trim(filename), status = 'old', access = 'stream')
-             read(1) nprocs
-             if(allocated(g2_istate)) deallocate(g2_istate, TP_istate, istate1, istate2)
-             allocate(g2_istate(nprocs))
-             if(nprocs > 0) read(1) g2_istate
-             close(1)
+             !Load g2_istate from disk for scattering rates calculation
+             if(key /= 'g') then
+                !Change to data output directory
+                call chdir(trim(adjustl(num%g2dir)))
+
+                !Read data in binary format
+                write (filename, '(I9)') istate
+                filename = 'gq2.istate'//trim(adjustl(filename))
+                open(1, file = trim(filename), status = 'old', access = 'stream')
+                read(1) nprocs
+                if(allocated(g2_istate)) deallocate(g2_istate, TP_istate, istate1, istate2)
+                allocate(g2_istate(nprocs))
+                if(nprocs > 0) read(1) g2_istate
+                close(1)
+
+                !Change back to working directory
+                call chdir(num%cwd)
+
+                !Allocate and initialize quantities related to transition probabilities
+                allocate(TP_istate(nprocs))
+                allocate(istate1(nprocs), istate2(nprocs))
+                istate1(:) = -1_i64
+                istate2(:) = -1_i64
+                TP_istate(:) = 0.0_r64
+             end if
+
+             !Initialize process counter
+             count = 0
+
+             !Run over initial (in-window, FBZ blocks) electron wave vectors
+             do ik = 1, el%nwv
+                !Initial wave vector (crystal coords.)
+                k_vec = vec(el%indexlist(ik), el%wvmesh, crys%reclattvecs)
+
+                !Find final electron wave vector
+                kp_vec = vec_add(k_vec, q_vec, el%wvmesh, crys%reclattvecs) 
+
+                !Check if final electron wave vector is within energy window
+                call binsearch(el%indexlist, kp_vec%muxed_index, ikp_window)
+                if(ikp_window < 0) cycle
+
+                !Run over initial electron bands
+                do m = 1, el%numbands                
+                   !Energy of initial electron
+                   en_el = el%ens(ik, m)
+
+                   !Apply energy window to initial electron
+                   if(abs(en_el - el%enref) > el%fsthick) cycle
+
+                   !Fermi factor for initial and final electrons
+                   if(key /= 'g') then
+                      fermi1 = Fermi(en_el, el%chempot, crys%T)
+                      fermi2 = Fermi(en_el + en_ph, el%chempot, crys%T)
+                   end if
+
+                   !Run over final electron bands
+                   do n = 1, el%numbands
+                      !Energy of final electron
+                      en_elp = el%ens(ikp_window, n)
+
+                      !Apply energy window to final electron
+                      if(abs(en_elp - el%enref) > el%fsthick) cycle
+
+                      !Increment g2 process counter
+                      count = count + 1
+
+                      if(key == 'g') then
+                         !Calculate |g_mns(k,<q>)|^2
+                         g2_istate(count) = wann%g2(crys, &
+                              k_vec%frac, q_vec%frac, &
+                              el%evecs(ik, m, :), el%evecs(ikp_window, n, :), &
+                              ph%evecs(iq_fbz, s, :), &
+                              ph%ens(iq_fbz, s), gReq_iq, 'el')
+                      end if
+
+                      if(key == 'Y') then                   
+                         !Evaluate delta function
+                         delta = delta_fn_ptr(en_elp - en_ph, ik, m, el%wvmesh, &
+                              el%simplex_map, el%simplex_count, el%simplex_evals)
+
+                         !Temperature dependent occupation factor
+                         occup_fac = fermi1*(1.0_r64 - fermi2)*invboseplus1
+
+                         !Save Y
+                         if(en_ph >= 0.5e-3) then !Use a small phonon energy cut-off
+                            TP_istate(count) = g2_istate(count)*occup_fac*delta
+                         end if
+
+                         !Save initial and final electron states
+                         istate1(count) = mux_state(el%numbands, m, ik)
+                         istate2(count) = mux_state(el%numbands, n, ikp_window)
+                      end if
+
+                      if(key == 'U') then                   
+                         !Evaluate delta function
+                         delta = delta_fn_ptr(en_elp + en_ph, ik, m, el%wvmesh, &
+                              el%simplex_map, el%simplex_count, el%simplex_evals)
+
+                         !Temperature dependent occupation factor
+                         occup_fac = (fermi1 - fermi2)*invboseboseplus1
+
+                         !Save U
+                         if(en_ph >= 0.5e-3) then !Use a small phonon energy cut-off
+                            TP_istate(count) = g2_istate(count)*occup_fac*delta
+                         end if
+
+                         !TODO: Check if these are actually every needed later
+                         !Save initial and final electron states
+                         istate1(count) = mux_state(el%numbands, m, ik)
+                         istate2(count) = mux_state(el%numbands, n, ikp_window)
+                      end if
+                   end do !n
+                end do !m
+             end do !ik
+
+             if(key == 'g') then
+                !Change to data output directory
+                call chdir(trim(adjustl(num%g2dir)))
+
+                !Write data in binary format
+                !Note: this will overwrite existing data!
+                write (filename, '(I9)') istate
+                filename = 'gq2.istate'//trim(adjustl(filename))
+                open(1, file = trim(filename), status = 'replace', access = 'stream')
+                write(1) count
+                write(1) g2_istate(1:count)
+                close(1)
+             end if
+
+             if(key == 'Y') then
+                write (filename, '(I9)') istate
+                filename = 'Y.istate'//trim(adjustl(filename))
+             end if
+
+             if(key == 'U') then
+                write (filename, '(I9)') istate
+                filename = 'U.istate'//trim(adjustl(filename))
+             end if
+
+             if(key /= 'g') then
+                !Multiply constant factor, unit factor, etc.
+                TP_istate(1:count) = const*TP_istate(1:count) !THz
+
+                !Change to data output directory
+                call chdir(trim(adjustl(num%Ydir)))
+
+                !Write data in binary format
+                !Note: this will overwrite existing data!
+                open(1, file = trim(filename), status = 'replace', access = 'stream')
+                write(1) count
+                write(1) TP_istate(1:count)
+                write(1) istate1(1:count)
+                write(1) istate2(1:count)
+                close(1)
+             end if
 
              !Change back to working directory
              call chdir(num%cwd)
 
-             !Allocate and initialize quantities related to transition probabilities
-             allocate(TP_istate(nprocs))
-             allocate(istate1(nprocs), istate2(nprocs))
-             istate1(:) = -1_i64
-             istate2(:) = -1_i64
-             TP_istate(:) = 0.0_r64
-          end if
+             if(key /= 'g') deallocate(g2_istate, TP_istate, istate1, istate2)
+          end do
+       end if
 
-          !Initialize process counter
-          count = 0
-
-          !Run over initial (in-window, FBZ blocks) electron wave vectors
-          do ik = 1, el%nwv
-             !Initial wave vector (crystal coords.)
-             k_vec = vec(el%indexlist(ik), el%wvmesh, crys%reclattvecs)
-
-             !Find final electron wave vector
-             kp_vec = vec_add(k_vec, q_vec, el%wvmesh, crys%reclattvecs) 
-
-             !Check if final electron wave vector is within energy window
-             call binsearch(el%indexlist, kp_vec%muxed_index, ikp_window)
-             if(ikp_window < 0) cycle
-
-             !Run over initial electron bands
-             do m = 1, el%numbands                
-                !Energy of initial electron
-                en_el = el%ens(ik, m)
-
-                !Apply energy window to initial electron
-                if(abs(en_el - el%enref) > el%fsthick) cycle
-
-                !Fermi factor for initial and final electrons
-                if(key /= 'g') then
-                   fermi1 = Fermi(en_el, el%chempot, crys%T)
-                   fermi2 = Fermi(en_el + en_ph, el%chempot, crys%T)
-                end if
-
-                !Run over final electron bands
-                do n = 1, el%numbands
-                   !Energy of final electron
-                   en_elp = el%ens(ikp_window, n)
-
-                   !Apply energy window to final electron
-                   if(abs(en_elp - el%enref) > el%fsthick) cycle
-
-                   !Increment g2 process counter
-                   count = count + 1
-
-                   if(key == 'g') then
-                      !Calculate |g_mns(k,<q>)|^2
-                      g2_istate(count) = wann%g2(crys, &
-                           k_vec%frac, q_vec%frac, &
-                           el%evecs(ik, m, :), el%evecs(ikp_window, n, :), &
-                           ph%evecs(iq_fbz, s, :), &
-                           ph%ens(iq_fbz, s), gReq_iq, 'el')
-                   end if
-
-                   if(key == 'Y') then                   
-                      !Evaluate delta function
-                      delta = delta_fn_ptr(en_elp - en_ph, ik, m, el%wvmesh, &
-                           el%simplex_map, el%simplex_count, el%simplex_evals)
-
-                      !Temperature dependent occupation factor
-                      occup_fac = fermi1*(1.0_r64 - fermi2)*invboseplus1
-
-                      !Save Y
-                      if(en_ph >= 0.5e-3) then !Use a small phonon energy cut-off
-                         TP_istate(count) = g2_istate(count)*occup_fac*delta
-                      end if
-
-                      !Save initial and final electron states
-                      istate1(count) = mux_state(el%numbands, m, ik)
-                      istate2(count) = mux_state(el%numbands, n, ikp_window)
-                   end if
-
-                   if(key == 'U') then                   
-                      !Evaluate delta function
-                      delta = delta_fn_ptr(en_elp + en_ph, ik, m, el%wvmesh, &
-                           el%simplex_map, el%simplex_count, el%simplex_evals)
-
-                      !Temperature dependent occupation factor
-                      occup_fac = (fermi1 - fermi2)*invboseboseplus1
-
-                      !Save U
-                      if(en_ph >= 0.5e-3) then !Use a small phonon energy cut-off
-                         TP_istate(count) = g2_istate(count)*occup_fac*delta
-                      end if
-
-                      !TODO: Check if these are actually every needed later
-                      !Save initial and final electron states
-                      istate1(count) = mux_state(el%numbands, m, ik)
-                      istate2(count) = mux_state(el%numbands, n, ikp_window)
-                   end if
-                end do !n
-             end do !m
-          end do !ik
-
-          if(key == 'g') then
-             !Change to data output directory
-             call chdir(trim(adjustl(num%g2dir)))
-
-             !Write data in binary format
-             !Note: this will overwrite existing data!
-             write (filename, '(I9)') istate
-             filename = 'gq2.istate'//trim(adjustl(filename))
-             open(1, file = trim(filename), status = 'replace', access = 'stream')
-             write(1) count
-             write(1) g2_istate(1:count)
-             close(1)
-          end if
-
-          if(key == 'Y') then
-             write (filename, '(I9)') istate
-             filename = 'Y.istate'//trim(adjustl(filename))
-          end if
-
-          if(key == 'U') then
-             write (filename, '(I9)') istate
-             filename = 'U.istate'//trim(adjustl(filename))
-          end if
-
-          if(key /= 'g') then
-             !Multiply constant factor, unit factor, etc.
-             TP_istate(1:count) = const*TP_istate(1:count) !THz
-
-             !Change to data output directory
-             call chdir(trim(adjustl(num%Ydir)))
-
-             !Write data in binary format
-             !Note: this will overwrite existing data!
-             open(1, file = trim(filename), status = 'replace', access = 'stream')
-             write(1) count
-             write(1) TP_istate(1:count)
-             write(1) istate1(1:count)
-             write(1) istate2(1:count)
-             close(1)
-          end if
-
-          !Change back to working directory
-          call chdir(num%cwd)
-
-          if(key /= 'g') deallocate(g2_istate, TP_istate, istate1, istate2)
-       end do
-    end if
+       sync all
+       if(this_image() == 1) call job%write_record(ibatch)
+    end do !over the batches
     sync all
 
     if(key == 'g') then
@@ -2008,10 +2096,12 @@ contains
     type(phonon), intent(in) :: ph
     type(numerics), intent(in) :: num
     character(len = 1), intent(in) :: key
+    type(task_manager) :: job
 
     !Local variables
     integer(i64) :: nstates_irred, istate, m, ik, ik_fbz, n, ikp, s, &
-         iq_fine, iq_coarse, start, end, chunk, count, nprocs, num_active_images
+         iq_fine, iq_coarse, index_start, index_end, chunk, count, nprocs, num_active_images, &
+         ibatch, num_batches, batch_range(3)
     real(r64) :: ph_ens_iq(1, ph%numbands), qlist(1, 3), &
          const, bosefac, fermi_minus_fac, fermi_plus_fac, en_ph, en_el, delta_plus, delta_minus, &
          occup_fac_plus, occup_fac_minus
@@ -2019,7 +2109,7 @@ contains
     integer(i64), allocatable :: istate_el(:), istate_ph(:)
     complex(r64), allocatable :: gkRp_ik(:, :, :, :)
     complex(r64) :: ph_evecs_iq(1, ph%numbands,ph%numbands)
-    character(len = 1024) :: filename_g, filename_plus, filename_minus
+    character(len = 1024) :: filename_g, filename_plus, filename_minus, batch_filename
     logical :: needfinephon
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
     type(vec) :: k_vec, kp_vec, q_vec, q_vec_coarse
@@ -2054,243 +2144,273 @@ contains
     !Total number of IBZ blocks states
     nstates_irred = el%nwv_irred*wann%numwannbands
 
-    call distribute_points(nstates_irred, chunk, start, end, num_active_images)
+    !Select the appropriate batch record filename based on the simulation key.
+    select case(key)
+    case('g')
+       batch_filename = "g2_ibzk_batches"
+    case('X')
+       batch_filename = "X2_ibzk_batches"
+    case('O')
+       batch_filename = "O2_ibzk_batches"
+    end select
 
-    if(this_image() == 1) then
-       write(*, "(A, I10)") " #states = ", nstates_irred
-       write(*, "(A, I10)") " #states/image <= ", chunk
-    end if
+    !Distribute the total number of states across batches.
+    call job%distribute_load(nstates_irred, num%num_batches, batch_filename)
 
-    !Only work with the active images
-    if(this_image() <= num_active_images) then
-       do istate = start, end !over IBZ blocks states
-          !Demux state index into band (m) and wave vector (ik) indices
-          call demux_state(istate, wann%numwannbands, m, ik)
+    !Starting from the next unfinished batch.
+    do ibatch = job%num_finished_batches + 1, num%num_batches
+       if(this_image() == 1) then
+          write(*, '(A, I0, A, I0)') "Processing batch ", ibatch, " of ", num%num_batches
+       end if
 
-          if(key == 'g') then
-             !Load gkRp(ik) here for use inside the loops below
-             call chdir(trim(adjustl(num%g2dir)))
-             write (filename_g, '(I6)') ik
-             filename_g = 'gkRp.ik'//trim(adjustl(filename_g))
-             open(1,file=filename_g,status="old",access='stream')
-             read(1) gkRp_ik
-             close(1)
-             call chdir(num%cwd)
-          end if
+       !Get the start, end, and size of the current batch.
+       batch_range = job%get_batch_range(ibatch)
 
-          !Get the muxed index of FBZ wave vector from the IBZ index list
-          ik_fbz = el%indexlist_irred(ik)
+       !Distribute tasks among images and add batch dependent shift.
+       call distribute_points(batch_range(3), chunk, index_start, index_end, num_active_images)
+       index_start = index_start + batch_range(1) - 1
+       index_end = index_end + batch_range(1) - 1
 
-          !Electron energy
-          en_el = el%ens_irred(ik, m)
+       if(this_image() == 1) then
+          write(*, "(A, I10)") " batch # = ", ibatch
+          write(*, "(A, I10)") " #states = ", nstates_irred/num%num_batches
+          write(*, "(A, I10)") " #states/image <= ", chunk
+       end if
 
-          !Apply energy window to initial (IBZ blocks) electron
-          if(abs(en_el - el%enref) > el%fsthick) cycle
+       !Only work with the active images
+       if(this_image() <= num_active_images) then
+          do istate = index_start, index_end !over IBZ blocks states
+             !Demux state index into band (m) and wave vector (ik) indices
+             call demux_state(istate, wann%numwannbands, m, ik)
 
-          !Create initial electron wave vector
-          k_vec = vec(ik_fbz, el%wvmesh, crys%reclattvecs)
+             if(key == 'g') then
+                !Load gkRp(ik) here for use inside the loops below
+                call chdir(trim(adjustl(num%g2dir)))
+                write (filename_g, '(I6)') ik
+                filename_g = 'gkRp.ik'//trim(adjustl(filename_g))
+                open(1,file=filename_g,status="old",access='stream')
+                read(1) gkRp_ik
+                close(1)
+                call chdir(num%cwd)
+             end if
 
-          !Load g2_istate from disk for scattering rates calculation
-          if(key /= 'g') then
-             !Change to data output directory
-             call chdir(trim(adjustl(num%g2dir)))
+             !Get the muxed index of FBZ wave vector from the IBZ index list
+             ik_fbz = el%indexlist_irred(ik)
 
-             !Read data in binary format
-             write (filename_g, '(I9)') istate
-             filename_g = 'gk2.istate'//trim(adjustl(filename_g))
-             open(1, file = trim(filename_g), status = 'old', access = 'stream')
-             read(1) nprocs
-             if(allocated(g2_istate)) deallocate(g2_istate, TPplus_istate, TPminus_istate, &
-                  istate_el, istate_ph)
-             allocate(g2_istate(nprocs))
-             if(nprocs > 0) read(1) g2_istate
-             close(1)
+             !Electron energy
+             en_el = el%ens_irred(ik, m)
+
+             !Apply energy window to initial (IBZ blocks) electron
+             if(abs(en_el - el%enref) > el%fsthick) cycle
+
+             !Create initial electron wave vector
+             k_vec = vec(ik_fbz, el%wvmesh, crys%reclattvecs)
+
+             !Load g2_istate from disk for scattering rates calculation
+             if(key /= 'g') then
+                !Change to data output directory
+                call chdir(trim(adjustl(num%g2dir)))
+
+                !Read data in binary format
+                write (filename_g, '(I9)') istate
+                filename_g = 'gk2.istate'//trim(adjustl(filename_g))
+                open(1, file = trim(filename_g), status = 'old', access = 'stream')
+                read(1) nprocs
+                if(allocated(g2_istate)) deallocate(g2_istate, TPplus_istate, TPminus_istate, &
+                     istate_el, istate_ph)
+                allocate(g2_istate(nprocs))
+                if(nprocs > 0) read(1) g2_istate
+                close(1)
+
+                !Change back to working directory
+                call chdir(num%cwd)
+
+                !Allocate and initialize quantities related to transition probabilities
+                allocate(TPplus_istate(nprocs), TPminus_istate(nprocs))
+                allocate(istate_el(nprocs), istate_ph(nprocs))
+                istate_el(:) = 0_i64
+                istate_ph(:) = 0_i64
+                TPplus_istate(:) = 0.0_r64
+                TPminus_istate(:) = 0.0_r64
+             end if
+
+             !Initialize eligible process counter for this state
+             count = 0
+
+             !Run over final (FBZ blocks) electron wave vectors
+             do ikp = 1, el%nwv
+                !Create final electron wave vector
+                kp_vec = vec(el%indexlist(ikp), el%wvmesh, crys%reclattvecs)
+
+                !Find interacting phonon wave vector.
+                !This is represented with respect to the electronic mesh.
+                q_vec = vec_sub(kp_vec, k_vec, el%wvmesh, crys%reclattvecs)
+                iq_fine = q_vec%muxed_index
+
+                !Note that q, k, and k' are all on the same mesh.
+                !However, there are some common q vector on which the
+                !phonon quantities have already been computed. Here, compute
+                !only the new k' - k quantities.
+                needfinephon = .false.
+                if(any(mod(q_vec%int(:), el%mesh_ref_array) /= 0_i64)) then
+                   needfinephon = .true.
+
+                   !Calculate the fine mesh phonon.
+                   qlist(1, :) = q_vec%frac
+                   call wann%ph_wann(crys, 1_i64, qlist, ph_ens_iq, ph_evecs_iq)
+                else !Get the q vector represented in the (coarser) phonon mesh
+                   q_vec_coarse = vec_change_grid(q_vec, ph%wvmesh)
+                   iq_coarse = q_vec_coarse%muxed_index
+                end if
+
+                !Run over final electron bands
+                do n = 1, wann%numwannbands
+                   !Apply energy window to final electron
+                   if(abs(el%ens(ikp, n) - el%enref) > el%fsthick) cycle
+
+                   !Run over phonon branches
+                   do s = 1, wann%numbranches
+                      !Increment g2 processes counter
+                      count = count + 1
+
+                      if(key == 'g') then
+                         !Calculate |g_mns(<k>,q)|^2
+                         if(needfinephon) then
+                            g2_istate(count) = wann%g2(crys, k_vec%frac, q_vec%frac, &
+                                 el%evecs_irred(ik, m, :), el%evecs(ikp, n, :), &
+                                 ph_evecs_iq(1, s, :), ph_ens_iq(1, s), &
+                                 gkRp_ik, 'ph')
+                         else
+                            g2_istate(count) = wann%g2(crys, k_vec%frac, q_vec_coarse%frac, &
+                                 el%evecs_irred(ik, m, :), el%evecs(ikp, n, :), &
+                                 ph%evecs(iq_coarse, s, :), ph%ens(iq_coarse, s), &
+                                 gkRp_ik, 'ph')
+                         end if
+                      else
+                         !Phonon energy
+                         if(needfinephon) then
+                            en_ph = ph_ens_iq(1, s)
+                         else
+                            en_ph = ph%ens(iq_coarse, s)
+                         end if
+
+                         if(key == 'X') then
+                            !Bose and Fermi factors
+                            if(en_ph /= 0.0_r64) then
+                               bosefac = Bose(en_ph, crys%T)
+                            else
+                               bosefac = 0.0_r64
+                            end if
+                            fermi_plus_fac = Fermi(en_el + en_ph, el%chempot, crys%T)
+                            fermi_minus_fac = Fermi(en_el - en_ph, el%chempot, crys%T)
+
+                            !Temperature dependent occupation factors
+                            occup_fac_plus = bosefac + fermi_plus_fac
+
+                            occup_fac_minus = 1.0_r64 + bosefac - fermi_minus_fac
+                         end if
+
+                         if(key == 'O') then
+                            !Temperature dependent occupation factors
+                            occup_fac_plus = (Fermi(en_el, el%chempot, crys%T) - fermi_plus_fac)/&
+                                 Fermi(en_el, el%chempot, crys%T)/(1.0_r64 - Fermi(en_el, el%chempot, crys%T))
+
+                            occup_fac_minus = (Fermi(en_el, el%chempot, crys%T) - fermi_minus_fac)/&
+                                 Fermi(en_el, el%chempot, crys%T)/(1.0_r64 - Fermi(en_el, el%chempot, crys%T))
+                         end if
+
+                         !Calculate X+/-:
+
+                         !Evaulate delta function
+                         delta_plus = delta_fn_ptr(en_el + en_ph, ikp, n, el%wvmesh, el%simplex_map, &
+                              el%simplex_count, el%simplex_evals)
+                         delta_minus = delta_fn_ptr(en_el - en_ph, ikp, n, el%wvmesh, el%simplex_map, &
+                              el%simplex_count, el%simplex_evals)
+
+                         !Save X+/-
+                         if(en_ph >= 0.5e-3) then !Use a small phonon energy cut-off
+                            TPplus_istate(count) = g2_istate(count)*occup_fac_plus*delta_plus
+                            TPminus_istate(count) = g2_istate(count)*occup_fac_minus*delta_minus
+                         end if
+
+                         !Save final electron and interacting phonon states (same for + and -)
+                         istate_el(count) = mux_state(el%numbands, n, ikp)
+                         if(needfinephon) then
+                            !Write fine phonon index as negative so that the iterator
+                            !knows to interpolate phonon quantities at this wave vector.
+                            istate_ph(count) = -mux_state(ph%numbands, s, iq_fine)
+                         else
+                            istate_ph(count) = mux_state(ph%numbands, s, iq_coarse)
+                         end if
+                      end if
+                   end do !s
+                end do !n
+             end do !ikp
+
+             if(key == 'g') then
+                !Change to data output directory
+                call chdir(trim(adjustl(num%g2dir)))
+
+                !Write data in binary format
+                !Note: this will overwrite existing data!
+                write (filename_g, '(I9)') istate
+                filename_g = 'gk2.istate'//trim(adjustl(filename_g))
+                open(1, file = trim(filename_g), status = 'replace', access = 'stream')
+                write(1) count
+                write(1) g2_istate
+                close(1)
+             end if
+
+             if(key == 'X') then             
+                write (filename_plus, '(I9)') istate
+                write (filename_minus, '(I9)') istate
+                filename_plus = 'Xplus.istate'//trim(adjustl(filename_plus))
+                filename_minus = 'Xminus.istate'//trim(adjustl(filename_minus))
+             end if
+
+             if(key == 'O') then
+                write (filename_plus, '(I9)') istate
+                write (filename_minus, '(I9)') istate
+                filename_plus = 'Omegaplus.istate'//trim(adjustl(filename_plus))
+                filename_minus = 'Omegaminus.istate'//trim(adjustl(filename_minus))
+             end if
+
+             if(key /= 'g') then
+                !Multiply constant factor, unit factor, etc.
+                TPplus_istate(1:count) = const*TPplus_istate(1:count) !THz
+                TPminus_istate(1:count) = const*TPminus_istate(1:count) !THz
+
+                !Change to data output directory
+                call chdir(trim(adjustl(num%Xdir)))
+
+                !Write data in binary format
+                !Note: this will overwrite existing data!
+                open(1, file = trim(filename_plus), status = 'replace', access = 'stream')
+                write(1) count
+                write(1) TPplus_istate(1:count)
+                write(1) istate_el(1:count)
+                write(1) istate_ph(1:count)
+                close(1)
+
+                open(1, file = trim(filename_minus), status = 'replace', access = 'stream')
+                write(1) count
+                write(1) TPminus_istate(1:count)
+                write(1) istate_el(1:count)
+                write(1) istate_ph(1:count)
+                close(1)
+             end if
 
              !Change back to working directory
              call chdir(num%cwd)
 
-             !Allocate and initialize quantities related to transition probabilities
-             allocate(TPplus_istate(nprocs), TPminus_istate(nprocs))
-             allocate(istate_el(nprocs), istate_ph(nprocs))
-             istate_el(:) = 0_i64
-             istate_ph(:) = 0_i64
-             TPplus_istate(:) = 0.0_r64
-             TPminus_istate(:) = 0.0_r64
-          end if
+             if(key /= 'g') deallocate(g2_istate, TPplus_istate, TPminus_istate, &
+                  istate_el, istate_ph)
+          end do
+       end if
 
-          !Initialize eligible process counter for this state
-          count = 0
-
-          !Run over final (FBZ blocks) electron wave vectors
-          do ikp = 1, el%nwv
-             !Create final electron wave vector
-             kp_vec = vec(el%indexlist(ikp), el%wvmesh, crys%reclattvecs)
-
-             !Find interacting phonon wave vector.
-             !This is represented with respect to the electronic mesh.
-             q_vec = vec_sub(kp_vec, k_vec, el%wvmesh, crys%reclattvecs)
-             iq_fine = q_vec%muxed_index
-
-             !Note that q, k, and k' are all on the same mesh.
-             !However, there are some common q vector on which the
-             !phonon quantities have already been computed. Here, compute
-             !only the new k' - k quantities.
-             needfinephon = .false.
-             if(any(mod(q_vec%int(:), el%mesh_ref_array) /= 0_i64)) then
-                needfinephon = .true.
-
-                !Calculate the fine mesh phonon.
-                qlist(1, :) = q_vec%frac
-                call wann%ph_wann(crys, 1_i64, qlist, ph_ens_iq, ph_evecs_iq)
-             else !Get the q vector represented in the (coarser) phonon mesh
-                q_vec_coarse = vec_change_grid(q_vec, ph%wvmesh)
-                iq_coarse = q_vec_coarse%muxed_index
-             end if
-
-             !Run over final electron bands
-             do n = 1, wann%numwannbands
-                !Apply energy window to final electron
-                if(abs(el%ens(ikp, n) - el%enref) > el%fsthick) cycle
-
-                !Run over phonon branches
-                do s = 1, wann%numbranches
-                   !Increment g2 processes counter
-                   count = count + 1
-
-                   if(key == 'g') then
-                      !Calculate |g_mns(<k>,q)|^2
-                      if(needfinephon) then
-                         g2_istate(count) = wann%g2(crys, k_vec%frac, q_vec%frac, &
-                              el%evecs_irred(ik, m, :), el%evecs(ikp, n, :), &
-                              ph_evecs_iq(1, s, :), ph_ens_iq(1, s), &
-                              gkRp_ik, 'ph')
-                      else
-                         g2_istate(count) = wann%g2(crys, k_vec%frac, q_vec_coarse%frac, &
-                              el%evecs_irred(ik, m, :), el%evecs(ikp, n, :), &
-                              ph%evecs(iq_coarse, s, :), ph%ens(iq_coarse, s), &
-                              gkRp_ik, 'ph')
-                      end if
-                   else
-                      !Phonon energy
-                      if(needfinephon) then
-                         en_ph = ph_ens_iq(1, s)
-                      else
-                         en_ph = ph%ens(iq_coarse, s)
-                      end if
-
-                      if(key == 'X') then
-                         !Bose and Fermi factors
-                         if(en_ph /= 0.0_r64) then
-                            bosefac = Bose(en_ph, crys%T)
-                         else
-                            bosefac = 0.0_r64
-                         end if
-                         fermi_plus_fac = Fermi(en_el + en_ph, el%chempot, crys%T)
-                         fermi_minus_fac = Fermi(en_el - en_ph, el%chempot, crys%T)
-
-                         !Temperature dependent occupation factors
-                         occup_fac_plus = bosefac + fermi_plus_fac
-
-                         occup_fac_minus = 1.0_r64 + bosefac - fermi_minus_fac
-                      end if
-
-                      if(key == 'O') then
-                         !Temperature dependent occupation factors
-                         occup_fac_plus = (Fermi(en_el, el%chempot, crys%T) - fermi_plus_fac)/&
-                              Fermi(en_el, el%chempot, crys%T)/(1.0_r64 - Fermi(en_el, el%chempot, crys%T))
-
-                         occup_fac_minus = (Fermi(en_el, el%chempot, crys%T) - fermi_minus_fac)/&
-                              Fermi(en_el, el%chempot, crys%T)/(1.0_r64 - Fermi(en_el, el%chempot, crys%T))
-                      end if
-
-                      !Calculate X+/-:
-
-                      !Evaulate delta function
-                      delta_plus = delta_fn_ptr(en_el + en_ph, ikp, n, el%wvmesh, el%simplex_map, &
-                           el%simplex_count, el%simplex_evals)
-                      delta_minus = delta_fn_ptr(en_el - en_ph, ikp, n, el%wvmesh, el%simplex_map, &
-                           el%simplex_count, el%simplex_evals)
-
-                      !Save X+/-
-                      if(en_ph >= 0.5e-3) then !Use a small phonon energy cut-off
-                         TPplus_istate(count) = g2_istate(count)*occup_fac_plus*delta_plus
-                         TPminus_istate(count) = g2_istate(count)*occup_fac_minus*delta_minus
-                      end if
-
-                      !Save final electron and interacting phonon states (same for + and -)
-                      istate_el(count) = mux_state(el%numbands, n, ikp)
-                      if(needfinephon) then
-                         !Write fine phonon index as negative so that the iterator
-                         !knows to interpolate phonon quantities at this wave vector.
-                         istate_ph(count) = -mux_state(ph%numbands, s, iq_fine)
-                      else
-                         istate_ph(count) = mux_state(ph%numbands, s, iq_coarse)
-                      end if
-                   end if
-                end do !s
-             end do !n
-          end do !ikp
-
-          if(key == 'g') then
-             !Change to data output directory
-             call chdir(trim(adjustl(num%g2dir)))
-
-             !Write data in binary format
-             !Note: this will overwrite existing data!
-             write (filename_g, '(I9)') istate
-             filename_g = 'gk2.istate'//trim(adjustl(filename_g))
-             open(1, file = trim(filename_g), status = 'replace', access = 'stream')
-             write(1) count
-             write(1) g2_istate
-             close(1)
-          end if
-
-          if(key == 'X') then             
-             write (filename_plus, '(I9)') istate
-             write (filename_minus, '(I9)') istate
-             filename_plus = 'Xplus.istate'//trim(adjustl(filename_plus))
-             filename_minus = 'Xminus.istate'//trim(adjustl(filename_minus))
-          end if
-
-          if(key == 'O') then
-             write (filename_plus, '(I9)') istate
-             write (filename_minus, '(I9)') istate
-             filename_plus = 'Omegaplus.istate'//trim(adjustl(filename_plus))
-             filename_minus = 'Omegaminus.istate'//trim(adjustl(filename_minus))
-          end if
-
-          if(key /= 'g') then
-             !Multiply constant factor, unit factor, etc.
-             TPplus_istate(1:count) = const*TPplus_istate(1:count) !THz
-             TPminus_istate(1:count) = const*TPminus_istate(1:count) !THz
-
-             !Change to data output directory
-             call chdir(trim(adjustl(num%Xdir)))
-
-             !Write data in binary format
-             !Note: this will overwrite existing data!
-             open(1, file = trim(filename_plus), status = 'replace', access = 'stream')
-             write(1) count
-             write(1) TPplus_istate(1:count)
-             write(1) istate_el(1:count)
-             write(1) istate_ph(1:count)
-             close(1)
-
-             open(1, file = trim(filename_minus), status = 'replace', access = 'stream')
-             write(1) count
-             write(1) TPminus_istate(1:count)
-             write(1) istate_el(1:count)
-             write(1) istate_ph(1:count)
-             close(1)
-          end if
-
-          !Change back to working directory
-          call chdir(num%cwd)
-
-          if(key /= 'g') deallocate(g2_istate, TPplus_istate, TPminus_istate, &
-               istate_el, istate_ph)
-       end do
-    end if
+       sync all
+       if(this_image() == 1) call job%write_record(ibatch)
+    end do !over the batches
     sync all
 
     if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
