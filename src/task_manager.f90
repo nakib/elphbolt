@@ -55,19 +55,42 @@ contains
 
     !Check if file exists.
     inquire(file = filename, exist = file_exist)
+
+    !This ensures future batch records can be appended without error.
+    if(allocated(self%filename_record)) deallocate(self%filename_record)
+    allocate(character(len = len_trim(filename)) :: self%filename_record)
+    self%filename_record = trim(filename)
+
     !If the file exist, read the last line and update num_finished_tasks.
     if(file_exist) then
        open(newunit = unit, file = filename, status = "old", action = "read", position = "rewind", iostat = ios)
        if(ios == 0) then
+          last_line = ''
           do
 
              read(unit, '(A)', iostat = ios) line
              !Exit on error or end of file.
              if(ios /= 0) exit
              !Keep updating with latest line.
-             last_line = line
+             if (len_trim(line) > 0) last_line = line
           end do
           close(unit)
+
+          !Verify that the batch record file contains at least one readable line.
+          if (len_trim(last_line) > 0) then
+             read(last_line, *, iostat = ios) timestamp, batch_number, start_idx, end_idx, batch_size
+             if (ios == 0) then
+                self%num_finished_batches = batch_number
+             else
+                self%num_finished_batches = 0
+                if (this_image() == 1) print *, "No batches completed yet."
+             end if
+          else
+             self%num_finished_batches = 0
+             batch_number = 0
+             if (this_image() == 1) print *, "Batch record file is empty. Starting from batch 0."
+          end if
+
 
           !Read the last line for the completed batch number.
           read(last_line, *, iostat = ios) timestamp, batch_number, start_idx, end_idx, batch_size
@@ -79,15 +102,8 @@ contains
           print *, " Last batch number: ", batch_number
           print *, " Restart from last batch: " , self%num_finished_batches
        end if
-    end if
+    else
 
-    !Clear old data.
-    if(allocated(self%filename_record)) deallocate(self%filename_record)
-    allocate(character(len = len_trim(filename)) :: self%filename_record)
-    self%filename_record = trim(filename)
-
-    inquire(file = self%filename_record, exist = file_exist)
-    if (.not. file_exist) then
        open(newunit = unit, file = self%filename_record, status = 'replace', action = 'write')
        close(unit)
     end if
