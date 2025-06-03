@@ -67,30 +67,28 @@ contains
        if(ios == 0) then
           last_line = ''
           do
-
              read(unit, '(A)', iostat = ios) line
              !Exit on error or end of file.
              if(ios /= 0) exit
              !Keep updating with latest line.
-             if (len_trim(line) > 0) last_line = line
+             if(len_trim(line) > 0) last_line = line
           end do
           close(unit)
 
           !Verify that the batch record file contains at least one readable line.
-          if (len_trim(last_line) > 0) then
+          if(len_trim(last_line) > 0) then
              read(last_line, *, iostat = ios) timestamp, batch_number, start_idx, end_idx, batch_size
-             if (ios == 0) then
+             if(ios == 0) then
                 self%num_finished_batches = batch_number
              else
                 self%num_finished_batches = 0
-                if (this_image() == 1) print *, "No batches completed yet."
+                if(this_image() == 1) print *, "No batches completed yet."
              end if
           else
              self%num_finished_batches = 0
              batch_number = 0
-             if (this_image() == 1) print *, "Batch record file is empty. Starting from batch 0."
+             if(this_image() == 1) print *, "Batch record file is empty. Starting from batch 0."
           end if
-
 
           !Read the last line for the completed batch number.
           read(last_line, *, iostat = ios) timestamp, batch_number, start_idx, end_idx, batch_size
@@ -103,7 +101,6 @@ contains
           print *, " Restart from last batch: " , self%num_finished_batches
        end if
     else
-
        open(newunit = unit, file = self%filename_record, status = 'replace', action = 'write')
        close(unit)
     end if

@@ -299,278 +299,278 @@ contains
     if(num_batches < 1) &
          call exit_with_message("num_batches has to be a postive number. Exiting.")
 
- !TODO
- !! [ ] Read eco mode info from input
- !! [ ] Check for valid choice of econess
+    !TODO
+    !! [ ] Read eco mode info from input
+    !! [ ] Check for valid choice of econess
 
- !eco mode DBG
- self%eco_mode = .true.
- self%econess = [2, 2, 2]
- !!
+    !eco mode DBG
+    self%eco_mode = .true.
+    self%econess = [2, 2, 2]
+    !!
 
- self%Bfield_on = Bfield_on
- self%Bfield = Bfield
+    self%Bfield_on = Bfield_on
+    self%Bfield = Bfield
 
- self%qmesh = qmesh
- self%runlevel = runlevel
- !Runlevels:
- !1 BTE
- !2 BTE postproc
- !3 Superconductivity
- if(self%runlevel /= 3) then !Non-superconductivity mode
-    self%mesh_ref = mesh_ref
-    self%fourph_mesh_ref = fourph_mesh_ref
-    self%read_gq2 = read_gq2
-    self%read_V = read_V
-    self%read_W = read_W
-    self%W_OTF = W_OTF
-    self%phe = phe
-    self%phiso = phiso
-    self%phiso_1B_theory = phiso_1B_theory
-    self%phiso_Tmat = phiso_Tmat
-    self%phsubs = phsubs
-    self%phbound = phbound
-    self%fourph = fourph
-    self%phthinfilm = phthinfilm
-    self%phthinfilm_ballistic = phthinfilm_ballistic
-    self%phdef_Tmat = phdef_Tmat
-    self%onlyphbte = onlyphbte
-    self%onlyebte = onlyebte
-    self%elchimp = elchimp
-    self%elel = elel
-    self%Coulomb_screening_type = trim(Coulomb_screening_type)
-    self%ncont_mesh = ncont_mesh
-    self%elbound = elbound
-    self%drag = drag
-    self%Y_OTF = Y_OTF
-    self%solve_bulk = solve_bulk
-    self%solve_nano = solve_nano
-    self%num_batches = num_batches
- else
-    self%mesh_ref = 1 !Enforce this for superconductivity mode
- end if
- self%use_Wannier_ifc2s = use_Wannier_ifc2s
- self%read_gk2 = read_gk2
- self%fsthick = fsthick
- self%datadumpdir = trim(datadumpdir)
- self%tetrahedra = tetrahedra
- self%maxiter = maxiter
- self%conv_thres = conv_thres
- self%plot_along_path = plot_along_path
+    self%qmesh = qmesh
+    self%runlevel = runlevel
+    !Runlevels:
+    !1 BTE
+    !2 BTE postproc
+    !3 Superconductivity
+    if(self%runlevel /= 3) then !Non-superconductivity mode
+       self%mesh_ref = mesh_ref
+       self%fourph_mesh_ref = fourph_mesh_ref
+       self%read_gq2 = read_gq2
+       self%read_V = read_V
+       self%read_W = read_W
+       self%W_OTF = W_OTF
+       self%phe = phe
+       self%phiso = phiso
+       self%phiso_1B_theory = phiso_1B_theory
+       self%phiso_Tmat = phiso_Tmat
+       self%phsubs = phsubs
+       self%phbound = phbound
+       self%fourph = fourph
+       self%phthinfilm = phthinfilm
+       self%phthinfilm_ballistic = phthinfilm_ballistic
+       self%phdef_Tmat = phdef_Tmat
+       self%onlyphbte = onlyphbte
+       self%onlyebte = onlyebte
+       self%elchimp = elchimp
+       self%elel = elel
+       self%Coulomb_screening_type = trim(Coulomb_screening_type)
+       self%ncont_mesh = ncont_mesh
+       self%elbound = elbound
+       self%drag = drag
+       self%Y_OTF = Y_OTF
+       self%solve_bulk = solve_bulk
+       self%solve_nano = solve_nano
+       self%num_batches = num_batches
+    else
+       self%mesh_ref = 1 !Enforce this for superconductivity mode
+    end if
+    self%use_Wannier_ifc2s = use_Wannier_ifc2s
+    self%read_gk2 = read_gk2
+    self%fsthick = fsthick
+    self%datadumpdir = trim(datadumpdir)
+    self%tetrahedra = tetrahedra
+    self%maxiter = maxiter
+    self%conv_thres = conv_thres
+    self%plot_along_path = plot_along_path
 
- if(runlevel == 2) then
-    self%ph_en_min = ph_en_min
-    self%ph_en_max = ph_en_max
-    self%ph_en_num = ph_en_num
-    self%el_en_min = el_en_min
-    self%el_en_max = el_en_max
-    self%el_en_num = el_en_num
-    self%ph_mfp_npts = ph_mfp_npts
-    self%ph_abs_q_npts = ph_abs_q_npts
- end if
+    if(runlevel == 2) then
+       self%ph_en_min = ph_en_min
+       self%ph_en_max = ph_en_max
+       self%ph_en_num = ph_en_num
+       self%el_en_min = el_en_min
+       self%el_en_max = el_en_max
+       self%el_en_num = el_en_num
+       self%ph_mfp_npts = ph_mfp_npts
+       self%ph_abs_q_npts = ph_abs_q_npts
+    end if
 
- if(crys%twod .and. self%qmesh(3) /= 1) then
-    call exit_with_message('For 2d systems, qmesh(3) must be equal to 1.')
- end if
+    if(crys%twod .and. self%qmesh(3) /= 1) then
+       call exit_with_message('For 2d systems, qmesh(3) must be equal to 1.')
+    end if
 
- ! Enforcing continuous mesh size to be odd
- if(mod(self%ncont_mesh, 2) == 0) then
-    self%ncont_mesh = self%ncont_mesh + 1
- end if
+    ! Enforcing continuous mesh size to be odd
+    if(mod(self%ncont_mesh, 2) == 0) then
+       self%ncont_mesh = self%ncont_mesh + 1
+    end if
 
- !Set BTE solution type
- if(self%onlyphbte) then
-    self%onlyebte = .false.
-    self%drag = .false.
- end if
- if(self%onlyebte) then
-    self%onlyphbte = .false.
-    self%phiso = .false.
-    self%phiso_Tmat = .false.
-    self%phsubs = .false.
-    self%drag = .false.
-    self%phe = .false.
- end if
- if(self%drag) then
-    self%onlyebte = .false.
-    self%onlyphbte = .false.
-    self%phe = .true.
- end if
+    !Set BTE solution type
+    if(self%onlyphbte) then
+       self%onlyebte = .false.
+       self%drag = .false.
+    end if
+    if(self%onlyebte) then
+       self%onlyphbte = .false.
+       self%phiso = .false.
+       self%phiso_Tmat = .false.
+       self%phsubs = .false.
+       self%drag = .false.
+       self%phe = .false.
+    end if
+    if(self%drag) then
+       self%onlyebte = .false.
+       self%onlyphbte = .false.
+       self%phe = .true.
+    end if
 
- !Set Wannier usage flag
- self%need_Wannier = self%use_Wannier_ifc2s .or. self%onlyebte .or. self%drag &
-      .or. (self%phe .and. self%onlyphbte) &
-      .or. self%plot_along_path .or. self%runlevel == 3
+    !Set Wannier usage flag
+    self%need_Wannier = self%use_Wannier_ifc2s .or. self%onlyebte .or. self%drag &
+         .or. (self%phe .and. self%onlyphbte) &
+         .or. self%plot_along_path .or. self%runlevel == 3
 
- !Check if T-matrix and tetrahedron method consistency
- if(self%phdef_Tmat .and. .not. self%tetrahedra) then
-    call exit_with_message("Currently T-matrix method is only supported with tetrahedron method. Exiting.")
- end if
+    !Check if T-matrix and tetrahedron method consistency
+    if(self%phdef_Tmat .and. .not. self%tetrahedra) then
+       call exit_with_message("Currently T-matrix method is only supported with tetrahedron method. Exiting.")
+    end if
 
- if(self%phiso_Tmat .and. .not. self%phdef_Tmat) then
-    call exit_with_message("For ph-iso scattering from T-matrix, need both phiso_Tmat and phdef_Tmat. Exiting.")
- end if
+    if(self%phiso_Tmat .and. .not. self%phdef_Tmat) then
+       call exit_with_message("For ph-iso scattering from T-matrix, need both phiso_Tmat and phdef_Tmat. Exiting.")
+    end if
 
- !Create data dump directory
- if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(self%datadumpdir)))
+    !Create data dump directory
+    if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(self%datadumpdir)))
 
- !Create matrix elements data directories
- self%g2dir = trim(adjustl(self%datadumpdir))//'g2'
- if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(self%g2dir)))
- self%Vdir = trim(adjustl(self%datadumpdir))//'V2'
- if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(self%Vdir)))
+    !Create matrix elements data directories
+    self%g2dir = trim(adjustl(self%datadumpdir))//'g2'
+    if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(self%g2dir)))
+    self%Vdir = trim(adjustl(self%datadumpdir))//'V2'
+    if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(self%Vdir)))
 
- !Create superconductivity data dump directory
- self%scdir = trim(adjustl(self%datadumpdir))//'sc'
- if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(self%scdir)))
+    !Create superconductivity data dump directory
+    self%scdir = trim(adjustl(self%datadumpdir))//'sc'
+    if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(self%scdir)))
 
- !Create T dependent subdirectory
- write(tag, "(E9.3)") crys%T
- self%datadumpdir_T = trim(adjustl(self%datadumpdir))//'T'//trim(adjustl(tag))
- if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(self%datadumpdir_T)))
+    !Create T dependent subdirectory
+    write(tag, "(E9.3)") crys%T
+    self%datadumpdir_T = trim(adjustl(self%datadumpdir))//'T'//trim(adjustl(tag))
+    if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(self%datadumpdir_T)))
 
- !Create T-dependent ph-ph transition probability directory
- self%Wdir = trim(adjustl(self%datadumpdir_T))//'/W'
- if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(self%Wdir)))
+    !Create T-dependent ph-ph transition probability directory
+    self%Wdir = trim(adjustl(self%datadumpdir_T))//'/W'
+    if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(self%Wdir)))
 
- !Close input file
- close(1)
-
- !Set current work directory.
- call getcwd(self%cwd)
- self%cwd = trim(self%cwd)
-
- !Print out information.
- if(this_image() == 1) then
-    write(numcols, "(I0)") 3
-    open(1, file = "ph.reclattvecs", status = "replace")
-    do i = 1, 3
-       write(1, "(" // trim(adjustl(numcols)) // "E20.10)") &
-            crys%reclattvecs(:, i)
-    end do
-    write(1, *) self%qmesh
+    !Close input file
     close(1)
 
-    open(1, file = "el.reclattvecs", status = "replace")
-    do i = 1, 3
-       write(1, "(" // trim(adjustl(numcols)) // "E20.10)") &
-            crys%reclattvecs(:, i)
-    end do
-    if(crys%twod) then
-       write(1, *) self%mesh_ref*self%qmesh(1), self%mesh_ref*self%qmesh(2), 1
-    else
-       write(1, *) self%mesh_ref*self%qmesh(1), self%mesh_ref*self%qmesh(2), &
-            self%mesh_ref*self%qmesh(3)
-    end if
-    close(1)
+    !Set current work directory.
+    call getcwd(self%cwd)
+    self%cwd = trim(self%cwd)
 
-    write(*, "(A, (3I5,x))") "q-mesh = ", self%qmesh
-    if(crys%twod) then
-       write(*, "(A, (3I5,x))") "k-mesh = ", self%mesh_ref*self%qmesh(1), self%mesh_ref*self%qmesh(2), 1
-    else
-       write(*, "(A, (3I5,x))") "k-mesh = ", self%mesh_ref*self%qmesh(1), self%mesh_ref*self%qmesh(2), &
-            self%mesh_ref*self%qmesh(3)
-    end if
-    if(self%fourph) then
+    !Print out information.
+    if(this_image() == 1) then
+       write(numcols, "(I0)") 3
+       open(1, file = "ph.reclattvecs", status = "replace")
+       do i = 1, 3
+          write(1, "(" // trim(adjustl(numcols)) // "E20.10)") &
+               crys%reclattvecs(:, i)
+       end do
+       write(1, *) self%qmesh
+       close(1)
+
+       open(1, file = "el.reclattvecs", status = "replace")
+       do i = 1, 3
+          write(1, "(" // trim(adjustl(numcols)) // "E20.10)") &
+               crys%reclattvecs(:, i)
+       end do
        if(crys%twod) then
-          write(*, "(A, (3I5,x))") "external 4ph q-mesh = ", &
-               self%qmesh(1)/self%fourph_mesh_ref, self%qmesh(2)/self%fourph_mesh_ref, 1
+          write(1, *) self%mesh_ref*self%qmesh(1), self%mesh_ref*self%qmesh(2), 1
        else
-          write(*, "(A, (3I5,x))") "external 4ph q-mesh = ", &
-               self%qmesh(1)/self%fourph_mesh_ref, self%qmesh(2)/self%fourph_mesh_ref, &
-               self%qmesh(3)/self%fourph_mesh_ref
+          write(1, *) self%mesh_ref*self%qmesh(1), self%mesh_ref*self%qmesh(2), &
+               self%mesh_ref*self%qmesh(3)
        end if
-    end if
-    write(*, "(A, 1E16.8, A)") "Fermi window thickness (each side of reference energy) = ", self%fsthick, " eV"
-    write(*, "(A, A)") "Working directory = ", trim(self%cwd)
-    write(*, "(A, A)") "Data dump directory = ", trim(self%datadumpdir)
-    write(*, "(A, A)") "T-dependent data dump directory = ", trim(self%datadumpdir_T)
-    write(*, "(A, A)") "e-ph directory = ", trim(self%g2dir)
-    write(*, "(A, L)") "Use Wannier ifcs: ", self%use_Wannier_ifc2s
-    if(self%runlevel /= 3) write(*, "(A, A)") "ph-ph directory = ", trim(self%Vdir)
-    write(*, "(A, L)") "Reuse e-ph matrix elements: ", self%read_gk2
-    if(self%runlevel /= 3) then
-       write(*, "(A, L)") "Using number of batches: ", self%num_batches     
-       write(*, "(A, L)") "Reuse ph-e matrix elements: ", self%read_gq2
-       write(*, "(A, L)") "Reuse ph-ph matrix elements: ", self%read_V
-       write(*, "(A, L)") "Reuse ph-ph transition probabilities: ", self%read_W
-       write(*, "(A, L)") "Calculate ph-ph transition probabilities on-the-fly: ", self%W_OTF
-       write(*, "(A, L)") "Calculate ph-e interaction: ", self%phe
-       write(*, "(A, L)") "Calculate ph-e transition probabilities on-the-fly: ", self%Y_OTF
-       write(*, "(A, L)") "Calculate 1st Born ph-isotope interaction: ", self%phiso
-       if(self%phiso) &
-            write(*, "(A, A)") "Selected ph-isotope 1st Born theory: ", self%phiso_1B_theory
-       write(*, "(A, L)") "Calculate ph-isotope interaction via T-matrix: ", self%phiso_Tmat
-       write(*, "(A, L)") "Include ph-substitution interaction: ", self%phsubs
-       write(*, "(A, L)") "Include ph-boundary interaction: ", self%phbound
-       write(*, "(A, L)") "Include 4-ph interaction: ", self%fourph
-       write(*, "(A, L)") "Include ph-thin-film interaction: ", self%phthinfilm
-       if(self%phthinfilm) write(*, "(A, L)") "    Use ballistic limit: ", self%phthinfilm_ballistic
-       write(*, "(A, L)") "Include ph-defect interaction using the T-matrix: ", self%phdef_Tmat
-       if(self%phbound) then
-          write(*,"(A,(1E16.8,x),A)") 'Characteristic length for ph-boundary scattering =', &
-               crys%bound_length, 'mm'
+       close(1)
+
+       write(*, "(A, (3I5,x))") "q-mesh = ", self%qmesh
+       if(crys%twod) then
+          write(*, "(A, (3I5,x))") "k-mesh = ", self%mesh_ref*self%qmesh(1), self%mesh_ref*self%qmesh(2), 1
+       else
+          write(*, "(A, (3I5,x))") "k-mesh = ", self%mesh_ref*self%qmesh(1), self%mesh_ref*self%qmesh(2), &
+               self%mesh_ref*self%qmesh(3)
        end if
-       if(self%phthinfilm) then
-          write(*,"(A,(1E16.8,x),A,A,A)") 'Height for ph-thin-film scattering =', &
-               crys%thinfilm_height, 'mm along the ', crys%thinfilm_normal, ' direction'
-          write(*,"(A,1E16.8)") 'Specularity factor =', crys%specfac
-       end if
-       write(*, "(A, L)") "Include el-charged impurity interaction: ", self%elchimp
-       write(*, "(A, L)") "Include el-el interaction: ", self%elel
-       if(self%elel .or. self%elchimp) then
-          write(*, "(A, A)") "Type of Coulomb screening: ", trim(self%Coulomb_screening_type)
-          if(self%Coulomb_screening_type == 'RPA') then
-             write(*, "(A, I5)") "Size of continuous energy mesh: ", self%ncont_mesh
+       if(self%fourph) then
+          if(crys%twod) then
+             write(*, "(A, (3I5,x))") "external 4ph q-mesh = ", &
+                  self%qmesh(1)/self%fourph_mesh_ref, self%qmesh(2)/self%fourph_mesh_ref, 1
+          else
+             write(*, "(A, (3I5,x))") "external 4ph q-mesh = ", &
+                  self%qmesh(1)/self%fourph_mesh_ref, self%qmesh(2)/self%fourph_mesh_ref, &
+                  self%qmesh(3)/self%fourph_mesh_ref
           end if
        end if
-       write(*, "(A, L)") "Include el-boundary interaction: ", self%elbound
-       write(*, "(A, L)") "Solve bulk-BTE: ", self%solve_bulk
-       write(*, "(A, L)") "Solve nano-BTE: ", self%solve_nano
-       if(self%elbound) then
-          write(*,"(A,(1E16.8,x),A)") 'Characteristic length for el-boundary scattering =', &
-               crys%bound_length, 'mm'
+       write(*, "(A, 1E16.8, A)") "Fermi window thickness (each side of reference energy) = ", self%fsthick, " eV"
+       write(*, "(A, A)") "Working directory = ", trim(self%cwd)
+       write(*, "(A, A)") "Data dump directory = ", trim(self%datadumpdir)
+       write(*, "(A, A)") "T-dependent data dump directory = ", trim(self%datadumpdir_T)
+       write(*, "(A, A)") "e-ph directory = ", trim(self%g2dir)
+       write(*, "(A, L)") "Use Wannier ifcs: ", self%use_Wannier_ifc2s
+       if(self%runlevel /= 3) write(*, "(A, A)") "ph-ph directory = ", trim(self%Vdir)
+       write(*, "(A, L)") "Reuse e-ph matrix elements: ", self%read_gk2
+       if(self%runlevel /= 3) then
+          write(*, "(A, L)") "Using number of batches: ", self%num_batches     
+          write(*, "(A, L)") "Reuse ph-e matrix elements: ", self%read_gq2
+          write(*, "(A, L)") "Reuse ph-ph matrix elements: ", self%read_V
+          write(*, "(A, L)") "Reuse ph-ph transition probabilities: ", self%read_W
+          write(*, "(A, L)") "Calculate ph-ph transition probabilities on-the-fly: ", self%W_OTF
+          write(*, "(A, L)") "Calculate ph-e interaction: ", self%phe
+          write(*, "(A, L)") "Calculate ph-e transition probabilities on-the-fly: ", self%Y_OTF
+          write(*, "(A, L)") "Calculate 1st Born ph-isotope interaction: ", self%phiso
+          if(self%phiso) &
+               write(*, "(A, A)") "Selected ph-isotope 1st Born theory: ", self%phiso_1B_theory
+          write(*, "(A, L)") "Calculate ph-isotope interaction via T-matrix: ", self%phiso_Tmat
+          write(*, "(A, L)") "Include ph-substitution interaction: ", self%phsubs
+          write(*, "(A, L)") "Include ph-boundary interaction: ", self%phbound
+          write(*, "(A, L)") "Include 4-ph interaction: ", self%fourph
+          write(*, "(A, L)") "Include ph-thin-film interaction: ", self%phthinfilm
+          if(self%phthinfilm) write(*, "(A, L)") "    Use ballistic limit: ", self%phthinfilm_ballistic
+          write(*, "(A, L)") "Include ph-defect interaction using the T-matrix: ", self%phdef_Tmat
+          if(self%phbound) then
+             write(*,"(A,(1E16.8,x),A)") 'Characteristic length for ph-boundary scattering =', &
+                  crys%bound_length, 'mm'
+          end if
+          if(self%phthinfilm) then
+             write(*,"(A,(1E16.8,x),A,A,A)") 'Height for ph-thin-film scattering =', &
+                  crys%thinfilm_height, 'mm along the ', crys%thinfilm_normal, ' direction'
+             write(*,"(A,1E16.8)") 'Specularity factor =', crys%specfac
+          end if
+          write(*, "(A, L)") "Include el-charged impurity interaction: ", self%elchimp
+          write(*, "(A, L)") "Include el-el interaction: ", self%elel
+          if(self%elel .or. self%elchimp) then
+             write(*, "(A, A)") "Type of Coulomb screening: ", trim(self%Coulomb_screening_type)
+             if(self%Coulomb_screening_type == 'RPA') then
+                write(*, "(A, I5)") "Size of continuous energy mesh: ", self%ncont_mesh
+             end if
+          end if
+          write(*, "(A, L)") "Include el-boundary interaction: ", self%elbound
+          write(*, "(A, L)") "Solve bulk-BTE: ", self%solve_bulk
+          write(*, "(A, L)") "Solve nano-BTE: ", self%solve_nano
+          if(self%elbound) then
+             write(*,"(A,(1E16.8,x),A)") 'Characteristic length for el-boundary scattering =', &
+                  crys%bound_length, 'mm'
+          end if
+          if(self%onlyphbte) write(*, "(A, L)") "Calculate only phonon BTE: ", self%onlyphbte
+          if(self%onlyebte) write(*, "(A, L)") "Calculate only electron BTE: ", self%onlyebte
+          write(*, "(A, L)") "Include drag: ", self%drag
        end if
-       if(self%onlyphbte) write(*, "(A, L)") "Calculate only phonon BTE: ", self%onlyphbte
-       if(self%onlyebte) write(*, "(A, L)") "Calculate only electron BTE: ", self%onlyebte
-       write(*, "(A, L)") "Include drag: ", self%drag
+       write(*, "(A, L)") "Use tetrahedron method: ", self%tetrahedra
+       write(*, "(A, L)") "Plot quantities along path: ", self%plot_along_path
+       write(*, "(A, I5)") "Maximum number of BTE/Migdal-Eliashberg equations iterations = ", self%maxiter
+       write(*, "(A, 1E16.8)") "BTE/Migdal-Eliashberg equations convergence threshold = ", self%conv_thres
+       write(*, "(A, L)") "B-field is on: ", self%Bfield_on
+       if(self%Bfield_on) write(*, "(A, 3E16.8)") "B-field  = ", self%Bfield
     end if
-    write(*, "(A, L)") "Use tetrahedron method: ", self%tetrahedra
-    write(*, "(A, L)") "Plot quantities along path: ", self%plot_along_path
-    write(*, "(A, I5)") "Maximum number of BTE/Migdal-Eliashberg equations iterations = ", self%maxiter
-    write(*, "(A, 1E16.8)") "BTE/Migdal-Eliashberg equations convergence threshold = ", self%conv_thres
-    write(*, "(A, L)") "B-field is on: ", self%Bfield_on
-    if(self%Bfield_on) write(*, "(A, 3E16.8)") "B-field  = ", self%Bfield
- end if
- sync all
-end subroutine read_input_and_setup
+    sync all
+  end subroutine read_input_and_setup
 
-subroutine create_chempot_dirs(self, chempot)
-  !! Subroutine to create data dump directory tagged by the chemical potential
-  !! and subdirectories within.
+  subroutine create_chempot_dirs(self, chempot)
+    !! Subroutine to create data dump directory tagged by the chemical potential
+    !! and subdirectories within.
 
- class(numerics), intent(inout) :: self
- real(r64), intent(in) :: chempot
+    class(numerics), intent(inout) :: self
+    real(r64), intent(in) :: chempot
 
- !Local variables
- character(len = 1024) :: tag
+    !Local variables
+    character(len = 1024) :: tag
 
- !Create chemical potential dependent data dump directory
- write(tag, "(E14.8)") chempot
- self%datadumpdir_T_chempot = trim(adjustl(self%datadumpdir_T)) // '/mu' // trim(adjustl(tag))
+    !Create chemical potential dependent data dump directory
+    write(tag, "(E14.8)") chempot
+    self%datadumpdir_T_chempot = trim(adjustl(self%datadumpdir_T)) // '/mu' // trim(adjustl(tag))
 
- !Create e-ph and ph-e transition probability data directories
- self%Xdir = trim(adjustl(self%datadumpdir_T_chempot)) // '/X'
- self%Ydir = trim(adjustl(self%datadumpdir_T_chempot)) // '/Y'
+    !Create e-ph and ph-e transition probability data directories
+    self%Xdir = trim(adjustl(self%datadumpdir_T_chempot)) // '/X'
+    self%Ydir = trim(adjustl(self%datadumpdir_T_chempot)) // '/Y'
 
- !Create chemical potential and T-dependent dielectric data directories
- self%epsilondir = trim(adjustl(self%datadumpdir_T_chempot)) // '/epsilon'
+    !Create chemical potential and T-dependent dielectric data directories
+    self%epsilondir = trim(adjustl(self%datadumpdir_T_chempot)) // '/epsilon'
 
- if(this_image() == 1) then
-    call system('mkdir -p ' // trim(adjustl(self%datadumpdir_T_chempot)))
-    call system('mkdir -p ' // trim(adjustl(self%Xdir)))
-    call system('mkdir -p ' // trim(adjustl(self%Ydir)))
- end if
- sync all
-end subroutine create_chempot_dirs
+    if(this_image() == 1) then
+       call system('mkdir -p ' // trim(adjustl(self%datadumpdir_T_chempot)))
+       call system('mkdir -p ' // trim(adjustl(self%Xdir)))
+       call system('mkdir -p ' // trim(adjustl(self%Ydir)))
+    end if
+    sync all
+  end subroutine create_chempot_dirs
 end module numerics_module
