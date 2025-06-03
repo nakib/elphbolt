@@ -54,9 +54,11 @@ module phonon_module
      
      character(len = 2) :: prefix = 'ph'
      !! Prefix idenitfying particle type.
-     integer(i64) :: scell(3)
+     integer(i64) :: scell(3) = [0, 0 ,0]
      !! q-mesh used in DFPT or, equivalently, supercell used in finite displencement
      !! method for calculating the 2nd order force constants.
+     character(len = 100) :: ifc2_engine = 'espresso'
+     !! What code was used to compute the 2nd order force constants?
      real(r64), allocatable :: ifc3(:,:,:,:)
      !! Third order force constants (ifc3) tensor.
      integer(i64) :: numtriplets
@@ -120,7 +122,8 @@ contains
        call read_ifc2(self, crys)
 
        !Precompute dynamical matrix related quantities
-       call phonon_espresso_precompute(self, crys)
+       if(self%ifc2_engine == 'espresso') &
+            call phonon_espresso_precompute(self, crys)
     end if
     
     !Calculate harmonic properties
@@ -208,11 +211,14 @@ contains
           call wann%ph_wann(crys, chunk, self%wavevecs(start:end, :), &
                ens_chunk, evecs_chunk, vels_chunk)
        else
-          !DBG
-          call phonon_espresso(self, crys, chunk, self%wavevecs(start:end, :), &
-               ens_chunk, evecs_chunk, vels_chunk)
-!!$          call phonon_phonopy(self, crys, chunk, self%wavevecs(start:end, :), &
-!!$               ens_chunk, evecs_chunk, vels_chunk)
+          select case (self%ifc2_engine)
+          case('phonopy')
+             call phonon_phonopy(self, crys, chunk, self%wavevecs(start:end, :), &
+                  ens_chunk, evecs_chunk, vels_chunk)
+          case ('espresso')
+             call phonon_espresso(self, crys, chunk, self%wavevecs(start:end, :), &
+                  ens_chunk, evecs_chunk, vels_chunk)
+          end select
        end if
     end if
     
@@ -384,7 +390,7 @@ contains
     !Local variables
     integer(i64) :: qscell(3), tipo(crys%numatoms), t1, t2, t3, i, j, &
          iat, jat, ibrav, ipol, jpol, m1, m2, m3, ntype, nat, nfc2, ntot, &
-         ucell1(3), ucell2(3), at1_sc, at2_sc, ntensors_phonopy
+         ucell1(3), ucell2(3), at1_sc, at2_sc
     real(r64) :: r(crys%numatoms, 3), wscell(3,0:3), celldm(6), at(3,3), &
          dnrm2
     character(len = 1) :: polar_key
@@ -407,11 +413,17 @@ contains
     if(espresso_format_file_exists .and. phonopy_format_file_exists) &
          call exit_with_message('Different types of 2nd order force constant file provided. Exiting.')
     
-    if(espresso_format_file_exists) &
-         call print_message('Reading espresso format 2nd order force constants...')
+    if(espresso_format_file_exists) then
+       call print_message('Reading espresso format 2nd order force constants...')
 
-    if(phonopy_format_file_exists) &
-         call print_message('Reading phonopy format 2nd order force constants...')
+       self%ifc2_engine = 'espresso'
+    end if
+
+    if(phonopy_format_file_exists) then
+       call print_message('Reading phonopy format 2nd order force constants...')
+       
+       self%ifc2_engine = 'phonopy'
+    end if
     
     !Espresso format:
     if(espresso_format_file_exists) then
@@ -460,6 +472,11 @@ contains
           end do
        end do
        close(1)
+
+       if(this_image() == 1) then
+          write(*, "(A, I10)") " Number of pairs read in = ", nfc2
+          write(*, "(A, 3I10)") " q-mesh used in IFC2 calculation = ", self%scell(1:3)
+       end if
     end if
 
     !Phonopy format:
@@ -468,18 +485,18 @@ contains
        
        open(1, file = "FORCE_CONSTANTS", status = "old")
 
-       read(1, *) ntensors_phonopy
-
-       !DEBUG
-       self%scell = [5, 5, 5]
+       !Note here that I am assuming that the phonopy IFC2 file has been
+       !modified to contain the supercell size information before passing
+       !into elphbolt.
+       read(1, *) nfc2, self%scell
 
        allocate(self%ifc2(3, 3, crys%numatoms, crys%numatoms, self%scell(1), self%scell(2), self%scell(3)))
        
-       if(ntensors_phonopy /= product(self%scell)*crys%numatoms) &
+       if(nfc2 /= product(self%scell)*crys%numatoms) &
             call exit_with_message('Wrong number of force constant tensors in file. Exiting.')
        
-       do i = 1, ntensors_phonopy
-          do j = 1, ntensors_phonopy
+       do i = 1, nfc2
+          do j = 1, nfc2
              read(1,*) at1_sc, at2_sc
 
              call phonopy_demux_atom_position(at1_sc, &
@@ -503,6 +520,11 @@ contains
        end do
        close(1)
 
+       if(this_image() == 1) then
+          write(*, "(A, I10)") " Number of pairs read in = ", nfc2
+          write(*, "(A, 3I10)") " Supercell size for IFC2 calculation = ", self%scell(1:3)
+       end if
+       
        !Convert from phonopy units [eV.A^-2] to our internal units [Ry.Bohr^-2]
        self%ifc2 = self%ifc2/Ryd2eV*(Bohr2nm*10.0_r64)**2
     end if
@@ -982,7 +1004,7 @@ contains
     self%R_k = matmul(crys%lattvecs, anint(self%R_k/10.0_r64)) !nm
 
     if(this_image() == 1) &
-       write(*, "(A, I10)") " Number triplets read in = ", self%numtriplets
+       write(*, "(A, I10)") " Number of triplets read in = ", self%numtriplets
   end subroutine read_ifc3
 
   subroutine phonon_espresso_precompute(self, crys)
@@ -1292,15 +1314,6 @@ contains
     !External procedures
     external :: zheev
     
-    !real(kind=8),intent(in) :: kpoints(:,:)
-    !real(kind=8),intent(out) :: omegas(:,:),velocities(:,:,:)
-    !complex(kind=8),intent(out),optional :: eigenvect(:,:,:)
-
-    !real(r64),parameter :: prefactor=1745.91429109 ! THz^2 * amu * nm^3
-
-    !real(r64), parameter :: massfactor = 1.8218779_r64*6.022e-4_r64
-
-    !real(r64),allocatable :: mm(:,:)
     complex(r64), allocatable :: dyn_total(:, :), dyn_nac(:, :)
     complex(r64), allocatable :: ddyn_total(:, :, :), ddyn_nac(:, :, :)
     real(r64), allocatable :: fc_short(:, :, :, :, :, :, :)
@@ -1447,12 +1460,6 @@ contains
        ! Force constants with long-range correction.
        fc_total = fc_short + fc_diel/product(self%scell)
        
-       ! Build the dynamical matrix and its derivatives.
-       !do iatom1 = 1, crys%numatoms
-       !   do iatom2 = 1, crys%numatoms
-       !      do ix1 = 1, self%scell(1)
-       !         do iy1 = 1, self%scell(2)
-
        do ix1 = 1, self%scell(1)
           do iy1 = 1, self%scell(2)
              do iz1 = 1, self%scell(3)
