@@ -148,6 +148,7 @@ module numerics_module
      !! Solve the BTE for bulk materials
      logical :: solve_nano 
      !! Solve the BTE for nanostructures using bulk properties but appropriate boundary conditions
+     integer(i64) :: num_batches
    contains
 
      procedure :: initialize=>read_input_and_setup, create_chempot_dirs
@@ -167,7 +168,7 @@ contains
 
     !Local variables
     integer(i64) :: mesh_ref, qmesh(3), maxiter, runlevel, el_en_num, &
-         ph_en_num, ph_mfp_npts, ph_abs_q_npts, fourph_mesh_ref
+         ph_en_num, ph_mfp_npts, ph_abs_q_npts, fourph_mesh_ref, num_batches
     integer :: i 
     integer(i64) :: ncont_mesh
     real(r64) :: fsthick, conv_thres, ph_en_min, ph_en_max, el_en_min, el_en_max, Bfield(3)
@@ -187,7 +188,7 @@ contains
          ph_mfp_npts, ph_abs_q_npts, phthinfilm, phthinfilm_ballistic, &
          fourph, fourph_mesh_ref, use_Wannier_ifc2s, elel, Coulomb_screening_type, ncont_mesh,&
          phiso_Tmat, phiso_1B_theory, Bfield_on, Bfield, W_OTF, Y_OTF, &
-         solve_bulk, solve_nano
+         solve_bulk, solve_nano, num_batches
 
     call subtitle("Reading numerics information...")
 
@@ -242,6 +243,7 @@ contains
     Y_OTF = .false.
     solve_bulk = .true.
     solve_nano = .false.
+    num_batches = 1
     read(1, nml = numerics)
 
     if(read_W .and. W_OTF) &
@@ -340,6 +342,7 @@ contains
        self%Y_OTF = Y_OTF
        self%solve_bulk = solve_bulk
        self%solve_nano = solve_nano
+       self%num_batches = num_batches
     else
        self%mesh_ref = 1 !Enforce this for superconductivity mode
     end if
@@ -484,6 +487,7 @@ contains
        if(self%runlevel /= 3) write(*, "(A, A)") "ph-ph directory = ", trim(self%Vdir)
        write(*, "(A, L)") "Reuse e-ph matrix elements: ", self%read_gk2
        if(self%runlevel /= 3) then
+          write(*, "(A, L)") "Using number of batches: ", self%num_batches     
           write(*, "(A, L)") "Reuse ph-e matrix elements: ", self%read_gq2
           write(*, "(A, L)") "Reuse ph-ph matrix elements: ", self%read_V
           write(*, "(A, L)") "Reuse ph-ph transition probabilities: ", self%read_W
