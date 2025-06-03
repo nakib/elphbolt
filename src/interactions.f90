@@ -16,7 +16,7 @@
 
 module interactions
   !! Module containing the procedures related to the computation of interactions.
-  
+
   use precision, only: i64, r64
   use params, only: pi, twopi, amu, qe, hbar_eVps, perm0, oneI, kB
   use misc, only: exit_with_message, print_message, distribute_points, &
@@ -27,7 +27,7 @@ module interactions
        linspace
   use resource_module, only: resource
   use screening_module, only: spectral_head_polarizability_3d_q
-  
+
   use wannier_module, only: wannier
   use crystal_module, only: crystal
   use electron_module, only: electron
@@ -38,7 +38,7 @@ module interactions
        vec_change_grid=>vector_allreps_change_grid
   use delta, only: delta_fn, get_delta_fn_pointer, &
        delta_fn_tetra, delta_fn_triang
-  
+
   implicit none
 
   private
@@ -61,9 +61,9 @@ module interactions
   ! dimension 4 => number of 2nd phonon bands
   ! dimension 5 => number of 3rd phonon bands
   real(r64), allocatable :: cg_Vm2(:, :, :, :, :)
-  
+
 contains
-  
+
   pure real(r64) function gchimp2_TF(el, crys, qcart, evec_k, evec_kp)
     !! Function to calculate the Thomas Fermi screened squared 
     !! electron-charged impurity vertex
@@ -80,11 +80,11 @@ contains
     real(r64) :: prefac, overlap, Gsum, &
          Gplusq(3), eps_3x3(3, 3)
     integer :: ik1, ik2, ik3
-        
+
     !This is [U(k')U^\dagger(k)]_nm squared
     !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
     overlap = (abs(dot_product(evec_kp, evec_k)))**2
-    
+
     prefac = 1.0e-3_r64/crys%volume/perm0**2*&
          (el%chimp_conc_n*(qe*el%Zn)**2 + el%chimp_conc_p*(qe*el%Zp)**2)
 
@@ -122,7 +122,7 @@ contains
          Gplusq(3)
     complex(r64) :: eps_3x3(3, 3)
     integer :: ik1, ik2, ik3
-        
+
     !This is [U(k')U^\dagger(k)]_nm squared
     overlap = (abs(dot_product(evec_kp, evec_k)))**2
 
@@ -142,12 +142,12 @@ contains
 
        !Only want G /= -q in the sum over G
        if(all(Gplusq /= 0)) Gsum = Gsum + &
-                 abs(1.0_r64/dot_product(Gplusq, matmul(eps_3x3, Gplusq)))**2
+            abs(1.0_r64/dot_product(Gplusq, matmul(eps_3x3, Gplusq)))**2
     end do
 
     gchimp2_RPA = prefac*overlap*Gsum !ev^2
   end function gchimp2_RPA
-  
+
   pure real(r64) function gCoul2_TF(el, crys, qcart, evec_k, evec_kp)
     !! Function to calculate the Thomas-Fermi screened
     !! squared electron-electron vertex.
@@ -176,8 +176,8 @@ contains
     Gsum = 0.0_r64
     do concurrent(ik1 = -1:1, ik2 = -1:1, ik3 = -1:1)
        Gplusq = (ik1*crys%reclattvecs(:, 1) &
-               + ik2*crys%reclattvecs(:, 2) &
-               + ik3*crys%reclattvecs(:, 3)) + qcart
+            + ik2*crys%reclattvecs(:, 2) &
+            + ik3*crys%reclattvecs(:, 3)) + qcart
 
        Gsum = Gsum + &
             1.0_r64/(twonorm(Gplusq)**2 + screened_qTF_sq)**2 !eV^2
@@ -205,13 +205,13 @@ contains
     !This is [U(k')U^\dagger(k)]_nm squared
     !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
     overlap = (abs(dot_product(evec_kp, evec_k)))**2
-    
+
     !Here ignore local field effects. That is, epsilon^{-1}(G /= G') = 0. 
     W_qw_msq = 0.0_r64
     do concurrent(ik1 = -1:1, ik2 = -1:1, ik3 = -1:1)
        Gplusq = (ik1*crys%reclattvecs(:, 1) &
-               + ik2*crys%reclattvecs(:, 2) &
-               + ik3*crys%reclattvecs(:, 3)) + qcart
+            + ik2*crys%reclattvecs(:, 2) &
+            + ik3*crys%reclattvecs(:, 3)) + qcart
 
        !|G + q|^2
        Gplusq_2normsq = twonorm(Gplusq)**2
@@ -227,9 +227,9 @@ contains
   end function gCoul2_RPA
 
   pure real(r64) function Vm2_3ph(ev1_s1, ev2_s2, ev3_s3, &
-    Index_i, Index_j, Index_k, ifc3, phases_q2q3, ntrip, nb)
+       Index_i, Index_j, Index_k, ifc3, phases_q2q3, ntrip, nb)
     !! Function to calculate the squared 3-ph interaction vertex |V-|^2.
-           
+
     integer(i64), intent(in) :: ntrip, Index_i(ntrip), Index_j(ntrip), Index_k(ntrip), nb
     complex(r64), intent(in) :: phases_q2q3(ntrip), ev1_s1(nb), ev2_s2(nb), ev3_s3(nb)
     real(r64), intent(in) :: ifc3(3, 3, 3, ntrip)
@@ -237,7 +237,7 @@ contains
     !Local variables
     integer(i64) :: it, a, b, c, aind, bind, cind
     complex(r64) :: aux1, aux2, aux3, V0
-    
+
     aux1 = (0.0_r64, 0.0_r64)
     do it = 1, ntrip
        aind = 3*(Index_k(it) - 1)
@@ -260,14 +260,14 @@ contains
 
     Vm2_3ph = abs(aux1)**2
   end function Vm2_3ph
-  
+
   subroutine calculate_coarse_grained_3ph_vertex(ph, crys, num)
     !! TODO
-    
+
     type(phonon), intent(in) :: ph
     type(crystal), intent(in) :: crys
     type(numerics), intent(in) :: num
-    
+
     !Locals
     integer(i64) :: start, end, chunk, &
          s1, s2, s3, iq1, iq2, iq3_minus, it, &
@@ -278,7 +278,7 @@ contains
     complex(r64) :: phases_q2q3(ph%numtriplets)
 
     call print_message("Calculating cgV2...")
-    
+
     !Total number of coarse grained IBZ states
     !nstates_irred = size(ph%cgset_indexlist_irred)*ph%numbands
 
@@ -287,7 +287,7 @@ contains
 
     ncgset = size(ph%cgset_indexlist)
     ncgset_irred = size(ph%cgset_indexlist_irred)
-    
+
     !Divide irreducible q-vectors among images
     call distribute_points(ncgset_irred, chunk, start, end, num_active_images)
 
@@ -295,7 +295,7 @@ contains
        write(*, "(A, I10)") " #q-points = ", ncgset_irred
        write(*, "(A, I10)") " #q-points/image <= ", chunk
     end if
-    
+
     allocate(cg_Vm2(ph%numbands, ph%numbands, ph%numbands, &
          ncgset, ncgset_irred))
     cg_Vm2 = 0.0_r64
@@ -405,7 +405,7 @@ contains
 
     !Associate delta function procedure pointer
     delta_fn_ptr => get_delta_fn_pointer(num%tetrahedra)
-    
+
     !Allocate W- and W+
     allocate(Wp(nprocs), Wm(nprocs))
     allocate(istate2_plus(nprocs), istate3_plus(nprocs),&
@@ -444,7 +444,7 @@ contains
 
           !Calculate coarse grained iq1_ibz
           cg_iq1_ibz = minloc(abs(ph%cgset_indexlist_irred - ph%cg_indexlist_irred(iq1_ibz)), dim = 1)
-          
+
           !Energy of phonon 1
           en1 = ph%ens(iq1, s1)
 
@@ -458,7 +458,7 @@ contains
           do iq2 = 1, ph%nwv
              !Calculate coarse grained iq2
              cg_iq2 = minloc(abs(ph%cgset_indexlist - ph%cg_indexlist(iq2)), dim = 1)
-             
+
              !Initial (IBZ blocks) wave vector (crystal coords.)
              q2 = ph%wavevecs(iq2, :)
 
@@ -478,7 +478,7 @@ contains
 
              !Get index of coarse grained -q2
              cg_neg_iq2 = minloc(abs(ph%cgset_indexlist - ph%cg_indexlist(neg_iq2)), dim = 1)
-             
+
              !Run over branches of second phonon
              do s2 = 1, ph%numbands
                 !Energy of phonon 2
@@ -486,7 +486,7 @@ contains
 
                 !Bose factor for phonon 2
                 bose2 = Bose(en2, crys%T)
-                
+
                 !Run over branches of third phonon
                 do s3 = 1, ph%numbands                
                    !Minus process index
@@ -584,7 +584,7 @@ contains
     end if
 
     if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
-    
+
     sync all
   end subroutine calculate_W_fromcgV2
 
@@ -634,7 +634,7 @@ contains
 
     !Associate delta function procedure pointer
     delta_fn_ptr => get_delta_fn_pointer(num%tetrahedra)
-    
+
     !Conversion factor in transition probability expression
     const = pi/4.0_r64*hbar_eVps**5*(qe/amu)**3*1.0d-12
 
@@ -645,12 +645,12 @@ contains
     nprocs = ph%nwv*ph%numbands**2
 
     allocate(chunk[*], start[*], end[*])
-    
+
     if(key == 'V') then       
        !Split load among cpus and gpus
        ! Defaults (no gpu): 
        load_split = 0.0
-       
+
        !Deep copies for the gpu
        ntrips_gpu = ph%numtriplets
        nwv_gpu = ph%nwv
@@ -677,7 +677,7 @@ contains
 
          call compute_resource%balance_load(load_split, nstates_irred, &
               chunk, start, end, num_active_images)
-         
+
          !Only work with the active images
          if(this_image() <= num_active_images) then            
             !Run over first phonon IBZ states
@@ -715,7 +715,7 @@ contains
 
                   !Muxed index of q3_minus
                   iq3_minus = mux_vector(q3_minus_indvec, wvmesh, 0_i64)
-                  
+
                   q2_cart = matmul(reclattvecs, q2)
                   q3_minus_cart = matmul(reclattvecs, q3_minus)
                   do it = 1, ntrips_gpu
@@ -726,7 +726,7 @@ contains
                      !Note: expi won't work on the accelerator
                      phases(it) = exp((0.0_r64, -1.0_r64)* &
                           (dot_product(q2_cart, (R_j(:, it))) + &
-                           dot_product(q3_minus_cart, (R_k(:, it)))))
+                          dot_product(q3_minus_cart, (R_k(:, it)))))
                   end do
 
                   !Combined loop over the 2nd and 3rd phonon bands
@@ -748,7 +748,7 @@ contains
 
                      delta_minus = delta_fn_ptr(en1 - en3, iq2, s2, wvmesh, simplex_map, &
                           simplex_count, simplex_evals) !minus process
-                     
+
                      delta_plus = delta_fn_ptr(en3 - en1, neg_iq2, s2, wvmesh, simplex_map, &
                           simplex_count, simplex_evals) !plus process      
 
@@ -776,7 +776,7 @@ contains
 
                !Change to data output directory
                call chdir(trim(adjustl(num%Vdir)))
-               
+
                !Write data in binary format
                !Note: this will overwrite existing data!
                write (filename, '(I9)') istate1
@@ -793,7 +793,7 @@ contains
                close(1)
             end do !istate1
          end if !num_active_images
-         
+
        end associate
     end if !key
 
@@ -857,7 +857,7 @@ contains
              !Muxed index of wave vector from the IBZ index list.
              !This will be used to access IBZ information from the FBZ quantities.
              iq1 = ph%indexlist_irred(iq1_ibz)
-             
+
              !Energy of phonon 1
              en1 = ph%ens(iq1, s1)
 
@@ -906,10 +906,10 @@ contains
                    !Evaluate delta functions
                    delta_minus = delta_fn_ptr(en1 - en3, iq2, s2, ph%wvmesh, ph%simplex_map, &
                         ph%simplex_count, ph%simplex_evals) !minus process
-                   
+
                    delta_plus = delta_fn_ptr(en3 - en1, neg_iq2, s2, ph%wvmesh, ph%simplex_map, &
                         ph%simplex_count, ph%simplex_evals) !plus process
-                   
+
                    if(en1*en2*en3 == 0.0_r64) cycle
 
                    !Bose factor for phonon 3
@@ -990,10 +990,10 @@ contains
     end if
 
     if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
-    
+
     sync all
   end subroutine calculate_3ph_interaction
-  
+
   subroutine calculate_W3ph_OTF(ph, num, istate1, T, &
        Wm, Wp, istate2_plus, istate3_plus, istate2_minus, istate3_minus)
     !! On-the-fly (OTF), serial calcualator of the 3-ph transition probability.
@@ -1008,7 +1008,7 @@ contains
     real(r64), allocatable, intent(out) :: Wm(:), Wp(:)
     integer(i64), allocatable, intent(out), optional :: istate2_plus(:), istate3_plus(:), &
          istate2_minus(:), istate3_minus(:)
-    
+
     !Locals
     integer(i64) :: nstates_irred, nprocs, s1, s2, s3, iq1_ibz, iq1, iq2, iq3_minus, &
          q1_indvec(3), q2_indvec(3), q3_minus_indvec(3), &
@@ -1024,7 +1024,7 @@ contains
     !Do I need to keep a tally of the all the interacting states?
     keep_interaction_tally = present(istate2_plus) .and. present(istate3_plus) .and. &
          present(istate2_minus) .and. present(istate3_minus)
-    
+
     !Associate delta function procedure pointer
     delta_fn_ptr => get_delta_fn_pointer(num%tetrahedra)
 
@@ -1042,9 +1042,9 @@ contains
     if(keep_interaction_tally) &
          allocate(istate2_minus(nprocs), istate2_plus(nprocs), &
          istate3_minus(nprocs), istate3_plus(nprocs))
-    
+
     !Load |V^-|^2 from disk for scattering rates calculation
-    
+
     !Change to data output directory
     call chdir(trim(adjustl(num%Vdir)))
 
@@ -1066,14 +1066,14 @@ contains
 
     !Change back to working directory
     call chdir(num%cwd)
-    
+
     !Zero out W- and W+ and process tallies
     Wm = 0.0_r64; Wp = 0.0_r64
     if(keep_interaction_tally) then
        istate2_plus(:) = 0_i64; istate3_plus(:) = 0_i64
        istate2_minus(:) = 0_i64; istate3_minus(:) = 0_i64
     end if
-       
+
     !Initialize process counters
     plus_count = 0_i64
     minus_count = 0_i64
@@ -1152,7 +1152,7 @@ contains
 
              !Save W-
              Wm(minus_count) = Vm2_1(minus_count)*occup_fac*delta_minus/en1/en2/en3
-             
+
              if(keep_interaction_tally) then
                 istate2_minus(minus_count) = mux_state(ph%numbands, s2, iq2)
                 istate3_minus(minus_count) = mux_state(ph%numbands, s3, iq3_minus)
@@ -1172,7 +1172,7 @@ contains
 
              !Save W+
              Wp(plus_count) = Vm2_2(plus_count)*occup_fac*delta_plus/en1/en2/en3
-             
+
              if(keep_interaction_tally) then
                 istate2_plus(plus_count) = mux_state(ph%numbands, s2, neg_iq2)
                 istate3_plus(plus_count) = mux_state(ph%numbands, s3, iq3_minus)
@@ -1196,10 +1196,10 @@ contains
        call shrink(istate3_plus, plus_count)
        call shrink(istate3_minus, minus_count)
     end if
-       
+
     if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
   end subroutine calculate_W3ph_OTF
-  
+
   subroutine calculate_gReq(wann, ph, num)
     !! Parallel driver of gReq_epw over IBZ phonon wave vectors.
 
@@ -1218,7 +1218,7 @@ contains
        print*, "   #q = ", ph%nwv_irred
        print*, "   #q/image <= ", chunk
     end if
-    
+
     !Only work with the active images
     if(this_image() <= num_active_images) then
        do iq = iqstart, iqend
@@ -1228,7 +1228,7 @@ contains
 
     sync all
   end subroutine calculate_gReq
-  
+
   subroutine calculate_gkRp(wann, el, num)
     !! Parallel driver of gkRp over IBZ electron wave vectors.
     !
@@ -1236,7 +1236,7 @@ contains
     ! For the sake of efficiency, it reshapes wann%gwann. It does, however,
     ! put that tensor back to its original shape. Is there a way to put a
     ! lock on the use of gwann while this procedure is running?
-    
+
     type(wannier), intent(in) :: wann
     type(electron), intent(in) :: el
     type(numerics), intent(in) :: num
@@ -1290,7 +1290,7 @@ contains
     type(phonon), intent(in) :: ph
     type(numerics), intent(in) :: num
     character(len = 1), intent(in) :: key
-    
+
     !Local variables
     integer(i64) :: nstates_irred, istate, m, iq, iq_fbz, n, ik, s, &
          ikp_window, start, end, chunk, nprocs, count, num_active_images
@@ -1302,7 +1302,7 @@ contains
     character(len = 1024) :: filename
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
     type(vec) :: q_vec, k_vec, kp_vec
-    
+
     if(key /= 'g' .and. key /= 'Y' .and. key /= 'U') then
        call exit_with_message(&
             "Invalid value of key in call to calculate_eph_interaction_ibzq. Exiting.")
@@ -1313,11 +1313,11 @@ contains
     else
        call print_message("Calculating ph-e transition probabilities for all IBZ phonons...")
     end if
-    
+
     !Allocate and initialize gReq_iq and g2_istate
     if(key == 'g') then
        allocate(gReq_iq(wann%numwannbands, wann%numwannbands, wann%numbranches, wann%nwsk))
-       
+
        !Maximum length of g2_istate
        nprocs = el%nstates_inwindow*ph%numbands
        allocate(g2_istate(nprocs))
@@ -1326,15 +1326,15 @@ contains
 
     !Associate delta function procedure pointer
     delta_fn_ptr => get_delta_fn_pointer(num%tetrahedra)
-    
+
     !Conversion factor in transition probability expression
     const = twopi/hbar_eVps
-    
+
     !Total number of IBZ blocks states
     nstates_irred = ph%nwv_irred*ph%numbands
 
     call distribute_points(nstates_irred, chunk, start, end, num_active_images)
-    
+
     if(this_image() == 1) then
        write(*, "(A, I10)") " #states = ", nstates_irred
        write(*, "(A, I10)") " #states/image <= ", chunk
@@ -1360,10 +1360,10 @@ contains
 
           !Get the muxed index of FBZ wave vector from the IBZ index list
           iq_fbz = ph%indexlist_irred(iq)
-          
+
           !Energy of phonon
           en_ph = ph%ens(iq_fbz, s)
-         
+
           !Create phonon wave vector
           q_vec = vec(iq_fbz, ph%wvmesh, crys%reclattvecs)
 
@@ -1422,7 +1422,7 @@ contains
 
              !Find final electron wave vector
              kp_vec = vec_add(k_vec, q_vec, el%wvmesh, crys%reclattvecs) 
-             
+
              !Check if final electron wave vector is within energy window
              call binsearch(el%indexlist, kp_vec%muxed_index, ikp_window)
              if(ikp_window < 0) cycle
@@ -1473,7 +1473,7 @@ contains
                       if(en_ph >= 0.5e-3) then !Use a small phonon energy cut-off
                          TP_istate(count) = g2_istate(count)*occup_fac*delta
                       end if
-                      
+
                       !Save initial and final electron states
                       istate1(count) = mux_state(el%numbands, m, ik)
                       istate2(count) = mux_state(el%numbands, n, ikp_window)
@@ -1524,7 +1524,7 @@ contains
              write (filename, '(I9)') istate
              filename = 'U.istate'//trim(adjustl(filename))
           end if
-          
+
           if(key /= 'g') then
              !Multiply constant factor, unit factor, etc.
              TP_istate(1:count) = const*TP_istate(1:count) !THz
@@ -1839,7 +1839,7 @@ contains
     real(r64), intent(in) :: T
     real(r64), intent(out), allocatable :: Y_istate(:)
     integer(i64), intent(out), allocatable, optional :: istate_el1(:), istate_el2(:)
-    
+
     !Local variables
     integer(i64) :: nstates_irred, istate, m, iq, iq_fbz, n, ik, ikp, s, &
          ikp_window, start, end, chunk, &
@@ -1851,16 +1851,16 @@ contains
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
     logical :: keep_interaction_tally
     type(vec) :: q_vec, k_vec, kp_vec
-    
+
     !Do I need to keep a tally of the all the interacting states?
     keep_interaction_tally = present(istate_el1) .and. present(istate_el2)
-    
+
     !Associate delta function procedure pointer
     delta_fn_ptr => get_delta_fn_pointer(num%tetrahedra)
-    
+
     !Conversion factor in transition probability expression
     const = twopi/hbar_eVps
-    
+
     !Maximum length of g2_istate
     nprocs = el%nstates_inwindow*ph%numbands
 
@@ -1887,7 +1887,7 @@ contains
 
     !Create phonon wave vector
     q_vec = vec(iq_fbz, ph%wvmesh, crys%reclattvecs)
-    
+
     !1/(1 + Bose factor) for phonon
     if(en_ph /= 0.0_r64) then
        invboseplus1 = 1.0_r64/(1.0_r64 + Bose(en_ph, T))
@@ -1951,7 +1951,7 @@ contains
              count = count + 1
 
              !Calculate Y:
-             
+
              !Evaluate delta function
              delta_val = delta_fn_ptr(en_elp - en_ph, ik, m, el%wvmesh, el%simplex_map, &
                   el%simplex_count, el%simplex_evals)
@@ -1978,7 +1978,7 @@ contains
 
     !Multiply constant/units factor, etc.
     Y_istate = const*Y_istate
-    
+
     !Shrink process tallies
     if(keep_interaction_tally) then
        call shrink(istate_el1, count)
@@ -1987,7 +1987,7 @@ contains
 
     if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
   end subroutine calculate_Y_OTF
-  
+
   subroutine calculate_eph_interaction_ibzk(wann, crys, el, ph, num, key)
     !! Parallel driver of g2(k,q) over IBZ electron states.
     !!
@@ -2008,7 +2008,7 @@ contains
     type(phonon), intent(in) :: ph
     type(numerics), intent(in) :: num
     character(len = 1), intent(in) :: key
-    
+
     !Local variables
     integer(i64) :: nstates_irred, istate, m, ik, ik_fbz, n, ikp, s, &
          iq_fine, iq_coarse, start, end, chunk, count, nprocs, num_active_images
@@ -2023,7 +2023,7 @@ contains
     logical :: needfinephon
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
     type(vec) :: k_vec, kp_vec, q_vec, q_vec_coarse
-    
+
     if(key /= 'g' .and. key /= 'X' .and. key /= 'O') then
        call exit_with_message(&
             "Invalid value of key in call to calculate_eph_interaction_ibzk. Exiting.")
@@ -2034,11 +2034,11 @@ contains
     else
        call print_message("Calculating e-ph transition probabilities for all IBZ electrons...")
     end if
-    
+
     !Allocate and initialize gkRp_ik and g2_istate
     if(key == 'g') then
        allocate(gkRp_ik(wann%numwannbands,wann%numwannbands,wann%numbranches,wann%nwsq))
-       
+
        !Length of g2_istate
        nprocs = el%nstates_inwindow*wann%numbranches
        allocate(g2_istate(nprocs))
@@ -2047,13 +2047,13 @@ contains
 
     !Associate delta function procedure pointer
     delta_fn_ptr => get_delta_fn_pointer(num%tetrahedra)
-    
+
     !Conversion factor in transition probability expression
     const = twopi/hbar_eVps
 
     !Total number of IBZ blocks states
     nstates_irred = el%nwv_irred*wann%numwannbands
-    
+
     call distribute_points(nstates_irred, chunk, start, end, num_active_images)
 
     if(this_image() == 1) then
@@ -2080,7 +2080,7 @@ contains
 
           !Get the muxed index of FBZ wave vector from the IBZ index list
           ik_fbz = el%indexlist_irred(ik)
-          
+
           !Electron energy
           en_el = el%ens_irred(ik, m)
 
@@ -2089,7 +2089,7 @@ contains
 
           !Create initial electron wave vector
           k_vec = vec(ik_fbz, el%wvmesh, crys%reclattvecs)
-          
+
           !Load g2_istate from disk for scattering rates calculation
           if(key /= 'g') then
              !Change to data output directory
@@ -2130,7 +2130,7 @@ contains
              !This is represented with respect to the electronic mesh.
              q_vec = vec_sub(kp_vec, k_vec, el%wvmesh, crys%reclattvecs)
              iq_fine = q_vec%muxed_index
-             
+
              !Note that q, k, and k' are all on the same mesh.
              !However, there are some common q vector on which the
              !phonon quantities have already been computed. Here, compute
@@ -2138,7 +2138,7 @@ contains
              needfinephon = .false.
              if(any(mod(q_vec%int(:), el%mesh_ref_array) /= 0_i64)) then
                 needfinephon = .true.
-                
+
                 !Calculate the fine mesh phonon.
                 qlist(1, :) = q_vec%frac
                 call wann%ph_wann(crys, 1_i64, qlist, ph_ens_iq, ph_evecs_iq)
@@ -2146,7 +2146,7 @@ contains
                 q_vec_coarse = vec_change_grid(q_vec, ph%wvmesh)
                 iq_coarse = q_vec_coarse%muxed_index
              end if
-            
+
              !Run over final electron bands
              do n = 1, wann%numwannbands
                 !Apply energy window to final electron
@@ -2177,7 +2177,7 @@ contains
                       else
                          en_ph = ph%ens(iq_coarse, s)
                       end if
-                      
+
                       if(key == 'X') then
                          !Bose and Fermi factors
                          if(en_ph /= 0.0_r64) then
@@ -2198,7 +2198,7 @@ contains
                          !Temperature dependent occupation factors
                          occup_fac_plus = (Fermi(en_el, el%chempot, crys%T) - fermi_plus_fac)/&
                               Fermi(en_el, el%chempot, crys%T)/(1.0_r64 - Fermi(en_el, el%chempot, crys%T))
-                         
+
                          occup_fac_minus = (Fermi(en_el, el%chempot, crys%T) - fermi_minus_fac)/&
                               Fermi(en_el, el%chempot, crys%T)/(1.0_r64 - Fermi(en_el, el%chempot, crys%T))
                       end if
@@ -2258,7 +2258,7 @@ contains
              filename_plus = 'Omegaplus.istate'//trim(adjustl(filename_plus))
              filename_minus = 'Omegaminus.istate'//trim(adjustl(filename_minus))
           end if
-          
+
           if(key /= 'g') then
              !Multiply constant factor, unit factor, etc.
              TPplus_istate(1:count) = const*TPplus_istate(1:count) !THz
@@ -2294,7 +2294,7 @@ contains
     sync all
 
     if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
-    
+
     if(key == 'g') then
        !Delete the gkRp disk data
        if(this_image() == 1) then
@@ -2305,7 +2305,7 @@ contains
     end if
     sync all
   end subroutine calculate_eph_interaction_ibzk
-  
+
   subroutine calculate_Xee_OTF(el, num, istate1, crys, X, &
        istate_el2, istate_el3, istate_el4)
     !! On-the-fly serial calculator of the e-e transition probability.
@@ -2327,7 +2327,7 @@ contains
     real(r64), intent(out), allocatable :: X(:)
     integer(i64), intent(out), allocatable, optional :: &
          istate_el2(:), istate_el3(:), istate_el4(:)
-    
+
     !Local variables
     integer(i64) :: istate, &
          n1, ik1, n2, ik2, n3, ik3, n4, ik4, &
@@ -2345,20 +2345,20 @@ contains
     !Do I need to keep a tally of the all the interacting states?
     keep_interaction_tally = present(istate_el2) .and. present(istate_el3) &
          .and. present(istate_el4)
-    
+
     !Inverse temperature energy
     beta = 1.0_r64/crys%T/kB
-    
+
     !Associate delta function procedure pointer
     delta_fn_ptr => get_delta_fn_pointer(num%tetrahedra)
-    
+
     !Constant factor in transition probability expression
     const = 2.0_r64*twopi/hbar_eVps/product(el%wvmesh)
 
     !Maxium possible length of transition rates
     !Nk**3*Nbands**2
     nprocs = el%nstates_inwindow**2*el%numbands
-    
+
     !Allocate quantities related to transition probabilities
     allocate(X(nprocs))
     if(keep_interaction_tally) &
@@ -2371,7 +2371,7 @@ contains
 
        call linspace(Omegas_cont, -2*el%fsthick, 2*el%fsthick, num%ncont_mesh) 
     end if
-    
+
     !Initialize X, and if needed, the process tallies
     X(:) = 0.0_r64
     if(keep_interaction_tally) then
@@ -2391,7 +2391,7 @@ contains
 
     !Initialize process counter for the state (k1, n1)
     count = 0
-    
+
     !Apply energy window to electron 1
     if(abs(en1 - el%enref) <= el%fsthick) then
 
@@ -2409,14 +2409,14 @@ contains
 
           !Reset screening precomputation flag
           screening_computed = .false.
-          
+
           do n3 = 1, el%numbands
              !Electron 3 energy
              en3 = el%ens(ik3, n3)
 
              !Apply energy window to electron 3
              if(abs(en3 - el%enref) > el%fsthick) cycle
-             
+
              !Fermi function of electron 3
              fermi3 = Fermi(en3, el%chempot, crys%T)
 
@@ -2434,14 +2434,14 @@ contains
 
                 !Reset g2 precomputation flag
                 g2_computed = .false.
-                
+
                 do n2 = 1, el%numbands
                    !Electron 2 energy
                    en2 = el%ens(ik2, n2)
 
                    !Apply energy window to electron 2
                    if(abs(en2 - el%enref) > el%fsthick) cycle
-                   
+
                    !Fermi function of electron 2
                    fermi2 = Fermi(en2, el%chempot, crys%T)
 
@@ -2484,13 +2484,13 @@ contains
 
                          g2_computed = .true.
                       end if
-                      
+
                       !Increase viable process counter
                       count = count + 1
 
                       !Fermi function of electron 4
                       fermi4 = Fermi(en1 + en2 - en3, el%chempot, crys%T)
-                      
+
                       !Evaulate delta function
                       delta_val = delta_fn_ptr(en4 + en3 - en1, &
                            ik2, n2, el%wvmesh, el%simplex_map, &
@@ -2521,7 +2521,7 @@ contains
     if(count > 0) then
        !Shrink X
        call shrink(X, count)
-       
+
        !Multiply constant/units factor, etc.
        X = const*X
 
@@ -2557,7 +2557,7 @@ contains
     integer(i64), intent(in) :: istate3
     real(r64), intent(out), allocatable :: X(:)
     integer(i64), intent(out), allocatable, optional :: istate_el2(:), istate_el4(:)
-    
+
     !Local variables
     integer(i64) :: istate, &
          n1, ik1, n2, ik2, n3, ik3, n4, ik4, &
@@ -2574,20 +2574,20 @@ contains
 
     !Do I need to keep a tally of the all the interacting states?
     keep_interaction_tally = present(istate_el2) .and. present(istate_el4)
-    
+
     !Inverse temperature energy
     beta = 1.0_r64/crys%T/kB
-    
+
     !Associate delta function procedure pointer
     delta_fn_ptr => get_delta_fn_pointer(num%tetrahedra)
-    
+
     !Constant factor in transition probability expression
     const = 2.0_r64*twopi/hbar_eVps/product(el%wvmesh)
 
     !Maxium possible length of transition rates
     !Nk**2*Nbands**1
     nprocs = el%nstates_inwindow*el%numbands
-    
+
     !Allocate quantities related to transition probabilities
     allocate(X(nprocs))
     if(keep_interaction_tally) &
@@ -2600,7 +2600,7 @@ contains
 
        call linspace(Omegas_cont, -2*el%fsthick, 2*el%fsthick, num%ncont_mesh) 
     end if
-    
+
     !Initialize X, and if needed, the process tallies
     X(:) = 0.0_r64
     if(keep_interaction_tally) then
@@ -2619,10 +2619,10 @@ contains
 
     !Electron 3 energy (in FBZ)
     en3 = el%ens(ik3, n3)
-    
+
     !Initialize process counter for the state {(k1, n1), (k3, n3)}
     count = 0
-    
+
     !Apply energy window to electrons 1 and 3
     if(abs(en1 - el%enref) <= el%fsthick .and. abs(en3 - el%enref) <= el%fsthick) then
        !Fermi function of electron 1
@@ -2746,7 +2746,7 @@ contains
     if(count > 0) then
        !Shrink X
        call shrink(X, count)
-       
+
        !Multiply constant/units factor, etc.
        X = const*X
 
@@ -2774,7 +2774,7 @@ contains
     type(crystal), intent(in) :: crys
     type(electron), intent(in) :: el
     type(numerics), intent(in) :: num
-    
+
     !Local variables
     integer(i64) :: nstates_irred, istate, m, ik, n, ikp, &
          start, end, chunk, count, nprocs, num_active_images
@@ -2793,7 +2793,7 @@ contains
 
     !Associate delta function procedure pointer
     delta_fn_ptr => get_delta_fn_pointer(num%tetrahedra)
-    
+
     !Conversion factor in transition probability expression
     const = twopi/hbar_eVps
 
@@ -2802,10 +2802,10 @@ contains
     allocate(Xchimp_istate(nprocs), istate_el(nprocs))
     Xchimp_istate(:) = 0.0_r64
     istate_el(:) = 0_i64
-    
+
     !Total number of IBZ blocks states
     nstates_irred = el%nwv_irred*el%numbands
-    
+
     if(num%Coulomb_screening_type == 'RPA') then
        !Allocate and create continuous energy mesh over around the Fermi shell
        allocate(Omegas_cont(num%ncont_mesh), specX0_cont(num%ncont_mesh), &
@@ -2813,9 +2813,9 @@ contains
 
        call linspace(Omegas_cont, -2*el%fsthick, 2*el%fsthick, num%ncont_mesh) 
     end if
-    
+
     call distribute_points(nstates_irred, chunk, start, end, num_active_images)
-    
+
     if(this_image() == 1) then
        write(*, "(A, I10)") " #states = ", nstates_irred
        write(*, "(A, I10)") " #states/image <= ", chunk
@@ -2843,7 +2843,7 @@ contains
           do ikp = 1, el%nwv
              !Final wave vector (crystal coords.)
              kp_vec = vec(el%indexlist(ikp), el%wvmesh, crys%reclattvecs)
-             
+
              !q \equiv kp - k
              q_vec = vec_sub(kp_vec, k_vec, el%wvmesh, crys%reclattvecs)
 
@@ -2854,10 +2854,10 @@ contains
              do n = 1, el%numbands
                 ! Energy of final electron
                 en_el_p = el%ens(ikp, n)
-                
+
                 !Apply energy window to final electron
                 if(abs(en_el_p - el%enref) > el%fsthick) cycle
-                
+
                 !Increment g2 processes counter
                 count = count + 1
 
@@ -2885,7 +2885,7 @@ contains
                         el%evecs_irred(ik, m, :), el%evecs(ikp, n, :))
                 else
                    g2 = gchimp2_RPA(el, crys, q_vec%cart, &
-                     el%evecs_irred(ik, m, :), el%evecs(ikp, n, :), X0_qw0)
+                        el%evecs_irred(ik, m, :), el%evecs(ikp, n, :), X0_qw0)
                 end if
 
                 !Evaulate delta function
@@ -2922,10 +2922,10 @@ contains
     end if
 
     if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
-    
+
     sync all
   end subroutine calculate_echimp_interaction_ibzk
-  
+
   subroutine calculate_ph_rta_rates(rta_rates_3ph, rta_rates_phe, num, crys, ph, el)
     !! Subroutine for parallel reading of the 3-ph and ph-e transition probabilities
     !! from disk and calculating the relaxation time approximation (RTA)
@@ -2943,21 +2943,21 @@ contains
          nprocs_phe, iproc, chunk, s, iq, num_active_images, start, end
     real(r64), allocatable :: W(:), Y(:), Wp(:), Wm(:)
     character(len = 1024) :: filepath_Wm, filepath_Wp, filepath_Y, tag
-    
+
     !Set output directory of transition probilities
     write(tag, "(E9.3)") crys%T
-    
+
     !Total number of IBZ blocks states
     nstates_irred = ph%nwv_irred*ph%numbands
-    
+
     !Divide phonon states among images
     call distribute_points(nstates_irred, chunk, start, end, num_active_images)
-    
+
     !Allocate and initialize scattering rates
     allocate(rta_rates_3ph(ph%nwv_irred, ph%numbands), rta_rates_phe(ph%nwv_irred, ph%numbands))
     rta_rates_3ph(:, :) = 0.0_r64
     rta_rates_phe(:, :) = 0.0_r64
-    
+
     !Only work with the active images
     if(this_image() <= num_active_images) then
        !Run over first phonon IBZ states
@@ -2968,14 +2968,14 @@ contains
 
           !Set file tag
           write(tag, '(I9)') istate
-          
+
           if(num%W_OTF) then
              call calculate_W3ph_OTF(ph, num, istate, crys%T, Wm, Wp)
 
              do iproc = 1, size(Wp)
                 rta_rates_3ph(iq, s) = rta_rates_3ph(iq, s) + Wp(iproc)
              end do
-             
+
              do iproc = 1, size(Wm)
                 rta_rates_3ph(iq, s) = rta_rates_3ph(iq, s) + 0.5_r64*Wm(iproc)
              end do
@@ -3009,12 +3009,12 @@ contains
              else
                 !Set Y filename
                 filepath_Y = trim(adjustl(num%Ydir))//'/Y.istate'//trim(adjustl(tag))
-                
+
                 !Read Y from file
                 if(allocated(Y)) deallocate(Y)
                 call read_transition_probs_e(trim(adjustl(filepath_Y)), nprocs_phe, Y)
              end if
-             
+
              do iproc = 1, size(Y)
                 rta_rates_phe(iq, s) = rta_rates_phe(iq, s) + el%spindeg*Y(iproc)
              end do
@@ -3037,7 +3037,7 @@ contains
     !! Subroutine for parallel coherence transition probabilities
     !! from disk and calculating the relaxation time approximation (RTA)
     !! coherence rates in the ph-e channel.
-    
+
     real(r64), allocatable, intent(out) :: rta_rates_phe(:, :)
     type(numerics), intent(in) :: num
     type(crystal), intent(in) :: crys
@@ -3048,8 +3048,8 @@ contains
     integer(i64) :: nstates_irred, istate, nprocs_plus, nprocs_minus, &
          nprocs_phe, iproc, chunk, num_active_images, start, end, &
          ieq, ik_ibz, iq_fbz, iq_ibz, s, m, n, nprocs!, &
-         !ik_sym, ikp, ikp_fbz_rot!, ik_fbz, iq_fbz, iq_ibz, &
-         
+    !ik_sym, ikp, ikp_fbz_rot!, ik_fbz, iq_fbz, iq_ibz, &
+
     integer(i64), allocatable :: istate_el(:), istate_ph(:)
     real(r64), allocatable :: Omegap(:), Omegam(:), rta_rates_phe_fbz(:, :)
     character(len = 1024) :: filepath_Omegap, filepath_Omegam, filepath_Wm, tag
@@ -3073,7 +3073,7 @@ contains
 
           !Apply energy window to initial (IBZ blocks) electron
           if(abs(el%ens_irred(ik_ibz, m) - el%enref) > el%fsthick) cycle
-          
+
           !Set Omega+ filename
           write(tag, '(I9)') istate
           filepath_Omegap = trim(adjustl(num%Xdir))//'/Omegaplus.istate'//trim(adjustl(tag))
@@ -3120,10 +3120,10 @@ contains
           end do
        end do
     end if
-    
+
     !Reduce partial sums
     call co_sum(rta_rates_phe_fbz)
-    
+
     !Need this on the IBZ
     allocate(rta_rates_phe(ph%nwv_irred, ph%numbands))
     do iq_fbz = 1, ph%nwv
@@ -3136,7 +3136,7 @@ contains
   subroutine calculate_4ph_rta_rates(rta_rates, num, crys, ph)
     !! Subroutine for interporlating 4-ph scattering rates from an
     !! external coarser mesh calculation.
-    
+
     real(r64), allocatable, intent(out) :: rta_rates(:,:)
     type(numerics), intent(in) :: num
     type(crystal), intent(in) :: crys
@@ -3161,7 +3161,7 @@ contains
        if(crys%twod) mesh_ref_array(3) = 1
        coarse_qmesh = ph%wvmesh/num%fourph_mesh_ref
        if(crys%twod) coarse_qmesh(3) = 1
-       
+
        write(temp_tag, "(E9.3)") crys%T
        filename = "FourPhonon_BTE.w_4ph_T" // trim(adjustl(temp_tag))
 
@@ -3174,9 +3174,9 @@ contains
        sync all
        call co_broadcast(coarse_numq_irred, 1)
        sync all
-       
+
        allocate(coarse_rta_rates_ibz(coarse_numq_irred, ph%numbands))
-       
+
        !Read coarse mesh, IBZ 4-ph scattering rates
        if(this_image() == 1 .and. num%fourph) then
           do s = 1, ph%numbands
@@ -3204,7 +3204,7 @@ contains
        sync all
        call co_broadcast(coarse_numq_full, 1)
        sync all
-          
+
        allocate(coarse_rta_rates_fbz(coarse_numq_full, ph%numbands))
 
        if(this_image() == 1 .and. num%fourph) then
@@ -3218,7 +3218,7 @@ contains
        sync all
        call co_broadcast(coarse_rta_rates_fbz, 1)
        sync all
-       
+
        !Divide phonon states among images
        call distribute_points(ph%nwv_irred, chunk, start, end, num_active_images)
 
@@ -3231,7 +3231,7 @@ contains
           do iq = 1, size(qs_int, 1)
              call demux_vector(iq, qs_int(iq, :), ph%wvmesh, 0_i64)
           end do
-          
+
           call precompute_interpolation_corners_and_weights(coarse_qmesh, &
                mesh_ref_array, qs_int, idc, widc)
 
@@ -3243,7 +3243,7 @@ contains
 
                 !q-point to interpolate on
                 iq2inter = mux_vector(fineq_indvec, ph%wvmesh, 0_i64)
-                
+
                 !Interpolate 4-ph scattering rates on this wave vector
                 do s = 1, ph%numbands
                    call interpolate_using_precomputed(idc(iq2inter, :), widc(iq2inter, :), &
@@ -3260,7 +3260,7 @@ contains
        end if
     end if
   end subroutine calculate_4ph_rta_rates
-  
+
   subroutine calculate_el_rta_rates(rta_rates_eph, rta_rates_echimp, rta_rates_ee, &
        num, crys, el)
     !! Subroutine for parallel reading of the e-ph transition probabilities
@@ -3272,7 +3272,7 @@ contains
     type(numerics), intent(in) :: num
     type(crystal), intent(in) :: crys
     type(electron), intent(in) :: el
-    
+
     !Local variables
     integer(i64) :: nstates_irred, nstates, istate, istate3, nprocs_eph, nprocs_echimp, &
          iproc, chunk, m, ik, ik3, m3, mp, ikp, num_active_images, start, end
@@ -3292,7 +3292,7 @@ contains
 
     !Divide phonon states among images
     call distribute_points(nstates_irred, chunk, start, end, num_active_images)
-    
+
     !Allocate and initialize scattering rates
     allocate(rta_rates_eph(el%nwv_irred, el%numbands))
     rta_rates_eph(:, :) = 0.0_r64
@@ -3330,7 +3330,7 @@ contains
                 end do
              end do
           end if
-          
+
           !Set X+ filename
           write(tag, '(I9)') istate
           filepath_Xp = trim(adjustl(num%Xdir))//'/Xplus.istate'//trim(adjustl(tag))
@@ -3374,16 +3374,16 @@ contains
 
     !Reduce partial sums
     call co_sum(rta_rates_eph)
-    
+
     if(num%elchimp) then
        call co_sum(rta_rates_echimp)
     end if
 
     !if(num%elel) then
-       call co_sum(rta_rates_ee)
+    call co_sum(rta_rates_ee)
     !end if
   end subroutine calculate_el_rta_rates
-  
+
   subroutine read_transition_probs_e(filepath, N, TP, istate1, istate2)
     !! Subroutine to read transition probabilities from disk for interaction processes.
 
@@ -3436,11 +3436,11 @@ contains
     !Number of IBZ wave vectors and bands
     nk_irred = size(indexlist_irred(:))
     nb = size(vels_fbz(1,:,1))
-    
+
     !Allocate boundary scattering rates and initialize to infinite crystal values
     allocate(scatt_rates(nk_irred, nb))
     scatt_rates = 0.0_r64
-    
+
     !Check finiteness of crystal
     if(finite_crys) then
        do ik = 1, nk_irred
@@ -3537,7 +3537,7 @@ contains
     !Write to file
     call write2file_rank2_real(prefix // '.W_rta_'//prefix//'thinfilm', thin_film_scatt_rates)
   end subroutine calculate_thinfilm_scatt_rates
-  
+
 !!$  subroutine calculate_thinfilm_scatt_rates(prefix, finite_crys, ballistic_limit, &
 !!$       height, normal, vels_fbz, indexlist_irred, other_scatt_rates, thin_film_scatt_rates)
 !!$    !! Subroutine to calculate the phonon/electron-thin-film scattering rates.

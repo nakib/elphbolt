@@ -23,12 +23,12 @@ module numerics_module
   use crystal_module, only: crystal
 
   implicit none
-  
+
   private
   public numerics
 
   !external system, getcwd
-  
+
   type numerics
      !! Data and procedures related to the numerics.
 
@@ -151,7 +151,7 @@ module numerics_module
    contains
 
      procedure :: initialize=>read_input_and_setup, create_chempot_dirs
-     
+
   end type numerics
 
 contains
@@ -164,7 +164,7 @@ contains
 
     class(numerics), intent(out) :: self
     type(crystal), intent(in) :: crys
-    
+
     !Local variables
     integer(i64) :: mesh_ref, qmesh(3), maxiter, runlevel, el_en_num, &
          ph_en_num, ph_mfp_npts, ph_abs_q_npts, fourph_mesh_ref
@@ -190,7 +190,7 @@ contains
          solve_bulk, solve_nano
 
     call subtitle("Reading numerics information...")
-    
+
     !Open input file
     open(1, file = 'input.nml', status = 'old')
 
@@ -246,7 +246,7 @@ contains
 
     if(read_W .and. W_OTF) &
          call exit_with_message("read_W and W_OTF can't both be true. Exiting.")
-    
+
     if(any(qmesh <= 0) .or. fourph_mesh_ref < 1 .or. mesh_ref < 1 .or. fsthick < 0 .or. ncont_mesh < 1) then
        call exit_with_message('Bad input(s) in numerics.')
     end if
@@ -275,7 +275,7 @@ contains
           call exit_with_message("phiso_1B_theory can't be 'Tamura' if 'DIB' is true. Exiting.")
        end if
     end if
-    
+
     if(elel .or. elchimp) then
        if((Coulomb_screening_type /= "RPA") .and. (Coulomb_screening_type /= "TF")) then
           call exit_with_message("Coulomb_screening_type can be either 'RPA' or 'TF'. Exiting.")
@@ -293,11 +293,11 @@ contains
 !!$          call exit_with_message("B-field has to be of the form [B 0 0], [0 B 0], or [0 0 B]. Exiting.")
 !!$       end if
     end if
-    
+
     !TODO
     !! [ ] Read eco mode info from input
     !! [ ] Check for valid choice of econess
-    
+
     !eco mode DBG
     self%eco_mode = .true.
     self%econess = [2, 2, 2]
@@ -305,7 +305,7 @@ contains
 
     self%Bfield_on = Bfield_on
     self%Bfield = Bfield
-    
+
     self%qmesh = qmesh
     self%runlevel = runlevel
     !Runlevels:
@@ -362,7 +362,7 @@ contains
        self%ph_mfp_npts = ph_mfp_npts
        self%ph_abs_q_npts = ph_abs_q_npts
     end if
-    
+
     if(crys%twod .and. self%qmesh(3) /= 1) then
        call exit_with_message('For 2d systems, qmesh(3) must be equal to 1.')
     end if
@@ -371,7 +371,7 @@ contains
     if(mod(self%ncont_mesh, 2) == 0) then
        self%ncont_mesh = self%ncont_mesh + 1
     end if
-    
+
     !Set BTE solution type
     if(self%onlyphbte) then
        self%onlyebte = .false.
@@ -390,7 +390,7 @@ contains
        self%onlyphbte = .false.
        self%phe = .true.
     end if
-    
+
     !Set Wannier usage flag
     self%need_Wannier = self%use_Wannier_ifc2s .or. self%onlyebte .or. self%drag &
          .or. (self%phe .and. self%onlyphbte) &
@@ -404,7 +404,7 @@ contains
     if(self%phiso_Tmat .and. .not. self%phdef_Tmat) then
        call exit_with_message("For ph-iso scattering from T-matrix, need both phiso_Tmat and phdef_Tmat. Exiting.")
     end if
-    
+
     !Create data dump directory
     if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(self%datadumpdir)))
 
@@ -426,7 +426,7 @@ contains
     !Create T-dependent ph-ph transition probability directory
     self%Wdir = trim(adjustl(self%datadumpdir_T))//'/W'
     if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(self%Wdir)))
-    
+
     !Close input file
     close(1)
 
@@ -457,7 +457,7 @@ contains
                self%mesh_ref*self%qmesh(3)
        end if
        close(1)
-       
+
        write(*, "(A, (3I5,x))") "q-mesh = ", self%qmesh
        if(crys%twod) then
           write(*, "(A, (3I5,x))") "k-mesh = ", self%mesh_ref*self%qmesh(1), self%mesh_ref*self%qmesh(2), 1
@@ -541,7 +541,7 @@ contains
   subroutine create_chempot_dirs(self, chempot)
     !! Subroutine to create data dump directory tagged by the chemical potential
     !! and subdirectories within.
-    
+
     class(numerics), intent(inout) :: self
     real(r64), intent(in) :: chempot
 
@@ -558,7 +558,7 @@ contains
 
     !Create chemical potential and T-dependent dielectric data directories
     self%epsilondir = trim(adjustl(self%datadumpdir_T_chempot)) // '/epsilon'
-    
+
     if(this_image() == 1) then
        call system('mkdir -p ' // trim(adjustl(self%datadumpdir_T_chempot)))
        call system('mkdir -p ' // trim(adjustl(self%Xdir)))
