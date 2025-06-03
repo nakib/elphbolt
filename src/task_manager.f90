@@ -13,10 +13,8 @@ module task_manager_module
 
      private
 
-     integer(i64) :: num_batches = 1 
-     !! Number of batches.
-     integer(i64), public :: num_finished_batches = 0
-     !! Number of completed batches. 
+     integer(i64) :: num_batches 
+     !! Number of batches. 
      integer(i64), allocatable :: batch_info(:, :)
      !! Task batching information. 
      character(len = :), allocatable :: filename_record
@@ -40,70 +38,18 @@ contains
     integer(i64), intent(in) :: num_tasks, num_batches
     character(len = *), intent(in) :: filename
 
-    integer(i64) :: batch_size, residual_task, ibatch, start_idx, end_idx, batch_number
-    integer :: ios, unit
-    logical :: file_exist
-    character(len = 256) :: line, last_line
-    character(len = 32) :: timestamp
+    integer(i64) :: batch_size, residual_task, ibatch, start_idx, end_idx
 
     !This handles cases where batches are more than tasks.
     self%num_batches = min(num_tasks, num_batches)
     allocate(self%batch_info(self%num_batches, 3))
 
-    !Default to zero for completed batches.
-    self%num_finished_batches = 0
-
-    !Check if file exists.
-    inquire(file = filename, exist = file_exist)
-
-    !This ensures future batch records can be appended without error.
+    !Clear old data
     if(allocated(self%filename_record)) deallocate(self%filename_record)
     allocate(character(len = len_trim(filename)) :: self%filename_record)
     self%filename_record = trim(filename)
-
-    !If the file exist, read the last line and update num_finished_tasks.
-    if(file_exist) then
-       open(newunit = unit, file = filename, status = "old", action = "read", position = "rewind", iostat = ios)
-       if(ios == 0) then
-          last_line = ''
-          do
-             read(unit, '(A)', iostat = ios) line
-             !Exit on error or end of file.
-             if(ios /= 0) exit
-             !Keep updating with latest line.
-             if(len_trim(line) > 0) last_line = line
-          end do
-          close(unit)
-
-          !Verify that the batch record file contains at least one readable line.
-          if(len_trim(last_line) > 0) then
-             read(last_line, *, iostat = ios) timestamp, batch_number, start_idx, end_idx, batch_size
-             if(ios == 0) then
-                self%num_finished_batches = batch_number
-             else
-                self%num_finished_batches = 0
-                if(this_image() == 1) print *, "No batches completed yet."
-             end if
-          else
-             self%num_finished_batches = 0
-             batch_number = 0
-             if(this_image() == 1) print *, "Batch record file is empty. Starting from batch 0."
-          end if
-
-          !Read the last line for the completed batch number.
-          read(last_line, *, iostat = ios) timestamp, batch_number, start_idx, end_idx, batch_size
-          if(ios == 0) self%num_finished_batches = batch_number
-       end if
-
-       if(this_image() == 1) then
-          print *, " Last record line : ", trim(last_line)
-          print *, " Last batch number: ", batch_number
-          print *, " Restart from last batch: " , self%num_finished_batches
-       end if
-    else
-       open(newunit = unit, file = self%filename_record, status = 'replace', action = 'write')
-       close(unit)
-    end if
+    open(unit = 10, file = self%filename_record, status = 'replace', action = 'write')
+    close(10)
 
     !Divide the total number of tasks in num_batches (subtasks).
     batch_size = num_tasks/self%num_batches
