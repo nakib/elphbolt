@@ -649,7 +649,7 @@ contains
     case('V')
        batch_filename = "V2_batches"
     case('W')
-       batch_filename = "W2_batches"
+       batch_filename = "W_batches"
     end select
 
     !Maximum total number of 3-phonon processes for a given initial phonon state
@@ -1394,9 +1394,9 @@ contains
     case('g')
        batch_filename = "g2_ibzq_batches"
     case('Y')
-       batch_filename = "Y2_ibzq_batches"
+       batch_filename = "Y_ibzq_batches"
     case('U') 
-       batch_filename = "U2_ibzq_batches"
+       batch_filename = "U_ibzq_batches"
     end select
 
     !Distributethe total number of states across batches.
@@ -2147,9 +2147,9 @@ contains
     case('g')
        batch_filename = "g2_ibzk_batches"
     case('X')
-       batch_filename = "X2_ibzk_batches"
+       batch_filename = "X_ibzk_batches"
     case('O')
-       batch_filename = "O2_ibzk_batches"
+       batch_filename = "O_ibzk_batches"
     end select
 
     !Distribute the total number of states across batches.
