@@ -42,7 +42,7 @@ contains
 
     integer(i64) :: batch_size, residual_task, ibatch, start_idx, end_idx, batch_number
     integer :: ios, unit
-    logical :: file_exist
+    logical :: file_exists
     character(len = 256) :: line, last_line
     character(len = 32) :: timestamp
 
@@ -54,30 +54,35 @@ contains
     self%num_finished_batches = 0
 
     !Check if file exists.
-    inquire(file = filename, exist = file_exist)
+    inquire(file = filename, exist = file_exists)
 
     !This ensures future batch records can be appended without error.
     if(allocated(self%filename_record)) deallocate(self%filename_record)
     allocate(character(len = len_trim(filename)) :: self%filename_record)
     self%filename_record = trim(filename)
 
-    !If the file exist, read the last line and update num_finished_tasks.
-    if(file_exist) then
+    !If the file exists, read the last line and update num_finished_tasks.
+    if(file_exists) then
        open(newunit = unit, file = filename, status = "old", action = "read", position = "rewind", iostat = ios)
+       
        if(ios == 0) then
           last_line = ''
+
           do
              read(unit, '(A)', iostat = ios) line
+
              !Exit on error or end of file.
              if(ios /= 0) exit
+
              !Keep updating with latest line.
              if(len_trim(line) > 0) last_line = line
           end do
-          close(unit)
 
           !Verify that the batch record file contains at least one readable line.
           if(len_trim(last_line) > 0) then
-             read(last_line, *, iostat = ios) timestamp, batch_number, start_idx, end_idx, batch_size
+             read(last_line, *, iostat = ios) &
+                  timestamp, batch_number, start_idx, end_idx, batch_size
+
              if(ios == 0) then
                 self%num_finished_batches = batch_number
              else
@@ -94,6 +99,8 @@ contains
           read(last_line, *, iostat = ios) timestamp, batch_number, start_idx, end_idx, batch_size
           if(ios == 0) self%num_finished_batches = batch_number
        end if
+
+       close(unit)
 
        if(this_image() == 1) then
           print *, " Last record line : ", trim(last_line)
@@ -186,8 +193,10 @@ contains
        !Append to the batch record file
        open(newunit = unit, file = self%filename_record, status = 'old', &
             position = 'append', action = 'write')
+       
        write(unit, '(A, 1X, I0, 1X, I0, 1X, I0, 1X, I0)') trim(timestamp), &
             batch_number, self%batch_info(batch_number, :)
+       
        close(unit)
     end if
   end subroutine write_record

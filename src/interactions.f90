@@ -3169,6 +3169,7 @@ contains
     !ik_sym, ikp, ikp_fbz_rot!, ik_fbz, iq_fbz, iq_ibz, &
 
     integer(i64), allocatable :: istate_el(:), istate_ph(:)
+    real(r64) :: Fermi_istate, occ_fac
     real(r64), allocatable :: Omegap(:), Omegam(:), rta_rates_phe_fbz(:, :)
     character(len = 1024) :: filepath_Omegap, filepath_Omegam, filepath_Wm, tag
 
@@ -3192,6 +3193,10 @@ contains
           !Apply energy window to initial (IBZ blocks) electron
           if(abs(el%ens_irred(ik_ibz, m) - el%enref) > el%fsthick) cycle
 
+          !Compute the Fermi factor that will be needed later
+          Fermi_istate = Fermi(el%ens_irred(ik_ibz, m), el%chempot, crys%T)
+          occ_fac = Fermi_istate*(1.0_r64 - Fermi_istate)
+          
           !Set Omega+ filename
           write(tag, '(I9)') istate
           filepath_Omegap = trim(adjustl(num%Xdir))//'/Omegaplus.istate'//trim(adjustl(tag))
@@ -3231,8 +3236,9 @@ contains
 
                    !iq_ibz = ph%fbz2ibz_map(iq_fbz)
 
+                   !Note here that I absorbed the occupation factor [f0(1 - f0)]^-1 in the Omegas earlier
                    rta_rates_phe_fbz(iq_fbz, s) = rta_rates_phe_fbz(iq_fbz, s) + &
-                        el%spindeg*(Omegap(iproc) - Omegam(iproc))
+                        el%spindeg*(Omegap(iproc) - Omegam(iproc))*occ_fac
                 end if
              end do
           end do

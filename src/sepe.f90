@@ -701,7 +701,8 @@ contains
        do it_el = 1, num%maxiter
           !E field:
           call iterate_el_occupations_eqn(num, el, crys, &
-               self%el_rta_rates_ibz, self%el_field_term_E, self%el_response_E, ph_drag_term_E)
+               self%el_rta_rates_ibz, self%el_field_term_E, self%el_response_E, &
+               ph_drag_term_E, ph_coherence_term_E)
 
           !Calculate electron transport coefficients
           call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, &
@@ -711,17 +712,22 @@ contains
 
           !delT field:
           call iterate_el_occupations_eqn(num, el, crys, &
-               self%el_rta_rates_ibz, self%el_field_term_T, self%el_response_T, ph_drag_term_T)
+               self%el_rta_rates_ibz, self%el_field_term_T, self%el_response_T, &
+               ph_drag_term_T, ph_coherence_term_T)
           !Enforce Kelvin-Onsager relation:
           !Fix "diffusion" part
           do icart = 1, 3
              I_diff(:,:,icart) = (el%ens(:,:) - el%chempot)/qe/crys%T*&
                   self%el_response_E(:,:,icart)
           end do
+
+          !TODO: How to generalize the following to include the coherence term?
+
           !Correct "drag" part
           I_drag = self%el_response_T - I_diff
           call correct_I_drag(I_drag, trace(sum(trans%ph_alphabyT, dim = 1))/crys%dim, lambda)
           self%el_response_T = I_diff + lambda*I_drag
+
 !!$          call correct_I_drag_expt(I_drag, sum(trans%ph_alphabyT, dim = 1), lambda_diag)
 !!$          self%el_response_T = I_diff + &
 !!$               I_drag*spread(spread(lambda_diag, dim = 1, ncopies = size(I_drag, 1)), &
@@ -1231,7 +1237,6 @@ contains
              end do
 
              !Drag contribution:
-
              !if(present(response_el)) then
              do iproc = 1, nprocs_phe
                 !Grab initial and final electron states
@@ -1301,7 +1306,7 @@ contains
          iq_fbz, iq_ibz, nq, numbands, &
          num_active_images, start, end, nprocs
     integer(i64), allocatable :: istate_el(:), istate_ph(:)
-    real(r64) :: ph_en, coherence_rate
+    real(r64) :: ph_en, coherence_rate, prefactor_denom
     complex(r64) :: prefactor
     real(r64), allocatable :: Xphplus(:), Xphminus(:)
     complex(r64), allocatable :: coherence_ph_reduce(:, :, :)
@@ -1387,13 +1392,15 @@ contains
                    !Note that I don't save the ph%ens_irred to save space. 
                    ph_en = ph%ens(iq_fbz, s)
                    !TODO: Double check if this spin DOF factor is needed. I think it is.
-                   prefactor = el%spindeg*&
-                        (hbar_eVps*coherence_rate - 4.0_r64*ph_en*oneI)/&
-                        ((hbar_eVps*coherence_rate)**2 + 16.0_r64*ph_en**2)
+                   prefactor_denom = (hbar_eVps*coherence_rate)**2 + 16.0_r64*ph_en**2
 
                    !Here accumulate contribution to \mathbf{R}_{\lambda}
-                   !from the 1st term of the RHS
-                   if(prefactor /= complex_zero) then
+                   !if(prefactor /= complex_zero) then
+                   if(prefactor_denom /= 0.0_r64) then
+                      prefactor = el%spindeg* &
+                           (hbar_eVps*coherence_rate - 4.0_r64*ph_en*oneI)/prefactor_denom
+
+                      !from the 1st term of the RHS
                       coherence_ph_reduce(iq_fbz, s, :) = coherence_ph_reduce(iq_fbz, s, :) + &
                            prefactor*(Xphplus(iproc) - Xphminus(iproc))*&
                            (response_el(ik_fbz, m, :) - response_el(ikp_fbz_rot, n, :))
@@ -1635,6 +1642,7 @@ contains
 
     !Allocate and initialize response reduction array
     allocate(ph_coherence_term_reduce(nk, numbands, 3))
+    ph_coherence_term_reduce = 0.0_r64
 
     !Allocate and set the real part of the coherence function
     allocate(coherence_ph_real(size(coherence_ph, 1), numbranches, 3))
@@ -1698,7 +1706,7 @@ contains
                         nint(matmul(sym%qrotations(:, :, ik_sym), fineq_indvec)), el%wvmesh)
 
                    !Interpolate response function on this wave vector using precomputed tabulated weights
-                   !and points. I note that response_ph(:, s, :) is not contiguous in memory.
+                   !and points. I note that coherence_ph_real(:, s, :) is not contiguous in memory.
                    iq2inter = mux_vector(fineq_indvec,el%wvmesh, 0_i64)
                    call interpolate_using_precomputed(&
                         coarse_mesh_corners(iq2inter,:), &
