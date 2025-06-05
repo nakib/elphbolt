@@ -2,6 +2,7 @@ module task_manager_module
   !! Module containing the data type related to task batching.
 
   use precision, only: i64
+  use misc, only: exit_with_message
 
   implicit none
 
@@ -32,91 +33,103 @@ contains
 
   subroutine distribute_load(self, num_tasks, num_batches, filename)
     !! Partitions a total number of tasks into number of batches balancing
-    !! the work as evenly as possible. We use a shuffling algorithm here.
-    !! The number of batches used is limited to min(num_tasks, num_batches),
-    !! which means no batch is left empty.
+    !! the work as evenly as possible.
+    !
+    ! We use a shuffling algorithm here.
+    ! The number of batches used is limited to min(num_tasks, num_batches),
+    ! which means no batch is left empty.
 
     class(task_manager), intent(out) :: self
     integer(i64), intent(in) :: num_tasks, num_batches
     character(len = *), intent(in) :: filename
 
-    integer(i64) :: batch_size, residual_task, ibatch, start_idx, end_idx, batch_number
-    integer :: ios, unit
+    integer(i64) :: batch_size, residual_tasks, ibatch, start_idx, end_idx, batch_number
+    integer :: ios, ios2, unit
     logical :: file_exists
     character(len = 256) :: line, last_line
     character(len = 32) :: timestamp
 
-    !This handles cases where batches are more than tasks.
+    !Set num_batches handling the case where there are more batches than tasks.
     self%num_batches = min(num_tasks, num_batches)
+
+    !Allocate batch_info array
     allocate(self%batch_info(self%num_batches, 3))
 
-    !Default to zero for completed batches.
-    self%num_finished_batches = 0
-
-    !Check if file exists.
-    inquire(file = filename, exist = file_exists)
-
-    !This ensures future batch records can be appended without error.
-    if(allocated(self%filename_record)) deallocate(self%filename_record)
+    !Allocate the record filename
     allocate(character(len = len_trim(filename)) :: self%filename_record)
+
+    !Set record filename
     self%filename_record = trim(filename)
 
-    !If the file exists, read the last line and update num_finished_tasks.
-    if(file_exists) then
-       open(newunit = unit, file = filename, status = "old", action = "read", position = "rewind", iostat = ios)
+    !Do all file creation business with just one image.
+    if(this_image() == 1) then
+       !Check if file exists.
+       inquire(file = filename, exist = file_exists)
 
-       if(ios == 0) then
-          last_line = ''
+       !If the file exists, read the last line and update num_finished_tasks.
+       if(file_exists) then
+          open(newunit = unit, file = filename, status = "old", action = "read", &
+               position = "rewind", iostat = ios)
 
-          do
-             read(unit, '(A)', iostat = ios) line
-
-             !Exit on error or end of file.
-             if(ios /= 0) exit
-
-             !Keep updating with latest line.
-             if(len_trim(line) > 0) last_line = line
-          end do
-
-          !Verify that the batch record file contains at least one readable line.
-          if(len_trim(last_line) > 0) then
-             read(last_line, *, iostat = ios) &
-                  timestamp, batch_number, start_idx, end_idx, batch_size
-
-             if(ios == 0) then
-                self%num_finished_batches = batch_number
-             else
-                self%num_finished_batches = 0
-                if(this_image() == 1) print *, "No batches completed yet."
-             end if
-          else
-             self%num_finished_batches = 0
+          if(ios == 0) then !Was able to open the existing file
+             !Defaults
+             last_line = ''
              batch_number = 0
-             if(this_image() == 1) print *, "Batch record file is empty. Starting from batch 0."
+
+             do
+                read(unit, '(A)', iostat = ios2) line
+
+                !Exit on error or end of file.
+                if(ios2 /= 0) exit
+
+                !Keep updating with latest line.
+                if(len_trim(line) > 0) last_line = line
+             end do
+
+             !Read last line
+             if(len_trim(line) > 0) then !non-empty last line
+                last_line = line
+
+                read(last_line, *) &
+                     timestamp, batch_number, start_idx, end_idx, batch_size
+
+                !Here assert that the data in the file makes sense
+                if(batch_number < 1 .or. start_idx < 1 &
+                     .or. end_idx < 1 .or. batch_size < 1) then
+                   close(unit)
+
+                   call exit_with_message('Meaningless data in job record file. Exiting.')
+                end if
+
+                self%num_finished_batches = batch_number
+
+                print *, " Last record line : ", trim(last_line)
+                print *, " Last batch number: ", batch_number
+                print *, " Restart from last batch: ", self%num_finished_batches
+             else !empty last line
+                print *, "Batch record file is empty."
+             end if
+
+             self%num_finished_batches = batch_number
+          else !Error opening file
+             call exit_with_message(&
+                  'Could not open batch record file in distribute_load. Exiting.')
           end if
-
-          !Read the last line for the completed batch number.
-          read(last_line, *, iostat = ios) timestamp, batch_number, start_idx, end_idx, batch_size
-          if(ios == 0) self%num_finished_batches = batch_number
+       else !file does not exist, so create it
+          open(newunit = unit, file = self%filename_record, status = 'replace')
        end if
 
        close(unit)
+    end if !only on image 1
 
-       if(this_image() == 1) then
-          print *, " Last record line : ", trim(last_line)
-          print *, " Last batch number: ", batch_number
-          print *, " Restart from last batch: " , self%num_finished_batches
-       end if
-    else
-       open(newunit = unit, file = self%filename_record, status = 'replace', action = 'write')
-       close(unit)
-    end if
+    !Here broadcast self%num_finished_batches to all other images
+    call co_broadcast(self%num_finished_batches, source_image = 1)
 
     !Divide the total number of tasks in num_batches (subtasks).
     batch_size = num_tasks/self%num_batches
 
     !How many tasks are left over?
-    residual_task = mod(num_tasks, self%num_batches)
+    residual_tasks = mod(num_tasks, self%num_batches)
 
     !The first batch index start is 1 always.
     start_idx = 1
@@ -124,7 +137,7 @@ contains
     !Record the start and the end index and the size of each batch.
     do ibatch = 1, self%num_batches
        !First check if this batch should receive one of the extra tasks.
-       if(ibatch <= residual_task) then
+       if(ibatch <= residual_tasks) then
           end_idx = start_idx + batch_size
        else
           !For the batches after the extra ones, assign exactly the batch_size tasks.
