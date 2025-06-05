@@ -19,7 +19,7 @@ program test_task_manager
   itest = 1
   test_array(itest) = testify("equal distribution: 100 tasks, 4 batches")
 
-  call job1%distribute_load(num_tasks = 100_i64, num_batches = 4_i64, filename = "task_log1.txt")
+  call job1%distribute_load(num_tasks = 100_i64, num_batches = 4_i64, filename = "test_task_log1.txt")
 
   call test_array(itest)%assert([job1%get_num_batches(), job1%get_batch_range(4_i64)], &
        [4, 76, 100, 25]*1_i64)
@@ -28,7 +28,7 @@ program test_task_manager
   itest = itest + 1
   test_array(itest) = testify("odd distribution: 13333 tasks, 3 batches")
 
-  call job1%distribute_load(num_tasks = 13333_i64, num_batches = 3_i64, filename = "task_log2.txt")
+  call job1%distribute_load(num_tasks = 13333_i64, num_batches = 3_i64, filename = "test_task_log2.txt")
 
   call test_array(itest)%assert([job1%get_num_batches(), job1%get_batch_range(3_i64)], &
        [3, 8890, 13333, 4444]*1_i64)
@@ -37,7 +37,7 @@ program test_task_manager
   itest = itest + 1
   test_array(itest) = testify("single test: 1 task, 1 batch")
 
-  call job1%distribute_load(num_tasks = 1_i64, num_batches = 1_i64, filename = "task_log3.txt")
+  call job1%distribute_load(num_tasks = 1_i64, num_batches = 1_i64, filename = "test_task_log3.txt")
 
   call test_array(itest)%assert([job1%get_num_batches(), job1%get_batch_range(1_i64)], &
        [1, 1, 1, 1]*1_i64)
@@ -46,7 +46,7 @@ program test_task_manager
   itest = itest + 1
   test_array(itest) = testify("more batches than tasks: 3 tasks, 5 batches")
 
-  call job1%distribute_load(num_tasks = 3_i64, num_batches = 5_i64, filename = "task_log4.txt")
+  call job1%distribute_load(num_tasks = 3_i64, num_batches = 5_i64, filename = "test_task_log4.txt")
 
   call test_array(itest)%assert([job1%get_num_batches(), job1%get_batch_range(3_i64)], &
        [3, 3, 3, 1]*1_i64)
@@ -55,7 +55,7 @@ program test_task_manager
   itest = itest + 1
   test_array(itest) = testify("write and read batch 2 record for 100 tasks and 4 batches")
 
-  call job1%distribute_load(num_tasks = 100_i64, num_batches = 4_i64, filename = "task_log5.txt")
+  call job1%distribute_load(num_tasks = 100_i64, num_batches = 4_i64, filename = "test_task_log5.txt")
 
   call job1%write_record(1_i64)
   call job1%write_record(2_i64)
@@ -66,7 +66,7 @@ program test_task_manager
   itest = itest + 1
   test_array(itest) = testify("write and read batch 3 record for 5 tasks and 10 batches")
 
-  call job1%distribute_load(num_tasks = 5_i64, num_batches = 10_i64, filename = "task_log6.txt")
+  call job1%distribute_load(num_tasks = 5_i64, num_batches = 10_i64, filename = "test_task_log6.txt")
 
   call job1%write_record(1_i64)
   call job1%read_record(batch, batch_info)
@@ -79,6 +79,8 @@ program test_task_manager
   tests_all = testify(test_array)
   call tests_all%report
 
+  !Delete test_task_log*
+  call system('rm test_task_log*')
+
   if(tests_all%get_status() .eqv. .false.) error stop -1
 end program test_task_manager
-
