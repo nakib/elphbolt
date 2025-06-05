@@ -64,7 +64,7 @@ contains
     !If the file exists, read the last line and update num_finished_tasks.
     if(file_exists) then
        open(newunit = unit, file = filename, status = "old", action = "read", position = "rewind", iostat = ios)
-       
+
        if(ios == 0) then
           last_line = ''
 
@@ -193,10 +193,10 @@ contains
        !Append to the batch record file
        open(newunit = unit, file = self%filename_record, status = 'old', &
             position = 'append', action = 'write')
-       
+
        write(unit, '(A, 1X, I0, 1X, I0, 1X, I0, 1X, I0)') trim(timestamp), &
             batch_number, self%batch_info(batch_number, :)
-       
+
        close(unit)
     end if
   end subroutine write_record

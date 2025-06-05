@@ -3196,7 +3196,7 @@ contains
           !Compute the Fermi factor that will be needed later
           Fermi_istate = Fermi(el%ens_irred(ik_ibz, m), el%chempot, crys%T)
           occ_fac = Fermi_istate*(1.0_r64 - Fermi_istate)
-          
+
           !Set Omega+ filename
           write(tag, '(I9)') istate
           filepath_Omegap = trim(adjustl(num%Xdir))//'/Omegaplus.istate'//trim(adjustl(tag))
