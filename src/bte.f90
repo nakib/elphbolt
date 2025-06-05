@@ -158,40 +158,29 @@ contains
     type(phonon), intent(in) :: ph
     type(electron), intent(in), optional :: el
 
-    !Local variables
-    character(1024) :: tag, Tdir
-
     call subtitle("Calculating transport (bulk)...")
 
     call print_message("Only the trace-averaged transport coefficients are printed below:")
 
-    !Create output folder tagged by temperature and create it
-    write(tag, "(E9.3)") crys%T
-    Tdir = trim(adjustl(num%cwd))//'/T'//trim(adjustl(tag))
-    if(this_image() == 1) then
-       call system('mkdir -p '//trim(adjustl(Tdir)))
-    end if
-    sync all
-
     !Phonon RTA
     if(.not. num%onlyebte) &
-         call dragless_phbte_RTA(Tdir, self, num, crys, sym, ph, el)
+         call dragless_phbte_RTA(num%cwd_T, self, num, crys, sym, ph, el)
 
     !Electron RTA
     if(.not. num%onlyphbte) &
-         call dragless_ebte_RTA(Tdir, self, num, crys, sym, el, ph)
+         call dragless_ebte_RTA(num%cwd_T, self, num, crys, sym, el, ph)
 
     !Dragful electron-phonon BTEs
     if(num%drag) &
-         call dragfull_ephbtes(Tdir, self, num, crys, sym, ph, el)
+         call dragfull_ephbtes(num%cwd_T, self, num, crys, sym, ph, el)
 
     !Dragless full phonon BTE
     if(num%onlyphbte .or. num%drag) &
-         call dragless_phbte_full(Tdir, self, num, crys, sym, ph, el)
+         call dragless_phbte_full(num%cwd_T, self, num, crys, sym, ph, el)
 
     !Dragless full electron BTE
     if(num%onlyebte .or. num%drag) &
-         call dragless_ebte_full(Tdir, self, num, crys, sym, el)
+         call dragless_ebte_full(num%cwd_T, self, num, crys, sym, el)
   end subroutine bte_driver
 
   subroutine dragless_ebte_RTA(Tdir, self, num, crys, sym, el, ph)
@@ -1906,7 +1895,7 @@ contains
          ph_mfp_sampling_grid(:), ph_q_sampling_grid(:), &
          ph_kappa_cumulative_mfp(:, :, :, :), ph_kappa_cumulative_q(:, :, :, :)
     real(r64) :: ph_abs_qs(ph%nwv)
-    character(len = 1024) :: tag, Tdir, numcols
+    character(len = 1024) :: numcols
     integer(i64) :: ik, ib
 
     !Calculate electron and/or phonon sampling energy grid
@@ -1940,9 +1929,7 @@ contains
     call write2file_rank1_real("ph_abs_q_sampling", ph_q_sampling_grid)
 
     !Change to T-dependent directory
-    write(tag, "(E9.3)") crys%T
-    Tdir = trim(adjustl(num%cwd))//'/T'//trim(adjustl(tag))
-    call chdir(trim(adjustl(Tdir)))
+    call chdir(trim(adjustl(num%cwd_T)))
 
     !Decoupled electron BTE
     if(.not. num%onlyphbte) then

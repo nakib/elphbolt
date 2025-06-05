@@ -161,30 +161,19 @@ contains
     type(phonon), intent(in) :: ph
     type(electron), intent(in), optional :: el
 
-    !Local variables
-    character(1024) :: tag, Tdir
-
     call subtitle("Calculating SEPEs...")
-
-    !Create output folder tagged by temperature and create it
-    write(tag, "(E9.3)") crys%T
-    Tdir = trim(adjustl(num%cwd))//'/T'//trim(adjustl(tag))
-    if(this_image() == 1) then
-       call system('mkdir -p '//trim(adjustl(Tdir)))
-    end if
-    sync all
 
     !Phonon RTA
     if(.not. num%onlyebte) &
-         call dragless_phbte_RTA(Tdir, self, num, crys, sym, ph, el)
+         call dragless_phbte_RTA(num%cwd_T, self, num, crys, sym, ph, el)
 
     !Electron RTA
     if(.not. num%onlyphbte) &
-         call dragless_ebte_RTA(Tdir, self, num, crys, sym, el, ph)
+         call dragless_ebte_RTA(num%cwd_T, self, num, crys, sym, el, ph)
 
     !Dragful electron-phonon BTEs
     if(num%drag) &
-         call dragfull_ephbtes(Tdir, self, num, crys, sym, ph, el)
+         call dragfull_ephbtes(num%cwd_T, self, num, crys, sym, ph, el)
   end subroutine sepe_driver
 
   subroutine calculate_field_term(species, field, nequiv, ibz2fbz_map, &

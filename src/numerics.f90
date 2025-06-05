@@ -44,6 +44,8 @@ module numerics_module
      !! Fermi surface thickness in eV.
      character(len = 1024) :: cwd
      !! Current working directory.
+     character(len = 1024) :: cwd_T
+     !! Temperature dependent subdirectory inside the working directory.
      character(len = 1024) ::datadumpdir
      !! Runtime data dump repository.
      character(len = 1024) ::datadumpdir_T
@@ -437,6 +439,11 @@ contains
     call getcwd(self%cwd)
     self%cwd = trim(self%cwd)
 
+    !Create a directory in the run directory, tagged by temperature
+    write(tag, "(E9.3)") crys%T
+    self%cwd_T = trim(adjustl(self%cwd))//'/T'//trim(adjustl(tag))
+    if(this_image() == 1) call system('mkdir -p '//trim(adjustl(self%cwd_T)))
+
     !Print out information.
     if(this_image() == 1) then
        write(numcols, "(I0)") 3
@@ -480,6 +487,7 @@ contains
        end if
        write(*, "(A, 1E16.8, A)") "Fermi window thickness (each side of reference energy) = ", self%fsthick, " eV"
        write(*, "(A, A)") "Working directory = ", trim(self%cwd)
+       write(*, "(A, A)") "T-dependent working directory = ", trim(self%cwd_T)
        write(*, "(A, A)") "Data dump directory = ", trim(self%datadumpdir)
        write(*, "(A, A)") "T-dependent data dump directory = ", trim(self%datadumpdir_T)
        write(*, "(A, A)") "e-ph directory = ", trim(self%g2dir)

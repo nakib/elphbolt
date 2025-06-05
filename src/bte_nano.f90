@@ -237,41 +237,30 @@ contains
     type(nanostructure), intent(inout) :: nano
     type(electron), intent(in), optional :: el
 
-    !Local variables
-    character(1024) :: tag, Tdir
-
     call subtitle("Calculating transport (nanostructures)...")
 
     call print_message("Only the transport coefficient of the first nanostructure is printed below,")
     call print_message("the coefficients for all the structures can be found in Tdir nanofiles")
 
-    !Create output folder tagged by temperature and create it
-    write(tag, "(E9.3)") crys%T
-    Tdir = trim(adjustl(num%cwd))//'/T'//trim(adjustl(tag))
-    if(this_image() == 1) then
-       call system('mkdir -p '//trim(adjustl(Tdir)))
-    end if
-    sync all
-
     !Phonon RTA
     if(.not. num%onlyebte) &
-         call dragless_phbte_RTA(Tdir, self, num, crys, sym, nano, ph, el)
+         call dragless_phbte_RTA(num%cwd_T, self, num, crys, sym, nano, ph, el)
 
     !Electron RTA
     if(.not. num%onlyphbte) &
-         call dragless_ebte_RTA(Tdir, self, num, crys, sym, nano, el, ph)
+         call dragless_ebte_RTA(num%cwd_T, self, num, crys, sym, nano, el, ph)
 
     !Dragful electron-phonon BTEs
     if(num%drag) &
-         call dragfull_ephbtes(Tdir, self, num, crys, sym, nano, ph, el)
+         call dragfull_ephbtes(num%cwd_T, self, num, crys, sym, nano, ph, el)
 
     !Dragless full phonon BTE
     if(num%onlyphbte .or. num%drag) &
-         call dragless_phbte_full(Tdir, self, num, crys, sym, nano, ph, el)
+         call dragless_phbte_full(num%cwd_T, self, num, crys, sym, nano, ph, el)
 
     !Dragless full electron BTE
     if(num%onlyebte .or. num%drag) &
-         call dragless_ebte_full(Tdir, self, num, crys, sym, nano, el)
+         call dragless_ebte_full(num%cwd_T, self, num, crys, sym, nano, el)
   end subroutine bte_driver
 
   subroutine dragless_ebte_RTA(Tdir, self, num, crys, sym, nano, el, ph)
