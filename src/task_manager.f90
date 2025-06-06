@@ -94,8 +94,8 @@ contains
                      timestamp, batch_number, start_idx, end_idx, batch_size
 
                 !Here assert that the data in the file makes sense
-                if(batch_number < 1 .or. start_idx < 1 &
-                     .or. end_idx < 1 .or. batch_size < 1) then
+                if(batch_number < 0 .or. start_idx < 0 &
+                     .or. end_idx < 0 .or. batch_size < 0) then
                    close(unit)
 
                    call exit_with_message('Meaningless data in job record file. Exiting.')
@@ -117,6 +117,8 @@ contains
           end if
        else !file does not exist, so create it
           open(newunit = unit, file = self%filename_record, status = 'replace')
+          write(unit, '(A, 1X, I0, 1X, I0, 1X, I0, 1X, I0)') "Start-marker", &
+               0, 0, 0, 0
        end if
 
        close(unit)

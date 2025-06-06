@@ -600,10 +600,10 @@ contains
       !! This splits the atom position in the supercell into the unitcell
       !! position (integer triplet) and atom index in that unitcell.
       !! Everything is 1-based.
-      !!
-      !! Didn't see the point of providing this subroutine in a global scope
-      !! as it really only useful in the context of parsing the phonopy
-      !! format 2nd order force constants file.
+      !
+      ! Didn't see the point of providing this subroutine in a global scope
+      ! as it is really only useful in the context of parsing the phonopy
+      ! format 2nd order force constants file.
 
       integer(i64), intent(in) :: atom_in_supercell_muxed, &
            supercell_size(3)
@@ -1030,11 +1030,9 @@ contains
 
     do iat = 1, crys%numatoms
        do jat = 1, crys%numatoms
-
           do m1 = -2*self%scell(1), 2*self%scell(1)
              do m2 = -2*self%scell(2), 2*self%scell(2)
                 do m3 = -2*self%scell(3), 2*self%scell(3)
-
                    counter = counter + 1
 
                    do i = 1, 3
@@ -1329,7 +1327,7 @@ contains
     real(r64), allocatable :: shortest(:, :)
     real(r64), allocatable :: omega2(:), rwork(:)
     complex(r64), allocatable :: work(:)
-    integer(i64) :: nwork=1
+    integer(i64) :: nwork = 1
 
     real(r64) :: dnrm2
 
@@ -1346,6 +1344,9 @@ contains
          self%scell(1), self%scell(2), self%scell(3)))
 
     !Grab the internal (short-ranged [?]) ifc2s that are not mass normalized
+    !Question: Is this purely short-ranged? Won't the commensurate q-vectors
+    !have the polar effects already since the IFC2s here have been generated using
+    !a supercell method?
     fc_short = self%ifc2
 
     !Now mass normalize them
@@ -1361,8 +1362,6 @@ contains
        qcart(:, iq) = matmul(crys%reclattvecs, qpoints(iq, :))
     end do
     qcart = qcart*bohr2nm !Bohr^-1
-
-    !volume_r = crys%volume/bohr2nm**3
 
     allocate(dyn_total(self%numbands,self%numbands))
     allocate(dyn_nac(self%numbands,self%numbands))
@@ -1541,7 +1540,7 @@ contains
              end do
           end do
        end do
-
+       
        ! Frequencies squared result from a diagonalization of the
        ! dynamical matrix. The first call to zheev serves to ensure that
        ! enough space has been allocated for this.
@@ -1565,11 +1564,10 @@ contains
        ! As is conventional, imaginary frequencies are returned as negative.
        omegas(iq, :) = sign(sqrt(abs(omega2)), omega2)
 
-       ! Group velocities are obtained perturbatively. This is very
-       ! advatageous with respect to finite differences.
+       ! Group velocities are calculated using the Hellmann-Feynman theorem
        do i = 1, self%numbands
           do ip = 1, 3
-             velocities(iq, i, ip)=real(dot_product(dyn_total(:, i), &
+             velocities(iq, i, ip) = real(dot_product(dyn_total(:, i), &
                   matmul(ddyn_total(:, :, ip), dyn_total(:, i))))
           end do
           velocities(iq, i, :) = velocities(iq, i, :)/(2.0_r64*omegas(iq, i))
