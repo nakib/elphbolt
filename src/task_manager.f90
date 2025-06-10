@@ -31,7 +31,7 @@ module task_manager_module
 
 contains
 
-  subroutine distribute_load(self, num_tasks, num_batches, filename)
+  subroutine distribute_load(self, num_tasks, num_batches, restart_from_batch_record, filename)
     !! Partitions a total number of tasks into number of batches balancing
     !! the work as evenly as possible.
     !
@@ -41,6 +41,7 @@ contains
 
     class(task_manager), intent(out) :: self
     integer(i64), intent(in) :: num_tasks, num_batches
+    logical, intent(in) :: restart_from_batch_record
     character(len = *), intent(in) :: filename
 
     integer(i64) :: batch_size, residual_tasks, ibatch, start_idx, end_idx, batch_number
@@ -66,8 +67,9 @@ contains
        !Check if file exists.
        inquire(file = filename, exist = file_exists)
 
-       !If the file exists, read the last line and update num_finished_tasks.
-       if(file_exists) then
+       !If the file exists and we want to restart from old records,
+       !read the last line and update num_finished_tasks.
+       if(file_exists .and. restart_from_batch_record) then
           open(newunit = unit, file = filename, status = "old", action = "read", &
                position = "rewind", iostat = ios)
 
@@ -115,7 +117,8 @@ contains
              call exit_with_message(&
                   'Could not open batch record file in distribute_load. Exiting.')
           end if
-       else !file does not exist, so create it
+       else !file does not exist or we want a fresh record file
+          !Create 
           open(newunit = unit, file = self%filename_record, status = 'replace')
           write(unit, '(A, 1X, I0, 1X, I0, 1X, I0, 1X, I0)') "Start-marker", &
                0, 0, 0, 0

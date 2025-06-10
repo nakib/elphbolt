@@ -1540,7 +1540,7 @@ contains
              end do
           end do
        end do
-       
+
        ! Frequencies squared result from a diagonalization of the
        ! dynamical matrix. The first call to zheev serves to ensure that
        ! enough space has been allocated for this.

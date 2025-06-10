@@ -151,6 +151,9 @@ module numerics_module
      logical :: solve_nano 
      !! Solve the BTE for nanostructures using bulk properties but appropriate boundary conditions
      integer(i64) :: num_batches
+     !! Number of batches that will be parallel-processed in sequence
+     logical :: restart_from_batch_record
+     !! Use old batch processing records for restarts?
    contains
 
      procedure :: initialize=>read_input_and_setup, create_chempot_dirs
@@ -181,7 +184,8 @@ contains
     logical :: read_gq2, read_gk2, read_V, read_W, tetrahedra, phe, phiso, phsubs, &
          phbound, phdef_Tmat, onlyphbte, onlyebte, elchimp, elbound, drag, plot_along_path, &
          phthinfilm, phthinfilm_ballistic, fourph, use_Wannier_ifc2s, phiso_Tmat, Bfield_on, &
-         W_OTF, Y_OTF, solve_bulk, solve_nano, elel
+         W_OTF, Y_OTF, solve_bulk, solve_nano, elel, &
+         restart_from_batch_record
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
          read_V, read_W, tetrahedra, phe, phiso, phsubs, onlyphbte, onlyebte, maxiter, &
@@ -190,7 +194,7 @@ contains
          ph_mfp_npts, ph_abs_q_npts, phthinfilm, phthinfilm_ballistic, &
          fourph, fourph_mesh_ref, use_Wannier_ifc2s, elel, Coulomb_screening_type, ncont_mesh,&
          phiso_Tmat, phiso_1B_theory, Bfield_on, Bfield, W_OTF, Y_OTF, &
-         solve_bulk, solve_nano, num_batches
+         solve_bulk, solve_nano, num_batches, restart_from_batch_record
 
     call subtitle("Reading numerics information...")
 
@@ -246,6 +250,7 @@ contains
     solve_bulk = .true.
     solve_nano = .false.
     num_batches = 1
+    restart_from_batch_record = .false.
     read(1, nml = numerics)
 
     if(read_W .and. W_OTF) &
@@ -303,8 +308,8 @@ contains
     !! [ ] Check for valid choice of econess
 
     !eco mode DBG
-    self%eco_mode = .true.
-    self%econess = [2, 2, 2]
+    !self%eco_mode = .true.
+    !self%econess = [2, 2, 2]
     !!
 
     self%Bfield_on = Bfield_on
@@ -345,6 +350,7 @@ contains
        self%solve_bulk = solve_bulk
        self%solve_nano = solve_nano
        self%num_batches = num_batches
+       self%restart_from_batch_record = restart_from_batch_record
     else
        self%mesh_ref = 1 !Enforce this for superconductivity mode
     end if
@@ -444,6 +450,20 @@ contains
     self%cwd_T = trim(adjustl(self%cwd))//'/T'//trim(adjustl(tag))
     if(this_image() == 1) call system('mkdir -p '//trim(adjustl(self%cwd_T)))
 
+    !Create directories for keeping old batch records.
+    !Also, keep a copy of the old batch files.
+    if(this_image() == 1) then
+       call system('mkdir -p '//trim(adjustl(self%cwd))//'/old_batch_record')
+       call system('mkdir -p '//trim(adjustl(self%cwd_T))//'/old_batch_record')
+
+       call system(&
+            'cp '//trim(adjustl(self%cwd))//'/*_batches ' &
+            //trim(adjustl(self%cwd))//'/old_batch_record/')
+       call system(&
+            'cp '//trim(adjustl(self%cwd_T))//'/*_batches ' &
+            //trim(adjustl(self%cwd_T))//'/old_batch_record/')
+    end if
+
     !Print out information.
     if(this_image() == 1) then
        write(numcols, "(I0)") 3
@@ -495,7 +515,8 @@ contains
        if(self%runlevel /= 3) write(*, "(A, A)") "ph-ph directory = ", trim(self%Vdir)
        write(*, "(A, L)") "Reuse e-ph matrix elements: ", self%read_gk2
        if(self%runlevel /= 3) then
-          write(*, "(A, L)") "Using number of batches: ", self%num_batches     
+          write(*, "(A, I5)") "Number of batches: ", self%num_batches
+          write(*, "(A, L)") "Restart from old batch processing records: ", self%restart_from_batch_record
           write(*, "(A, L)") "Reuse ph-e matrix elements: ", self%read_gq2
           write(*, "(A, L)") "Reuse ph-ph matrix elements: ", self%read_V
           write(*, "(A, L)") "Reuse ph-ph transition probabilities: ", self%read_W

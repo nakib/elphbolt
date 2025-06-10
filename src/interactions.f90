@@ -687,7 +687,8 @@ contains
          ! 2. that are non-zero when the symmetry-related plus-type processes are energetically allowed
 
          !Distribute the total number of states across batches.
-         call job%distribute_load(nstates_irred, num%num_batches, batch_filename)
+         call job%distribute_load(nstates_irred, num%num_batches, &
+              num%restart_from_batch_record, batch_filename)
 
          !Starting from the next unfinished batch.
          do ibatch = job%num_finished_batches + 1, num%num_batches
@@ -839,7 +840,8 @@ contains
             istate2_minus(nprocs),istate3_minus(nprocs))
 
        !Distribute the total number of states across batches.
-       call job%distribute_load(nstates_irred, num%num_batches, batch_filename)
+       call job%distribute_load(nstates_irred, num%num_batches, &
+            num%restart_from_batch_record, batch_filename)
 
        !Starting from the next unfinished batch.
        do ibatch = job%num_finished_batches + 1, num%num_batches
@@ -1400,7 +1402,8 @@ contains
     end select
 
     !Distributethe total number of states across batches.
-    call job%distribute_load(nstates_irred, num%num_batches, batch_filename)
+    call job%distribute_load(nstates_irred, num%num_batches, &
+         num%restart_from_batch_record, batch_filename)
 
     !Starting from the next unfinished batch.
     do ibatch = job%num_finished_batches + 1, num%num_batches
@@ -1892,7 +1895,8 @@ contains
     end select
 
     !Distribute the total number of states across batches.
-    call job%distribute_load(nstates_irred, num%num_batches, batch_filename)
+    call job%distribute_load(nstates_irred, num%num_batches, &
+         num%restart_from_batch_record, batch_filename)
 
     !Starting from the next unfinished batch.
     do ibatch = job%num_finished_batches + 1, num%num_batches
