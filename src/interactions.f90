@@ -690,6 +690,13 @@ contains
          call job%distribute_load(nstates_irred, num%num_batches, &
               num%restart_from_batch_record, batch_filename)
 
+         batch_range = job%get_batch_range(job%num_finished_batches + 1)
+
+         !Check if we have covered all states.
+         if(batch_range(2) == nstates_irred) then
+            return
+         end if
+
          !Starting from the next unfinished batch.
          do ibatch = job%num_finished_batches + 1, num%num_batches
             if(this_image() == 1) then
@@ -842,6 +849,13 @@ contains
        !Distribute the total number of states across batches.
        call job%distribute_load(nstates_irred, num%num_batches, &
             num%restart_from_batch_record, batch_filename)
+
+       batch_range = job%get_batch_range(job%num_finished_batches + 1)
+
+       !Check if we have covered all states.
+       if(batch_range(2) == nstates_irred) then
+          return
+       end if
 
        !Starting from the next unfinished batch.
        do ibatch = job%num_finished_batches + 1, num%num_batches
@@ -1401,9 +1415,16 @@ contains
        batch_filename = trim(adjustl(num%cwd_T))//"/Uq_batches"
     end select
 
-    !Distributethe total number of states across batches.
+    !Distribute the total number of states across batches.
     call job%distribute_load(nstates_irred, num%num_batches, &
          num%restart_from_batch_record, batch_filename)
+
+    batch_range = job%get_batch_range(job%num_finished_batches + 1)
+
+    !Check if we have covered all states.
+    if(batch_range(2) == nstates_irred) then
+       return
+    end if
 
     !Starting from the next unfinished batch.
     do ibatch = job%num_finished_batches + 1, num%num_batches
@@ -1897,6 +1918,13 @@ contains
     !Distribute the total number of states across batches.
     call job%distribute_load(nstates_irred, num%num_batches, &
          num%restart_from_batch_record, batch_filename)
+
+    batch_range = job%get_batch_range(job%num_finished_batches + 1)
+
+    !Check if we have covered all states.
+    if(batch_range(2) == nstates_irred) then
+       return
+    end if
 
     !Starting from the next unfinished batch.
     do ibatch = job%num_finished_batches + 1, num%num_batches

@@ -10,7 +10,7 @@ module task_manager_module
   public :: task_manager
 
   type :: task_manager
-     !! Container for task batching strategy that assign tasks to batches.
+     !! Container for task batching strategy that assigns tasks to batches.
 
      private
 
