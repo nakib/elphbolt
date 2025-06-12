@@ -20,7 +20,7 @@ module phonon_module
   !! Module containing type and procedures related to the phononic properties.
 
   use precision, only: r64, i64
-  use params, only: bohr2nm, pi, twopi, Ryd2eV, oneI
+  use params, only: bohr2nm, pi, twopi, Ryd2eV, oneI, complex_zero
   use particle_module, only: particle
   use misc, only: print_message, subtitle, expi, distribute_points, &
        write2file_rank2_real, exit_with_message, create_set, coarse_grain, &
@@ -592,7 +592,6 @@ contains
 
     !Our internal format uses Espresso units for the mass matrix.
     self%mm = self%mm/massfactor
-
   contains
 
     subroutine phonopy_demux_atom_position(atom_in_supercell_muxed, &
@@ -1395,10 +1394,10 @@ contains
     end do
 
     do iq = 1, nq
-       dyn_total = 0.0_r64
-       dyn_nac = 0.0_r64
-       ddyn_total = 0.0_r64
-       ddyn_nac = 0.0_r64
+       dyn_total = complex_zero
+       dyn_nac = complex_zero
+       ddyn_total = complex_zero
+       ddyn_nac = complex_zero
        fc_diel = 0.0_r64
 
        ! If the polar flag is set, we add the electrostatic
@@ -1498,7 +1497,7 @@ contains
                          end do
                       end do
 
-                      star = 0.0_r64
+                      star = complex_zero
 
                       do ip = 1, neq
                          ztmp = expi(-qr(ip))/neq
@@ -1564,7 +1563,7 @@ contains
        ! As is conventional, imaginary frequencies are returned as negative.
        omegas(iq, :) = sign(sqrt(abs(omega2)), omega2)
 
-       ! Group velocities are calculated using the Hellmann-Feynman theorem
+       ! Group velocities are calculated using the Hellman-Feynman theorem
        do i = 1, self%numbands
           do ip = 1, 3
              velocities(iq, i, ip) = real(dot_product(dyn_total(:, i), &
