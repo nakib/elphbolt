@@ -690,15 +690,14 @@ contains
          call job%distribute_load(nstates_irred, num%num_batches, &
               num%restart_from_batch_record, batch_filename)
 
-         batch_range = job%get_batch_range(job%num_finished_batches + 1)
-
-         !Check if we have covered all states.
-         if(batch_range(2) == nstates_irred) then
+         !Check whether the batch record file contains an end marker.
+         if(job%end_marker()) then
+            if(this_image() == 1) print *, 'All batches already completed.'
             return
          end if
 
          !Starting from the next unfinished batch.
-         do ibatch = job%num_finished_batches + 1, num%num_batches
+         do ibatch = job%get_num_finished_batches() + 1, num%num_batches
             if(this_image() == 1) then
                write(*, '(A, I0, A, I0)') "Processing batch ", ibatch, " of ", num%num_batches
             end if
@@ -850,15 +849,14 @@ contains
        call job%distribute_load(nstates_irred, num%num_batches, &
             num%restart_from_batch_record, batch_filename)
 
-       batch_range = job%get_batch_range(job%num_finished_batches + 1)
-
-       !Check if we have covered all states.
-       if(batch_range(2) == nstates_irred) then
-          return
+       !Check whether the batch record file contains an end marker.
+       if(job%end_marker()) then
+          if(this_image() == 1) print *, 'All batches already completed.'
+          return  
        end if
 
        !Starting from the next unfinished batch.
-       do ibatch = job%num_finished_batches + 1, num%num_batches
+       do ibatch = job%get_num_finished_batches() + 1, num%num_batches
           if(this_image() == 1) then
              write(*, '(A, I0, A, I0)') "Processing batch ", ibatch, " of ", num%num_batches
           end if
@@ -1419,15 +1417,14 @@ contains
     call job%distribute_load(nstates_irred, num%num_batches, &
          num%restart_from_batch_record, batch_filename)
 
-    batch_range = job%get_batch_range(job%num_finished_batches + 1)
-
-    !Check if we have covered all states.
-    if(batch_range(2) == nstates_irred) then
-       return
+    !Check whether the batch record file contains an end marker.
+    if(job%end_marker()) then
+       if(this_image() == 1) print *, 'All batches already completed.'
+       return  
     end if
 
     !Starting from the next unfinished batch.
-    do ibatch = job%num_finished_batches + 1, num%num_batches
+    do ibatch = job%get_num_finished_batches() + 1, num%num_batches
        if(this_image() == 1) then
           write(*, '(A, I0, A, I0)') "Processing batch ", ibatch, " of ", num%num_batches
        end if
@@ -1919,15 +1916,14 @@ contains
     call job%distribute_load(nstates_irred, num%num_batches, &
          num%restart_from_batch_record, batch_filename)
 
-    batch_range = job%get_batch_range(job%num_finished_batches + 1)
-
-    !Check if we have covered all states.
-    if(batch_range(2) == nstates_irred) then
-       return
+    !Check whether the batch record file contains an end marker.
+    if(job%end_marker()) then
+       if(this_image() == 1) print *, 'All batches already completed.'
+       return  
     end if
 
     !Starting from the next unfinished batch.
-    do ibatch = job%num_finished_batches + 1, num%num_batches
+    do ibatch = job%get_num_finished_batches() + 1, num%num_batches
        if(this_image() == 1) then
           write(*, '(A, I0, A, I0)') "Processing batch ", ibatch, " of ", num%num_batches
        end if
