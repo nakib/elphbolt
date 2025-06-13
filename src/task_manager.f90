@@ -10,23 +10,26 @@ module task_manager_module
   public :: task_manager
 
   type :: task_manager
-     !! Container for task batching strategy that assign tasks to batches.
+     !! Container for task batching strategy that assigns tasks to batches.
 
      private
 
      integer(i64) :: num_batches = 1 
      !! Number of batches.
-     integer(i64), public :: num_finished_batches = 0
+     integer(i64) :: num_finished_batches = 0
      !! Number of completed batches. 
      integer(i64), allocatable :: batch_info(:, :)
      !! Task batching information. 
      character(len = :), allocatable :: filename_record
      !! Saves batch records using write and read record
+     logical :: found_end_marker = .false.
+     !! True if end marker is found in batch record file
 
    contains
 
      procedure, public :: distribute_load, print_report, &
-          get_num_batches, get_batch_range, read_record, write_record
+          get_num_batches, get_batch_range, read_record, write_record, &
+          get_num_finished_batches, end_marker
   end type task_manager
 
 contains
@@ -84,6 +87,14 @@ contains
                 !Exit on error or end of file.
                 if(ios2 /= 0) exit
 
+                !If we reach the end marker, skip reading.
+                print *, 'Read line:', trim(line)
+                if(trim(line) == '=====') then
+                   self%num_finished_batches = self%num_batches 
+                   self%found_end_marker = .true.
+                   print *, "End marker found in record file."
+                end if
+
                 !Keep updating with latest line.
                 if(len_trim(line) > 0) last_line = line
              end do
@@ -92,22 +103,24 @@ contains
              if(len_trim(line) > 0) then !non-empty last line
                 last_line = line
 
-                read(last_line, *) &
-                     timestamp, batch_number, start_idx, end_idx, batch_size
+                if(.not. self%found_end_marker) then
+                   read(last_line, *) &
+                        timestamp, batch_number, start_idx, end_idx, batch_size
 
-                !Here assert that the data in the file makes sense
-                if(batch_number < 0 .or. start_idx < 0 &
-                     .or. end_idx < 0 .or. batch_size < 0) then
-                   close(unit)
+                   !Here assert that the data in the file makes sense
+                   if(batch_number < 0 .or. start_idx < 0 &
+                        .or. end_idx < 0 .or. batch_size < 0) then
+                      close(unit)
 
-                   call exit_with_message('Meaningless data in job record file. Exiting.')
+                      call exit_with_message('Meaningless data in job record file. Exiting.')
+                   end if
+
+                   self%num_finished_batches = batch_number
+
+                   print *, " Last record line : ", trim(last_line)
+                   print *, " Last batch number: ", batch_number
+                   print *, " Restart from last batch: ", self%num_finished_batches
                 end if
-
-                self%num_finished_batches = batch_number
-
-                print *, " Last record line : ", trim(last_line)
-                print *, " Last batch number: ", batch_number
-                print *, " Restart from last batch: ", self%num_finished_batches
              else !empty last line
                 print *, "Batch record file is empty."
              end if
@@ -129,6 +142,9 @@ contains
 
     !Here broadcast self%num_finished_batches to all other images
     call co_broadcast(self%num_finished_batches, source_image = 1)
+
+    !Here broadcast self%found_end_marker to all other images
+    call co_broadcast(self%found_end_marker, source_image = 1)
 
     !Divide the total number of tasks in num_batches (subtasks).
     batch_size = num_tasks/self%num_batches
@@ -215,6 +231,11 @@ contains
        write(unit, '(A, 1X, I0, 1X, I0, 1X, I0, 1X, I0)') trim(timestamp), &
             batch_number, self%batch_info(batch_number, :)
 
+       !If this is the last batch, set an end marker. 
+       if(batch_number == self%num_batches) then
+          write(unit, '(A)') '====='
+       end if
+
        close(unit)
     end if
   end subroutine write_record
@@ -239,4 +260,20 @@ contains
 
     read(line, *) timestamp, batch_number, batch_info(:)
   end subroutine read_record
+
+  pure integer(i64) function get_num_finished_batches(self)
+    !! Returns the number of last finished batches.
+
+    class(task_manager), intent(in) :: self
+
+    get_num_finished_batches = self%num_finished_batches
+  end function get_num_finished_batches
+
+  pure logical function end_marker(self)
+    !! Check if the end marker is found in batch record file.
+
+    class(task_manager), intent(in) :: self
+
+    end_marker = self%found_end_marker
+  end function end_marker
 end module task_manager_module
