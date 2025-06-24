@@ -502,9 +502,11 @@ contains
     integer(i64) :: iq, io, iOmega, numomega, numq, &
          start, end, chunk, num_active_images, qxmesh
     real(r64), allocatable :: spec_X0(:), ImX0(:), ReX0(:), Ls(:, :)
-    complex(r64), allocatable :: diel(:, :), X0_qw(:)
+    complex(r64), allocatable :: diel_rpa(:, :), diel_tf(:, :), X0_qw(:)
+    complex(r64), allocatable :: pol(:, :)
     character(len = 1024) :: filename
-    real(r64) :: omega_plasma, prefac, Gplusq_2norm, dim_norm
+    real(r64) :: omega_plasma, prefac, q2norm, dim_norm
+    real(r64), parameter :: plus0 = 1
 
     !Silicon
     !omega_plasma = 1.0e-9_r64*hbar*sqrt(el%conc_el/perm0/crys%epsiloninf/(0.267*me)) !eV
@@ -518,24 +520,30 @@ contains
     !end if
 
     !TEST
-    numq = el%wvmesh(1)*10
+    numq = el%wvmesh(1) !*10
     qxmesh = numq
     !Create qlist in crystal coordinates
     allocate(qlist(numq, 3), qmaglist(numq))
     do iq = 1, numq
-       qlist(iq, :) = [(iq - 1.0_r64)/qxmesh, (iq - 1.0_r64)/qxmesh, 0.0_r64]
+       ! Gamma -> 1, 1, 0
+       !qlist(iq, :) = [(iq - 1.0_r64)/qxmesh, (iq - 1.0_r64)/qxmesh, 0.0_r64]
+       ! Gamma -> K (0.333, 0.333, 0)
+       qlist(iq, :) = [(iq - 1.0_r64)/(qxmesh - 1)/3, (iq - 1.0_r64)/(qxmesh - 1)/3, &
+                        0.0_r64] 
        qmaglist(iq) = twonorm(matmul(crys%reclattvecs, qlist(iq, :)))
     end do
     call sort(qmaglist)
 
     !Create energy grid
-    numomega = 1501 !601 !6 !5 !1001
+    numomega = 9001 !601 !6 !5 !1001
     allocate(energylist(numomega))
     call linspace(energylist, -3.5_r64, 3.5_r64, numomega)
     
     !Allocate diel_ik to hold maximum possible Omega
-    allocate(diel(numq, numomega), Ls(numq, numomega))
-    diel = 0.0_r64
+    allocate(diel_rpa(numq, numomega), diel_tf(numq, numomega), Ls(numq, numomega))
+    allocate(pol(numq, numomega))
+    pol = 0.0_r64
+    diel_rpa = 0.0_r64
 
     !Allocate spectral and imaginary X0 (defined on uniform frequency mesh)
     allocate(spec_X0(numomega), ImX0(numomega))
@@ -553,10 +561,10 @@ contains
 
     do iq = start, end !Over IBZ k points
        qcrys = qlist(iq, :) !crystal coordinates
-       qcart = matmul(crys%reclattvecs, qcrys)
 
        !|G + q|^2 or |G + q|, for 3D or 2D case
-       Gplusq_2norm = twonorm(qcart)**(crys%dim-1)
+       q2norm = qmaglist(iq)**(crys%dim-1)
+       !q2norm = qmaglist(iq)**2 
 
        call spectral_head_polarizability_2d_qpath_old(&
             spec_X0, energylist, qcrys, el, wann, crys, num%tetrahedra)
@@ -564,32 +572,41 @@ contains
        ImX0 = -pi*spec_X0
        call hilbert_transform(-ImX0, ReX0)
        X0_qw = ReX0 + oneI*ImX0
+       pol(iq, :) = X0_qw
           
        !Calculate RPA dielectric (diagonal in G-G' space)
-       !diel(iq, :) = crys%epsiloninf - &
-       !     1.0_r64/qmaglist(iq)**2* &
-       !     (ReX0 + oneI*ImX0)/perm0*qe*1.0e9_r64
+!$!        diel_rpa(iq, :) = crys%epsiloninf - &
+!$!             1.0_r64/qmaglist(iq)**2* &
+!$!             (ReX0 + oneI*ImX0)/perm0*qe*1.0e9_r64
 
-       diel(iq, :) = 1.0_r64 - prefac*X0_qw/Gplusq_2norm
-       ! diel(iq, :) = crys%epsiloninf - prefac*X0_qw/Gplusq_2norm
-       Ls(iq, :) = prefac*Gplusq_2norm*ImX0/((Gplusq_2norm*crys%epsiloninf - &
-         prefac*ReX0)**2 + (prefac*ImX0)**2)
-       if(iq==1) Ls(iq, :) = 1e-20_r64
-       do io=1, numomega
-         if(Ls(iq, io)<1e-50_r64) Ls(iq, io) = 1e-50_r64
-       end do
+       !k_star = 4.436
+       !diel_rpa(iq, :) = 1.0_r64 - prefac*X0_qw/q2norm
+       diel_rpa(iq, :) = crys%epsiloninf - prefac*X0_qw/q2norm
+       !diel_tf(iq, :) = crys%epsiloninf + crys%qTF/q2norm + oneI*energylist*plus0
+       !Ls(iq, :) = -prefac*q2norm*ImX0/((q2norm*crys%epsiloninf - &
+       !  prefac*ReX0)**2 + (prefac*ImX0)**2)
+       !if(iq==1) Ls(iq, :) = 1e-20_r64
+       !do io=1, numomega
+       !  if(Ls(iq, io)<1e-50_r64) Ls(iq, io) = 1e-50_r64
+       !end do
 
     end do
 
-    call co_sum(diel)
-    call co_sum(Ls)
+    call co_sum(pol)
+    call co_sum(diel_rpa)
+    !call co_sum(diel_tf)
+    !call co_sum(Ls)
     
     !Print to file
     call write2file_rank2_real("RPA_dielectric_2D_G0_qpath", qlist)
     call write2file_rank1_real("RPA_dielectric_2D_G0_qmagpath", qmaglist)
     call write2file_rank1_real("RPA_dielectric_2D_G0_Omega", energylist)
-    call write2file_rank2_real("RPA_dielectric_2D_G0_real", real(diel))
-    call write2file_rank2_real("RPA_dielectric_2D_G0_imag", imag(diel))
-    call write2file_rank2_real("RPA_dielectric_2D_G0_loss", Ls)
+    call write2file_rank2_real("RPA_polarisability_2D_G0_real", real(pol))
+    call write2file_rank2_real("RPA_polarisability_2D_G0_imag", imag(pol))
+    call write2file_rank2_real("RPA_dielectric_2D_G0_real", real(diel_rpa))
+    call write2file_rank2_real("RPA_dielectric_2D_G0_imag", imag(diel_rpa))
+    !call write2file_rank2_real("TF_dielectric_2D_G0_real", real(diel_tf))
+    !call write2file_rank2_real("TF_dielectric_2D_G0_imag", imag(diel_tf))
+    !call write2file_rank2_real("RPA_dielectric_2D_G0_loss", Ls)
   end subroutine calculate_RPA_dielectric_2d_model
 end module screening_module
