@@ -7,7 +7,7 @@ program test_vector
        vector_allreps_print, vector_allreps_change_grid
 
   implicit none
-  
+
   integer :: itest
   integer, parameter :: num_tests = 25 !17
   type(testify) :: test_array(num_tests), tests_all
@@ -22,12 +22,12 @@ program test_vector
   primitive_vecs(:, 1) = [-0.5_r64, 0.0_r64, 0.5_r64]
   primitive_vecs(:, 2) = [ 0.0_r64, 0.5_r64, 0.5_r64]
   primitive_vecs(:, 3) = [-0.5_r64, 0.5_r64, 0.0_r64]
-  
+
   grid = [4, 4, 4]
 
   !Null vector
   v0 = vector_allreps(1_i64, grid, primitive_vecs)
-  
+
   itest = 1
   test_array(itest) = testify("null vector, integer rep")
   call test_array(itest)%assert(&
@@ -94,7 +94,7 @@ program test_vector
   itest = itest + 1
   test_array(itest) = testify("add vectors, muxed index")
   call test_array(itest)%assert(v3%muxed_index, 61_i64)
-  
+
   itest = itest + 1
   test_array(itest) = testify("add vectors, integer rep")
   call test_array(itest)%assert(&
@@ -112,14 +112,14 @@ program test_vector
   call test_array(itest)%assert(&
        v3%cart, &
        [-3.0, 6.0, 3.0]/8.0_r64)
-  
+
   !Subtraction with Umklapp
   v3 = vector_allreps_sub(v1, v2, grid, primitive_vecs)
 
   itest = itest + 1
   test_array(itest) = testify("subtract vectors, muxed index")
   call test_array(itest)%assert(v3%muxed_index, 23_i64)
-  
+
   itest = itest + 1
   test_array(itest) = testify("subtract vectors, integer rep")
   call test_array(itest)%assert(&
@@ -147,7 +147,7 @@ program test_vector
   itest = itest + 1
   test_array(itest) = testify("grid change null vector, muxed index")
   call test_array(itest)%assert(v0p%muxed_index, 1_i64)
-  
+
   itest = itest + 1
   test_array(itest) = testify("grid change null vector, integer rep")
   call test_array(itest)%assert(&
@@ -165,7 +165,7 @@ program test_vector
   call test_array(itest)%assert(&
        v0p%cart, &
        [0.0, 0.0, 0.0]*1.0_r64)
-  
+
   ! test the last vector of original grid
   v1 = vector_allreps(product(grid), grid, primitive_vecs)
   v1p = vector_allreps_change_grid(v1, another_grid)
@@ -173,7 +173,7 @@ program test_vector
   itest = itest + 1
   test_array(itest) = testify("grid change last vector, muxed index")
   call test_array(itest)%assert(v1p%muxed_index, 1414_i64)
-  
+
   itest = itest + 1
   test_array(itest) = testify("grid change last vector, integer rep")
   call test_array(itest)%assert(&
@@ -191,7 +191,7 @@ program test_vector
   call test_array(itest)%assert(&
        v1p%cart, &
        v1%cart)
-  
+
   tests_all = testify(test_array)
   call tests_all%report
 

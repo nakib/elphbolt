@@ -5,7 +5,7 @@ program screening_comparison
   use params, only: hbar, hbar_eVps, me, twopi, pi, kB, qe, bohr2nm, perm0
   use misc, only: qdist, linspace, compsimps, outer, sort, &
        write2file_rank2_real, write2file_rank1_real, twonorm, exit_with_message
-  
+
   implicit none
 
   !integer :: itest
@@ -26,26 +26,26 @@ program screening_comparison
 
   !real(r64), parameter :: m_eff = 0.267*me !Si
   !real(r64), parameter :: epsiloninf = 13.0619569 !From dfpt
-  
+
   !wGaN
   real(r64), parameter :: m_eff = 0.259*me !0.2*me
   real(r64), parameter :: epsiloninf = 5.8968
   !real(r64), parameter :: epsilon0 = ?
-  
+
   !GaAs
   !real(r64), parameter :: m_eff = 0.07*me
   !real(r64), parameter :: epsiloninf = 11.1
   !real(r64), parameter :: epsilon0 = 12.9
-  
+
   real(r64), allocatable :: imeps(:, :), reeps(:, :), Omegas(:)
-  
+
   if(this_image() == 1) then
      !write(*, '(A)')  'Screening test for Si'
      write(*, '(A)')  'Screening test for wGaN'
      !write(*, '(A)')  'Screening test for GaAs'
      write(*, '(A, I5)') 'Number of coarray images = ', num_images()
-  end if 
-  
+  end if
+
   !Test counter
   !itest = 0
 
@@ -59,10 +59,10 @@ program screening_comparison
   !Calculate Fermi energy for model band (degenerate limit)
   eF =  energy_parabolic(kF, m_eff)
   print*, 'Fermi energy = ', eF, ' eV'
-  
+
   !Calculate chemical potential for model band to match carrier conc.
   mu = chempot(conc, m_eff, beta, eF)
-  
+
   !Calculate Plasmon energy
   !en_plasmon = 1.0e-9_r64*hbar_evps*qe*sqrt(conc/perm0/epsilon0/m_eff) !eV
 
@@ -81,23 +81,23 @@ program screening_comparison
   numq = 400
   call linspace(qmags, 0.0_r64, 3.0_r64*kF, numq)
   call write2file_rank1_real("RPA_test_qmags", qmags)
-  
+
   !Create bosonic energy mesh
   numomega = 400
   call linspace(Omegas, 0.0_r64, 5.0_r64*eF, numomega)
   call write2file_rank1_real("RPA_test_Omegas", Omegas)
-  
+
   !Calculate analytic Im RPA dielectric function
   call calculate_Imeps(qmags, Omegas, mu, m_eff, eF, kF, beta, Imeps)
   call write2file_rank2_real("model_RPA_dielectric_3D_imag", Imeps)
-  
+
   !Calculate analytic Re RPA dielectric function
   call calculate_Reeps(qmags, Omegas, mu, m_eff, eF, en_plasmon, &
        kF, kTF, epsiloninf, beta, Reeps)
   call write2file_rank2_real("model_RPA_dielectric_3D_real", Reeps)
-  
+
 contains
-  
+
   pure real(r64) elemental function energy_parabolic(k, m_eff)
     !! Parabolic band energy for a given wave vector magnitude
     !!
@@ -105,10 +105,10 @@ contains
     !! m_eff Effective mass in Kg
 
     real(r64), intent(in) :: k, m_eff
-    
+
     energy_parabolic = 0.5_r64*(hbar*k)**2/m_eff*1.0e-6_r64/qe !eV
   end function energy_parabolic
-  
+
   real(r64) function chempot(conc, m_eff, beta, eF)
     !!Use bisection method to find chemical potential
     !!for a given carrier concentration
@@ -126,19 +126,19 @@ contains
     real(r64) :: a, b, tmp, aux, thresh, upper
 
     upper = eF*beta + 15.0 !to be used as inifinity of Fermi integral
-    
+
     a = -5.0 !eV, "Safe" lower bound
     b = 5.0 !eV, "Safe" upper bound
 
     thresh = 1.0e-12_r64
-    
+
     tmp = 2.0_r64*(0.5_r64*m_eff/hbar_eVps**2/beta/pi/qe)**1.5_r64*1.0e30_r64 !cm^-3
 
     do i = 1, maxiter
        chempot = 0.5*(a + b)
 
        aux = tmp*fdi(0.5_r64, chempot*beta, upper)
-       
+
        if(abs(aux - conc)/conc < thresh) then
           exit
        else if(aux < conc) then
@@ -170,30 +170,30 @@ contains
 
     prefac = 0.5_r64*qe/pi**2/perm0*(2.0_r64*m_eff)**(1.5_r64)/(1.0e-12_r64*hbar)**3*beta*&
          qe**1.5/epsilon
-    
+
     upper = mu + 10.0 !eV, to be used as inifinity of Fermi integral
 
     call linspace(ens, 0.0_r64, upper, N)
 
     f0 = 1.0_r64/(exp(beta*(ens - mu)) + 1.0_r64)
-    
+
     call compsimps(sqrt(ens)*f0*(1.0_r64 - f0), ens(2) - ens(1), Thomas_Fermi)
     Thomas_Fermi = sqrt(prefac*Thomas_Fermi)*1.0e-9_r64 !nm^-1 
-    
+
     !write(*, "(A, 1E16.8, A)") 'Thomas-Fermi wave vector = ', Thomas_Fermi, ' nm^-1'
   end function Thomas_Fermi
 
   real(r64) function fdi(j, eta, upper)
     !! Fermi-Dirac integral for positive j
-    
+
     real(r64), intent(in) :: j, eta, upper
 
     integer(i64), parameter :: ngrid = 100000_i64
     real(r64), allocatable :: x(:)
     real(r64) :: dx
-    
+
     if(j < 0.0_r64) call exit_with_message("Negative j is not allowed. Exiting.")
-    
+
     call linspace(x, 0.0_r64, upper, ngrid)
 
     dx = x(2) - x(1)
@@ -205,7 +205,7 @@ contains
     !! Fermi-Dirac integral j = -1/2
     !! Source: Frank G. Lether
     !! Journal of Scientific Computing, Vol. 15, No. 4, 2000
-    
+
     real(r64), intent(in) :: eta
 
     integer :: k
@@ -216,7 +216,7 @@ contains
        aux = sqrt(eta**2 + (2.0_r64*k - 1.0_r64)**2*pi**2)
        last_term = last_term + sqrt(aux - eta)/aux
     end do
-    
+
     fdi_minus1half = 8220.0_r64/919 + 3923.0_r64/110242*eta + &
          27.0_r64/381503*eta**2 - eta**3/3553038.0_r64 - &
          eta**4/714900621.0_r64 - eta**5/128458636383.0_r64 - &
@@ -241,9 +241,9 @@ contains
     !Locals
     integer :: iOmega
     real(r64) :: u(size(qmags), size(ens))
-    
+
     allocate(Imeps(size(qmags), size(ens)))
-    
+
     call outer(0.5_r64*kF/qmags, ens/eF, u)
 
     do iOmega = 1, size(ens)
@@ -299,13 +299,13 @@ contains
     real(r64), intent(in) :: qmags(:), ens(:), chempot, m_eff, eF, kF, &
          kTF, epsinf, beta, eplasmon
     real(r64), allocatable :: Reeps(:, :)
-    
+
     !Locals
     integer(i64) :: iOmega, iq, ngrid
     real(r64) :: ymax, dy, aux0, aux1, aux2, D, x, eta, ks_squared
     real(r64) :: u(size(qmags), size(ens)), z(size(qmags))
     real(r64), allocatable :: y(:), I0(:)
-    
+
     !Here I use pra 29 1471.
     !Note that in the paper above the Bohr radius is renormalized.
     !Here we need an extra factor of ms/me.
@@ -315,7 +315,7 @@ contains
     ymax = 10.0!20.0_r64
 
     allocate(y(ngrid), I0(ngrid), Reeps(size(qmags), size(ens)))
-    
+
     call linspace(y, 0.0_r64, ymax, ngrid)
 
     dy = y(2) - y(1)
@@ -326,7 +326,7 @@ contains
     z = 0.5_r64*qmags/kF
 
     call outer(0.5_r64*kF/qmags, ens/eF, u)
-        
+
     !Calculate screening wave vector (squared)
     !ks_squared = 0.5_r64*kTF**2*sqrt(1.0_r64/D)*fdi_minus1half(eta)
     !print*, 'ks = ', sqrt(ks_squared), ' nm^-1'

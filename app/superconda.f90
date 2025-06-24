@@ -35,7 +35,7 @@ program superconda
        calculate_el_Ws, calculate_el_Ws_Gaussian
   use interactions, only: calculate_gkRp, calculate_eph_interaction_ibzk 
   use eliashberg, only: calculate_a2F
-  
+
   implicit none
 
   type(numerics) :: num
@@ -72,7 +72,7 @@ program superconda
 
   !Calculate electrons
   call el%initialize(wann, crys, sym, num)
-  
+
   call t_event%end_timer('Initialization')
 
   if(num%plot_along_path) then
@@ -85,7 +85,7 @@ program superconda
 
      call t_event%end_timer('Plots along path')
   end if
-  
+
   call t_event%start_timer('Phonons')
 
   !Calculate phonons
@@ -134,7 +134,7 @@ program superconda
 
   !Deallocate Wannier quantities
   call wann%deallocate_wannier(num)
-  
+
   !After this point the electron eigenvectors are not needed
   call el%deallocate_eigenvecs
 

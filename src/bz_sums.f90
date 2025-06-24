@@ -41,7 +41,7 @@ module bz_sums
   interface calculate_dos
      module procedure :: calculate_el_dos, calculate_ph_dos_iso
   end interface calculate_dos
-  
+
 contains
 
   subroutine calculate_el_dos_Fermi_Gaussian(el, reclattvecs)
@@ -64,7 +64,7 @@ contains
     do dim = 1, 3
        Qs(dim, :) = reclattvecs(dim, :)/el%wvmesh(dim)
     end do
-    
+
     call print_message("Calculating spin-normalized electronic density of states at Fermi level...")
 
     el%spinnormed_dos_fermi = 0.0_r64
@@ -77,7 +77,7 @@ contains
                   dot_product(el%vels(ikp, ibp, :), Qs(dim, :))**2
           end do
           sigma = hbar_eVps*onebyroot12*sqrt(aux)
-          
+
           !Evaluate delta[E(iq',ib') - E_Fermi]
           delta = max(onebyroot2pi/sigma*&
                exp(-0.5_r64*((el%chempot - el%ens(ikp, ibp))/sigma)**2), 1.0e-4_r64)
@@ -93,16 +93,16 @@ contains
 
     sync all
   end subroutine calculate_el_dos_Fermi_Gaussian
-  
+
   subroutine calculate_el_dos_Fermi(el, usetetra)
     !! Calculate spin-normalized electron density of states at the Fermi level
     !!
     !! el Electron data type
     !! usetetra Use the tetrahedron method for delta functions?
-    
+
     type(electron), intent(inout) :: el
     logical, intent(in) :: usetetra
-    
+
     !Local variables
     integer(i64) :: ikp, ibp
     real(r64) :: delta
@@ -112,14 +112,14 @@ contains
 
     !Associate delta function procedure pointer
     delta_fn_ptr => get_delta_fn_pointer(usetetra)
-    
+
     el%spinnormed_dos_fermi = 0.0_r64
     do ikp = 1, el%nwv !over FBZ blocks
        do ibp = 1, el%numbands
           !Evaluate delta[E(iq',ib') - E_Fermi]
           delta = delta_fn_ptr(el%chempot, ikp, ibp, el%wvmesh, el%simplex_map, &
                el%simplex_count, el%simplex_evals)
-          
+
           el%spinnormed_dos_fermi = el%spinnormed_dos_fermi + delta
        end do
     end do
@@ -129,7 +129,7 @@ contains
     end if
 
     if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
-    
+
     sync all
   end subroutine calculate_el_dos_Fermi
 
@@ -141,19 +141,19 @@ contains
 
     type(electron), intent(inout) :: el
     real(r64), intent(in) :: reclattvecs(3, 3)    
-    
+
     !Local variables
     integer(i64) :: ik_ibz, ik_fbz, ieq, ib
     integer :: dim
     real(r64) :: sigma, delta, onebyroot2pi, onebyroot12, aux, Qs(3, 3)
-    
+
     onebyroot2pi = 1.0_r64/sqrt(twopi)
     onebyroot12 = 1.0_r64/sqrt(12.0_r64)
 
     do dim = 1, 3
        Qs(dim, :) = reclattvecs(dim, :)/el%wvmesh(dim)
     end do
-    
+
     call print_message("Calculating DOS(Ef) normalized electron delta functions...")
 
     allocate(el%Ws(el%nwv, el%numbands))
@@ -186,10 +186,10 @@ contains
     end do
     el%Ws = el%Ws/el%spinnormed_dos_fermi/product(el%wvmesh)
     el%Ws_irred = el%Ws_irred/el%spinnormed_dos_fermi/product(el%wvmesh)
-    
+
     sync all
   end subroutine calculate_el_Ws_Gaussian
-  
+
   subroutine calculate_el_Ws(el, usetetra)
     !! Calculate all electron delta functions scaled by spin-normalized DOS(Ef)
     !! W_mk = delta[E_mk - Ef]/DOS(Ef)
@@ -198,17 +198,17 @@ contains
 
     type(electron), intent(inout) :: el
     logical, intent(in) :: usetetra
-    
+
     !Local variables
     integer(i64) :: ik_ibz, ik_fbz, ieq, ib
     real(r64) :: delta
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
-    
+
     call print_message("Calculating DOS(Ef) normalized electron delta functions...")
 
     !Associate delta function procedure pointer
     delta_fn_ptr => get_delta_fn_pointer(usetetra)
-    
+
     allocate(el%Ws(el%nwv, el%numbands))
     allocate(el%Ws_irred(el%nwv_irred, el%numbands))
 
@@ -220,7 +220,7 @@ contains
              !Evaluate delta[E(ik,ib) - E_Fermi]
              delta = delta_fn_ptr(el%chempot, ik_fbz, ib, el%wvmesh, el%simplex_map, &
                   el%simplex_count, el%simplex_evals)
-             
+
              el%Ws(ik_fbz, ib) = delta
           end do
           el%Ws_irred(ik_ibz, :) = el%Ws_irred(ik_ibz, :) + &
@@ -233,10 +233,10 @@ contains
     el%Ws_irred = el%Ws_irred/el%spinnormed_dos_fermi
 
     if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
-    
+
     sync all
   end subroutine calculate_el_Ws
-  
+
   subroutine calculate_el_dos(el, usetetra)
     !! Calculate the density of states (DOS) in units of 1/energy. 
     !! The DOS will be evaluates on the IBZ mesh energies.
@@ -246,7 +246,7 @@ contains
 
     type(electron), intent(inout) :: el
     logical, intent(in) :: usetetra
-    
+
     !Local variables
     integer(i64) :: ik, ib, ikp, ibp, im, chunk, counter, num_active_images
     integer(i64), allocatable :: start[:], end[:]
@@ -258,13 +258,13 @@ contains
 
     !Associate delta function procedure pointer
     delta_fn_ptr => get_delta_fn_pointer(usetetra)
-    
+
     !Allocate start and end coarrays
     allocate(start[*], end[*])
-    
+
     !Divide wave vectors among images
     call distribute_points(el%nwv_irred, chunk, start, end, num_active_images)
-    
+
     !Allocate dos
     allocate(el%dos(el%nwv_irred, el%numbands))
 
@@ -274,7 +274,7 @@ contains
     !Allocate small work variable chunk for each image and initialize
     allocate(dos_chunk(chunk, el%numbands)[*])
     dos_chunk(:,:) = 0.0_r64
-    
+
     counter = 0
     !Only work with the active images
     if(this_image() <= num_active_images) then       
@@ -302,7 +302,7 @@ contains
     end if
 
     if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
-    
+
     !Gather from images and broadcast to all
     sync all    
     if(this_image() == 1) then
@@ -313,7 +313,7 @@ contains
     sync all
     call co_broadcast(el%dos, 1)
     sync all
-    
+
     !Write dos to file
     call write2file_rank2_real(el%prefix // '.dos', el%dos)
 
@@ -337,7 +337,7 @@ contains
     !integer(i64), intent(in) :: atomtypes(:)
     character(len = 6), intent(in) :: phiso_1B_theory
     real(r64), intent(out), allocatable :: W_phiso(:,:), W_phsubs(:,:)
-    
+
     !Local variables
     integer(i64) :: iq, ib, iqp, ibp, im, chunk, counter, num_active_images, &
          pol, a, numatoms
@@ -346,7 +346,7 @@ contains
     real(r64), allocatable :: dos_chunk(:,:)[:], W_phiso_chunk(:,:)[:], &
          W_phsubs_chunk(:,:)[:]
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
-    
+
     call print_message("Calculating phonon density of states and (if needed) isotope/substitution scattering...")
 
     !Associate delta function procedure pointer
@@ -354,13 +354,13 @@ contains
 
     !Number of basis atoms
     numatoms = size(crys%atomtypes)
-    
+
     !Allocate start and end coarrays
     allocate(start[*], end[*])
-    
+
     !Divide wave vectors among images
     call distribute_points(ph%nwv_irred, chunk, start, end, num_active_images)
-        
+
     !Allocate dos and W_phiso
     allocate(ph%dos(ph%nwv_irred, ph%numbands))
     allocate(W_phiso(ph%nwv_irred, ph%numbands))
@@ -373,12 +373,12 @@ contains
 
     !!Initialize the matrix elements storage
     if (phiso .and. .not. phiso_Tmat) then 
-      call ph%xiso%allocate_xmassvar(ph, usetetra, phiso_Tmat)
-    end if 
-    if (phsubs) then
-      call ph%xsubs%allocate_xmassvar(ph, usetetra, phiso_Tmat)
+       call ph%xiso%allocate_xmassvar(ph, usetetra, phiso_Tmat)
     end if
-    
+    if (phsubs) then
+       call ph%xsubs%allocate_xmassvar(ph, usetetra, phiso_Tmat)
+    end if
+
     !Allocate small work variable chunk for each image
     allocate(dos_chunk(chunk, ph%numbands)[*])
     if(phiso .and. .not. phiso_Tmat) allocate(W_phiso_chunk(chunk, ph%numbands)[*])
@@ -386,7 +386,7 @@ contains
     dos_chunk(:,:) = 0.0_r64
     if(phiso .and. .not. phiso_Tmat) W_phiso_chunk(:,:) = 0.0_r64
     if(phsubs) W_phsubs_chunk(:,:) = 0.0_r64
-    
+
     counter = 0
     !Only work with the active images
     if(this_image() <= num_active_images) then       
@@ -405,7 +405,7 @@ contains
 
                    ! If not energy conserving ignore
                    if (delta <= 0.0_r64 ) then
-                     cycle
+                      cycle
                    end if
 
                    !Sum over delta function
@@ -440,15 +440,15 @@ contains
                    end if
                    ! Save here
                    if (phiso .and. .not. phiso_Tmat) then
-                     W_phiso_chunk(counter, ib) = W_phiso_chunk(counter, ib) +  & 
-                              matel_iso * 0.5_r64 * pi / hbar_eVps
-                     call ph%xiso%save_xmassvar(ph%numbands, iq, iqp, ib, ibp, matel_iso)
+                      W_phiso_chunk(counter, ib) = W_phiso_chunk(counter, ib) +  & 
+                           matel_iso * 0.5_r64 * pi / hbar_eVps
+                      call ph%xiso%save_xmassvar(ph%numbands, iq, iqp, ib, ibp, matel_iso)
                    end if
                    if (phsubs) then
-                     W_phsubs_chunk(counter, ib) = W_phsubs_chunk(counter, ib) +  & 
-                              matel_subs * 0.5_r64 * pi / hbar_eVps
-                     call ph%xsubs%save_xmassvar(ph%numbands, iq, iqp, ib, ibp, matel_subs)
-                   end if  
+                      W_phsubs_chunk(counter, ib) = W_phsubs_chunk(counter, ib) +  & 
+                           matel_subs * 0.5_r64 * pi / hbar_eVps
+                      call ph%xsubs%save_xmassvar(ph%numbands, iq, iqp, ib, ibp, matel_subs)
+                   end if
                 end do
              end do
           end do
@@ -456,7 +456,7 @@ contains
     end if
 
     if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
-    
+
     !Gather from images and broadcast to all
     sync all
     if(this_image() == 1) then
@@ -472,7 +472,7 @@ contains
     call co_broadcast(W_phiso, 1)
     call co_broadcast(W_phsubs, 1)
     sync all
-    
+
     !Write to file
     call write2file_rank2_real(ph%prefix // '.dos', ph%dos)
     call write2file_rank2_real(ph%prefix // '.W_rta_phiso', W_phiso)
@@ -508,20 +508,20 @@ contains
     logical, optional, intent(in)   :: symmetrize
     real(r64), intent(out) :: trans_coeff_hc(:,:,:), trans_coeff_cc(:,:,:)
     ! Above, h(c)c = heat(charge) current
-    
+
     !Local variables
     integer(i64) :: ik, ib, j, l, nk, nbands, pow_hc, pow_cc
     real(r64) :: dist_factor, e, v, fac, A_hc, A_cc
     logical :: symmetrize_local = .true.
 
     if (present(symmetrize)) symmetrize_local = symmetrize
-    
+
     nk = size(ens(:,1))
     nbands = size(ens(1,:))
 
     !Common multiplicative factor
     fac = 1.0e21/kB/T/volume/product(mesh) 
-    
+
     !Do checks related to particle and field type
     if(species_prefix == 'ph') then
        if(chempot /= 0.0_r64) then
@@ -558,7 +558,7 @@ contains
     else
        call exit_with_message("Unknown particle species in calculate_transport_coefficient. Exiting.")
     end if
-    
+
     trans_coeff_hc = 0.0_r64
     trans_coeff_cc = 0.0_r64
 
@@ -595,21 +595,21 @@ contains
     !TODO The following has to be generalized in the presence of a B-field
     !Symmetrize transport tensor
     if (symmetrize_local) then
-      do ib = 1, nbands
-         !Note that fortran does not short-circuit logical expression chains
-         if(present(Bfield)) then
-            if(any(Bfield /= 0.0_r64)) then
-               call symmetrize_3x3_tensor_noTR(trans_coeff_hc(ib, :, :), sym%crotations, Bfield)
-               if(A_cc /= 0.0_r64) call symmetrize_3x3_tensor_noTR(trans_coeff_cc(ib, :, :), sym%crotations, Bfield)
-            end if
-         else
-            call symmetrize_3x3_tensor(trans_coeff_hc(ib, :, :), sym%crotations)
-            if(A_cc /= 0.0_r64) call symmetrize_3x3_tensor(trans_coeff_cc(ib, :, :), sym%crotations)
-         end if
-      end do
+       do ib = 1, nbands
+          !Note that fortran does not short-circuit logical expression chains
+          if(present(Bfield)) then
+             if(any(Bfield /= 0.0_r64)) then
+                call symmetrize_3x3_tensor_noTR(trans_coeff_hc(ib, :, :), sym%crotations, Bfield)
+                if(A_cc /= 0.0_r64) call symmetrize_3x3_tensor_noTR(trans_coeff_cc(ib, :, :), sym%crotations, Bfield)
+             end if
+          else
+             call symmetrize_3x3_tensor(trans_coeff_hc(ib, :, :), sym%crotations)
+             if(A_cc /= 0.0_r64) call symmetrize_3x3_tensor(trans_coeff_cc(ib, :, :), sym%crotations)
+          end if
+       end do
     end if
   end subroutine calculate_transport_coeff
-  
+
   subroutine calculate_spectral_transport_coeff(species, field, T, deg, chempot, &
        ens, vels, volume, response, en_grid, usetetra, sym, trans_coeff_hc, trans_coeff_cc)
     !! Subroutine to calculate the spectral transport coefficients.
@@ -645,7 +645,7 @@ contains
 
     !Associate delta function procedure pointer
     delta_fn_ptr => get_delta_fn_pointer(usetetra)
-    
+
     nk = size(ens(:,1)) !Number of (transport active) wave vectors
     nbands = size(ens(1,:)) !Number of bands/branches
     ne = size(en_grid(:)) !Number of sampling energy mesh points    
@@ -662,7 +662,7 @@ contains
     class default
        species_prefix = 'xx' !Unknown species
     end select
-    
+
     !Do checks related to particle and field type
     if(species_prefix == 'ph') then
        if(chempot /= 0.0_r64) then
@@ -705,7 +705,7 @@ contains
     !Initialize transport coefficients
     trans_coeff_hc = 0.0_r64
     trans_coeff_cc = 0.0_r64
-    
+
     do ik = 1, nk !Sum over wave vectors
        do ib = 1, nbands !Sum over bands/branches
           e = ens(ik, ib) !Grab energy
@@ -719,7 +719,7 @@ contains
              dist_factor = Fermi(e, chempot, T)
              dist_factor = dist_factor*(1.0_r64 - dist_factor)
           end if
-          
+
           !Run over sampling energies
           do ie = 1, ne
              !Evaluate delta function
@@ -731,7 +731,7 @@ contains
                 delta = delta_fn_ptr(en_grid(ie), ik, ib, species%wvmesh, species%simplex_map, &
                      species%simplex_count, species%simplex_evals)
              end select
-             
+
              do icart = 1, 3 !Run over Cartesian directions
                 v = vels(ik, ib, icart) !Grab velocity
                 trans_coeff_hc(ib, icart, :, ie) = trans_coeff_hc(ib, icart, :, ie) + &
@@ -801,7 +801,7 @@ contains
     ! Above, h(c)c = heat(charge) current
     integer(i64) :: ik, iq_sampling, ib, imfp, icart, nmfp, nk, nbands, pow_hc!, pow_cc
     real(r64) :: dist_factor, e, v, fac, A_hc!, A_cc
-    
+
     nk = size(ens(:,1))
     nbands = size(ens(1,:))
     nmfp = size(mfp_grid_sampling)
@@ -907,7 +907,7 @@ contains
           end if
        end do
     end do
-    
+
     !Units:
     ! W/m/K for thermal conductivity
     ! 1/Omega/m for charge conductivity
@@ -924,7 +924,7 @@ contains
 !!$          if(A_cc /= 0.0_r64) call symmetrize_3x3_tensor(trans_coeff_cc(ib, :, :, imfp), sym%crotations)
        end do
     end do
-    
+
     !Symmetrize transport tensor
     do iq_sampling = 1, size(q_grid_sampling)
        do ib = 1, nbands

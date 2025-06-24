@@ -27,7 +27,7 @@ module electron_module
   use symmetry_module, only: symmetry, find_irred_wedge, create_fbz2ibz_map
   use delta, only: form_tetrahedra_3d, fill_tetrahedra_3d, &
        form_triangles, fill_triangles
-  
+
   implicit none
 
   private
@@ -103,7 +103,7 @@ module electron_module
      !! Spin-normalized density of states at the Fermi level
      real(r64), allocatable :: Ws_irred(:, :), Ws(:, :)
      !! Electron delta functions normalized by spinnormed_dos_fermi
-     
+
    contains
 
      procedure, public :: initialize=>read_input_and_setup, deallocate_eigenvecs
@@ -135,9 +135,9 @@ contains
          indlowband, indhighband, metallic, chempot, Zn, Zp, &
          indlowconduction, indhighvalence, dopingtype, numT, numconc, &
          Tlist, conclist, scissor
-         
+
     call subtitle("Setting up electrons...")
-    
+
     !Open input file
     open(1, file = 'input.nml', status = 'old')
 
@@ -181,15 +181,15 @@ contains
     end if
     if(metallic .and. scissor .ne. 0.0_r64) then
        call exit_with_message(&
-               'Scissor operator cannot be applied to metals.')
+            'Scissor operator cannot be applied to metals.')
     end if
     if(metallic .and. scissor .lt. 0.0_r64) then
        call exit_with_message(&
-               'Scissor operator must be positive.')
+            'Scissor operator must be positive.')
     end if
     if(numbands .ne. wann%numwannbands ) then
        call exit_with_message(&
-               'Number of wannier bands is not correct.')
+            'Number of wannier bands is not correct.')
     end if
     if(num%runlevel == 0) then
        if(numT <= 0 .or. numconc <= 0) then
@@ -206,7 +206,7 @@ contains
           call exit_with_message("dopingtype must be 'n' or 'p'.")
        end if
     end if
-    
+
     self%spindeg = spindeg
     self%numbands = numbands
     self%indlowband = indlowband
@@ -235,7 +235,7 @@ contains
        self%conclist(:) = conclist(1:numconc)
        self%dopingtype = dopingtype
     end if
-    
+
     !Close input file
     close(1)
 
@@ -253,9 +253,9 @@ contains
     allocate(self%scissor(wann%numwannbands))
     self%scissor(:) = 0.0_r64
     if (.not. metallic .and. self%indlowconduction > self%indhighvalence) then
-      self%scissor(self%indlowconduction:wann%numwannbands) = scissor
+       self%scissor(self%indlowconduction:wann%numwannbands) = scissor
     end if
-    
+
     !Print out information.
     if(this_image() == 1) then
        write(*, "(A, I1)") "Spin degeneracy = ", self%spindeg
@@ -273,13 +273,13 @@ contains
        end if
        if (scissor .ne. 0.0_r64 .and. self%indlowconduction > self%indhighvalence) then
           write(*, "(A, 1E16.8, A)") "Scissor operator = ", &
-            self%scissor(self%indlowconduction) , " eV"
+               self%scissor(self%indlowconduction) , " eV"
        end if
     end if
-    
+
     !Calculate electrons
     call calculate_electrons(self, wann, crys, sym, num)
-    
+
     !Set total number of charged impurities
     if(.not. self%metallic) then
        self%chimp_conc_n = 0.0_r64
@@ -317,7 +317,7 @@ contains
        end if
     end if
   end subroutine read_input_and_setup
-  
+
   subroutine calculate_electrons(self, wann, crys, sym, num)
     !! Calculate electron energy window restricted wave vector meshes
     !! and the electronic properties on them
@@ -327,7 +327,7 @@ contains
     type(crystal), intent(in) :: crys
     type(symmetry), intent(in) :: sym
     type(numerics), intent(in) :: num
-    
+
     !Some utitlity variables
     integer(i64) :: i, l, s, il, ii, jj, kk, ib, count, istate, aux
     real(r64), allocatable :: el_ens_tmp(:, :), el_vels_tmp(:, :, :)
@@ -340,22 +340,22 @@ contains
 
     call print_message("Energy unrestricted calculation:")
     call print_message("--------------------------------")
-    
+
     !Set initial FBZ total number of wave vectors
     self%nwv = product(self%wvmesh)
-    
+
     !The electronic mesh setup proceeds in multiple steps:
     ! 1. Calculate full electron wave vector mesh
     call print_message("Calculating FBZ...")
     blocks = .false.
     call calculate_wavevectors_full(self%wvmesh, self%wavevecs, blocks)
-    
+
     ! 2. Calculate the IBZ
     call print_message("Calculating IBZ and IBZ -> FBZ mappings...")
     call find_irred_wedge(self%wvmesh, self%nwv_irred, self%wavevecs_irred, &
          self%indexlist_irred, self%nequiv, sym%nsymm_rot, sym%qrotations, &
          self%ibz2fbz_map, self%equiv_map, blocks)
-    
+
     ! 3. Calculate IBZ quantities
     call print_message("Calculating IBZ energies...")
     allocate(self%ens_irred(self%nwv_irred, wann%numwannbands), &
@@ -363,12 +363,12 @@ contains
          self%evecs_irred(self%nwv_irred, wann%numwannbands, wann%numwannbands))
     call wann%el_wann(crys, self%nwv_irred, self%wavevecs_irred, self%ens_irred, &
          self%vels_irred, self%evecs_irred,self%scissor)
-    
+
     ! 4. Map out FBZ quantities from IBZ ones
     call print_message("Mapping out FBZ energies...")
     allocate(self%indexlist(self%nwv), self%ens(self%nwv, wann%numwannbands), &
          self%vels(self%nwv, wann%numwannbands, 3))
-    
+
     do i = 1,self%nwv_irred !an irreducible point
        do l = 1,self%nequiv(i) !number of equivalent points of i
           il = self%ibz2fbz_map(l, i, 2) ! (i, l) -> il
@@ -379,7 +379,7 @@ contains
 
           !energy
           self%ens(il,:) = self%ens_irred(i,:)
-          
+
           !velocity
           do ib = 1, self%numtransbands !wann%numwannbands
              !here use real space (Cartesian) rotations
@@ -407,16 +407,16 @@ contains
           end if
        end if
     end if
-    
+
     call print_message("Transport energy window restricted calculation:")
     call print_message("-----------------------------------------------")
-    
+
     ! 5. Find energy window restricted FBZ blocks.
     !    After this step, self%nwv, self%indexlist will refer
     !    to the energy restricted mesh.
     call print_message("Calculating Fermi window restricted FBZ blocks...")
     call apply_energy_window(self%nwv, self%indexlist, self%ens, self%enref, self%fsthick)
-    
+
     ! 6. Sort index list and related quanties of FBZ blocks
     call print_message("Sorting FBZ blocks index list...")
     call sort(self%indexlist)
@@ -425,16 +425,16 @@ contains
     !    After this step, self%wavevecs, self%ens, self%vels, and self%evecs
     !    will refer to the energy restricted mesh.
     call print_message("Calcutating FBZ blocks quantities...")
-    
+
     !wave vectors
     deallocate(self%wavevecs)
-    
+
     blocks = .true.
     call calculate_wavevectors_full(self%wvmesh, self%wavevecs, blocks, self%indexlist) !wave vectors
 
     !Print electron FBZ mesh
     call write2file_rank2_real("el.wavevecs_fbz", self%wavevecs)
-    
+
     !energies and velocities
     call fbz_blocks_quantities(self%indexlist, self%ens, self%vels)
 
@@ -443,9 +443,9 @@ contains
     allocate(self%evecs(self%nwv, wann%numwannbands, wann%numwannbands))
     allocate(el_ens_tmp(self%nwv, wann%numwannbands), el_vels_tmp(self%nwv, wann%numwannbands, 3))
     call wann%el_wann(crys, self%nwv, self%wavevecs, el_ens_tmp, el_vels_tmp, &
-      self%evecs,self%scissor)
+         self%evecs,self%scissor)
     deallocate(el_ens_tmp, el_vels_tmp) !free up memory
-    
+
     ! 8. Find IBZ of energy window restricted blocks
     !    After this step, self%nwv_irred, self%indexlist_irred, 
     !    self%wavevecs_irred, self%nequiv, and self%ibz2fbz_map
@@ -460,7 +460,7 @@ contains
 
     !Print electron IBZ mesh
     call write2file_rank2_real("el.wavevecs_ibz", self%wavevecs_irred)
-    
+
     !Create symmetrizers of wave vector dependent vectors ShengBTE style
     allocate(self%symmetrizers(3, 3, self%nwv))
     self%symmetrizers = 0.0_r64
@@ -478,7 +478,7 @@ contains
           self%symmetrizers(:, :, i) = self%symmetrizers(:, :, i)/kk
        end if
     end do
-    
+
     ! 9. Get IBZ blocks energies, velocities, and eigen vectors.
     call print_message("Calcutating IBZ blocks quantities...")
     deallocate(self%ens_irred, self%vels_irred, self%evecs_irred)
@@ -487,7 +487,7 @@ contains
          self%evecs_irred(self%nwv_irred, wann%numwannbands, wann%numwannbands))
     call wann%el_wann(crys, self%nwv_irred, self%wavevecs_irred, self%ens_irred, &
          self%vels_irred, self%evecs_irred,self%scissor)
-    
+
     ! 10. Calculate the number of FBZ blocks electronic states
     !     available for scattering
     self%nstates_inwindow = 0
@@ -511,7 +511,7 @@ contains
        end do
        close(1)
     end if
-    
+
     do i = 1, self%nwv_irred !IBZ
        do l = 1, self%nequiv(i) !number of equivalent points of i
           il = self%ibz2fbz_map(l, i, 2) ! (i, l) -> il
@@ -520,7 +520,7 @@ contains
 
           !energy
           self%ens(aux,:) = self%ens_irred(i,:)
-          
+
           !velocity
           do ib = 1,wann%numwannbands
              !here use real space (Cartesian) rotations
@@ -530,7 +530,7 @@ contains
                matmul(self%symmetrizers(:,:,aux),transpose(self%vels(aux,:,:))))
        end do
     end do
-        
+
     ! 12. Calculate the number of IBZ electronic states available for scattering
     self%nstates_irred_inwindow = 0
     do istate = 1,self%nwv_irred*wann%numwannbands
@@ -542,7 +542,7 @@ contains
     end do
     if(this_image() == 1) write(*, "(A, I10)") " Number of energy restricted IBZ blocks states = ", &
          self%nstates_irred_inwindow
-    
+
     !Calculate list of IBZ in-window states = (wave vector index, band index)
     allocate(self%IBZ_inwindow_states(self%nstates_irred_inwindow,2))
     count = 0
@@ -577,7 +577,7 @@ contains
     !Print out full BZ electron energies and velocities
     call write2file_rank2_real("el.ens_fbz", self%ens)
     call write2file_rank3_real("el.vels_fbz", self%vels)
-    
+
     !Calculate electron simplicial complex
     if(num%tetrahedra) then
        call print_message("Calculating electron mesh tetrahedra...")
@@ -612,10 +612,10 @@ contains
 
     integer(i64) :: ik, count, numbands, inwindow(nk)
     real(r64), allocatable :: aux(:)
-    
+
     numbands = size(energies(1,:))    
     allocate(aux(numbands))
-    
+
     count = 0
     do ik = 1, nk
        aux = energies(ik, :)
@@ -627,7 +627,7 @@ contains
     end do
 
     if(count == 0) call exit_with_message("No states found within Fermi window.")
-    
+
     !Update index list
     deallocate(indexlist)
     allocate(indexlist(count))
@@ -649,7 +649,7 @@ contains
     numbands = size(energies(1,:))
 
     allocate(energies_tmp(nk, numbands), velocities_tmp(nk, numbands, 3))
-    
+
     do i = 1, nk
        energies_tmp(i,:) = energies(indexlist(i),:)
        velocities_tmp(i,:,:) = velocities(indexlist(i),:,:)
@@ -680,7 +680,7 @@ contains
 
     self%conc_el = 0.0_r64
     self%conc_hole = 0.0_r64
-    
+
     !Normalization and units factor
     const = self%spindeg/dble(product(self%wvmesh))/vol/(1.0e-21_r64)
 
@@ -714,7 +714,7 @@ contains
        self%conc = self%conc*h*1.0e-7_r64 !cm^-2
        self%conc_el = self%conc_el*h*1.0e-7_r64 !cm^-2
        self%conc_hole = self%conc_hole*h*1.0e-7_r64 !cm^-2
-    end if    
+    end if
   end subroutine calculate_carrier_conc
 
   subroutine calculate_chempot(self, vol, dopingtype, Tlist, conclist, h)
@@ -743,7 +743,7 @@ contains
     !Allocate chemical potential array
     allocate(chempot(numtemp, numconc))
     chempot = -99.99_r64
-    
+
     !Total number of points in full mesh
     ngrid = product(self%wvmesh)
 
@@ -783,7 +783,7 @@ contains
           write(*, "(A, 1E16.8, A)") 'Minimum uncorrected energy conduction band = ' , &
                minval(self%ens_irred(:,self%indlowconduction)) - self%scissor, ' eV'
        end if
-       
+
        if(self%indhighvalence > 0 .and. self%indlowconduction > 0) then
           write(*, "(A, 1E16.8, A)") 'Band gap = ' , &
                minval(self%ens_irred(:,self%indlowconduction)) - &
@@ -832,7 +832,7 @@ contains
              end if
           end do
           chempot(itemp,iconc) = mu
-          
+
           if(abs(aux - conclist(iconc))/conclist(iconc) > thresh) then
              call exit_with_message(&
                   "Could not converge to correct chemical potential. Exiting.")

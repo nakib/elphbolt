@@ -14,7 +14,7 @@ program bte_regression
   use interactions, only: calculate_gReq, calculate_gkRp, calculate_3ph_interaction, &
        calculate_eph_interaction_ibzq, calculate_eph_interaction_ibzk, &
        calculate_echimp_interaction_ibzk, calculate_bound_scatt_rates
-      
+
   implicit none
 
   integer :: itest
@@ -36,7 +36,7 @@ program bte_regression
      write(*, '(A)')  'Regression test on 3C-SiC'
      write(*, '(A, I5)') 'Number of coarray images = ', num_images()
   end if
-     
+
   !Test counter
   itest = 0
 
@@ -81,9 +81,9 @@ program bte_regression
         call test_array(itest)%assert( &
              [transpose(el%ens_irred)], &
              [0.1091276329E+02_r64, 0.1459479591E+02_r64, 0.2329596906E+02_r64, 0.2329596906E+02_r64, &
-              0.1096209018E+02_r64, 0.1442980731E+02_r64, 0.2334947484E+02_r64, 0.2340698517E+02_r64, &
-              0.1079030242E+02_r64, 0.1369997715E+02_r64, 0.2354625098E+02_r64, 0.2354625098E+02_r64, &
-              0.1107938027E+02_r64, 0.1467078718E+02_r64, 0.2311065489E+02_r64, 0.2358101936E+02_r64], &
+             0.1096209018E+02_r64, 0.1442980731E+02_r64, 0.2334947484E+02_r64, 0.2340698517E+02_r64, &
+             0.1079030242E+02_r64, 0.1369997715E+02_r64, 0.2354625098E+02_r64, 0.2354625098E+02_r64, &
+             0.1107938027E+02_r64, 0.1467078718E+02_r64, 0.2311065489E+02_r64, 0.2358101936E+02_r64], &
              tol = 1.0e-8_r64)
      end if
      !!
@@ -102,17 +102,17 @@ program bte_regression
      test_array(itest) = testify("phonon energies")
      call test_array(itest)%assert( &
           [ph%ens(ph%indexlist_irred(1), :), &
-           ph%ens(ph%indexlist_irred(2), :), &
-           ph%ens(ph%indexlist_irred(9), :), &
-           ph%ens(ph%indexlist_irred(10), :)], &
+          ph%ens(ph%indexlist_irred(2), :), &
+          ph%ens(ph%indexlist_irred(9), :), &
+          ph%ens(ph%indexlist_irred(10), :)], &
           [0.0000000000E+00_r64, 0.0000000000E+00_r64, 0.0000000000E+00_r64, &
-            0.9660348775E-01_r64, 0.9660348775E-01_r64, 0.9660348775E-01_r64, &
-           0.2227978117E-01_r64, 0.2227978118E-01_r64, 0.4234985469E-01_r64, &
-            0.9520507538E-01_r64, 0.9520507538E-01_r64, 0.1173379503E+00_r64, &
-           0.4840698090E-01_r64, 0.5786962566E-01_r64, 0.7499234595E-01_r64, &
-            0.9196463235E-01_r64, 0.9478418434E-01_r64, 0.1060798273E+00_r64, &
-           0.5004202869E-01_r64, 0.5811331198E-01_r64, 0.6793992839E-01_r64, &
-            0.9281467594E-01_r64, 0.9595198760E-01_r64, 0.1073275295E+00_r64], &
+          0.9660348775E-01_r64, 0.9660348775E-01_r64, 0.9660348775E-01_r64, &
+          0.2227978117E-01_r64, 0.2227978118E-01_r64, 0.4234985469E-01_r64, &
+          0.9520507538E-01_r64, 0.9520507538E-01_r64, 0.1173379503E+00_r64, &
+          0.4840698090E-01_r64, 0.5786962566E-01_r64, 0.7499234595E-01_r64, &
+          0.9196463235E-01_r64, 0.9478418434E-01_r64, 0.1060798273E+00_r64, &
+          0.5004202869E-01_r64, 0.5811331198E-01_r64, 0.6793992839E-01_r64, &
+          0.9281467594E-01_r64, 0.9595198760E-01_r64, 0.1073275295E+00_r64], &
           tol = 1.0e-10_r64)
   end if
   sync all
@@ -134,9 +134,9 @@ program bte_regression
         call test_array(itest)%assert( &
              [transpose(el%dos)], &
              [0.6944754862E-02, 0.7200286243E-02, 0.2139545035E-01, 0.2139545067E-01, &
-              0.2264851605E-01, 0.3001614634E-02, 0.1790595013E-01, 0.2216849050E-01, &
-              0.0000000000E+00, 0.0000000000E+00, 0.6902017554E-02, 0.6902017108E-02, &
-              0.9485622620E-02, 0.2888871441E-02, 0.9858176079E-02, 0.1918518845E-02]*1.0_r64, &
+             0.2264851605E-01, 0.3001614634E-02, 0.1790595013E-01, 0.2216849050E-01, &
+             0.0000000000E+00, 0.0000000000E+00, 0.6902017554E-02, 0.6902017108E-02, &
+             0.9485622620E-02, 0.2888871441E-02, 0.9858176079E-02, 0.1918518845E-02]*1.0_r64, &
              tol = 1.0e-9_r64)
      end if
      !!
@@ -157,7 +157,7 @@ program bte_regression
      call calculate_bound_scatt_rates(el%prefix, num%elbound, crys%bound_length, &
           el%vels, el%indexlist_irred, bt%el_rta_rates_bound_ibz)
   end if
-  
+
   !Calculate phonon density of states and, if needed, phonon-isotope
   !and/or phonon-substitution scattering rates.
   !
@@ -168,24 +168,24 @@ program bte_regression
   !they belong -- interactions.f90 -- soon.
   call calculate_dos(ph, crys, num%tetrahedra, bt%ph_rta_rates_iso_ibz, bt%ph_rta_rates_subs_ibz, &
        num%phiso, num%phiso_1B_theory, num%phsubs, num%phiso_Tmat)
-  
+
   !Test phonon density of states
   if(this_image() == 1) then
      itest = itest + 1
      test_array(itest) = testify("Phonon DOS")
      call test_array(itest)%assert( &
           [ph%dos(1, :), &
-           ph%dos(2, :), &
-           ph%dos(9, :), &
-           ph%dos(10, :)], &
+          ph%dos(2, :), &
+          ph%dos(9, :), &
+          ph%dos(10, :)], &
           [0.0000000000E+00_r64, 0.0000000000E+00_r64, 0.0000000000E+00_r64, &
-           0.2672064440E+03_r64, 0.2672064440E+03_r64, 0.2672064440E+03_r64, &
-           0.4607796189E+01_r64, 0.4607796199E+01_r64, 0.8583557121E+02_r64, &
-           0.4038905966E+03_r64, 0.4038906017E+03_r64, 0.1437348153E+02_r64, &
-           0.1343766722E+03_r64, 0.6297533596E+02_r64, 0.0000000000E+00_r64, &
-           0.2805500270E+03_r64, 0.2896877310E+03_r64, 0.1284652824E+01_r64, &
-           0.8160608929E+02_r64, 0.9246561665E+02_r64, 0.7797451387E+02_r64, &
-           0.6395645220E+03_r64, 0.5625272067E+03_r64, 0.2034377505E+03_r64], &
+          0.2672064440E+03_r64, 0.2672064440E+03_r64, 0.2672064440E+03_r64, &
+          0.4607796189E+01_r64, 0.4607796199E+01_r64, 0.8583557121E+02_r64, &
+          0.4038905966E+03_r64, 0.4038906017E+03_r64, 0.1437348153E+02_r64, &
+          0.1343766722E+03_r64, 0.6297533596E+02_r64, 0.0000000000E+00_r64, &
+          0.2805500270E+03_r64, 0.2896877310E+03_r64, 0.1284652824E+01_r64, &
+          0.8160608929E+02_r64, 0.9246561665E+02_r64, 0.7797451387E+02_r64, &
+          0.6395645220E+03_r64, 0.5625272067E+03_r64, 0.2034377505E+03_r64], &
           tol = 1.0e-7_r64)
   end if
   !!
@@ -196,22 +196,22 @@ program bte_regression
      test_array(itest) = testify("Phonon-isotope scattering Tamura model")
      call test_array(itest)%assert( &
           [bt%ph_rta_rates_iso_ibz(1, :), &
-           bt%ph_rta_rates_iso_ibz(2, :), &
-           bt%ph_rta_rates_iso_ibz(9, :), &
-           bt%ph_rta_rates_iso_ibz(10, :)], &
+          bt%ph_rta_rates_iso_ibz(2, :), &
+          bt%ph_rta_rates_iso_ibz(9, :), &
+          bt%ph_rta_rates_iso_ibz(10, :)], &
           [0.0000000000E+00_r64,    0.0000000000E+00_r64,    0.0000000000E+00_r64, &
-            0.1263687201E+00_r64,    0.9683788784E-01_r64,    0.9902981700E-01_r64, &
-            0.2344573151E-03_r64,    0.1669499774E-03_r64,    0.1554351322E-01_r64, &
-            0.1394726680E+00_r64,    0.1838958745E+00_r64,    0.8370501743E-02_r64, &
-            0.3970374223E-01_r64,    0.2976859573E-01_r64,    0.0000000000E+00_r64, &
-            0.9314628584E-01_r64,    0.1261722420E+00_r64,    0.5224496635E-03_r64, &
-            0.2867531169E-01_r64,    0.3811180360E-01_r64,    0.4851394523E-01_r64, &
-            0.2895513822E+00_r64,    0.2735793343E+00_r64,    0.1352376696E+00_r64], &
-            tol = 1e-2_r64)
-           !tol = 1e-9_r64)
+          0.1263687201E+00_r64,    0.9683788784E-01_r64,    0.9902981700E-01_r64, &
+          0.2344573151E-03_r64,    0.1669499774E-03_r64,    0.1554351322E-01_r64, &
+          0.1394726680E+00_r64,    0.1838958745E+00_r64,    0.8370501743E-02_r64, &
+          0.3970374223E-01_r64,    0.2976859573E-01_r64,    0.0000000000E+00_r64, &
+          0.9314628584E-01_r64,    0.1261722420E+00_r64,    0.5224496635E-03_r64, &
+          0.2867531169E-01_r64,    0.3811180360E-01_r64,    0.4851394523E-01_r64, &
+          0.2895513822E+00_r64,    0.2735793343E+00_r64,    0.1352376696E+00_r64], &
+          tol = 1e-2_r64)
+     !tol = 1e-9_r64)
   end if
   !!
-  
+
   !Calculate boundary scattering rates.
   call calculate_bound_scatt_rates(ph%prefix, num%phbound, crys%bound_length, &
        ph%vels, ph%indexlist_irred, bt%ph_rta_rates_bound_ibz)
@@ -250,9 +250,9 @@ program bte_regression
      !Calculate ph-e transition probabilities
      if(.not. num%Y_OTF) then
         call t_event%start_timer('IBZ ph-e transition probilities')
-        
+
         call calculate_eph_interaction_ibzq(wann, crys, el, ph, num, 'Y')
-        
+
         call t_event%end_timer('IBZ ph-e transition probilities')
      end if
   end if
@@ -283,7 +283,7 @@ program bte_regression
      !Deallocate Wannier quantities
      call wann%deallocate_wannier(num)
   end if
-  
+
   if(num%onlyebte .or. num%drag) then
      if(num%elchimp) then
         call t_event%start_timer('e-ch. imp. interactions')
@@ -330,7 +330,7 @@ program bte_regression
      call bt%solve_bte(num, crys, sym, ph)
   else
      call bt%solve_bte(num, crys, sym, ph, el)
-     
+
      !TODO Here test the transport coefficients
   end if
 
@@ -338,7 +338,7 @@ program bte_regression
   if(this_image() == 1) then
      tests_all = testify(test_array)
      call tests_all%report
-     
+
      if(tests_all%get_status() .eqv. .false.) error stop -1
   end if
   sync all

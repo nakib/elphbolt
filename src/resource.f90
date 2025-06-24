@@ -6,11 +6,11 @@ module resource_module
 #endif
   use precision, only: r64, i64
   use misc, only: create_set
-  
+
   implicit none
-  
+
   public resource
-  
+
   type resource
      integer :: num_cpus
      !! Number of lonely cpus (not a gpu manager)
@@ -23,13 +23,13 @@ module resource_module
      character*(30) :: gpu_name = trim("None"), &
           gpu_vendor = trim("None"), gpu_driver = trim("None")
      !! Information about gpu device
-     
+
    contains
      procedure :: initialize, report, balance_load
   end type resource
 
 contains
-  
+
   subroutine initialize(self)
     class(resource), intent(out) :: self
 
@@ -44,7 +44,7 @@ contains
     character(len=10), allocatable :: hostname_set(:)
 
     allocate(self%gpu_manager[*])
-        
+
     allocate(hostname(num_images())[*])
     call hostnm(hostname(this_image()))
     if(this_image() == 1) then
@@ -56,9 +56,9 @@ contains
     sync all
     call co_broadcast(hostname, 1)
     sync all
-    
+
     call create_set(hostname, hostname_set)
-    
+
     self%num_gpus = 0
 #ifdef _OPENACC
     !Bug? The following returns 1 from all images, even if I throw multiple
@@ -75,7 +75,7 @@ contains
     self%gpu_manager = &
          (this_image() == findloc(hostname, hostname_set(self%this_node), 1)) &
          .and. self%num_gpus > 0
-    
+
 #ifdef _OPENACC
     if(self%gpu_manager) then
        igpus = 0
@@ -93,7 +93,7 @@ contains
        call acc_get_property_string(igpus, acc_get_device_type(), &
             property, string)
        self%gpu_driver = trim(string)
-       
+
 !!$       do igpus = 0, self%num_gpus - 1 !Mind the 0 based indexing of openacc
 !!$          property = acc_property_name
 !!$          call acc_get_property_string(igpus, acc_get_device_type(), &
@@ -116,7 +116,7 @@ contains
 
   subroutine balance_load(self, split, total_load, chunk, istart, iend, num_active_images)
     !! A simple gpus/cpus load balancer.
-    
+
     class(resource), intent(in) :: self
     real(r64), intent(in) :: split
     integer(i64), intent(in) :: total_load
@@ -151,9 +151,9 @@ contains
 !!$            modulo(cpu_load, num_active_images - self%num_gpus)
 
        remainder = total_load - load_per_gpu*self%num_gpus - load_per_cpu*self%num_cpus
-       
+
        !print*, remainder
-       
+
        offset = 0
        do im = 1, num_active_images
           if(self%gpu_manager[im]) then
@@ -172,7 +172,7 @@ contains
              istart[im] = 0
              iend[im] = 0
           end if
-          
+
 !!$          print*, 'image, gpu_manager, chunk, istart, iend:', &
 !!$               im, self%gpu_manager[im], chunk[im], istart[im], iend[im]
        end do
@@ -195,7 +195,7 @@ contains
     !Update number of active images
     num_active_images = activate
   end subroutine balance_load
-  
+
   subroutine report(self)
     class(resource), intent(in) :: self
 

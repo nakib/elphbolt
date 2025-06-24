@@ -72,8 +72,8 @@ program V3_permutations
   Vm2_calculator => Vm2_3ph_reference
   call t_event%start_timer('Full V set calculation')
   call calculate_3ph_interaction(ph, crys, num, V2, Vm2_calculator)
-  print*, 'value = ', twonorm(pack(V2, .true.))
   call t_event%end_timer('Full V set calculation')
+  print*, 'value = ', twonorm(pack(V2, .true.))
   !print*, 'value = ', twonorm(pack(V2_minimal_set, .true.))
   ! print*, V2(3, 1, 2, 3, 3)
   ! print*, V2(3, 2, 4, 3, 2)
@@ -84,12 +84,11 @@ program V3_permutations
   !Minimal set calculations
   call t_event%start_timer('Minimal V set calculation')
   call map_triplet_full_to_reduced_new(ph%numbands, ph%wvmesh, &
-       ph%nwv_irred*ph%numbands, ph%nwv*ph%numbands, &
-       triplet_permutation_maps)
+       ph%nwv_irred, ph%nwv, triplet_permutation_maps)
   call calculate_3ph_interaction_minimalset_new(ph, crys, num, &
        triplet_permutation_maps, V2, Vm2_calculator)
-  print*, 'value = ', twonorm(pack(V2, .true.))
   call t_event%end_timer('Minimal V set calculation')
+  print*, 'value = ', twonorm(pack(V2, .true.))
 
 !!$  count_full = 0
 !!$  print *, '---------------------------------------------------------------'
@@ -523,7 +522,28 @@ contains
              do s2 = 1, ph%numbands
                 istate2 = mux_state(ph%numbands, s2, iq2)
 
+                !can_trip = permutations_map(:, istate2, istate1)
+
                 do s3 = 1, ph%numbands
+                   !Demux the canonical triplets
+                   !call demux_state(can_trip(1), ph%numbands, can_trip_s1, can_trip_iq1)
+                   !call demux_state(can_trip(2), ph%numbands, can_trip_s2, can_trip_iq2)
+                   !call demux_state(can_trip(3), ph%numbands, can_trip_s3, can_trip_iq3)
+
+                   !aux = Vm2_calculator(ph%evecs(can_trip_iq1, can_trip_s1, :), &
+                   !     ph%evecs(can_trip_iq2, can_trip_s2, :), &
+                   !     ph%evecs(can_trip_iq3, can_trip_s3, :), &
+                   !     ph%Index_i(:), ph%Index_j(:), ph%Index_k(:), ph%ifc3(:, :, :, :), &
+                   !     phases(:), ph%numtriplets, ph%numbands)
+                   !
+                   !?
+                   !V2(s3, s2, iq2, istate1) = aux
+
+                   !Combined loop over the 2nd and 3rd phonon bands
+                   !do s2s3 = 1, ph%numbands**2
+                   !s2 = int((s2s3 - 1)/ph%numbands) + 1 !changes slow
+                   !s3 = modulo(s2s3 - 1, ph%numbands) + 1 !changes fast
+
                    istate3 = mux_state(ph%numbands, s3, iq3_minus)
 
                    !Need only compute the matrix element for one of the permutations
@@ -535,10 +555,10 @@ contains
                            ph%evecs(iq2, s2, :), ph%evecs(iq3_minus, s3, :), &
                            ph%Index_i(:), ph%Index_j(:), ph%Index_k(:), ph%ifc3(:, :, :, :), &
                            phases(:), ph%numtriplets, ph%numbands)
-
-                      !Beware: Here only the minimal subset will be non-zero
-                      V2(s3, iq3_minus, s2, iq2, istate1) = aux
                    end if
+
+                   !For now fill the entire tensor
+                   V2(s3, iq3_minus, s2, iq2, istate1) = aux
                 end do
              end do
           end do

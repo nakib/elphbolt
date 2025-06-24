@@ -104,7 +104,7 @@ module crystal_module
      !! Specularity factor
      character(1) :: thinfilm_normal
      !! Normal direction of the thin-film: 'x', 'y', or 'z'.
-     
+
    contains
 
      procedure :: initialize=>read_input_and_setup_crystal
@@ -129,7 +129,7 @@ contains
     character(len=100) :: name
     character(1) :: thinfilm_normal
     logical :: polar, VCA, DIB, read_epsiloninf, twod
-    
+
     namelist /allocations/ numelements, numatoms
     namelist /crystal_info/ name, elements, atomtypes, basis, lattvecs, &
          polar, born, epsilon, read_epsiloninf, epsilon0, epsiloninf, &
@@ -143,17 +143,17 @@ contains
     open(1, file = 'input.nml', status = 'old')
 
     !Set values from input:
-    
+
     !Read allocations
     numelements = 0
     numatoms = 0
     read(1, nml = allocations)
     if(numelements < 1 .or. numatoms < 1 .or. numatoms < numelements) then
        call exit_with_message('Bad input(s) in allocations.')
-    end if    
+    end if
     self%numelements = numelements
     self%numatoms = numatoms
-    
+
     !Allocate variables
     allocate(elements(numelements), atomtypes(numatoms), born(3,3,numatoms), &
          basis(3,numatoms), masses(numelements), basis_cart(3,numatoms), &
@@ -166,7 +166,7 @@ contains
          self%basis(3,self%numatoms), self%basis_cart(3,self%numatoms), &
          self%subs_masses(self%numelements), self%subs_conc(self%numelements), &
          self%subs_gfactors(self%numelements))
-    
+
     !Read crystal_info
     name = trim(adjustl('Crystal'))
     elements = 'X'
@@ -216,7 +216,7 @@ contains
 
     !Close input file
     close(1)
-    
+
     self%name = name
     self%elements = elements
     self%atomtypes = atomtypes
@@ -241,11 +241,11 @@ contains
     self%thinfilm_normal = thinfilm_normal
     self%specfac = specfac
     self%numdopants_types = numdopants_types
-    
+
     if(product(numdopants_types) <= 0) then
        call exit_with_message('Number of dopant types must be a non-zero integer. Exiting.')   
     end if
-    
+
     if(self%twod) then
        if(lattvecs(1,3) /= 0 .or. lattvecs(2,3) /= 0 .or. lattvecs(3,3) == 0) then
           call exit_with_message('For 2d systems, cross plane lattice vector must be &
@@ -264,14 +264,14 @@ contains
     self%dopant_conc = 0.0_r64
     self%dopant_masses = dopant_masses(1:size(self%dopant_masses, 1), :)
     self%dopant_conc = dopant_conc(1:size(self%dopant_conc, 1), :)
-    
+
     !Set high-frequency dielectric constant
     if(self%read_epsiloninf) then
        self%epsiloninf = epsiloninf
     else
        self%epsiloninf = trace(self%epsilon)/3.0_r64
     end if
-    
+
     !If required, calculate isotopic average masses and g-factors
     if(self%VCA) &
          call calculate_mavg_and_g(self%elements, self%masses, self%gfactors_VCA)
@@ -280,7 +280,7 @@ contains
 
     !Calculate atomic basis in Cartesian coordinates
     self%basis_cart(:,:) = matmul(self%lattvecs,self%basis)
-    
+
     !Calculate reciprocal lattice vectors and real and reciprocal cell volumes
     do i = 1, 3
        j = mod(i, 3) + 1
@@ -299,7 +299,7 @@ contains
           if(self%atomtypes(j) == i) num_atomtypes(i) = num_atomtypes(i) + 1 
        end do
     end do
-    
+
     !Convert number concentration of substitutions to percentage
     !of replaced host atoms.
     if(twod) then
@@ -307,7 +307,7 @@ contains
     else
        subs_perc = self%subs_conc*(1.0e-21_r64*self%volume)/num_atomtypes*100.0_r64
     end if
-        
+
     !Calculate the mass variance parameters for the substitutions
     do i = 1, self%numelements
        !Impurity and host mixed mass
@@ -319,11 +319,11 @@ contains
             (100.0_r64 - subs_perc(i))*(1.0_r64 - self%masses(i)/subs_mavg)**2
     end do
     self%subs_gfactors = self%subs_gfactors/100.0_r64
-    
+
     !Print out crystal and reciprocal lattice information.
     if(this_image() == 1) then
        write(*, "(A, A)") 'Material: ', self%name
-       
+
        if(self%VCA) write(*,"(A)") 'Isotopic average of masses (VCA) will be used.'
        if(self%DIB) write(*,"(A)") 'Dominant isotopic masses (DIB) will be used.'
        do i = 1, self%numelements
@@ -340,7 +340,7 @@ contains
                   trim(self%elements(i)), " substitution amount = ", subs_perc(i), " %"
           end do
        end if
-       
+
        write(*,"(A)") 'Lattice vectors [nm]:'
        write(*,"(3(1E16.8,x))") self%lattvecs(:,1)
        write(*,"(3(1E16.8,x))") self%lattvecs(:,2)
@@ -353,7 +353,7 @@ contains
        write(*,"(3(1E16.8,x))") self%reclattvecs(:,3)
        write(*,"(A,(1E16.8,x),A)") 'Brillouin zone volume =', self%volume_bz, '1/nm^3'       
        if(self%twod) write(*,"(A)") 'System is 2d.'
-       
+
        if(self%polar) then
           write(*,"(A)") 'System is polar.'
           write(*,"(A)") 'Dielectric tensor:'
@@ -414,7 +414,7 @@ contains
     !! This subroutine is adapted from ShengBTE.
     use params, only: lookup_periodic_table 
     use isotopes_module, only: isotopes
-    
+
     character(len=3), intent(in) :: elements(:)
     real(r64), intent(out) :: m(:), g(:)
 
@@ -423,17 +423,17 @@ contains
     type(isotopes) :: iso_data
 
     nelems = size(elements)
-        
+
     do e = 1, nelems
        iso_data = lookup_periodic_table(elements(e))
        m(e) = 0.0_r64
        do i = 1, iso_data%numisotopes
-             m(e) = m(e) + iso_data%masses(i)*iso_data%abundances(i)
+          m(e) = m(e) + iso_data%masses(i)*iso_data%abundances(i)
        end do
        m(e) = m(e)/100.0_r64
        g(e) = 0.0_r64
        do i = 1, iso_data%numisotopes
-             g(e) = g(e) + iso_data%abundances(i)*(1.0_r64 - iso_data%masses(i)/m(e))**2
+          g(e) = g(e) + iso_data%abundances(i)*(1.0_r64 - iso_data%masses(i)/m(e))**2
        end do
        g(e) = g(e)/100.0_r64
     end do
@@ -444,7 +444,7 @@ contains
     !! and the average mass perturbation for use in the DIB-1st Born ph-iso scattering theory.
     use params, only: lookup_periodic_table
     use isotopes_module, only: isotopes
-    
+
     character(len=3), intent(in) :: elements(:)
     real(r64), intent(out) :: m(:), g(:)
 
@@ -459,7 +459,7 @@ contains
 
        !Set the dominant isotopic mass of element e
        m(e) = iso_data%masses(maxloc(iso_data%abundances, dim = 1))
-       
+
        !Calculate g_2 for this element.
        g(e) = 0.0_r64
        do i = 1, iso_data%numisotopes
@@ -468,12 +468,12 @@ contains
           !Still, explicitly taking out the dominant isotope from
           !the list of defects.
           if(i == maxloc(iso_data%abundances, dim = 1)) cycle
-          
+
           g(e) = g(e) + iso_data%abundances(i)* &
                (1.0_r64 - iso_data%masses(i)/m(e))**2
        end do
        g(e) = g(e)/100.0_r64
-       
+
     end do
   end subroutine calculate_g_DIB
 

@@ -54,7 +54,7 @@ module phonon_defect_module
      !! Choose if mass defect is going to be used.
      character(len=100) :: approx
      !! Approximation of scattering T-matrix.
-     
+
    contains
 
      procedure, public :: initialize, calculate_phonon_Tmatrix
@@ -65,11 +65,11 @@ contains
 
   subroutine initialize(self, ph, crys)
     !! Initialize the phonon defect data type.
-    
+
     class(phonon_defect), intent(out) :: self
     type(phonon), intent(in) :: ph
     type(crystal), intent(in) :: crys
-    
+
     !Local variables
     real(r64) :: range
     logical :: mass_defect
@@ -79,13 +79,13 @@ contains
     character(len=100) :: approx
 
     namelist /phonon_defect/ mass_defect, range, approx
-    
+
     call subtitle("Setting up phonon defect...")
 
     mass_defect = .false.
     range = 0.0_r64
     approx = 'full Born'
-    
+
     !Read defect input
     open(1, file = 'input.nml', status = 'old')
 
@@ -105,7 +105,7 @@ contains
     self%mass_defect = mass_defect
     self%range = range !nm
     self%approx = approx
-    
+
     !Apply defect radius
     cell_count = 0
     do cell = 1, product(ph%scell)
@@ -113,7 +113,7 @@ contains
        !giving the coordinates of a cell in the supercell.
        call demux_vector(cell, cell_intvec, ph%scell, 0_i64)
        !cell_intvec = cell_intvec - ph%scell/2
-       
+
        !If position of cell is within range, then keep it.
        if(distance_from_origin(cell_intvec, ph%scell, crys%lattvecs) <= range) then
           cell_count = cell_count + 1
@@ -121,7 +121,7 @@ contains
           supercell_cell_pos_intvec(:, cell_count) = cell_intvec
        end if
     end do
-    
+
     self%numcells = cell_count
     allocate(self%cell_pos_intvec(3, self%numcells))
     self%cell_pos_intvec(:, 1:self%numcells) = &
@@ -136,7 +136,7 @@ contains
     allocate(self%pcell_atom_dof(supercell_numatoms*3))
 
     allocate(self%dimp_cell_pos_intvec(3, supercell_numatoms*3))
-    
+
     atom_count = 0
     sc_dof_count = 0
     do cell = 1, self%numcells
@@ -145,11 +145,11 @@ contains
           atom_count = atom_count + 1
 
           self%pcell_atom_label(atom_count) = atom
-          
+
           do a = 1, 3
              uc_dof_count = uc_dof_count + 1
              sc_dof_count = sc_dof_count + 1
-             
+
              self%pcell_atom_dof(sc_dof_count) = uc_dof_count
 
              self%dimp_cell_pos_intvec(:, sc_dof_count) = self%cell_pos_intvec(:, cell)
@@ -163,7 +163,7 @@ contains
        if(self%mass_defect) write(*,"(A)") 'On-site mass-defect scattering will be used.'
     end if
   end subroutine initialize
-  
+
   pure real(r64) function distance_from_origin(cell_intvec, scell, lattvecs)
     !! Function to calculate the minimum distance (nm) of a vector measured from
     !! the origin of a supercell.
@@ -174,7 +174,7 @@ contains
     !Local variables
     real(r64) :: distance_from_origins(5**3), supercell_lattvecs(3, 3)
     integer(i64) :: i, j, k, count
-    
+
     !Calculate supercell lattice vectors
     do i = 1, 3
        supercell_lattvecs(:, i) = scell(i)*lattvecs(:, i)
@@ -191,7 +191,7 @@ contains
           end do
        end do
     end do
-    
+
     !Return the minimum distance
     distance_from_origin = minval(distance_from_origins)
   end function distance_from_origin
@@ -202,7 +202,7 @@ contains
     type(phonon), intent(in) :: ph
     type(crystal), intent(in) :: crys
     real(r64), allocatable, intent(out) :: scatt_rates(:, :)
-  
+
     integer(i64) :: host, ik, i, j, dopant
     real(r64) :: def_frac
     real(r64), allocatable :: renorm_ens(:, :), lineshifts(:, :)
@@ -268,7 +268,7 @@ contains
     !call write2file_rank2_real(ph%prefix // '.ens_renorm_ibz_'//ph%prefix//'defect', renorm_ens)
     call write2file_rank2_real(ph%prefix // '.ens_renorm_ibz_'//ph%prefix//'iso', renorm_ens)
   end subroutine calculate_phonon_Tmatrix
-  
+
   !subroutine calculate_phonon_Tmatrix_host(self, ph, crys, host, diagT, V_mass)
   subroutine calculate_phonon_Tmatrix_host(self, ph, crys, diagT, V_mass)
     !! Parallel calculator of the scattering T-matrix for phonons for a given approximation.
@@ -302,7 +302,7 @@ contains
 
     !Number of irreducible phonon states
     numstates_irred = ph%nwv_irred*ph%numbands
-    
+
     allocate(T_onsite(num_dof_def, num_dof_def, numstates_irred))
     allocate(V(num_dof_def, num_dof_def))
     T_onsite = 0.0_r64
@@ -318,7 +318,7 @@ contains
 
     !Divide phonon states among images
     call distribute_points(numstates_irred, chunk, start, end, num_active_images)
-    
+
     !Only work with the active images
     if(this_image() <= num_active_images) then
        do istate = start, end
@@ -343,7 +343,7 @@ contains
                 end do
              end do
           end do
-         
+
           select case(self%approx)
           case('lowest order')
              ! Lowest order:
@@ -389,15 +389,15 @@ contains
     sync all
     call co_sum(T_onsite)
     sync all
-    
+
     !Release some memory
     deallocate(V, identity)
     if(allocated(inv_one_minus_VD0)) deallocate(inv_one_minus_VD0)
-    
+
     !Calculate diagonal T in reciprocal space.
     allocate(phi(num_dof_def))
     diagT = 0.0_r64
-    
+
     !Optical theorem
     ! Only work with the active images
     if(this_image() <= num_active_images) then
@@ -420,7 +420,7 @@ contains
           diagT(iq, s) = dot_product(phi, matmul(T_onsite(:, :, istate), phi))
        end do
     end if
-    
+
     !Reduce diagT
     sync all
     call co_sum(diagT)

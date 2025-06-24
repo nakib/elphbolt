@@ -22,7 +22,7 @@ module delta
   use wannier_module, only: wannier
   use misc, only: exit_with_message, print_message, demux_vector, mux_vector, &
        binsearch, sort
-  
+
   implicit none
 
   private
@@ -34,30 +34,30 @@ module delta
   abstract interface
      pure real(r64) function delta_fn(e, ik, ib, mesh, map, count, evals)
        import r64, i64
-       
+
        real(r64), intent(in) :: e
        integer(i64), intent(in) :: ik, ib
        integer(i64), intent(in) :: mesh(3), map(:,:,:), count(:)
        real(r64), intent(in) :: evals(:,:,:)
      end function delta_fn
   end interface
-  
+
 contains
 
   pure function get_delta_fn_pointer(tetrahedra) result(ptr)
     !! Return pointer to either tetrahedra or tringular delta
     !! function evaulator.
-    
+
     logical, intent(in) :: tetrahedra
     procedure(delta_fn), pointer :: ptr
-    
+
     if(tetrahedra) then
        ptr => delta_fn_tetra
     else
        ptr => delta_fn_triang
-    end if    
+    end if
   end function get_delta_fn_pointer
-  
+
   pure real(r64) function delta_fn_tetra(e, ik, ib, mesh, tetramap, tetracount, tetra_evals)
     !! Calculate delta function using the tetraheron method.
     !!
@@ -70,7 +70,7 @@ contains
     !! tetra_evals Tetrahedra populated with the eigenvalues
 
     !$acc routine seq
-    
+
     real(r64), intent(in) :: e
     integer(i64), intent(in) :: ik, ib
     integer(i64), intent(in) :: mesh(3), tetramap(:,:,:), tetracount(:)
@@ -87,10 +87,10 @@ contains
 
     !Total number of tetrahedra in the system
     numtetra = product(mesh)*6
-    
+
     !Grab number of tetrahedra in which wave vector belongs
     num = tetracount(ik)
-    
+
     do itk = 1, num !Run over tetrahedra
        it = tetramap(1, ik, itk) !Grab tetrahedron
        iv = tetramap(2, ik, itk) !Grab vertex
@@ -219,7 +219,7 @@ contains
     end do !itk
 
     if(delta_fn_tetra < 1.0e-12_r64) delta_fn_tetra = 0.0_r64
-    
+
     !Normalize with the total number of tetrahedra
     delta_fn_tetra = delta_fn_tetra/numtetra
   end function delta_fn_tetra
@@ -296,7 +296,7 @@ contains
 
        logabs_ee3 = 0.0_r64
        if(ee3 /= 0.0_r64) logabs_ee3 = log(abs(ee3))
-       
+
 
        !Evaluate the seven cases
        c1 = e0 < e1 .and. e1 < e2 .and. e2 < e3
@@ -407,7 +407,7 @@ contains
                 tmp = eval_Eq9_5_144()
              end if
           end select
-       
+
           if(e0 == e1 .and. e1 == e2 .and. e2 == e3) tmp = 0.25_r64/ee0
 
           real_tetra = real_tetra + tmp
@@ -490,7 +490,7 @@ contains
            + (ee0**2 - 0.5_r64*ee0*e01 + e01**2/3.0_r64)/e01**3
     end function eval_Eq9_5_144
   end function real_tetra
-  
+
   subroutine form_tetrahedra_3d(nk, mesh, tetra, tetracount, tetramap, &
        blocks, indexlist)
     !! Form all the tetrahedra of a 3d FBZ mesh.
@@ -590,17 +590,17 @@ contains
 
              if(blocks) then
              end if
-             
+
              if(blocks) then !In general, non-contiguous sectors of BZ
                 !Binary search in indexlist
                 call binsearch(indexlist, aux, tmp)
-                
+
                 !Keep track of vertices whose eigenvalues lie outside the chosen Fermi window
                 !by saving the index as a negative number.
                 if(tmp < 0) then
                    !If vertex is outside Fermi window, save negative index
                    tetra(count, tl) = -aux
-                   
+
                 else
                    !Save the index from indexlist
                    tetra(count, tl) = tmp
@@ -609,7 +609,7 @@ contains
                 !Save the multiplexed index
                 tetra(count, tl) = aux
              end if
-             
+
              if(tmp > 0) then
                 !Save the mapping of a wave vector index to a (tetrahedron, vertex)
                 tetracount(tmp) = tetracount(tmp) + 1
@@ -662,7 +662,7 @@ contains
              ! Vertex outside Fermi window, calculate eigenvalues on-the-fly
              call demux_vector(-aux, k_intvec, wvmesh, 1_i64)
              k_frac(1, :) = real(k_intvec, r64)/wvmesh
-             
+
              call wann%el_wann(crys, 1_i64, k_frac, energies, scissor = scissor)
 
              tetra_evals(it, :, iv) = energies(1, :)
@@ -820,7 +820,7 @@ contains
     !Allocations
     allocate(triang_evals(numtriangs, numbands, 3))
     if(present(wann)) allocate(energies(1, numbands))
-    
+
     do it = 1, numtriangs !Run over triangles
        do iv = 1, 3 !Run over vertices
           aux = triang(it, iv)
@@ -859,7 +859,7 @@ contains
     !! triang_evals Triangles populated with the eigenvalues
 
     !$acc routine seq
-    
+
     real(r64), intent(in) :: e
     integer(i64), intent(in) :: ik, ib
     integer(i64), intent(in) :: mesh(3), triangmap(:,:,:), triangcount(:)
@@ -875,10 +875,10 @@ contains
 
     !Total number of triangles in the system
     numtriangs = product(mesh)*2
-    
+
     !Grab number of triangles in which wave vector belongs
     num = triangcount(ik)
-    
+
     do itk = 1, num !Run over triangles
        it = triangmap(1, ik, itk) !Grab triangle
        iv = triangmap(2, ik, itk) !Grab vertex
@@ -897,7 +897,7 @@ contains
        tmp = 0.0_r64
 
        if(c1 .or. c4) cycle
-       
+
        !Define Eij
        ! Note that at this stage the quantities below might
        ! be ill defined due to degeneracies. But the conditionals
@@ -908,7 +908,7 @@ contains
        E31 = (e - e1)/(e3 - e1)
        E23 = (e - e3)/(e2 - e3)
        E32 = (e - e2)/(e3 - e2)
-              
+
        select case(iv)
        case(1)
           if(c2) then
@@ -934,7 +934,7 @@ contains
     end do !itk
 
     if(delta_fn_triang < 1.0e-12_r64) delta_fn_triang = 0.0_r64
-        
+
     !Normalize with the total number of triangles
     delta_fn_triang = delta_fn_triang/numtriangs
   end function delta_fn_triang

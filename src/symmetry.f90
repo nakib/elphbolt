@@ -25,16 +25,16 @@ module symmetry_module
 
   use iso_c_binding
   use spglib_f08, only: SpglibDataset, spg_get_dataset
-  
+
   implicit none
-  
+
   private
   public symmetry, find_equiv_map, find_irred_wedge, create_fbz2ibz_map, &
        fbz2ibz, symmetrize_3x3_tensor, symmetrize_3x3_tensor_noTR
-  
+
   type symmetry
      !! Data and procedure related to symmetries.
-     
+
      integer(i64) :: nsymm
      !! Number of spacegroup symmetries.
      integer(i64) :: nsymm_rot
@@ -58,9 +58,9 @@ module symmetry_module
    contains
 
      procedure :: calculate_symmetries
-     
+
   end type symmetry
-    
+
 contains
 
   subroutine calculate_symmetries(self, crys, mesh)
@@ -86,17 +86,17 @@ contains
 
     !External procedures
     external :: dgesv
-    
+
     call subtitle("Analyzing symmetry...")
-    
+
     !Number of points in wave vector mesh
     nq = product(mesh)
-    
+
     numatoms_cint = crys%numatoms
     atomtypes_cint = crys%atomtypes
     symdataset = spg_get_dataset(transpose(crys%lattvecs), crys%basis, &
          atomtypes_cint, numatoms_cint, 1.0e-5_r64)
-    
+
     !Grab subset of symmetry info from spglib data set
     ! Number of symmetry operations
     self%nsymm = symdataset%n_operations
@@ -124,7 +124,7 @@ contains
     ! Set the international symbol
     self%international = trim(adjustl(symdataset%international_symbol))
     !!
-        
+
     if(this_image() == 1) then
        write(*, "(A, A)") "Crystal symmetry group = ", self%international
        write(*, "(A, I3)") "Spacegroup number = ", symdataset%spacegroup_number
@@ -133,7 +133,7 @@ contains
 
     !Set symmetry operations in Cartesian basis.
     ctranslations = matmul(crys%lattvecs, translations)
-    
+
     do i = 1, self%nsymm
        tmp1 = transpose(crys%lattvecs)
        tmp2 = transpose(matmul(crys%lattvecs, self%rotations_orig(:, :, i)))
@@ -142,7 +142,7 @@ contains
     end do
     self%crotations(:, :, 1:self%nsymm) = self%crotations_orig
     !!
-    
+
     !Transform the rotation matrices to the reciprocal-space basis.
     do i = 1, self%nsymm
        tmp1 = matmul(transpose(crys%lattvecs), crys%lattvecs)
@@ -242,7 +242,7 @@ contains
     integer(i64) :: i, isym, ivec(3), base
     real(r64) :: vec(3), vec_star(3, nsymm_rot), dnrm2
     integer(i64), allocatable :: start[:], end[:], equiv_map_chunk(:,:)[:]
-    
+
     if(present(indexlist)) then
        nmesh = size(indexlist)
     else
@@ -261,13 +261,13 @@ contains
 
     !Allocate start and end coarrays
     allocate(start[*], end[*])
-    
+
     !Divide wave vectors among images
     call distribute_points(nmesh, chunk, start, end, num_active_images)
-    
+
     !Allocate small work variable chunk for each image
     allocate(equiv_map_chunk(nsymm_rot, chunk)[*])
-    
+
     !Only work with the active images
     if(this_image() <= num_active_images) then
        counter = 0
@@ -287,7 +287,7 @@ contains
           end do
        end do
     end if
-    
+
     !Gather equiv_map_chunks in equiv_map and broadcast to all
     sync all
     if(this_image() == 1) then
@@ -449,7 +449,7 @@ contains
        wavevecs_irred(i,:) = dble(ijk)/mesh !wave vectors in crystal coordinates
     end do
   end subroutine find_irred_wedge
-  
+
   function fbz2ibz(iwvmux,nwv_irred,nequiv,ibz2fbz_map)
     !! Find index in IBZ blocks list for a given FBZ blocks muxed vector index
 
@@ -492,7 +492,7 @@ contains
        fbz2ibz_map(iwv) = fbz2ibz(indexlist(iwv),nwv_irred,nequiv,ibz2fbz_map)
     end do
   end subroutine create_fbz2ibz_map
-  
+
   subroutine symmetrize_3x3_tensor(tensor, crotations)
     !! Symmetrize a 3x3 tensor.
 
@@ -502,13 +502,13 @@ contains
     real(r64) :: aux(3,3)
 
     nrots = size(crotations(1, 1, :))
-    
+
     aux(:,:) = 0.0_r64
     do irot = 1, nrots
        aux(:,:) = aux(:,:) + matmul(crotations(:, :, irot),&
             matmul(tensor, transpose(crotations(:, :, irot))))
     end do
-    
+
     tensor(:,:) = aux(:,:)/nrots
   end subroutine symmetrize_3x3_tensor
 
@@ -523,13 +523,13 @@ contains
     real(r64) :: aux(3,3)
 
     nrots = size(crotations(1, 1, :))/2
-       
+
     aux = 0.0_r64
     do irot = 1, nrots
        aux(:, :) = aux(:, :) + matmul(crotations(:, :, irot),&
             matmul(tensor, transpose(crotations(:, :, irot))))
     end do
-    
+
     !Symmetrize along z:
     tensor(3, 1:2) = aux(3, 1:2)/nrots
     tensor(1:2, 3) = aux(1:2, 3)/nrots

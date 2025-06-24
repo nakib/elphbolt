@@ -2,14 +2,14 @@ module vector_allreps_module
 
   use precision, only: i64, r64
   use misc, only: mux_vector, demux_vector, operator(.umklapp.)
-  
+
   implicit none
 
   private
   public :: vector_allreps, &
        vector_allreps_add, vector_allreps_sub, &
        vector_allreps_change_grid, vector_allreps_print
-  
+
   type vector_allreps
      !! A container for a (3-)vector and relevant arithmetic operations.
      !! It is convenient to use under certain circumstances, for example,
@@ -21,7 +21,7 @@ module vector_allreps_module
      real(r64) :: frac(3) = 0.0
      !Cartesian coordinates
      real(r64) :: cart(3) = 0.0
-     
+
      !Grid dependent representations:
      !0-based integer triplet with respect to a discretized grid
      integer(i64) :: int(3) = 0
@@ -34,7 +34,7 @@ module vector_allreps_module
   end interface vector_allreps
 
 contains
-  
+
   function create(ind, grid, primitive_vecs) result(vector_obj)
     integer(i64), intent(in) :: ind, grid(3)
     real(r64), intent(in) :: primitive_vecs(3, 3)
@@ -43,20 +43,20 @@ contains
     !vector_obj%grid = grid
 
     !vector_obj%primitive_vecs = primitive_vecs
-    
+
     vector_obj%muxed_index = ind
 
     call demux_vector(ind, vector_obj%int, &
          grid, 0_i64)
-    
+
     vector_obj%frac = dble(vector_obj%int)/grid
-    
+
     vector_obj%cart = matmul(primitive_vecs, vector_obj%frac)
   end function create
 
   subroutine vector_allreps_print(v)
     !! Printer
-    
+
     type(vector_allreps), intent(in) :: v
 
     print*, v%muxed_index
@@ -67,7 +67,7 @@ contains
 
   pure function vector_allreps_add(v1, v2, grid, primitive_vecs) result(v3)
     !! Adder
-    
+
     type(vector_allreps), intent(in) :: v1
     type(vector_allreps), intent(in) :: v2
     integer(i64), intent(in) :: grid(3)
@@ -85,7 +85,7 @@ contains
 
   pure function vector_allreps_sub(v1, v2, grid, primitive_vecs) result(v3)
     !! Subtracter
-    
+
     type(vector_allreps), intent(in) :: v1
     type(vector_allreps), intent(in) :: v2
     integer(i64), intent(in) :: grid(3)
