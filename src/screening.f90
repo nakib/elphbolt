@@ -55,7 +55,7 @@ contains
        !Free-electron gas Thomas-Fermi model
        ! qTF**2 = spindeg*e^2*beta/nptq/vol_pcell/perm0*Sum_{BZ}f0_{k}(1-f0_{k})
        crys%qTF = sqrt(1.0e9_r64*crys%qTF*el%spindeg*beta*qe**2/product(el%wvmesh)&
-            /crys%volume/crys%thickness/perm0) !nm^-1
+            /crys%volume/perm0) !nm^-1
 
        if(this_image() == 1) then
           write(*, "(A, 1E16.8, A)") ' Thomas-Fermi screening wave vector = ', crys%qTF, ' 1/nm'
@@ -65,7 +65,7 @@ contains
 
   subroutine spectral_head_polarizability_3d_q(spec_eps, Omegas, qvec, &
        el, crys, tetrahedra)
-    !! Spectral head of the bare polarizability of the 2d or 3d Kohn-Sham system using
+    !! Spectral head of the bare polarizability of the 3d Kohn-Sham system using
     !! Eq. 16 of Shishkin and Kresse Phys. Rev. B 74, 035101 (2006).
     !!
     !! Here we calculate the diagonal in G-G' space. Moreover,
@@ -91,8 +91,8 @@ contains
     complex(r64) :: el_evecs_kp(1, el%numbands, el%numbands)
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
     type(vec) :: kvec, kpvec
-    real(r64) :: dOmega, norm
-    
+    real(r64) :: dOmega
+ 
     nOmegas = size(Omegas)
 
     dOmega = Omegas(2) - Omegas(1)
@@ -100,13 +100,7 @@ contains
     allocate(spec_eps(nOmegas))
 
     !Associate delta function procedure pointer
-    if (crys%twod) then
-       delta_fn_ptr => get_delta_fn_pointer(tetrahedra = .false.)
-       norm = crys%volume/crys%thickness   ! normalisation by cell area 
-    else
-       delta_fn_ptr => get_delta_fn_pointer(tetrahedra)
-       norm = crys%volume                  ! normalisation by cell volume
-    end if
+    delta_fn_ptr => get_delta_fn_pointer(tetrahedra)
 
     spec_eps = 0.0
     !Below, we will sum over k, m, and n
@@ -158,9 +152,9 @@ contains
     do iOmega = 1, nOmegas
        !Recall that the resolvent is already normalized in the full wave vector mesh.
        !As such, the 1/product(el%wvmesh) is not needed in the expression below.
-       spec_eps(iOmega) = spec_eps(iOmega)*el%spindeg/norm
+       spec_eps(iOmega) = spec_eps(iOmega)*el%spindeg/crys%volume
     end do
-    !At this point [spec_eps] = nm^-3.eV^-1 (3D) or nm^-2.eV^-1 (2D)
+    !At this point [spec_eps] = nm^-3.eV^-1
 
     !The negative energy sector
     do iOmega = 1, nOmegas/2
