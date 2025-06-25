@@ -18,8 +18,8 @@ module misc
   !! Module containing miscellaneous math and numerics related functions and subroutines.
 
   use precision, only: r128, r64, i64
-  use params, only: kB, twopi, pi
-  use fftw3
+  use params, only: kB, twopi, pi, oneI
+  use fftpack, only: fft, ifft
   
   implicit none
 
@@ -1905,49 +1905,42 @@ contains
 
   subroutine Hilbert_transform(fx, Hfx)
     !! Hilbert transform, H(f(w)) = IFFT(-i.sgn(t).FFT(f(w)))
+    !!
     !! fx is the function 
     !! Hfx is the Hilbert transform of the function
-    !! 
 
     real(r64), intent(out) :: Hfx(:)
     real(r64), intent(in) :: fx(:)
 
-    integer :: i, N
-    complex(r64), allocatable :: x_fft(:), x_hilbert(:), fx_c(:), Hfx_c(:)
-    complex(r64) :: h_filter
-    type(c_ptr) :: plan_fwd, plan_bwd 
+    integer :: i, N, N_mid, n_pad
+    complex(r64), allocatable :: fx_c(:), ft_c(:), Hfx_c(:)
 
     N = size(fx)
+    n_pad = 100
+    !N_mid = int(N/2) + n_pad
+    N_mid = int(N/2)
 
     ! allocate all the arrays
-    allocate(x_fft(N), x_hilbert(N), fx_c(N), Hfx_c(N))
+    !allocate(fx_c(1:N + 2*n_pad), ft_c(N + 2*n_pad), Hfx_c(N + 2*n_pad))
+    allocate(fx_c(N), ft_c(N), Hfx_c(N))
 
-    !complexify
-    fx_c = fx
+    fx_c = 0.0
+    !fx_c(n_pad + 1: n_pad + N) = cmplx(fx)
+    fx_c = cmplx(fx)
 
-    ! create plans
-    plan_fwd = fftw_plan_dft_1d(N, fx_c, x_fft, FFTW_FORWARD, FFTW_ESTIMATE)
-    plan_bwd = fftw_plan_dft_1d(N, x_hilbert, Hfx_c, FFTW_BACKWARD, FFTW_ESTIMATE)
+    ! perform fft
+    ft_c = fft(fx_c)
 
-    ! Forward FFT
-    call fftw_execute_dft(plan_fwd, fx_c, x_fft)
+    ! put filter -i.sgn(t)
+    ft_c(:N_mid) = -ft_c(:N_mid)*oneI
+    ft_c(N_mid + 1:) = ft_c(N_mid + 1:)*oneI
+    !ft_c(:N_mid) = -ft_c(:N_mid)*cmplx(0.0, 1.0)
+    !ft_c(N_mid + 1:) = ft_c(N_mid + 1:)*cmplx(0.0, 1.0)
+    if(mod(N, 2)/=0) ft_c(N_mid + 1) = 0.0
 
-    !put filter
-    x_hilbert = x_fft*cmplx(0.0_r64, 1.0_r64)
-    x_hilbert(1) = x_fft(1)*cmplx(0.0_r64, 0.0_r64)
-    do i = 2, N/2+1
-       x_hilbert(i) = x_hilbert(i)*(-1.0_r64)
-    end do
-    
-    ! inverse FFTW
-    call fftw_execute_dft(plan_bwd, x_hilbert, Hfx_c)
-
-    Hfx = real(Hfx_c)/N ! Normalize
-    
-    ! cleanup
-    call fftw_destroy_plan(plan_fwd)
-    call fftw_destroy_plan(plan_bwd)
-    call fftw_cleanup()
+    Hfx = real(ifft(ft_c))/N
+    !Hfx_c = ifft(ft_c)
+    !Hfx = real(Hfx_c(n_pad + 1: n_pad + N))/N
   end subroutine Hilbert_transform
 
   pure function interpolator_1d(samp, cont, f_cont) result(f_samp)
