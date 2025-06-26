@@ -313,8 +313,9 @@ contains
 
     allocate(spec_eps(nOmegas))
 
-    !Associate delta function procedure pointer
-    delta_fn_ptr => get_delta_fn_pointer(tetrahedra)
+    !Associate delta function procedure pointer ! 2D
+    delta_fn_ptr => get_delta_fn_pointer(tetrahedra = .false.)
+    !delta_fn_ptr => get_delta_fn_pointer(tetrahedra)
 
     spec_eps = 0.0
     do ik = 1, el%nwv
@@ -345,13 +346,17 @@ contains
                 !This is |U(k')U^\dagger(k)|_nm squared
                 !(Recall that U^\dagger(k) is the diagonalizer of the electronic hamiltonian.)
                 overlap = (abs(dot_product(el_evecs_kp(1, n, :), el%evecs(ik, m, :))))**2
+                !overlap = 1.0_r64
+                ! np and n
+                !no = sign(1, n - el%indlowconduction)
+                !npo = sign(1, el%indlowconduction - m)
 
-!!$                spec_eps(iOmega) = spec_eps(iOmega) + &
-!!$                     (Fermi(ek, el%chempot, crys%T) - &
-!!$                     Fermi(ekp, el%chempot, crys%T))*overlap* &
-!!$                     delta_fn_ptr(ekp - Omegas(iOmega), ik, m, &
-!!$                     el%wvmesh, el%simplex_map, &
-!!$                     el%simplex_count, el%simplex_evals)
+!$!                 spec_eps(iOmega) = spec_eps(iOmega) + &
+!$!                      (Fermi(ek, el%chempot, crys%T) - &
+!$!                      Fermi(ekp, el%chempot, crys%T))*overlap* &
+!$!                      delta_fn_ptr(ekp - Omegas(iOmega), ik, m, &
+!$!                      el%wvmesh, el%simplex_map, &
+!$!                      el%simplex_count, el%simplex_evals)
 
 !!$                spec_eps(iOmega) = spec_eps(iOmega) + &
 !!$                     (Fermi(ek, el%chempot, crys%T) - &
