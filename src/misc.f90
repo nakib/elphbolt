@@ -1903,44 +1903,121 @@ contains
   !   end do
   ! end subroutine Hilbert_transform
 
+!$!   subroutine Hilbert_transform(fx, Hfx)
+!$!     !! Hilbert transform, H(f(w)) = IFFT(-i.sgn(t).FFT(f(w)))
+!$!     !!
+!$!     !! fx is the function 
+!$!     !! Hfx is the Hilbert transform of the function
+!$! 
+!$!     real(r64), intent(out) :: Hfx(:)
+!$!     real(r64), intent(in) :: fx(:)
+!$! 
+!$!     integer :: i, N, N_mid, n_pad
+!$!     complex(r64), allocatable :: fx_c(:), ft_c(:), Hfx_c(:)
+!$! 
+!$!     N = size(fx)
+!$!     n_pad = 100
+!$!     !N_mid = int(N/2) + n_pad
+!$!     N_mid = int(N/2)
+!$! 
+!$!     ! allocate all the arrays
+!$!     !allocate(fx_c(1:N + 2*n_pad), ft_c(N + 2*n_pad), Hfx_c(N + 2*n_pad))
+!$!     allocate(fx_c(N), ft_c(N), Hfx_c(N))
+!$! 
+!$!     fx_c = 0.0
+!$!     !fx_c(n_pad + 1: n_pad + N) = cmplx(fx)
+!$!     fx_c = cmplx(fx)
+!$! 
+!$!     ! perform fft
+!$!     ft_c = fft(fx_c)
+!$! 
+!$!     ! put filter -i.sgn(t)
+!$!     ft_c(:N_mid) = -ft_c(:N_mid)*oneI
+!$!     ft_c(N_mid + 1:) = ft_c(N_mid + 1:)*oneI
+!$!     !ft_c(:N_mid) = -ft_c(:N_mid)*cmplx(0.0, 1.0)
+!$!     !ft_c(N_mid + 1:) = ft_c(N_mid + 1:)*cmplx(0.0, 1.0)
+!$!     if(mod(N, 2)/=0) ft_c(N_mid + 1) = 0.0
+!$! 
+!$!     Hfx = real(ifft(ft_c))/N
+!$!     !Hfx_c = ifft(ft_c)
+!$!     !Hfx = real(Hfx_c(n_pad + 1: n_pad + N))/N
+!$!   end subroutine Hilbert_transform
+
+!$!   subroutine Hilbert_transform(fx, Hfx)
+!$!     !! Hilbert transform, H(f(w)) = IFFT(-i.sgn(t).FFT(f(w)))
+!$!     !!
+!$!     !! fx is the function 
+!$!     !! Hfx is the Hilbert transform of the function
+!$! 
+!$!     real(r64), intent(out) :: Hfx(:)
+!$!     real(r64), intent(in) :: fx(:)
+!$! 
+!$!     integer :: i, N, npt, nmid
+!$!     complex(r64), allocatable :: fx_c(:), ft_c(:)
+!$! 
+!$!     N = size(fx)
+!$! 
+!$!     npt = 2**(int(log(real(N))/log(2.0)) + 1)
+!$!     ! allocate all the arrays
+!$!     allocate(fx_c(npt), ft_c(npt))
+!$! 
+!$!     fx_c = (0.0_r64, 0.0_r64)
+!$!     fx_c(1:N) = cmplx(fx(1:N), 0.0_r64)
+!$! 
+!$!     ! perform fft
+!$!     ft_c = fft(fx_c)/npt
+!$! 
+!$!     ! put filter -i.sgn(t)
+!$!     nmid = npt/2
+!$!     ft_c(1:nmid - 1) = -ft_c(1:nmid - 1)*oneI
+!$!     ft_c(nmid) = 0.0_r64
+!$!     ft_c(nmid + 1:Npt) = ft_c(nmid + 1:npt)*oneI
+!$! 
+!$!     Hfx = real(ifft(ft_c(1:N)))
+!$!   end subroutine Hilbert_transform
+  
   subroutine Hilbert_transform(fx, Hfx)
-    !! Hilbert transform, H(f(w)) = IFFT(-i.sgn(t).FFT(f(w)))
-    !!
-    !! fx is the function 
-    !! Hfx is the Hilbert transform of the function
+    !integer, intent(in)    :: nt
+    !real,    intent(inout) :: trace(nt)
 
-    real(r64), intent(out) :: Hfx(:)
     real(r64), intent(in) :: fx(:)
+    real(r64), intent(out) :: Hfx(:)
+    integer :: nt
 
-    integer :: i, N, N_mid, n_pad
-    complex(r64), allocatable :: fx_c(:), ft_c(:), Hfx_c(:)
+    complex(r64), allocatable :: C(:)
+    complex(r64), parameter :: CI = (0.0, 1.0)
+    integer :: NPT,IMID
 
-    N = size(fx)
-    n_pad = 100
-    !N_mid = int(N/2) + n_pad
-    N_mid = int(N/2)
+    nt = size(fx)
 
-    ! allocate all the arrays
-    !allocate(fx_c(1:N + 2*n_pad), ft_c(N + 2*n_pad), Hfx_c(N + 2*n_pad))
-    allocate(fx_c(N), ft_c(N), Hfx_c(N))
+    ! extend nt to a power of 2
+    IF ( nt <= 0 ) STOP 'FATAL ERROR in HILBERT: nt must be positive'
 
-    fx_c = 0.0
-    !fx_c(n_pad + 1: n_pad + N) = cmplx(fx)
-    fx_c = cmplx(fx)
+    NPT = 2**( INT( LOG10( REAL( nt ) ) / 0.30104_r64 ) + 1 )
+    ! IF ( NPT /= nt) print*,'pad trace from length ', nt, ' to ',NPT
+    IF (NPT > 16784) STOP 'FATAL ERROR in HILBERT: nt(NPT) exceeds 16784 '
 
-    ! perform fft
-    ft_c = fft(fx_c)
+    allocate(C(NPT))
+    C = (0.0_r64, 0.0_r64)
+    !C(1:nt)=cmplx(trace(1:nt),0.0)
+    C(1:nt)=cmplx(fx(1:nt),0.0_r64)
 
-    ! put filter -i.sgn(t)
-    ft_c(:N_mid) = -ft_c(:N_mid)*oneI
-    ft_c(N_mid + 1:) = ft_c(N_mid + 1:)*oneI
-    !ft_c(:N_mid) = -ft_c(:N_mid)*cmplx(0.0, 1.0)
-    !ft_c(N_mid + 1:) = ft_c(N_mid + 1:)*cmplx(0.0, 1.0)
-    if(mod(N, 2)/=0) ft_c(N_mid + 1) = 0.0
+    ! Fourier transform
+    C = fft(C)
+    ! scaling
+    C=C/NPT
 
-    Hfx = real(ifft(ft_c))/N
-    !Hfx_c = ifft(ft_c)
-    !Hfx = real(Hfx_c(n_pad + 1: n_pad + N))/N
+    !  Multiply by i * sgn( f )
+    IMID = NPT / 2
+    C( 1:IMID-1 ) = -CI * C( 1:IMID-1 )   ! pos. spectrum (-i)
+    C( IMID     ) = 0.0_r64                   ! d.c. component
+    C(IMID+1:NPT) = CI * C( IMID+1:NPT )   ! neg. spectrum (i)
+
+    ! inverse Fourier transform
+    C = ifft(C)
+
+    ! output
+    Hfx = real(C(1:nt))
   end subroutine Hilbert_transform
 
   pure function interpolator_1d(samp, cont, f_cont) result(f_samp)
