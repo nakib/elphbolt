@@ -1859,165 +1859,91 @@ contains
     if(this_image() == 1) write(*,'(A75)') string2print
   end subroutine subtitle
 
-  ! subroutine Hilbert_transform(fx, Hfx)
-  !   !! Does Hilbert tranform for a given function
-  !   !! Ref - EQ (4)3, R. Balito et. al.
-  !   !! "An algorithm for fast Hilbert transform of real functions"
-  !   !!
-  !   !! fx The input function
-  !   !! Hfx The Hilbert transform
-
-  !   real(r64), intent(in) :: fx(:)
-  !   real(r64), allocatable, intent(out) :: Hfx(:)
-
-  !   ! Local variables
-  !   integer :: n, k, nfx
-  !   real(r64) :: term2, term3, b
-
-  !   nfx = size(fx)
-  !   allocate(Hfx(nfx))
-
-  !   ! Hilbert function is zero at the edges
-  !   Hfx(1) = 0.0_r64
-  !   Hfx(nfx) = 0.0_r64
-
-  !   ! Note: In the reference, we have N + 1 points and indexing is 0-based
-  !   ! whereas here we have N points and indexing is 1-based
-  !   do k = 1, nfx - 2 ! Run over the internal points
-  !      term2 = 0.0_r64 ! 2nd term in Bilato Eq. 4
-  !      term3 = 0.0_r64 ! 3rd term in Bilato Eq. 4
-
-  !      do n = 1, nfx - 2 - k ! Partial sum over internal points
-  !         b = log((n + 1.0_r64)/n)
-  !         term2 = term2 - (1.0_r64 - (n + 1.0_r64)*b)*fx(k + n + 1) + &
-  !              (1.0_r64 - n*b)*fx(k + n + 2)
-  !      end do
-  !      
-  !      do n = 1, k - 1 ! Partial sum over internal points
-  !         b = log((n + 1.0_r64)/n)
-  !         term3 = term3 + (1.0_r64 - (n + 1.0_r64)*b)*fx(k - n + 1) - &
-  !              (1.0_r64 - n*b)*fx(k - n)
-  !      end do
-  !      
-  !      Hfx(k + 1) = -(fx(k + 2) - fx(k) + term2 + term3)/pi
-  !   end do
-  ! end subroutine Hilbert_transform
-
 !$!   subroutine Hilbert_transform(fx, Hfx)
-!$!     !! Hilbert transform, H(f(w)) = IFFT(-i.sgn(t).FFT(f(w)))
+!$!     !! Does Hilbert tranform for a given function
+!$!     !! Ref - EQ (4)3, R. Balito et. al.
+!$!     !! "An algorithm for fast Hilbert transform of real functions"
 !$!     !!
-!$!     !! fx is the function 
-!$!     !! Hfx is the Hilbert transform of the function
+!$!     !! fx The input function
+!$!     !! Hfx The Hilbert transform
 !$! 
-!$!     real(r64), intent(out) :: Hfx(:)
 !$!     real(r64), intent(in) :: fx(:)
+!$!     real(r64), allocatable, intent(out) :: Hfx(:)
 !$! 
-!$!     integer :: i, N, N_mid, n_pad
-!$!     complex(r64), allocatable :: fx_c(:), ft_c(:), Hfx_c(:)
+!$!     ! Local variables
+!$!     integer :: n, k, nfx
+!$!     real(r64) :: term2, term3, b
 !$! 
-!$!     N = size(fx)
-!$!     n_pad = 100
-!$!     !N_mid = int(N/2) + n_pad
-!$!     N_mid = int(N/2)
+!$!     nfx = size(fx)
+!$!     allocate(Hfx(nfx))
 !$! 
-!$!     ! allocate all the arrays
-!$!     !allocate(fx_c(1:N + 2*n_pad), ft_c(N + 2*n_pad), Hfx_c(N + 2*n_pad))
-!$!     allocate(fx_c(N), ft_c(N), Hfx_c(N))
+!$!     ! Hilbert function is zero at the edges
+!$!     Hfx(1) = 0.0_r64
+!$!     Hfx(nfx) = 0.0_r64
 !$! 
-!$!     fx_c = 0.0
-!$!     !fx_c(n_pad + 1: n_pad + N) = cmplx(fx)
-!$!     fx_c = cmplx(fx)
+!$!     ! Note: In the reference, we have N + 1 points and indexing is 0-based
+!$!     ! whereas here we have N points and indexing is 1-based
+!$!     do k = 1, nfx - 2 ! Run over the internal points
+!$!        term2 = 0.0_r64 ! 2nd term in Bilato Eq. 4
+!$!        term3 = 0.0_r64 ! 3rd term in Bilato Eq. 4
 !$! 
-!$!     ! perform fft
-!$!     ft_c = fft(fx_c)
-!$! 
-!$!     ! put filter -i.sgn(t)
-!$!     ft_c(:N_mid) = -ft_c(:N_mid)*oneI
-!$!     ft_c(N_mid + 1:) = ft_c(N_mid + 1:)*oneI
-!$!     !ft_c(:N_mid) = -ft_c(:N_mid)*cmplx(0.0, 1.0)
-!$!     !ft_c(N_mid + 1:) = ft_c(N_mid + 1:)*cmplx(0.0, 1.0)
-!$!     if(mod(N, 2)/=0) ft_c(N_mid + 1) = 0.0
-!$! 
-!$!     Hfx = real(ifft(ft_c))/N
-!$!     !Hfx_c = ifft(ft_c)
-!$!     !Hfx = real(Hfx_c(n_pad + 1: n_pad + N))/N
+!$!        do n = 1, nfx - 2 - k ! Partial sum over internal points
+!$!           b = log((n + 1.0_r64)/n)
+!$!           term2 = term2 - (1.0_r64 - (n + 1.0_r64)*b)*fx(k + n + 1) + &
+!$!                (1.0_r64 - n*b)*fx(k + n + 2)
+!$!        end do
+!$!        
+!$!        do n = 1, k - 1 ! Partial sum over internal points
+!$!           b = log((n + 1.0_r64)/n)
+!$!           term3 = term3 + (1.0_r64 - (n + 1.0_r64)*b)*fx(k - n + 1) - &
+!$!                (1.0_r64 - n*b)*fx(k - n)
+!$!        end do
+!$!        
+!$!        Hfx(k + 1) = -(fx(k + 2) - fx(k) + term2 + term3)/pi
+!$!     end do
 !$!   end subroutine Hilbert_transform
 
-!$!   subroutine Hilbert_transform(fx, Hfx)
-!$!     !! Hilbert transform, H(f(w)) = IFFT(-i.sgn(t).FFT(f(w)))
-!$!     !!
-!$!     !! fx is the function 
-!$!     !! Hfx is the Hilbert transform of the function
-!$! 
-!$!     real(r64), intent(out) :: Hfx(:)
-!$!     real(r64), intent(in) :: fx(:)
-!$! 
-!$!     integer :: i, N, npt, nmid
-!$!     complex(r64), allocatable :: fx_c(:), ft_c(:)
-!$! 
-!$!     N = size(fx)
-!$! 
-!$!     npt = 2**(int(log(real(N))/log(2.0)) + 1)
-!$!     ! allocate all the arrays
-!$!     allocate(fx_c(npt), ft_c(npt))
-!$! 
-!$!     fx_c = (0.0_r64, 0.0_r64)
-!$!     fx_c(1:N) = cmplx(fx(1:N), 0.0_r64)
-!$! 
-!$!     ! perform fft
-!$!     ft_c = fft(fx_c)/npt
-!$! 
-!$!     ! put filter -i.sgn(t)
-!$!     nmid = npt/2
-!$!     ft_c(1:nmid - 1) = -ft_c(1:nmid - 1)*oneI
-!$!     ft_c(nmid) = 0.0_r64
-!$!     ft_c(nmid + 1:Npt) = ft_c(nmid + 1:npt)*oneI
-!$! 
-!$!     Hfx = real(ifft(ft_c(1:N)))
-!$!   end subroutine Hilbert_transform
-  
   subroutine Hilbert_transform(fx, Hfx)
-    !integer, intent(in)    :: nt
-    !real,    intent(inout) :: trace(nt)
+    !! Hilbert transform, H(f(w)) = IFFT(-i.sgn(t).FFT(f(w)))
+    !!
+    !! fx is the function 
+    !! Hfx is the Hilbert transform of the function
 
     real(r64), intent(in) :: fx(:)
     real(r64), intent(out) :: Hfx(:)
     integer :: nt
 
-    complex(r64), allocatable :: C(:)
-    complex(r64), parameter :: CI = (0.0, 1.0)
-    integer :: NPT,IMID
+    complex(r64), allocatable :: fx_c(:), ffx_c(:), Hfx_c(:)
+    integer :: npt, mid
 
     nt = size(fx)
 
-    ! extend nt to a power of 2
-    IF ( nt <= 0 ) STOP 'FATAL ERROR in HILBERT: nt must be positive'
+    npt = 2**(int(log10(real(nt))/log10(2.0)) + 1)
+    
+    ! stop npt from blowing up
+    if(npt > 16784) &
+      call exit_with_message('Npts in Hilbert transform exceed 16784.')
 
-    NPT = 2**( INT( LOG10( REAL( nt ) ) / 0.30104_r64 ) + 1 )
-    ! IF ( NPT /= nt) print*,'pad trace from length ', nt, ' to ',NPT
-    IF (NPT > 16784) STOP 'FATAL ERROR in HILBERT: nt(NPT) exceeds 16784 '
-
-    allocate(C(NPT))
-    C = (0.0_r64, 0.0_r64)
-    !C(1:nt)=cmplx(trace(1:nt),0.0)
-    C(1:nt)=cmplx(fx(1:nt),0.0_r64)
+    allocate(fx_c(npt), ffx_c(npt), Hfx_c(npt))
+    fx_c = (0.0_r64, 0.0_r64)
+    fx_c(1:nt)=cmplx(fx(1:nt),0.0_r64)
 
     ! Fourier transform
-    C = fft(C)
+    ffx_c = fft(fx_c)
     ! scaling
-    C=C/NPT
+    ffx_c = ffx_c/npt
 
     !  Multiply by i * sgn( f )
-    IMID = NPT / 2
-    C( 1:IMID-1 ) = -CI * C( 1:IMID-1 )   ! pos. spectrum (-i)
-    C( IMID     ) = 0.0_r64                   ! d.c. component
-    C(IMID+1:NPT) = CI * C( IMID+1:NPT )   ! neg. spectrum (i)
+    mid = npt/2
+    ffx_c(1:mid - 1) = -oneI*ffx_c(1:mid - 1)      
+    ffx_c(mid) = 0.0_r64                      
+    ffx_c(mid + 1:npt) = oneI*ffx_c(mid + 1:npt)   
 
     ! inverse Fourier transform
-    C = ifft(C)
+    Hfx_c = ifft(ffx_c)
 
     ! output
-    Hfx = real(C(1:nt))
+    Hfx = real(Hfx_c(1:nt))
   end subroutine Hilbert_transform
 
   pure function interpolator_1d(samp, cont, f_cont) result(f_samp)
