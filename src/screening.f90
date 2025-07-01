@@ -320,6 +320,11 @@ contains
     spec_eps = 0.0
     do ik = 1, el%nwv
        kppathvecs(1, :) = el%wavevecs(ik, :).umklapp.qcrys
+       ! np and n
+       no = sign(1, n - el%indlowconduction)
+       npo = sign(1, m - el%indlowconduction)
+       overlap = 1 + no*npo*dot_product(el%wavevecs(ik, :), qcrys)/
+       
        call wann%el_wann(crys = crys, &
             nk = 1_i64, &
             kvecs = kppathvecs, &
@@ -345,11 +350,8 @@ contains
 
                 !This is |U(k')U^\dagger(k)|_nm squared
                 !(Recall that U^\dagger(k) is the diagonalizer of the electronic hamiltonian.)
-                overlap = (abs(dot_product(el_evecs_kp(1, n, :), el%evecs(ik, m, :))))**2
-                !overlap = 1.0_r64
-                ! np and n
-                !no = sign(1, n - el%indlowconduction)
-                !npo = sign(1, el%indlowconduction - m)
+                ! overlap = (abs(dot_product(el_evecs_kp(1, n, :), el%evecs(ik, m, :))))**2
+                ! overlap = 1.0_r64
 
 !$!                 spec_eps(iOmega) = spec_eps(iOmega) + &
 !$!                      (Fermi(ek, el%chempot, crys%T) - &
@@ -525,7 +527,7 @@ contains
     !end if
 
     !TEST
-    numq = el%wvmesh(1) !*10
+    numq = el%wvmesh(1)*3
     qxmesh = numq
     !Create qlist in crystal coordinates
     allocate(qlist(numq, 3), qmaglist(numq))
