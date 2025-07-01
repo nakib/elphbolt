@@ -2529,8 +2529,9 @@ contains
        !q \equiv k1 - k3
        q_vec = vec_sub(k1_vec, k3_vec, el%wvmesh, crys%reclattvecs)
 
-       !Reset screening precomputation flag
+       !Reset screening and g2 precomputation flag
        screening_computed = .false.
+       g2_computed = .false.
 
        !Run over electrons states 2, and 4, eliminating the k4 sum with the
        !delta(k1 - k3 + k2 - k4)
@@ -2545,9 +2546,6 @@ contains
           !Is k4 within the transport window restricted BZ?
           call binsearch(el%indexlist, k4_vec%muxed_index, ik4)
           if(ik4 < 0) cycle
-
-          !Reset g2 precomputation flag
-          g2_computed = .false.
 
           do n2 = 1, el%numbands
              !Electron 2 energy
