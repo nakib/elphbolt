@@ -458,46 +458,46 @@ program test_misc
   call test_array(itest)%assert(hfx2_odd(ind_odd), hfx2(x_odd(ind_odd)), &
        tol = 3e-5_r64)
 
-!$!   ! Old unit test
-!$!   xmin = -30.0
-!$!   xmax = 30.0
-!$!   n_even = 4000
-!$!   n_odd = 4001
-!$!   ! ind_even are indices to compare in case of even number of points
-!$!   ! ind_odd are indices to compare in case of odd number of points
-!$!   allocate(ind_even(6),ind_odd(5))
-!$!   ind_even = [801, 1201, 1601, 2001, 2401, 2801]
-!$!   ind_odd = [889, 1333, 1777, 2221, 2665]
-!$! 
-!$!   itest = itest + 1
-!$!   test_array(itest) = testify("Hilbert transform: f(x) = 1/(1 + x^2), even points")
-!$!   allocate(x_even(n_even), hfx1_even(n_even))
-!$!   call linspace(x_even, xmin, xmax, n_even)
-!$!   call Hilbert_transform(fx1(x_even), hfx1_even)
-!$!   call test_array(itest)%assert(hfx1_even(ind_even), hfx1(x_even(ind_even)), &
-!$!        tol = 2e-4_r64)
-!$! 
-!$!   itest = itest + 1
-!$!   test_array(itest) = testify("Hilbert transform: f(x) = sin(x)/(1 + x^2), even points")
-!$!   allocate(hfx2_even(n_even))
-!$!   call Hilbert_transform(fx2(x_even), hfx2_even)
-!$!   call test_array(itest)%assert(hfx2_even(ind_even), hfx2(x_even(ind_even)), &
-!$!        tol = 1e-4_r64)
-!$! 
-!$!   itest = itest + 1
-!$!   test_array(itest) = testify("Hilbert transform: f(x) = 1/(1 + x^2), odd points")
-!$!   allocate(x_odd(n_odd), hfx1_odd(n_odd))
-!$!   call linspace(x_odd, xmin, xmax, n_odd)
-!$!   call Hilbert_transform(fx1(x_odd), hfx1_odd)
-!$!   call test_array(itest)%assert(hfx1_odd(ind_odd), hfx1(x_odd(ind_odd)), &
-!$!        tol = 4e-4_r64)
-!$! 
-!$!   itest = itest + 1
-!$!   test_array(itest) = testify("Hilbert transform: f(x) = sin(x)/(1 + x^2), odd points")
-!$!   allocate(hfx2_odd(n_odd))
-!$!   call Hilbert_transform(fx2(x_odd), hfx2_odd)
-!$!   call test_array(itest)%assert(hfx2_odd(ind_odd), hfx2(x_odd(ind_odd)), &
-!$!        tol = 1e-5_r64)
+  !$!   ! Old unit test
+  !$!   xmin = -30.0
+  !$!   xmax = 30.0
+  !$!   n_even = 4000
+  !$!   n_odd = 4001
+  !$!   ! ind_even are indices to compare in case of even number of points
+  !$!   ! ind_odd are indices to compare in case of odd number of points
+  !$!   allocate(ind_even(6),ind_odd(5))
+  !$!   ind_even = [801, 1201, 1601, 2001, 2401, 2801]
+  !$!   ind_odd = [889, 1333, 1777, 2221, 2665]
+  !$! 
+  !$!   itest = itest + 1
+  !$!   test_array(itest) = testify("Hilbert transform: f(x) = 1/(1 + x^2), even points")
+  !$!   allocate(x_even(n_even), hfx1_even(n_even))
+  !$!   call linspace(x_even, xmin, xmax, n_even)
+  !$!   call Hilbert_transform(fx1(x_even), hfx1_even)
+  !$!   call test_array(itest)%assert(hfx1_even(ind_even), hfx1(x_even(ind_even)), &
+  !$!        tol = 2e-4_r64)
+  !$! 
+  !$!   itest = itest + 1
+  !$!   test_array(itest) = testify("Hilbert transform: f(x) = sin(x)/(1 + x^2), even points")
+  !$!   allocate(hfx2_even(n_even))
+  !$!   call Hilbert_transform(fx2(x_even), hfx2_even)
+  !$!   call test_array(itest)%assert(hfx2_even(ind_even), hfx2(x_even(ind_even)), &
+  !$!        tol = 1e-4_r64)
+  !$! 
+  !$!   itest = itest + 1
+  !$!   test_array(itest) = testify("Hilbert transform: f(x) = 1/(1 + x^2), odd points")
+  !$!   allocate(x_odd(n_odd), hfx1_odd(n_odd))
+  !$!   call linspace(x_odd, xmin, xmax, n_odd)
+  !$!   call Hilbert_transform(fx1(x_odd), hfx1_odd)
+  !$!   call test_array(itest)%assert(hfx1_odd(ind_odd), hfx1(x_odd(ind_odd)), &
+  !$!        tol = 4e-4_r64)
+  !$! 
+  !$!   itest = itest + 1
+  !$!   test_array(itest) = testify("Hilbert transform: f(x) = sin(x)/(1 + x^2), odd points")
+  !$!   allocate(hfx2_odd(n_odd))
+  !$!   call Hilbert_transform(fx2(x_odd), hfx2_odd)
+  !$!   call test_array(itest)%assert(hfx2_odd(ind_odd), hfx2(x_odd(ind_odd)), &
+  !$!        tol = 1e-5_r64)
 
   ! 1D Interpolation
   itest = itest + 1
@@ -513,17 +513,17 @@ program test_misc
 
 contains
   ! Some reference functions and their Hilbert transforms:
-!$!   pure elemental real(r64) function fx1(x)  ! Old
-!$!     real(r64), intent(in) :: x
-!$! 
-!$!     fx1 = 1/(1.0_r64 + x**2)
-!$!   end function fx1
-!$! 
-!$!   pure elemental real(r64) function hfx1(x)
-!$!     real(r64), intent(in) :: x
-!$! 
-!$!     hfx1 = x/(1.0_r64 + x**2)
-!$!   end function hfx1
+  !$!   pure elemental real(r64) function fx1(x)  ! Old
+  !$!     real(r64), intent(in) :: x
+  !$! 
+  !$!     fx1 = 1/(1.0_r64 + x**2)
+  !$!   end function fx1
+  !$! 
+  !$!   pure elemental real(r64) function hfx1(x)
+  !$!     real(r64), intent(in) :: x
+  !$! 
+  !$!     hfx1 = x/(1.0_r64 + x**2)
+  !$!   end function hfx1
 
   pure elemental real(r64) function fx1(x)
     real(r64), intent(in) :: x

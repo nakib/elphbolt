@@ -92,7 +92,7 @@ contains
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
     type(vec) :: kvec, kpvec
     real(r64) :: dOmega
- 
+
     nOmegas = size(Omegas)
 
     dOmega = Omegas(2) - Omegas(1)

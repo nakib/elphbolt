@@ -227,7 +227,7 @@ contains
     gCoul2_RPA = W_qw_msq*prefac**2*overlap/crys%volume**2 ! eV^2 
   end function gCoul2_RPA
 
-  
+
   pure real(r64) function Vm2_3ph(ev1_s1, ev2_s2, ev3_s3, &
        Index_i, Index_j, Index_k, ifc3, phases_q2q3, ntrip, nb)
     !! Function to calculate the squared 3-ph interaction vertex |V-|^2.
