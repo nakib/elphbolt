@@ -303,7 +303,7 @@ contains
     logical, intent(in) :: tetrahedra
 
     !Locals
-    integer(i64) :: m, n, ik, iOmega, nOmegas, k_indvec(3), kp_indvec(3)
+    integer(i64) :: m, n, ik, iOmega, nOmegas, k_indvec(3), kp_indvec(3), no, npo
     real(r64) :: overlap, ek, ekp, delta, Omega_l, Omega_r, &
          el_ens_kp(1, el%numbands), kppathvecs(1, 3)
     complex(r64) :: el_evecs_kp(1, el%numbands, el%numbands)
@@ -321,9 +321,10 @@ contains
     do ik = 1, el%nwv
        kppathvecs(1, :) = el%wavevecs(ik, :).umklapp.qcrys
        ! np and n
-       no = sign(1, n - el%indlowconduction)
-       npo = sign(1, m - el%indlowconduction)
-       overlap = 1 + no*npo*dot_product(el%wavevecs(ik, :), qcrys)/
+       no = sign(1_i64, n - el%indlowconduction)
+       npo = sign(1_i64, m - el%indlowconduction)
+       overlap = 1 + no*npo*dot_product(el%wavevecs(ik, :), kppathvecs(1, :))&
+                           /twonorm(el%wavevecs(ik, :))/twonorm(kppathvecs(1, :))
        
        call wann%el_wann(crys = crys, &
             nk = 1_i64, &
