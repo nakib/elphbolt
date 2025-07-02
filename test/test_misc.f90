@@ -8,12 +8,13 @@ program test_misc
        unique, linspace, compsimps, mux_state, demux_state, demux_mesh, expm1, &
        Fermi, Bose, Pade_continued, precompute_interpolation_corners_and_weights, &
        interpolate_using_precomputed, operator(.umklapp.), shrink, Hilbert_transform, &
-       interpolator_1d, permutations, lex_less_2d, lex_less_1d, map_triplet_full_to_reduced
+       fft_next_pow2, interpolator_1d, permutations, lex_less_2d, lex_less_1d, &
+       map_triplet_full_to_reduced
 
   implicit none
 
   integer :: itest
-  integer, parameter :: num_tests = 42
+  integer, parameter :: num_tests = 43
   type(testify) :: test_array(num_tests), tests_all
   integer(i64) :: index, quotient, remainder, int_array(5), v1(3), v2(3), &
        v1_muxed, v2_muxed, ik, ik1, ik2, ik3, ib1, ib2, ib3, wvmesh(3), &
@@ -411,6 +412,11 @@ program test_misc
   call shrink(array_of_reals, 2_i64)
   call test_array(itest)%assert(array_of_reals, [1, 2]*1.0_r64)
 
+  ! Next power of 2
+  itest = itest + 1
+  test_array(itest) = testify("next power of 2")
+  call test_array(itest)%assert(4096_i64, fft_next_pow2(3000_i64))
+  
   ! Hilbert transform tests (H)
   ! fx1 -> function 1, fx2 -> function 2
   ! hfx1_even stores hilbert transform calculated for fx1, and for even number
@@ -498,6 +504,7 @@ program test_misc
   !$!   call Hilbert_transform(fx2(x_odd), hfx2_odd)
   !$!   call test_array(itest)%assert(hfx2_odd(ind_odd), hfx2(x_odd(ind_odd)), &
   !$!        tol = 1e-5_r64)
+
 
   ! 1D Interpolation
   itest = itest + 1

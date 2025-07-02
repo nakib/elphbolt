@@ -1903,6 +1903,14 @@ contains
   !$!     end do
   !$!   end subroutine Hilbert_transform
 
+  pure function fft_next_pow2(n)
+    !! Smallest 2^m such that 2^m >= n for integer m, needed for FFT speedup
+    integer(r64), intent(in) :: n
+    integer(i64) :: fft_next_pow2
+
+    fft_next_pow2 = 2**(int(log10(real(n))/log10(2.0)) + 1)
+  end function fft_next_pow2
+
   subroutine Hilbert_transform(fx, Hfx)
     !! Hilbert transform, H(f(w)) = IFFT(-i.sgn(t).FFT(f(w)))
     !!
@@ -1942,14 +1950,6 @@ contains
     ! output
     Hfx = real(Hfx_c(1:nfx))
   end subroutine Hilbert_transform
-
-  pure function fft_next_pow2(n)
-    !! Smallest 2^m such that 2^m >= n for integer m, needed for FFT speedup
-    integer(r64), intent(in) :: n
-    integer(i64) :: fft_next_pow2
-
-    fft_next_pow2 = 2**(int(log10(real(n))/log10(2.0)) + 1)
-  end function fft_next_pow2
 
   pure function interpolator_1d(samp, cont, f_cont) result(f_samp)
     !! linear interpolation from 1d array evaluated on a fine, continuous mesh
