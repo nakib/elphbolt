@@ -28,7 +28,7 @@ program test_misc
        widc(:, :), f_coarse(:), f_interp(:), array_of_reals(:)
   real(r64), allocatable :: hfx1_even(:), hfx1_odd(:), hfx2_even(:), hfx2_odd(:), &
        ind_even(:), ind_odd(:), x_even(:), x_odd(:), xmin, xmax
-  integer(i64) :: n_even, n_odd
+  integer(i64) :: n_even, n_odd, n_hilb
 
   logical :: lex_order_2d, lex_order_1d
 

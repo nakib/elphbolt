@@ -1911,40 +1911,45 @@ contains
 
     real(r64), intent(in) :: fx(:)
     real(r64), intent(out) :: Hfx(:)
-    integer :: nt
 
+    integer(i64) :: nfx, nhilb, mid
     complex(r64), allocatable :: fx_c(:), ffx_c(:), Hfx_c(:)
-    integer :: npt, mid
 
-    nt = size(fx)
+    nfx = size(fx)
+    ! Finding the next 2^N
+    nhilb = fft_next_pow2(nfx)
 
-    npt = 2**(int(log10(real(nt))/log10(2.0)) + 1)
+    allocate(fx_c(nhilb), ffx_c(nhilb), Hfx_c(nhilb))
 
-    ! stop npt from blowing up
-    if(npt > 16784) &
-         call exit_with_message('Npts in Hilbert transform exceed 16784.')
-
-    allocate(fx_c(npt), ffx_c(npt), Hfx_c(npt))
+    ! The extra space is used as zero-padding
     fx_c = (0.0_r64, 0.0_r64)
-    fx_c(1:nt) = cmplx(fx(1:nt), 0.0_r64)
+    fx_c(1:nfx) = cmplx(fx(1:nfx), 0.0_r64)
 
     ! Fourier transform
     ffx_c = fft(fx_c)
     ! scaling
-    ffx_c = ffx_c/npt
+    ffx_c = ffx_c/nhilb
 
-    !  Multiply by i * sgn( f )
-    mid = npt/2
+    !  Multiply by i*sgn(t)
+    mid = nhilb/2
     ffx_c(1:mid - 1) = -oneI*ffx_c(1:mid - 1)      
     ffx_c(mid) = 0.0_r64                      
-    ffx_c(mid + 1:npt) = oneI*ffx_c(mid + 1:npt)   
+    ffx_c(mid + 1:nhilb) = oneI*ffx_c(mid + 1:nhilb)   
 
     ! inverse Fourier transform
     Hfx_c = ifft(ffx_c)
 
     ! output
-    Hfx = real(Hfx_c(1:nt))
+    Hfx = real(Hfx_c(1:nfx))
   end subroutine Hilbert_transform
+
+  pure function fft_next_pow2(n)
+    !! Smallest 2^m such that 2^m >= n for integer m, needed for FFT speedup
+    integer(r64), intent(in) :: n
+    integer(i64) :: fft_next_pow2
+
+    fft_next_pow2 = 2**(int(log10(real(n))/log10(2.0)) + 1)
+  end function fft_next_pow2
 
   pure function interpolator_1d(samp, cont, f_cont) result(f_samp)
     !! linear interpolation from 1d array evaluated on a fine, continuous mesh
