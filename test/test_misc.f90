@@ -416,7 +416,7 @@ program test_misc
   itest = itest + 1
   test_array(itest) = testify("next power of 2")
   call test_array(itest)%assert(4096_i64, fft_next_pow2(3000_i64))
-  
+
   ! Hilbert transform tests (H)
   ! fx1 -> function 1, fx2 -> function 2
   ! hfx1_even stores hilbert transform calculated for fx1, and for even number
