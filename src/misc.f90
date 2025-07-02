@@ -1926,7 +1926,7 @@ contains
 
     allocate(fx_c(npt), ffx_c(npt), Hfx_c(npt))
     fx_c = (0.0_r64, 0.0_r64)
-    fx_c(1:nt)=cmplx(fx(1:nt),0.0_r64)
+    fx_c(1:nt) = cmplx(fx(1:nt), 0.0_r64)
 
     ! Fourier transform
     ffx_c = fft(fx_c)
