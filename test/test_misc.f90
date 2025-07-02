@@ -427,7 +427,7 @@ program test_misc
   ! ind_even are indices to compare in case of even number of points
   ! ind_odd are indices to compare in case of odd number of points
   allocate(ind_even(6),ind_odd(5))
-  ind_even = [ 1900, 1950, 2000, 2001, 2251, 2201]
+  ind_even = [1900, 1950, 2000, 2001, 2251, 2201]
   ind_odd = [1900, 1950, 2001, 2250, 2200] 
 
   itest = itest + 1
