@@ -198,7 +198,7 @@ contains
 
     real(r64) :: prefac, W_qw_msq, overlap
     complex(r64) :: diel_qw
-    real(r64) :: Gplusq(3), Gplusq_2normsq 
+    real(r64) :: Gplusq(3), Gplusq_2normsq
     integer(i64) :: ik1, ik2, ik3
 
     prefac = 1.0e9_r64*qe/(perm0*crys%epsiloninf) ! ev.nm
@@ -3027,8 +3027,9 @@ contains
        !q \equiv k1 - k3
        q_vec = vec_sub(k1_vec, k3_vec, el%wvmesh, crys%reclattvecs)
 
-       !Reset screening precomputation flag
+       !Reset screening and g2 precomputation flag
        screening_computed = .false.
+       g2_computed = .false.
 
        !Run over electrons states 2, and 4, eliminating the k4 sum with the
        !delta(k1 - k3 + k2 - k4)
@@ -3043,9 +3044,6 @@ contains
           !Is k4 within the transport window restricted BZ?
           call binsearch(el%indexlist, k4_vec%muxed_index, ik4)
           if(ik4 < 0) cycle
-
-          !Reset g2 precomputation flag
-          g2_computed = .false.
 
           do n2 = 1, el%numbands
              !Electron 2 energy

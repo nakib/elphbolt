@@ -19,7 +19,7 @@ module numerics_module
 
   use precision, only: r64, i64
   use params, only: twopi
-  use misc, only: exit_with_message, subtitle
+  use misc, only: exit_with_message, subtitle, fft_next_pow2
   use crystal_module, only: crystal
 
   implicit none
@@ -378,9 +378,15 @@ contains
        call exit_with_message('For 2d systems, qmesh(3) must be equal to 1.')
     end if
 
-    ! Enforcing continuous mesh size to be odd
-    if(mod(self%ncont_mesh, 2) == 0) then
-       self%ncont_mesh = self%ncont_mesh + 1
+    if(self%Coulomb_screening_type == 'RPA') then
+       ! Enforcing continuous mesh size to be odd
+       if(mod(self%ncont_mesh, 2) == 0) then
+          self%ncont_mesh = self%ncont_mesh + 1
+       end if
+
+       ! Stop the mesh size for Hilbert transform from blowing up
+       if(fft_next_pow2(self%ncont_mesh) > 16384) &
+            call exit_with_message('Mesh size for Hilbert transform exceed 16384. Decrease the value of ncont_mesh.')
     end if
 
     !Set BTE solution type

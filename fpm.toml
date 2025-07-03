@@ -26,6 +26,9 @@ fhash = {path = "thirdparty/fhash"}
 #Use local copy from thirdparty directory
 spglib = {path = "thirdparty/spglib"}
 
+#Pull from github
+fftpack = { git = "https://github.com/fortran-lang/fftpack.git" }
+
 [build]
 #By default, I will use try to use the forlapack and forblas builds from ~/.local/lib/
 #These will have been put there by the configuration step.
