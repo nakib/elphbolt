@@ -2038,9 +2038,14 @@ contains
                    if(abs(en_el - el%enref) > el%fsthick) cycle
 
                    !Fermi factor for initial and final electrons
-                   if(key /= 'g') then
+                   if(key == 'Y') then
                       fermi1 = Fermi(en_el, el%chempot, crys%T)
                       fermi2 = Fermi(en_el + en_ph, el%chempot, crys%T)
+                   end if
+
+                   if(key == 'U') then
+                      fermi1 = Fermi(en_el, el%chempot, crys%T)
+                      fermi2 = Fermi(en_el - en_ph, el%chempot, crys%T)
                    end if
 
                    !Run over final electron bands

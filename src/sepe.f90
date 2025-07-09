@@ -1193,9 +1193,9 @@ contains
           !Set U filename
           filepath_U = trim(adjustl(num%Ydir))//'/U.istate'//trim(adjustl(tag))
 
-          !Read Y from file
+          !Read U from file
           if(allocated(U)) deallocate(U)
-          call read_transition_probs_e(trim(adjustl(filepath_Y)), nprocs_phcoh, U)
+          call read_transition_probs_e(trim(adjustl(filepath_U)), nprocs_phcoh, U)
 
           !Sum over the number of equivalent q-points of the IBZ point
           do ieq = 1, ph%nequiv(iq1_ibz)
