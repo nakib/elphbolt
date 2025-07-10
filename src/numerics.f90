@@ -19,16 +19,16 @@ module numerics_module
 
   use precision, only: r64, i64
   use params, only: twopi
-  use misc, only: exit_with_message, subtitle
+  use misc, only: exit_with_message, subtitle, fft_next_pow2
   use crystal_module, only: crystal
 
   implicit none
-  
+
   private
   public numerics
 
   !external system, getcwd
-  
+
   type numerics
      !! Data and procedures related to the numerics.
 
@@ -44,6 +44,8 @@ module numerics_module
      !! Fermi surface thickness in eV.
      character(len = 1024) :: cwd
      !! Current working directory.
+     character(len = 1024) :: cwd_T
+     !! Temperature dependent subdirectory inside the working directory.
      character(len = 1024) ::datadumpdir
      !! Runtime data dump repository.
      character(len = 1024) ::datadumpdir_T
@@ -148,10 +150,14 @@ module numerics_module
      !! Solve the BTE for bulk materials
      logical :: solve_nano 
      !! Solve the BTE for nanostructures using bulk properties but appropriate boundary conditions
+     integer(i64) :: num_batches
+     !! Number of batches that will be parallel-processed in sequence
+     logical :: restart_from_batch_record
+     !! Use old batch processing records for restarts?
    contains
 
      procedure :: initialize=>read_input_and_setup, create_chempot_dirs
-     
+
   end type numerics
 
 contains
@@ -164,10 +170,10 @@ contains
 
     class(numerics), intent(out) :: self
     type(crystal), intent(in) :: crys
-    
+
     !Local variables
     integer(i64) :: mesh_ref, qmesh(3), maxiter, runlevel, el_en_num, &
-         ph_en_num, ph_mfp_npts, ph_abs_q_npts, fourph_mesh_ref
+         ph_en_num, ph_mfp_npts, ph_abs_q_npts, fourph_mesh_ref, num_batches
     integer :: i 
     integer(i64) :: ncont_mesh
     real(r64) :: fsthick, conv_thres, ph_en_min, ph_en_max, el_en_min, el_en_max, Bfield(3)
@@ -178,7 +184,8 @@ contains
     logical :: read_gq2, read_gk2, read_V, read_W, tetrahedra, phe, phiso, phsubs, &
          phbound, phdef_Tmat, onlyphbte, onlyebte, elchimp, elbound, drag, plot_along_path, &
          phthinfilm, phthinfilm_ballistic, fourph, use_Wannier_ifc2s, phiso_Tmat, Bfield_on, &
-         W_OTF, Y_OTF, solve_bulk, solve_nano, elel
+         W_OTF, Y_OTF, solve_bulk, solve_nano, elel, &
+         restart_from_batch_record
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
          read_V, read_W, tetrahedra, phe, phiso, phsubs, onlyphbte, onlyebte, maxiter, &
@@ -187,10 +194,10 @@ contains
          ph_mfp_npts, ph_abs_q_npts, phthinfilm, phthinfilm_ballistic, &
          fourph, fourph_mesh_ref, use_Wannier_ifc2s, elel, Coulomb_screening_type, ncont_mesh,&
          phiso_Tmat, phiso_1B_theory, Bfield_on, Bfield, W_OTF, Y_OTF, &
-         solve_bulk, solve_nano
+         solve_bulk, solve_nano, num_batches, restart_from_batch_record
 
     call subtitle("Reading numerics information...")
-    
+
     !Open input file
     open(1, file = 'input.nml', status = 'old')
 
@@ -242,11 +249,13 @@ contains
     Y_OTF = .false.
     solve_bulk = .true.
     solve_nano = .false.
+    num_batches = 1
+    restart_from_batch_record = .false.
     read(1, nml = numerics)
 
     if(read_W .and. W_OTF) &
          call exit_with_message("read_W and W_OTF can't both be true. Exiting.")
-    
+
     if(any(qmesh <= 0) .or. fourph_mesh_ref < 1 .or. mesh_ref < 1 .or. fsthick < 0 .or. ncont_mesh < 1) then
        call exit_with_message('Bad input(s) in numerics.')
     end if
@@ -275,7 +284,7 @@ contains
           call exit_with_message("phiso_1B_theory can't be 'Tamura' if 'DIB' is true. Exiting.")
        end if
     end if
-    
+
     if(elel .or. elchimp) then
        if((Coulomb_screening_type /= "RPA") .and. (Coulomb_screening_type /= "TF")) then
           call exit_with_message("Coulomb_screening_type can be either 'RPA' or 'TF'. Exiting.")
@@ -293,19 +302,19 @@ contains
 !!$          call exit_with_message("B-field has to be of the form [B 0 0], [0 B 0], or [0 0 B]. Exiting.")
 !!$       end if
     end if
-    
+
     !TODO
     !! [ ] Read eco mode info from input
     !! [ ] Check for valid choice of econess
-    
+
     !eco mode DBG
-    self%eco_mode = .true.
-    self%econess = [2, 2, 2]
+    !self%eco_mode = .true.
+    !self%econess = [2, 2, 2]
     !!
 
     self%Bfield_on = Bfield_on
     self%Bfield = Bfield
-    
+
     self%qmesh = qmesh
     self%runlevel = runlevel
     !Runlevels:
@@ -340,6 +349,8 @@ contains
        self%Y_OTF = Y_OTF
        self%solve_bulk = solve_bulk
        self%solve_nano = solve_nano
+       self%num_batches = num_batches
+       self%restart_from_batch_record = restart_from_batch_record
     else
        self%mesh_ref = 1 !Enforce this for superconductivity mode
     end if
@@ -362,16 +373,22 @@ contains
        self%ph_mfp_npts = ph_mfp_npts
        self%ph_abs_q_npts = ph_abs_q_npts
     end if
-    
+
     if(crys%twod .and. self%qmesh(3) /= 1) then
        call exit_with_message('For 2d systems, qmesh(3) must be equal to 1.')
     end if
 
-    ! Enforcing continuous mesh size to be odd
-    if(mod(self%ncont_mesh, 2) == 0) then
-       self%ncont_mesh = self%ncont_mesh + 1
+    if(self%Coulomb_screening_type == 'RPA') then
+       ! Enforcing continuous mesh size to be odd
+       if(mod(self%ncont_mesh, 2) == 0) then
+          self%ncont_mesh = self%ncont_mesh + 1
+       end if
+
+       ! Stop the mesh size for Hilbert transform from blowing up
+       if(fft_next_pow2(self%ncont_mesh) > 16384) &
+            call exit_with_message('Mesh size for Hilbert transform exceed 16384. Decrease the value of ncont_mesh.')
     end if
-    
+
     !Set BTE solution type
     if(self%onlyphbte) then
        self%onlyebte = .false.
@@ -390,7 +407,7 @@ contains
        self%onlyphbte = .false.
        self%phe = .true.
     end if
-    
+
     !Set Wannier usage flag
     self%need_Wannier = self%use_Wannier_ifc2s .or. self%onlyebte .or. self%drag &
          .or. (self%phe .and. self%onlyphbte) &
@@ -404,7 +421,7 @@ contains
     if(self%phiso_Tmat .and. .not. self%phdef_Tmat) then
        call exit_with_message("For ph-iso scattering from T-matrix, need both phiso_Tmat and phdef_Tmat. Exiting.")
     end if
-    
+
     !Create data dump directory
     if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(self%datadumpdir)))
 
@@ -426,13 +443,32 @@ contains
     !Create T-dependent ph-ph transition probability directory
     self%Wdir = trim(adjustl(self%datadumpdir_T))//'/W'
     if(this_image() == 1) call system('mkdir -p ' // trim(adjustl(self%Wdir)))
-    
+
     !Close input file
     close(1)
 
     !Set current work directory.
     call getcwd(self%cwd)
     self%cwd = trim(self%cwd)
+
+    !Create a directory in the run directory, tagged by temperature
+    write(tag, "(E9.3)") crys%T
+    self%cwd_T = trim(adjustl(self%cwd))//'/T'//trim(adjustl(tag))
+    if(this_image() == 1) call system('mkdir -p '//trim(adjustl(self%cwd_T)))
+
+    !Create directories for keeping old batch records.
+    !Also, keep a copy of the old batch files.
+    if(this_image() == 1) then
+       call system('mkdir -p '//trim(adjustl(self%cwd))//'/old_batch_record')
+       call system('mkdir -p '//trim(adjustl(self%cwd_T))//'/old_batch_record')
+
+       call system(&
+            'cp '//trim(adjustl(self%cwd))//'/*_batches ' &
+            //trim(adjustl(self%cwd))//'/old_batch_record/')
+       call system(&
+            'cp '//trim(adjustl(self%cwd_T))//'/*_batches ' &
+            //trim(adjustl(self%cwd_T))//'/old_batch_record/')
+    end if
 
     !Print out information.
     if(this_image() == 1) then
@@ -457,7 +493,7 @@ contains
                self%mesh_ref*self%qmesh(3)
        end if
        close(1)
-       
+
        write(*, "(A, (3I5,x))") "q-mesh = ", self%qmesh
        if(crys%twod) then
           write(*, "(A, (3I5,x))") "k-mesh = ", self%mesh_ref*self%qmesh(1), self%mesh_ref*self%qmesh(2), 1
@@ -477,6 +513,7 @@ contains
        end if
        write(*, "(A, 1E16.8, A)") "Fermi window thickness (each side of reference energy) = ", self%fsthick, " eV"
        write(*, "(A, A)") "Working directory = ", trim(self%cwd)
+       write(*, "(A, A)") "T-dependent working directory = ", trim(self%cwd_T)
        write(*, "(A, A)") "Data dump directory = ", trim(self%datadumpdir)
        write(*, "(A, A)") "T-dependent data dump directory = ", trim(self%datadumpdir_T)
        write(*, "(A, A)") "e-ph directory = ", trim(self%g2dir)
@@ -484,6 +521,8 @@ contains
        if(self%runlevel /= 3) write(*, "(A, A)") "ph-ph directory = ", trim(self%Vdir)
        write(*, "(A, L)") "Reuse e-ph matrix elements: ", self%read_gk2
        if(self%runlevel /= 3) then
+          write(*, "(A, I5)") "Number of batches: ", self%num_batches
+          write(*, "(A, L)") "Restart from old batch processing records: ", self%restart_from_batch_record
           write(*, "(A, L)") "Reuse ph-e matrix elements: ", self%read_gq2
           write(*, "(A, L)") "Reuse ph-ph matrix elements: ", self%read_V
           write(*, "(A, L)") "Reuse ph-ph transition probabilities: ", self%read_W
@@ -541,7 +580,7 @@ contains
   subroutine create_chempot_dirs(self, chempot)
     !! Subroutine to create data dump directory tagged by the chemical potential
     !! and subdirectories within.
-    
+
     class(numerics), intent(inout) :: self
     real(r64), intent(in) :: chempot
 
@@ -558,7 +597,7 @@ contains
 
     !Create chemical potential and T-dependent dielectric data directories
     self%epsilondir = trim(adjustl(self%datadumpdir_T_chempot)) // '/epsilon'
-    
+
     if(this_image() == 1) then
        call system('mkdir -p ' // trim(adjustl(self%datadumpdir_T_chempot)))
        call system('mkdir -p ' // trim(adjustl(self%Xdir)))

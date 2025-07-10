@@ -26,6 +26,9 @@ fhash = {path = "thirdparty/fhash"}
 #Use local copy from thirdparty directory
 spglib = {path = "thirdparty/spglib"}
 
+#Pull from github
+fftpack = { git = "https://github.com/fortran-lang/fftpack.git" }
+
 [build]
 #By default, I will use try to use the forlapack and forblas builds from ~/.local/lib/
 #These will have been put there by the configuration step.
@@ -97,6 +100,11 @@ main = "test_vector.f90"
 name = "bte_regression"
 source-dir="test"
 main = "bte_regression.f90"
+
+[[test]]
+name = "test_task_manager"
+source-dir = "test"
+main = "test_task_manager.f90"
 
 #
 #[[test]]

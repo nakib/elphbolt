@@ -7,7 +7,7 @@ program test_autodiff
        operator(+), operator(-), operator(*), operator(/)
 
   implicit none
-  
+
   integer :: itest
   integer, parameter :: num_tests = 2
   type(testify) :: test_array(num_tests), tests_all
@@ -18,9 +18,9 @@ program test_autodiff
   type(autodiff) :: ad_x(N), ad_fx(N)
 
   print*, '<<module autodiff unit tests>>'
-  
+
   call linspace(x, 0.0_r64, 1.0_r64, N)
-  
+
   itest = 1
   test_array(itest) = testify("f(x) = x^2 + 2x")
   do i = 1, N
@@ -47,7 +47,7 @@ program test_autodiff
        [(ad_fx(i)%df, i = 1, N)], &
        [-0.5_r64, -16.0_r64/25.0_r64 - 0.5_r64, -1.0_r64], &
        tol = 1.0e-12_r64)
-  
+
   tests_all = testify(test_array)
   call tests_all%report
 

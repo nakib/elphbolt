@@ -22,7 +22,7 @@ module screening_module
        !calculate_RPA_dielectric_3d_G0_scratch, &
   
 contains
-  
+
   subroutine calculate_qTF(crys, el)
     !! Calculate Thomas-Fermi screening wave vector from the static
     !! limit of the Lindhard function.
@@ -63,7 +63,7 @@ contains
        end if
     end if
   end subroutine calculate_qTF
-  
+
   subroutine spectral_head_polarizability_3d_q(spec_eps, Omegas, qvec, &
        el, crys, tetrahedra)
     !! Spectral head of the bare polarizability of the 3d Kohn-Sham system using
@@ -85,7 +85,7 @@ contains
     type(crystal), intent(in) :: crys
     logical, intent(in) :: tetrahedra
     real(r64), allocatable, intent(out) :: spec_eps(:)
-    
+
     !Locals
     integer(i64) :: m, n, ik, iOmega, nOmegas, k_indvec(3), kp_indvec(3), where_in_indexlist
     real(r64) :: overlap, ek, ekp, el_ens_kp(1, el%numbands), kppathvecs(1, 3)
@@ -93,11 +93,11 @@ contains
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
     type(vec) :: kvec, kpvec
     real(r64) :: dOmega
-    
+
     nOmegas = size(Omegas)
 
     dOmega = Omegas(2) - Omegas(1)
-    
+
     allocate(spec_eps(nOmegas))
 
     !Associate delta function procedure pointer
@@ -117,21 +117,21 @@ contains
 
        !Ignore terms for which k' is outside the Fermi shell
        if(where_in_indexlist < 0) cycle
-       
+
        el_ens_kp(1, :) = el%ens(where_in_indexlist, :)
        el_evecs_kp(1, :, :) = el%evecs(where_in_indexlist, :, :)
-                 
+
        do m = 1, el%numbands
           ek = el%ens(ik, m)
-          
+
           !Apply energy window to initial electron
           if(abs(ek - el%enref) > el%fsthick) cycle
-          
+
           do iOmega = nOmegas/2 + 2, nOmegas !positive energy sector
              do n = 1, el%numbands
 
                 ekp = el_ens_kp(1, n)
-                
+
                 !Apply energy window to final electron
                 if(abs(ekp - el%enref) > el%fsthick) cycle
 
@@ -163,7 +163,7 @@ contains
     do iOmega = 1, nOmegas/2
        spec_eps(iOmega) = -spec_eps(nOmegas + 1 - iOmega)
     end do
-   
+
     if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
   end subroutine spectral_head_polarizability_3d_q
 
@@ -190,20 +190,20 @@ contains
     type(crystal), intent(in) :: crys
     logical, intent(in) :: tetrahedra
     real(r64), allocatable, intent(out) :: spec_eps(:)
-    
+
     !Locals
     integer(i64) :: m, n, ik, iOmega, nOmegas, k_indvec(3), kp_indvec(3), where_in_indexlist
     real(r64) :: overlap, ek, ekp, el_ens_kp(1, el%numbands), kppathvecs(1, 3)
     complex(r64) :: el_evecs_kp(1, el%numbands, el%numbands)
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
     type(vec) :: kvec, kpvec
-    
+
     real(r64) :: dOmega
 
     nOmegas = size(Omegas)
 
     dOmega = Omegas(2) - Omegas(1)
-    
+
     allocate(spec_eps(nOmegas))
 
     !Associate delta function procedure pointer
@@ -236,18 +236,18 @@ contains
           el_ens_kp(1, :) = el%ens(where_in_indexlist, :)
           el_evecs_kp(1, :, :) = el%evecs(where_in_indexlist, :, :)
        end if
-          
+
        do m = 1, wann%numwannbands
           ek = el%ens(ik, m)
-          
+
           !Apply energy window to initial electron
           if(abs(ek - el%enref) > el%fsthick) cycle
-          
+
           do iOmega = nOmegas/2 + 2, nOmegas !positive energy sector
              do n = 1, wann%numwannbands
 
                 ekp = el_ens_kp(1, n)
-                
+
                 !Apply energy window to final electron
                 if(abs(ekp - el%enref) > el%fsthick) cycle
 
@@ -277,7 +277,7 @@ contains
     do iOmega = 1, nOmegas/2
        spec_eps(iOmega) = -spec_eps(nOmegas + 1 - iOmega)
     end do
-   
+
     if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
   end subroutine spectral_head_polarizability_3d_qpath
 
