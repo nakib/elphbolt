@@ -305,7 +305,8 @@ contains
     !Locals
     integer(i64) :: m, n, ik, iOmega, nOmegas, k_indvec(3), kp_indvec(3), no, npo
     real(r64) :: overlap, ek, ekp, delta, Omega_l, Omega_r, &
-         el_ens_kp(1, el%numbands), kppathvecs(1, 3)
+         el_ens_kp(1, el%numbands), kppathvecs(1, 3), kvec(3), kpqvec(3),&
+         kpvel(1, el%numbands, 3)
     complex(r64) :: el_evecs_kp(1, el%numbands, el%numbands)
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
 
@@ -319,19 +320,21 @@ contains
 
     spec_eps = 0.0
     do ik = 1, el%nwv
+       
        kppathvecs(1, :) = el%wavevecs(ik, :).umklapp.qcrys
-       ! np and n
-       no = sign(1_i64, n - el%indlowconduction)
-       npo = sign(1_i64, m - el%indlowconduction)
-       overlap = 1 + no*npo*dot_product(el%wavevecs(ik, :), kppathvecs(1, :))&
-                           /twonorm(el%wavevecs(ik, :))/twonorm(kppathvecs(1, :))
        
        call wann%el_wann(crys = crys, &
-            nk = 1_i64, &
-            kvecs = kppathvecs, &
-            energies = el_ens_kp, &
-            evecs = el_evecs_kp, &
-            scissor = el%scissor)
+        nk = 1_i64, &
+        kvecs = kppathvecs, &
+        energies = el_ens_kp, velocities = kpvel, &
+        evecs = el_evecs_kp, &
+        scissor = el%scissor)
+!$!        call wann%el_wann(crys = crys, &
+!$!         nk = 1_i64, &
+!$!         kvecs = kppathvecs, &
+!$!         energies = el_ens_kp, &
+!$!         evecs = el_evecs_kp, &
+!$!         scissor = el%scissor)
 
        !Below, we will sum out m, n, and k
        do m = 1, wann%numwannbands
@@ -344,6 +347,26 @@ contains
           do iOmega = nOmegas/2 + 2, nOmegas
              do n = 1, wann%numwannbands
 
+                ! np and n
+                !no = sign(1_i64, n - el%indlowconduction)
+                !npo = sign(1_i64, m - el%indlowconduction)
+                if(n==4) then
+                  no = -1
+                else
+                  no = 1
+                end if
+                if(m==4) then
+                  npo = -1
+                else
+                  npo = 1
+                end if
+
+            
+                !kvec = matmul(crys%reclattvecs, el%wavevecs(ik, :))
+                !kpqvec = matmul(crys%reclattvecs, kppathvecs(1, :))
+!$!                 overlap = (1.0_r64 + no*npo*dot_product(el%vels(ik, m, :), kpvel(1, n, :))&
+!$!                                /twonorm(el%vels(ik, m, :))/twonorm(kpvel(1, n, :)))/2
+                
                 ekp = el_ens_kp(1, n)
 
                 !Apply energy window to final electron
@@ -351,7 +374,7 @@ contains
 
                 !This is |U(k')U^\dagger(k)|_nm squared
                 !(Recall that U^\dagger(k) is the diagonalizer of the electronic hamiltonian.)
-                ! overlap = (abs(dot_product(el_evecs_kp(1, n, :), el%evecs(ik, m, :))))**2
+                overlap = (abs(dot_product(el_evecs_kp(1, n, :), el%evecs(ik, m, :))))**2
                 ! overlap = 1.0_r64
 
 !$!                 spec_eps(iOmega) = spec_eps(iOmega) + &
@@ -528,7 +551,7 @@ contains
     !end if
 
     !TEST
-    numq = el%wvmesh(1)*3
+    numq = el%wvmesh(1)
     qxmesh = numq
     !Create qlist in crystal coordinates
     allocate(qlist(numq, 3), qmaglist(numq))
@@ -536,7 +559,10 @@ contains
        ! Gamma -> 1, 1, 0
        !qlist(iq, :) = [(iq - 1.0_r64)/qxmesh, (iq - 1.0_r64)/qxmesh, 0.0_r64]
        ! Gamma -> K (0.333, 0.333, 0)
-       qlist(iq, :) = [(iq - 1.0_r64)/(qxmesh - 1)/3, (iq - 1.0_r64)/(qxmesh - 1)/3, &
+       !qlist(iq, :) = [(iq - 1.0_r64)/(qxmesh - 1)/3, (iq - 1.0_r64)/(qxmesh - 1)/3, &
+       !                 0.0_r64] 
+       ! Gamma -> K (0.1, 0.1, 0)
+       qlist(iq, :) = [(iq - 1.0_r64)/(qxmesh - 1)/10, (iq - 1.0_r64)/(qxmesh - 1)/10, &
                         0.0_r64] 
        qmaglist(iq) = twonorm(matmul(crys%reclattvecs, qlist(iq, :)))
     end do
@@ -570,7 +596,8 @@ contains
     do iq = start, end !Over IBZ k points
        qcrys = qlist(iq, :) !crystal coordinates
 
-       !|G + q|^2 or |G + q|, for 3D or 2D case
+       ! print *, "q->", iq
+       ! |G + q|^2 or |G + q|, for 3D or 2D case
        q2norm = qmaglist(iq)**(crys%dim-1)
        !q2norm = qmaglist(iq)**2 
 
