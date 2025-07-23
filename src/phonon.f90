@@ -24,7 +24,7 @@ module phonon_module
   use particle_module, only: particle
   use misc, only: print_message, subtitle, expi, distribute_points, &
        write2file_rank2_real, exit_with_message, create_set, coarse_grain, &
-       mux_state, write2file_rank3_real, int_div
+       mux_state, write2file_rank3_real, int_div, twonorm
   use numerics_module, only: numerics
   use crystal_module, only: crystal, calculate_wavevectors_full
   use symmetry_module, only: symmetry, find_irred_wedge, create_fbz2ibz_map
@@ -215,6 +215,8 @@ contains
           case('phonopy')
              call phonon_phonopy(self, crys, chunk, self%wavevecs(start:end, :), &
                   ens_chunk, evecs_chunk, vels_chunk)
+!!$             call phonon_phonopy_ref(self, crys, chunk, self%wavevecs(start:end, :), &
+!!$                  ens_chunk, evecs_chunk, vels_chunk)
           case ('espresso')
              call phonon_espresso(self, crys, chunk, self%wavevecs(start:end, :), &
                   ens_chunk, evecs_chunk, vels_chunk)
@@ -391,8 +393,8 @@ contains
     integer(i64) :: qscell(3), tipo(crys%numatoms), t1, t2, t3, i, j, &
          iat, jat, ibrav, ipol, jpol, m1, m2, m3, ntype, nat, nfc2, ntot, &
          ucell1(3), ucell2(3), at1_sc, at2_sc
-    real(r64) :: r(crys%numatoms, 3), wscell(3,0:3), celldm(6), at(3,3), &
-         dnrm2
+    real(r64) :: wscell(3,0:3), celldm(6), at(3,3), &
+         dnrm2, r(3, crys%numatoms)
     character(len = 1) :: polar_key
     character(len = 6) :: label(crys%numelements)
     real(r64), parameter :: massfactor = 1.8218779_r64*6.022e-4_r64
@@ -481,7 +483,7 @@ contains
 
     !Phonopy format:
     if(phonopy_format_file_exists) then
-       r = transpose(matmul(crys%lattvecs, crys%basis))/bohr2nm
+       !r = transpose(matmul(crys%lattvecs, crys%basis))/bohr2nm
 
        open(1, file = "FORCE_CONSTANTS", status = "old")
 
@@ -574,7 +576,8 @@ contains
 
     !Basis atoms in Cartesian coordinates and in Bohr.
     !This is used in the section below to construct the r(i) - r(j) vectors
-    r = transpose(matmul(crys%lattvecs, crys%basis))/bohr2nm
+    !r = transpose(matmul(crys%lattvecs, crys%basis))/bohr2nm
+    r = crys%basis_cart/bohr2nm
 
     do i = 1, crys%numatoms
        self%mm(i, i) = crys%masses(crys%atomtypes(i))
@@ -584,7 +587,8 @@ contains
           self%mm(i, j) = &
                sqrt(crys%masses(crys%atomtypes(i))*&
                crys%masses(crys%atomtypes(j)))
-          self%rr(i, j, 1:3) = r(i, 1:3) - r(j, 1:3)
+          !self%rr(i, j, 1:3) = r(i, 1:3) - r(j, 1:3)
+          self%rr(i, j, 1:3) = r(1:3, i) - r(1:3, j)
           self%mm(j, i) = self%mm(i, j)
           self%rr(j, i, 1:3) = -self%rr(i, j, 1:3)
        end do
@@ -1400,6 +1404,8 @@ contains
        ddyn_nac = complex_zero
        fc_diel = 0.0_r64
 
+       neq = 0
+
        ! If the polar flag is set, we add the electrostatic
        ! correction. No correction is applied exactly at \Gamma in
        ! order not to rely on guesses about directions.
@@ -1501,6 +1507,9 @@ contains
 
                       do ip = 1, neq
                          ztmp = expi(-qr(ip))/neq
+                         !DBG
+                         !ztmp = expi(-qr(ip))
+
                          star = star + ztmp
 
                          do i = 1, 3
@@ -1540,6 +1549,91 @@ contains
           end do
        end do
 
+!!$       do ix1 = 1, self%scell(1)
+!!$          do iy1 = 1, self%scell(2)
+!!$             do iz1 = 1, self%scell(3)
+!!$                rcell = matmul(crys%lattvecs, [ix1, iy1, iz1] - [1, 1, 1])/bohr2nm !Bohr
+!!$
+!!$                do iatom1 = 1, crys%numatoms
+!!$                   do iatom2 = 1, crys%numatoms
+!!$                      r = self%rr(iatom1, iatom2, :) + rcell !Bohr
+!!$
+!!$                      dmin = huge(dmin)
+!!$
+!!$                      !TODO Check if the previously calculated Wigner-Seitz
+!!$                      !weights can be used here.
+!!$                      do ix2 = -2, 2
+!!$                         do iy2 = -2, 2
+!!$                            do iz2 = -2, 2
+!!$                               rl = (ix2*self%scell(1)*crys%lattvecs(:, 1) + &
+!!$                                    iy2*self%scell(2)*crys%lattvecs(:, 2) + &
+!!$                                    iz2*self%scell(3)*crys%lattvecs(:, 3))/bohr2nm !Bohr
+!!$
+!!$                               Rnorm = dnrm2(3, rl + r, 1)
+!!$
+!!$                               !Note the "step convection" for the phase
+!!$                               if(abs(Rnorm - dmin) > 1.0e-5_r64) then
+!!$                                  if(Rnorm < dmin) then
+!!$                                     neq = 1
+!!$                                     dmin = Rnorm
+!!$                                     rr(:, neq) = rl + rcell
+!!$                                     qr(neq) = dot_product(qcart(:, iq) , rr(:, neq))
+!!$                                  end if
+!!$                               else
+!!$                                  neq = neq + 1
+!!$                                  rr(:, neq) = rl + rcell
+!!$                                  qr(neq) = dot_product(qcart(:, iq), rr(:, neq))
+!!$                               end if
+!!$                            end do
+!!$                         end do
+!!$                      end do
+!!$
+!!$                      star = complex_zero
+!!$
+!!$                      do ip = 1, neq
+!!$                         ztmp = expi(-qr(ip))/neq
+!!$                         !DBG
+!!$                         !ztmp = expi(-qr(ip))
+!!$
+!!$                         star = star + ztmp
+!!$
+!!$                         do i = 1, 3
+!!$                            idim = 3*(iatom1 - 1) + i
+!!$
+!!$                            do j = 1, 3
+!!$                               jdim = 3*(iatom2 - 1) + j
+!!$
+!!$                               dyn_total(idim, jdim) = &
+!!$                                    dyn_total(idim, jdim) + &
+!!$                                    ztmp*fc_total(j, i, iatom2, iatom1, ix1, iy1, iz1)
+!!$
+!!$                               ddyn_total(idim, jdim, :) = &
+!!$                                    ddyn_total(idim, jdim, :) - &
+!!$                                    oneI*ztmp*rr(:, ip)* &
+!!$                                    fc_total(j, i, iatom2, iatom1, ix1, iy1, iz1)
+!!$                            end do
+!!$                         end do
+!!$                      end do
+!!$
+!!$                      if(crys%polar .and. .not. all(qcart(:, iq) == 0.0_r64)) then
+!!$                         do i = 1, 3
+!!$                            idim = 3*(iatom1 - 1) + i
+!!$
+!!$                            do j = 1, 3
+!!$                               jdim = 3*(iatom2 - 1) + j
+!!$
+!!$                               ddyn_total(idim, jdim, :) = &
+!!$                                    ddyn_total(idim, jdim, :) + &
+!!$                                    star*ddyn_nac(idim, jdim, :)/product(self%scell)
+!!$                            end do
+!!$                         end do
+!!$                      end if
+!!$                   end do
+!!$                end do
+!!$             end do
+!!$          end do
+!!$       end do
+
        ! Frequencies squared result from a diagonalization of the
        ! dynamical matrix. The first call to zheev serves to ensure that
        ! enough space has been allocated for this.
@@ -1577,6 +1671,367 @@ contains
     omegas = omegas*Ryd2eV !eV
     if(present(velocities)) velocities = velocities*bohr2nm*toTHz !Km/s
   end subroutine phonon_phonopy
+
+  !!test
+  ! Compute phonon dispersions, Phonopy style.
+  subroutine phonon_phonopy_ref(self, crys, nk, kpoints_crys, omegas, eigenvect, velocities)
+
+    use params, only: hbar_eVps
+
+    !subroutine phonon_phonopy_ref(kpoints,omegas,velocities,eigenvect)
+    class(phonon), intent(in) :: self
+    type(crystal), intent(in) :: crys
+    integer(i64), intent(in) :: nk
+    real(r64),intent(in) :: kpoints_crys(:,:)
+    real(r64),intent(out) :: omegas(:,:),velocities(:,:,:)
+    complex(r64),intent(out),optional :: eigenvect(:,:,:)
+
+    real(r64),parameter :: prefactor=1745.91429109 ! THz^2 * amu * nm^3
+
+    !integer(i64) :: nk
+    real(r64),allocatable :: mm(:,:)
+    complex(r64),allocatable :: dyn_total(:,:),dyn_nac(:,:)
+    complex(r64),allocatable :: ddyn_total(:,:,:),ddyn_nac(:,:,:)
+    real(r64),allocatable :: fc_short(:,:,:,:,:,:,:)
+    real(r64),allocatable :: fc_diel(:,:,:,:,:,:,:)
+    real(r64),allocatable :: fc_total(:,:,:,:,:,:,:)
+
+    integer(i64) :: i,j,ip,ik,neq, counter
+    integer(i64) :: ix1,iy1,iz1,iatom1,ix2,iy2,iz2,iatom2
+    real(r64) :: tmp1,tmp2,tmp3,dmin,Rnorm
+    real(r64) :: rcell(3),r(3),rl(3),rr(3,27),qr(27)
+    complex(r64) :: ztmp,star
+
+    real(r64) :: kpoints_cart(nk, 3)
+    real(r64), allocatable :: shortest(:,:)
+    real(r64), allocatable :: omega2(:),rwork(:)
+    complex(r64), allocatable :: work(:)
+    integer(i64) :: nwork=1_i64
+
+    real(r64) :: dnrm2
+
+    !nk=size(kpoints,1)
+
+    allocate(mm(crys%numatoms,crys%numatoms))
+    allocate(omega2(self%numbands))
+    allocate(rwork(max(1,9*crys%numatoms-2)))
+    allocate(fc_diel(crys%numatoms,3,self%scell(1),self%scell(2),self%scell(3),crys%numatoms,3))
+    allocate(fc_total(crys%numatoms,3,self%scell(1),self%scell(2),self%scell(3),crys%numatoms,3))
+
+    do ik = 1, nk
+       kpoints_cart(ik, :) = matmul(crys%reclattvecs, kpoints_crys(ik, :))
+    end do
+
+    do i=1,crys%numatoms
+       mm(i,i)=crys%masses(crys%atomtypes(i))
+       do j=i+1,crys%numatoms
+          mm(i,j)=sqrt(crys%masses(crys%atomtypes(i))*crys%masses(crys%atomtypes(j)))
+          mm(j,i)=mm(i,j)
+       end do
+    end do
+
+    ! Read FORCE_CONSTANTS_2ND and reduce the constants using mm.
+    call read2fc(fc_short, self%scell, crys, 'FORCE_CONSTANTS')
+    !call read2fc(fc_short, [5, 5, 5]*1_i64, crys, 'FORCE_CONSTANTS')
+
+    allocate(dyn_total(self%numbands,self%numbands))
+    allocate(dyn_nac(self%numbands,self%numbands))
+    allocate(ddyn_total(self%numbands,self%numbands,3))
+    allocate(ddyn_nac(self%numbands,self%numbands,3))
+    allocate(work(nwork))
+    allocate(shortest(3,nk))
+
+    ! Use the 1st BZ image of each q point to improve the behavior of
+    ! the non-analytic correction.
+    do ik=1,nk
+       shortest(:,ik)=kpoints_cart(ik,:)
+       tmp1=dnrm2(3,shortest(:,ik),1)
+       do ix1=-2,2
+          do iy1=-2,2
+             do iz1=-2,2
+                r=kpoints_cart(ik,:)+ix1*&
+                     crys%reclattvecs(:,1)&
+                     +iy1*crys%reclattvecs(:,2)+&
+                     iz1*crys%reclattvecs(:,3)
+                tmp2=dnrm2(3,r,1)
+                if(tmp2.lt.tmp1) then
+                   tmp1=tmp2
+                   shortest(:,ik)=r
+                end if
+             end do
+          end do
+       end do
+    end do
+
+    do ik=1,nk
+       dyn_total = complex_zero
+       dyn_nac =  0.0_r64
+       ddyn_total = 0.0_r64
+       ddyn_nac = 0.0_r64
+       fc_diel = 0.0_r64
+
+       ! If the nonanalytic flag is set to TRUE, add the electrostatic
+       ! correction. No correction is applied exactly at \Gamma in
+       ! order not to rely on guesses about directions.
+       if(crys%polar.and..not.all(shortest(:,ik).eq.0.)) then
+          tmp3=dot_product(shortest(:,ik),matmul(crys%epsilon,shortest(:,ik)))
+          do iatom1=1,crys%numatoms
+             do iatom2=1,crys%numatoms
+                do i=1,3
+                   do j=1,3
+                      tmp1=dot_product(shortest(:,ik),crys%born(:,i,iatom1))
+                      tmp2=dot_product(shortest(:,ik),crys%born(:,j,iatom2))
+                      dyn_nac(3*(iatom1-1)+i,3*(iatom2-1)+j)=tmp1*tmp2/&
+                           mm(iatom1,iatom2)
+                      ! The derivatives of the nonanalytic correction
+                      ! will be needed later to make group velocities
+                      ! and frequencies completely consistent.
+                      do ip=1,3
+                         ddyn_nac(3*(iatom1-1)+i,3*(iatom2-1)+j,ip)=&
+                              tmp1*crys%born(ip,j,iatom2)+tmp2*crys%born(ip,i,iatom1)-&
+                              2.*tmp1*tmp2*dot_product(crys%epsilon(ip,:),shortest(:,ik))/tmp3
+                      end do
+                      ddyn_nac(3*(iatom1-1)+i,3*(iatom2-1)+j,:)=&
+                           ddyn_nac(3*(iatom1-1)+i,3*(iatom2-1)+j,:)/&
+                           mm(iatom1,iatom2)
+                   end do
+                end do
+             end do
+          end do
+          dyn_nac=prefactor*dyn_nac/tmp3/crys%volume
+          ddyn_nac=prefactor*ddyn_nac/tmp3/crys%volume
+          ! Transform back to real space to obtain a correction to the
+          ! short-range force constants.
+          do iatom1=1,crys%numatoms
+             do iatom2=1,crys%numatoms
+                do i=1,3
+                   do j=1,3
+                      fc_diel(iatom1,i,:,:,:,iatom2,j)=real(dyn_nac(3*(iatom1-1)+i,&
+                           3*(iatom2-1)+j))
+                   end do
+                end do
+             end do
+          end do
+          fc_diel=fc_diel/(self%scell(1)*self%scell(2)*self%scell(3))
+       end if
+
+       ! Force constants with long-range correction.
+       fc_total=fc_short+fc_diel
+       ! Build the dynamical matrix and its derivatives.
+
+       !counter = 0
+
+       do iatom1 = 1, crys%numatoms
+          do iatom2 =1, crys%numatoms
+             do ix1 = 1, self%scell(1)
+                do iy1 = 1, self%scell(2)
+                   do iz1 = 1, self%scell(3)
+                      rcell = matmul(crys%lattvecs, &
+                           [ix1, iy1, iz1] - [1, 1, 1])
+
+                      !Both of these give the same result:
+                      !r=crys%basis_cart(:,iatom1)-crys%basis_cart(:,iatom2)+rcell
+                      r = self%rr(iatom1, iatom2, :)*bohr2nm + rcell
+
+                      dmin = huge(dmin)
+
+                      do ix2 = -2, 2
+                         do iy2 = -2, 2
+                            do iz2 = -2, 2
+                               !TODO Check this line:
+                               rl = ix2*self%scell(1)*crys%lattvecs(:,1) + &
+                                    iy2*self%scell(2)*crys%lattvecs(:,2) + &
+                                    iz2*self%scell(3)*crys%lattvecs(:,3)
+
+                               Rnorm = twonorm(rl + r) !dnrm2(3, rl + r, 1)
+
+                               !if(abs(Rnorm - dmin) > 1e-28) then !Rnorm /= dmin
+                               if(Rnorm /= dmin) then
+                                  if(Rnorm < dmin) then
+                                     neq = 1
+                                     dmin = Rnorm
+                                     qr(neq) = &
+                                          dot_product(kpoints_cart(ik, :), rl + rcell)
+                                     rr(:, neq) = rl + rcell
+                                  end if
+                               else !Rnorm == dmin
+                                  neq = neq + 1
+                                  qr(neq) = &
+                                       dot_product(kpoints_cart(ik,:), rl + rcell)
+                                  rr(:, neq) = rl + rcell
+                               end if
+                            end do
+                         end do
+                      end do
+
+                      star = complex_zero
+
+                      do ip = 1, neq                         
+                         ztmp = expi(-qr(ip))/real(neq, r64)
+                         !ztmp = expi(-qr(ip))
+
+                         star = star + ztmp
+                         do i=1,3
+                            do j=1,3
+                               dyn_total(3*(iatom1-1)+i,3*(iatom2-1)+j)=&
+                                    dyn_total(3*(iatom1-1)+i,3*(iatom2-1)+j)+&
+                                    ztmp*fc_total(iatom2,j,ix1,iy1,iz1,iatom1,i)
+
+                               ddyn_total(3*(iatom1-1)+i,3*(iatom2-1)+j,:)=&
+                                    ddyn_total(3*(iatom1-1)+i,3*(iatom2-1)+j,:)-&
+                                    oneI*ztmp*rr(:,ip)*&
+                                    fc_total(iatom2,j,ix1,iy1,iz1,iatom1,i)
+                            end do
+                         end do
+                      end do
+                      if(crys%polar.and..not.all(kpoints_cart(ik,:).eq.0)) then
+                         do i=1,3
+                            do j=1,3
+                               ddyn_total(3*(iatom1-1)+i,3*(iatom2-1)+j,:)=&
+                                    ddyn_total(3*(iatom1-1)+i,3*(iatom2-1)+j,:)+&
+                                    star*ddyn_nac(3*(iatom1-1)+i,3*(iatom2-1)+j,:)/&
+                                    (self%scell(1)*self%scell(2)*self%scell(3))
+                            end do
+                         end do
+                      end if
+                   end do
+                end do
+             end do
+          end do
+       end do
+
+!!$       !Force Hermiticity
+!!$       do i = 1, self%numbands
+!!$          do j = i + 1, self%numbands
+!!$             dyn_total(i, j) = (dyn_total(i, j) + conjg(dyn_total(j, i)))*0.5_r64
+!!$             dyn_total(j, i) = dyn_total(i, j)
+!!$          end do
+!!$       end do
+
+       ! Frequencies squared result from a diagonalization of the
+       ! dynamical matrix. The first call to zheev serves to ensure that
+       ! enough space has been allocated for this.
+       call zheev("V","U",self%numbands,dyn_total,self%numbands,omega2,work,-1_i64,rwork,i)
+
+       if(real(work(1)).gt.nwork) then
+          nwork=nint(2*real(work(1)))
+          deallocate(work)
+          allocate(work(nwork))
+       end if
+       call zheev("V","U",self%numbands,dyn_total,self%numbands,omega2,work,nwork,rwork,i)
+
+!!$       !Fix gauge
+!!$       if(abs(dyn_total(1, 1)) /= 0.0_r64) then
+!!$          dyn_total(:, :) = dyn_total(:, :)/(dyn_total(1, 1)/abs(dyn_total(1, 1)))
+!!$       end if
+
+       ! Eigenvectors are also returned if required.
+       if(present(eigenvect)) then
+          eigenvect(ik, :, :) = transpose(dyn_total)
+       end if
+
+       ! As is conventional, imaginary frequencies are returned as negative.
+       omegas(ik,:)=sign(sqrt(abs(omega2)),omega2)*hbar_eVps
+
+       ! Group velocities are obtained perturbatively. This is very
+       ! advatageous with respect to finite differences.
+       do i=1,self%numbands
+          do ip=1,3
+             velocities(ik,i,ip)=real(dot_product(dyn_total(:,i),&
+                  matmul(ddyn_total(:,:,ip),dyn_total(:,i))))
+          end do
+          velocities(ik,i,:)=velocities(ik,i,:)/(2.*omegas(ik,i))
+       end do
+    end do
+
+    velocities = velocities/hbar_eVps !Km/s
+
+!!$    deallocate(mm,omega2,rwork,fc_short,fc_diel,fc_total,&
+!!$         dyn_total,dyn_nac,ddyn_total,ddyn_nac,work,shortest)
+  end subroutine phonon_phonopy_ref
+  !!end test
+
+  ! Read FORCE_CONSTANTS_2ND.
+  subroutine read2fc(fc, scell, crys, filename_2fc)
+    real(r64),allocatable,intent(out) :: fc(:,:,:,:,:,:,:)
+    integer(i64), intent(in) :: scell(3)
+    type(crystal), intent(in) :: crys
+    character(*), intent(in) :: filename_2fc
+
+    integer(i64) :: ntot,atom1,atom2,i,j,ip,ierr
+    integer(i64) :: ix1,iy1,iz1,ix2,iy2,iz2,iatom1,iatom2
+    real(r64) :: mm(crys%numatoms,crys%numatoms)
+
+    real(r64), parameter :: unitfactor=9648.53336213 ! from eV/(A^2*amu) to THz^2
+
+    do i=1,crys%numatoms
+       mm(i,i)=crys%masses(crys%atomtypes(i))
+       do j=i+1,crys%numatoms
+          mm(i,j)=sqrt(crys%masses(crys%atomtypes(i))*crys%masses(crys%atomtypes(j)))
+          mm(j,i)=mm(i,j)
+       end do
+    end do
+
+    allocate(fc(crys%numatoms,3,scell(1),scell(2),scell(3),crys%numatoms,3))
+
+    ! Phonopy's 2nd-order format is quite straightforward. Each file
+    ! is essentially a sequence of 3x3 blocks, one for each pair of atoms
+    ! in the supercell. A single header line contains the number of atoms.
+    open(1,file=filename_2fc,status="old")
+    read(1,*) ntot
+    if(ntot.ne.scell(1)*scell(2)*scell(3)*crys%numatoms) then
+       if(this_image() == 1) &
+            write(1, *) "Error: wrong number of force constants for the specified scell"
+    end if
+    do i=1,ntot
+       do j=1,ntot
+          read(1,*) atom1,atom2
+          call split_index(atom1,scell(1),scell(2),scell(3),&
+               ix1,iy1,iz1,iatom1)
+          call split_index(atom2,scell(1),scell(2),scell(3),&
+               ix2,iy2,iz2,iatom2)
+          if(ix1.eq.1.and.iy1.eq.1.and.iz1.eq.1) then
+             do ip=1,3
+                read(1,*) fc(iatom1,ip,ix2,iy2,iz2,iatom2,:)
+             end do
+          else
+             do ip=1,3
+                read(1,*)
+             end do
+          end if
+       end do
+    end do
+    close(1)
+
+    ! After reading the force constants, they are reduced using the
+    ! tensor product of the square root of the atomic masses. It is these
+    ! reduced constants that enter the expression of the dynamical matrix.
+    do iatom1=1,crys%numatoms
+       do iatom2=1,crys%numatoms
+          fc(iatom1,:,:,:,:,iatom2,:)=&
+               fc(iatom1,:,:,:,:,iatom2,:)/mm(iatom1,iatom2)
+       end do
+    end do
+    fc=unitfactor*fc
+  end subroutine read2fc
+
+  ! Convert a supercell index of the kind used by Phonopy into
+  ! a set of unit cell+atom indices.
+  subroutine split_index(index,nx,ny,nz,ix,iy,iz,iatom)
+    integer(i64),intent(in) :: index,nx,ny,nz
+    integer(i64),intent(out) :: ix,iy,iz,iatom
+
+    integer(i64) :: tmp1,tmp2
+
+    call int_div(index-1,nx,tmp1,ix)
+    call int_div(tmp1,ny,tmp2,iy)
+    call int_div(tmp2,nz,iatom,iz)
+
+    ix=ix+1
+    iy=iy+1
+    iz=iz+1
+    iatom=iatom+1
+  end subroutine split_index
 
   subroutine allocate_xmassvar(self, ph, usetetra, Tmat)
     !! Intializes the xmass var matrix elements size (for that image)

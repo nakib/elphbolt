@@ -73,17 +73,22 @@ program V3offload
   call t_event%end_timer('V- on gpu, algo 1')
   print*, 'value = ', twonorm(pack(V2, .true.))
 
+  call t_event%start_timer('V- on gpu, low transfer')
+  call calculate_3ph_interaction_lowtransfer(ph, crys, num, V2)
+  call t_event%end_timer('V- on gpu, low transfer')
+  print*, 'value = ', twonorm(pack(V2, .true.))
+
   !Calculate ph-ph vertex (gpu, algo 2)
   call t_event%start_timer('V- on gpu, algo 2')
   call calculate_3ph_interaction_gpu_algo2(ph, crys, num, V2)
   call t_event%end_timer('V- on gpu, algo 2')
   print*, 'value = ', twonorm(pack(V2, .true.))
-
-  !Calculate ph-ph vertex (gpu, algo 3)
-  call t_event%start_timer('V- on gpu, algo 3')
-  call calculate_3ph_interaction_gpu_algo3(ph, crys, num, V2)
-  call t_event%end_timer('V- on gpu, algo 3')
-  print*, 'value = ', twonorm(pack(V2, .true.))
+!!$
+!!$  !Calculate ph-ph vertex (gpu, algo 3)
+!!$  call t_event%start_timer('V- on gpu, algo 3')
+!!$  call calculate_3ph_interaction_gpu_algo3(ph, crys, num, V2)
+!!$  call t_event%end_timer('V- on gpu, algo 3')
+!!$  print*, 'value = ', twonorm(pack(V2, .true.))
 
 !!$  !Calculate ph-ph vertex (gpu, algo 3)
 !!$  call t_event%start_timer('V- on gpu, algo 3')
@@ -265,6 +270,326 @@ contains
     !$acc end data
   end subroutine calculate_3ph_interaction_gpu
 
+  subroutine calculate_3ph_interaction_lowtransfer(ph, crys, num, V2)
+    type(phonon), intent(in) :: ph
+    type(crystal), intent(in) :: crys
+    type(numerics), intent(in) :: num
+    real(r64), allocatable, intent(out) :: V2(:, :, :, :, :)
+
+    !Local variables
+    integer(i64) :: istate1, nstates_irred, &
+         nprocs, s1, s2, s3, iq1_ibz, iq1, iq2, iq3_minus, it, &
+         q1_indvec(3), q2_indvec(3), q3_minus_indvec(3), &
+         idim, jdim, s2s3
+    real(r64) :: en1, en2, en3, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
+         aux
+    complex(r64) :: phases(ph%numtriplets), &
+         evecs(ph%nwv, ph%numbands, 3, crys%numatoms)
+
+    complex(r64) :: R1(3, 3, ph%numtriplets), R3(ph%numtriplets)
+
+
+    !TODO Reshape full eigenvectors list
+    print*, 'reshaping evecs'
+    do iq1 = 1, ph%nwv
+       do s1 = 1, ph%numbands
+          evecs(iq1, s1, :, :) = reshape(ph%evecs(iq1, s1, :), &
+               shape = [3, int(crys%numatoms, 4)])
+       end do
+    end do
+    print*, 'reshaping done'
+
+    print*, 'copying data to gpu'
+
+    !$acc data copyin(ph%ifc3, ph%Index_i, ph%Index_j, ph%Index_k, evecs) &
+    !$acc      create(iq1, s1, iq2, s2, iq3_minus, s3, R1, R3)
+
+    print*, 'copying data done'
+
+    !Total number of IBZ blocks states
+    nstates_irred = ph%nwv_irred*ph%numbands
+
+    allocate(V2(ph%numbands, ph%nwv, ph%numbands, ph%nwv, nstates_irred))
+
+    V2 = 0.0
+
+    !Run over first phonon IBZ states
+    !do istate1 = 1, nstates_irred
+    !Demux state index into branch (s) and wave vector (iq) indices
+    !call demux_state(istate1, ph%numbands, s1, iq1_ibz)
+    do iq1_ibz = 1, ph%nwv_irred
+
+       !Muxed index of wave vector from the IBZ index list.
+       !This will be used to access IBZ information from the FBZ quantities.
+       iq1 = ph%indexlist_irred(iq1_ibz)
+
+       !$acc update device(iq1)
+
+       !Initial (IBZ blocks) wave vector (crystal coords.)
+       q1 = ph%wavevecs(iq1, :)
+
+       !Convert from crystal to 0-based index vector
+       q1_indvec = nint(q1*ph%wvmesh)
+
+       do iq2 = 1, ph%nwv          
+          !Initial (IBZ blocks) wave vector (crystal coords.)
+          q2 = ph%wavevecs(iq2, :)
+
+          !Convert from crystal to 0-based index vector
+          q2_indvec = nint(q2*ph%wvmesh)
+
+          !Folded final phonon wave vector
+          q3_minus_indvec = modulo(q1_indvec - q2_indvec, ph%wvmesh) !0-based index vector
+          q3_minus = q3_minus_indvec/dble(ph%wvmesh) !crystal coords.
+
+          !Muxed index of q3_minus
+          iq3_minus = mux_vector(q3_minus_indvec, ph%wvmesh, 0_i64)
+
+          !$acc update device(iq2, iq3_minus)
+
+          q2_cart = matmul(crys%reclattvecs, q2)
+          q3_minus_cart = matmul(crys%reclattvecs, q3_minus)
+
+          phases = exp((0.0_r64, -1.0_r64)* &
+               (matmul(q2_cart, ph%R_j) + matmul(q3_minus_cart, ph%R_k)))
+
+          do s1 = 1, ph%numbands
+             !$acc update device(s1)
+
+             istate1 = mux_state(ph%numbands, s1, iq1_ibz)
+
+             do s2 = 1, ph%numbands
+                !$acc update device(s2)
+
+                do s3 = 1, ph%numbands
+                   !$acc update device(s3)
+
+!!$acc update device(iq1, iq2, iq3_minus, s1, s2, s3)
+
+                   aux = Vm2_3ph_gpu_lowtransfer(evecs, &
+                        iq1, s1, iq2, s2, iq3_minus, s3, &
+                        ph%Index_i(:), ph%Index_j(:), ph%Index_k(:), ph%ifc3(:,:,:,:), &
+                        phases(:), ph%numtriplets, ph%numbands, R1, R3)
+
+                   V2(s3, iq3_minus, s2, iq2, istate1) = aux
+                end do
+             end do
+          end do
+       end do
+    end do
+    !$acc end data
+  end subroutine calculate_3ph_interaction_lowtransfer
+
+  real(r64) function Vm2_3ph_gpu_lowtransfer(evecs, &
+       iq1, s1, iq2, s2, iq3_minus, s3, &
+       Index_i, Index_j, Index_k, ifc3, phases, ntrip, nb, R1, R3)
+    !! Function to calculate the squared 3-ph interaction vertex |V-|^2.
+
+    integer(i64), intent(in) :: ntrip, Index_i(ntrip), Index_j(ntrip), &
+         Index_k(ntrip), nb, iq1, s1, iq2, s2, iq3_minus, s3
+    complex(r64), intent(in) :: phases(ntrip), evecs(:, :, :, :)
+    real(r64), intent(in) :: ifc3(3, 3, 3, ntrip)
+    complex(r64), intent(inout) :: R1(3, 3, ntrip), R3(ntrip)
+
+    !Local variables
+    integer(i64) :: it, a, b, c, aind, bind, cind
+    integer(i64) :: ijk, nijk, ndim, idim
+    complex(r64) :: aux1, aux2, ev1(3), ev2(3), ev3(3)
+
+    nijk = ntrip
+    ndim = 3
+
+    !$acc data create(ev1, ev2, ev3)
+
+    !$acc parallel loop
+    do ijk = 1, nijk       
+       ev1(:) = evecs(iq1, s1, :, Index_i(ijk))
+       ev2(:) = evecs(iq2, s2, :, Index_j(ijk))
+       ev3(:) = evecs(iq3_minus, s3, :, Index_k(ijk))
+
+       do c = 1, ndim
+          do b = 1, ndim
+             aux1 = (0.0_r64, 0.0_r64)
+             do idim = 1, ndim
+                !aux1 = aux1 + ifc3(idim, b, c, ijk)*evecs(iq1, s1, idim, Index_i(ijk))
+                aux1 = aux1 + ifc3(idim, b, c, ijk)*ev1(idim)
+             end do
+             R1(b, c, ijk) = aux1
+          end do
+       end do
+
+       do c = 1, ndim
+          aux1 = (0.0_r64, 0.0_r64)
+          do idim = 1, ndim
+             !aux1 = aux1 + R1(idim, c, ijk)*conjg(evecs(iq2, s2, idim, Index_j(ijk)))
+             aux1 = aux1 + R1(idim, c, ijk)*conjg(ev2(idim))
+          end do
+          R1(c, 1, ijk) = aux1
+       end do
+
+       R3(ijk) = (0.0_r64, 0.0_r64)
+       do idim = 1, ndim
+          R3(ijk) = R3(ijk) + R1(idim, 1, ijk)*&
+               conjg(ev3(idim))
+          !conjg(evecs(iq3_minus, s3, idim, Index_k(ijk)))
+       end do
+    end do
+    !$acc update host(R3)
+
+    !$acc end data
+
+    !And the Fourier transform
+    Vm2_3ph_gpu_lowtransfer = abs(dot_product(conjg(R3), phases))**2
+  end function Vm2_3ph_gpu_lowtransfer
+
+!!$  subroutine calculate_3ph_interaction_gpu_flat(ph, crys, num, V2)
+!!$    type(phonon), intent(in) :: ph
+!!$    type(crystal), intent(in) :: crys
+!!$    type(numerics), intent(in) :: num
+!!$    real(r64), allocatable, intent(out) :: V2(:, :, :, :, :)
+!!$
+!!$    !Local variables
+!!$    integer(i64) :: istate1, nstates_irred, &
+!!$         nprocs, s1, s2, s3, iq1_ibz, iq1, iq2, iq3_minus, it, &
+!!$         q1_indvec(3), q2_indvec(3), q3_minus_indvec(3), &
+!!$         idim, jdim, s2s3
+!!$    real(r64) :: en1, en2, en3, q1(3), q2(3), q3_minus(3), q2_cart(3), &
+!!$         q3_minus_cart(3), aux, ifc3_flat(27*ph%numtriplets)
+!!$    
+!!$    !complex(r64) :: ev1(3, crys%numatoms), ev2(3, crys%numatoms), ev3(3, crys%numatoms)
+!!$    complex(r64) :: phases(ph%numtriplets)
+!!$
+!!$    !complex(r64) :: R3(ph%numtriplets)
+!!$    !complex(r64) :: ev12(3, 3, ph%numtriplets)
+!!$    !complex(r64) :: ev123(3, 3, 3, ph%numtriplets)
+!!$    complex(r64) :: ev123_flat(27*ph%numtriplets)
+!!$
+!!$    ifc3_flat = pack(ph%ifc3, mask = .true.)
+!!$    
+!!$    !$acc data copyin(ifc3_flat, ph%Index_i, ph%Index_j, ph%Index_k, ph%evecs) &
+!!$    !$acc      create(ev123_flat)
+!!$
+!!$    !Total number of IBZ blocks states
+!!$    nstates_irred = ph%nwv_irred*ph%numbands
+!!$
+!!$    allocate(V2(ph%numbands, ph%nwv, ph%numbands, ph%nwv, nstates_irred))
+!!$
+!!$    V2 = 0.0
+!!$
+!!$    !Run over first phonon IBZ states
+!!$    !do istate1 = 1, nstates_irred
+!!$    !Demux state index into branch (s) and wave vector (iq) indices
+!!$    !call demux_state(istate1, ph%numbands, s1, iq1_ibz)
+!!$    do iq1_ibz = 1, ph%nwv_irred
+!!$
+!!$       !Muxed index of wave vector from the IBZ index list.
+!!$       !This will be used to access IBZ information from the FBZ quantities.
+!!$       iq1 = ph%indexlist_irred(iq1_ibz)
+!!$
+!!$       !Initial (IBZ blocks) wave vector (crystal coords.)
+!!$       q1 = ph%wavevecs(iq1, :)
+!!$
+!!$       !Convert from crystal to 0-based index vector
+!!$       q1_indvec = nint(q1*ph%wvmesh)
+!!$
+!!$       do iq2 = 1, ph%nwv
+!!$          !Initial (IBZ blocks) wave vector (crystal coords.)
+!!$          q2 = ph%wavevecs(iq2, :)
+!!$
+!!$          !Convert from crystal to 0-based index vector
+!!$          q2_indvec = nint(q2*ph%wvmesh)
+!!$
+!!$          !Folded final phonon wave vector
+!!$          q3_minus_indvec = modulo(q1_indvec - q2_indvec, ph%wvmesh) !0-based index vector
+!!$          q3_minus = q3_minus_indvec/dble(ph%wvmesh) !crystal coords.
+!!$
+!!$          !Muxed index of q3_minus
+!!$          iq3_minus = mux_vector(q3_minus_indvec, ph%wvmesh, 0_i64)
+!!$
+!!$          q2_cart = matmul(crys%reclattvecs, q2)
+!!$          q3_minus_cart = matmul(crys%reclattvecs, q3_minus)
+!!$
+!!$          phases = exp((0.0_r64, -1.0_r64)* &
+!!$               (matmul(q2_cart, ph%R_j) + matmul(q3_minus_cart, ph%R_k)))
+!!$
+!!$          do s1 = 1, ph%numbands
+!!$
+!!$             istate1 = mux_state(ph%numbands, s1, iq1_ibz)
+!!$
+!!$             !ev1 = reshape(ph%evecs(iq1, s1, :), shape = [3, crys%numatoms])
+!!$             !!$acc update device(ev1)
+!!$
+!!$             do s2 = 1, ph%numbands
+!!$                !ev2 = reshape(ph%evecs(iq2, s2, :), shape = [3, crys%numatoms])                     
+!!$                !!$acc update device(ev2)
+!!$
+!!$                do s3 = 1, ph%numbands
+!!$                   !ev3 = reshape(ph%evecs(iq3_minus, s3, :), shape = [3, crys%numatoms])
+!!$                   !!$acc update device(ev3)
+!!$
+!!$                   aux = Vm2_3ph_gpu_flat(s1, iq1, iq2, s2, iq3_minus, s3, &
+!!$                        ph%Index_i(:), ph%Index_j(:), ph%Index_k(:), &
+!!$                        phases(:), ph%numtriplets, ph%numbands)
+!!$
+!!$                   V2(s3, iq3_minus, s2, iq2, istate1) = aux
+!!$                end do
+!!$             end do
+!!$          end do
+!!$       end do
+!!$    end do
+!!$    !$acc end data
+!!$  end subroutine calculate_3ph_interaction_gpu_flat
+!!$
+!!$  real(r64) function Vm2_3ph_gpu_flat(s1, iq1, iq2, s2, iq3_minus, s3, &
+!!$       Index_i, Index_j, Index_k, phases, ntrip, nb)
+!!$    !! Function to calculate the squared 3-ph interaction vertex |V-|^2.
+!!$
+!!$    integer(i64), intent(in) :: ntrip, Index_i(ntrip), Index_j(ntrip), Index_k(ntrip), &
+!!$         nb, s1, iq1, iq2, s2, iq3_minus, s3
+!!$    complex(r64), intent(in) :: phases(ntrip)
+!!$
+!!$    !Local variables
+!!$    integer(i64) :: it, a, b, c, aind, bind, cind, numatoms, idx
+!!$    integer(i64) :: ijk, nijk, ndim, idim, j, atom1_ind, atom2_ind, atom3_ind
+!!$    complex(r64) :: aux1, aux2, R3(ntrip)
+!!$
+!!$    nijk = ntrip
+!!$    ndim = 3
+!!$    numatoms = nb/3
+!!$
+!!$    R3 = (0.0_r64, 0.0_r64)
+!!$
+  !acc data copyin(iq1, iq2, iq3_minus, s1, s2, s3) copy(R3)
+!!$    !$acc data copy(R3)
+!!$
+!!$    !$acc parallel loop
+!!$    do ijk = 1, nijk
+!!$       !0-based
+!!$       atom1_ind = 3*(Index_i(ijk) - 1)
+!!$       atom2_ind = 3*(Index_j(ijk) - 1)
+!!$       atom3_ind = 3*(Index_k(ijk) - 1)
+!!$       do c = 1, 3
+!!$          do b = 1, 3
+!!$             do a = 1, 3
+!!$                idx = a + (b - 1)*3 + (c - 1)*9 + (ijk - 1)*27
+!!$
+!!$                ev123_flat(idx) = ph%evecs(iq1, s1, atom1_ind + a)*&
+!!$                     conjg(ph%evecs(iq2, s2, atom2_ind + b))*&
+!!$                     conjg(ph%evecs(iq3_minus, s3, atom3_ind + c))
+!!$             end do
+!!$          end do
+!!$       end do
+!!$
+!!$       idx = (ijk - 1)*27
+!!$       R3(ijk) = R3(ijk) + &
+!!$            dot_product(ifc3_flat(idx + 1:idx + 27), ev123_flat(idx + 1:idx + 27))
+!!$    end do
+!!$    !$acc end data
+!!$
+!!$    !And the Fourier transform
+!!$    Vm2_3ph_gpu_flat = abs(dot_product(conjg(R3), phases))**2
+!!$  end function Vm2_3ph_gpu_flat
+
   subroutine calculate_3ph_interaction_gpu_algo2(ph, crys, num, V2)
     type(phonon), intent(in) :: ph
     type(crystal), intent(in) :: crys
@@ -351,97 +676,97 @@ contains
 
     !end associate
   end subroutine calculate_3ph_interaction_gpu_algo2
-
-  subroutine calculate_3ph_interaction_gpu_algo3(ph, crys, num, V2)
-    type(phonon), intent(in) :: ph
-    type(crystal), intent(in) :: crys
-    type(numerics), intent(in) :: num
-    real(r64), allocatable, intent(out) :: V2(:, :, :, :, :)
-
-    !Local variables
-    integer(i64) :: istate1, nstates_irred, &
-         nprocs, s1, s2, s3, iq1_ibz, iq1, iq2, iq3_minus, it, &
-         q1_indvec(3), q2_indvec(3), q3_minus_indvec(3), &
-         idim, jdim, s2s3
-    real(r64) :: en1, en2, en3, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
-         aux
-    complex(r64) :: phases(ph%numtriplets)
-
-    complex(r64) :: R1(3, 3, ph%numtriplets), R3(ph%numtriplets)
-
-    !$acc data copyin(ph%ifc3, ph%Index_i, ph%Index_j, ph%Index_k) &
-    !$acc      create(R1, R3, ev1, ev2, ev3)
-
-    !Total number of IBZ blocks states
-    nstates_irred = ph%nwv_irred*ph%numbands
-
-    allocate(V2(ph%numbands, ph%nwv, ph%numbands, ph%nwv, nstates_irred))
-
-    V2 = 0.0
-
-    !Run over first phonon IBZ states
-    !do istate1 = 1, nstates_irred
-    !Demux state index into branch (s) and wave vector (iq) indices
-    !call demux_state(istate1, ph%numbands, s1, iq1_ibz)
-    do iq1_ibz = 1, ph%nwv_irred
-
-       !Muxed index of wave vector from the IBZ index list.
-       !This will be used to access IBZ information from the FBZ quantities.
-       iq1 = ph%indexlist_irred(iq1_ibz)
-
-       !Initial (IBZ blocks) wave vector (crystal coords.)
-       q1 = ph%wavevecs(iq1, :)
-
-       !Convert from crystal to 0-based index vector
-       q1_indvec = nint(q1*ph%wvmesh)
-
-       do iq2 = 1, ph%nwv
-          !Initial (IBZ blocks) wave vector (crystal coords.)
-          q2 = ph%wavevecs(iq2, :)
-
-          !Convert from crystal to 0-based index vector
-          q2_indvec = nint(q2*ph%wvmesh)
-
-          !Folded final phonon wave vector
-          q3_minus_indvec = modulo(q1_indvec - q2_indvec, ph%wvmesh) !0-based index vector
-          q3_minus = q3_minus_indvec/dble(ph%wvmesh) !crystal coords.
-
-          !Muxed index of q3_minus
-          iq3_minus = mux_vector(q3_minus_indvec, ph%wvmesh, 0_i64)
-
-          q2_cart = matmul(crys%reclattvecs, q2)
-          q3_minus_cart = matmul(crys%reclattvecs, q3_minus)
-
-          phases = exp((0.0_r64, -1.0_r64)* &
-               (matmul(q2_cart, ph%R_j) + matmul(q3_minus_cart, ph%R_k)))
-
-          do s1 = 1, ph%numbands
-
-             istate1 = mux_state(ph%numbands, s1, iq1_ibz)
-
-             ev1 = reshape(ph%evecs(iq1, s1, :), shape = [3, int(crys%numatoms, 4)])
-             !$acc update device(ev1)
-
-             do s2 = 1, ph%numbands
-                ev2 = reshape(ph%evecs(iq2, s2, :), shape = [3, int(crys%numatoms, 4)])
-                !$acc update device(ev2)
-
-                do s3 = 1, ph%numbands
-                   ev3 = reshape(ph%evecs(iq3_minus, s3, :), shape = [3, int(crys%numatoms, 4)])
-                   !$acc update device(ev3)
-
-                   aux = Vm2_3ph_gpu_algo3(ev1, ev2, ev3, &
-                        ph%Index_i(:), ph%Index_j(:), ph%Index_k(:), ph%ifc3(:,:,:,:), &
-                        phases(:), ph%numtriplets, ph%numbands, R1, R3)
-
-                   V2(s3, iq3_minus, s2, iq2, istate1) = aux
-                end do
-             end do
-          end do
-       end do
-    end do
-    !$acc end data
-  end subroutine calculate_3ph_interaction_gpu_algo3
+!!$
+!!$  subroutine calculate_3ph_interaction_gpu_algo3(ph, crys, num, V2)
+!!$    type(phonon), intent(in) :: ph
+!!$    type(crystal), intent(in) :: crys
+!!$    type(numerics), intent(in) :: num
+!!$    real(r64), allocatable, intent(out) :: V2(:, :, :, :, :)
+!!$
+!!$    !Local variables
+!!$    integer(i64) :: istate1, nstates_irred, &
+!!$         nprocs, s1, s2, s3, iq1_ibz, iq1, iq2, iq3_minus, it, &
+!!$         q1_indvec(3), q2_indvec(3), q3_minus_indvec(3), &
+!!$         idim, jdim, s2s3
+!!$    real(r64) :: en1, en2, en3, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
+!!$         aux
+!!$    complex(r64) :: phases(ph%numtriplets)
+!!$
+!!$    complex(r64) :: R1(3, 3, ph%numtriplets), R3(ph%numtriplets)
+!!$
+!!$    !$acc data copyin(ph%ifc3, ph%Index_i, ph%Index_j, ph%Index_k) &
+!!$    !$acc      create(R1, R3, ev1, ev2, ev3)
+!!$
+!!$    !Total number of IBZ blocks states
+!!$    nstates_irred = ph%nwv_irred*ph%numbands
+!!$
+!!$    allocate(V2(ph%numbands, ph%nwv, ph%numbands, ph%nwv, nstates_irred))
+!!$
+!!$    V2 = 0.0
+!!$
+!!$    !Run over first phonon IBZ states
+!!$    !do istate1 = 1, nstates_irred
+!!$    !Demux state index into branch (s) and wave vector (iq) indices
+!!$    !call demux_state(istate1, ph%numbands, s1, iq1_ibz)
+!!$    do iq1_ibz = 1, ph%nwv_irred
+!!$
+!!$       !Muxed index of wave vector from the IBZ index list.
+!!$       !This will be used to access IBZ information from the FBZ quantities.
+!!$       iq1 = ph%indexlist_irred(iq1_ibz)
+!!$
+!!$       !Initial (IBZ blocks) wave vector (crystal coords.)
+!!$       q1 = ph%wavevecs(iq1, :)
+!!$
+!!$       !Convert from crystal to 0-based index vector
+!!$       q1_indvec = nint(q1*ph%wvmesh)
+!!$
+!!$       do iq2 = 1, ph%nwv
+!!$          !Initial (IBZ blocks) wave vector (crystal coords.)
+!!$          q2 = ph%wavevecs(iq2, :)
+!!$
+!!$          !Convert from crystal to 0-based index vector
+!!$          q2_indvec = nint(q2*ph%wvmesh)
+!!$
+!!$          !Folded final phonon wave vector
+!!$          q3_minus_indvec = modulo(q1_indvec - q2_indvec, ph%wvmesh) !0-based index vector
+!!$          q3_minus = q3_minus_indvec/dble(ph%wvmesh) !crystal coords.
+!!$
+!!$          !Muxed index of q3_minus
+!!$          iq3_minus = mux_vector(q3_minus_indvec, ph%wvmesh, 0_i64)
+!!$
+!!$          q2_cart = matmul(crys%reclattvecs, q2)
+!!$          q3_minus_cart = matmul(crys%reclattvecs, q3_minus)
+!!$
+!!$          phases = exp((0.0_r64, -1.0_r64)* &
+!!$               (matmul(q2_cart, ph%R_j) + matmul(q3_minus_cart, ph%R_k)))
+!!$
+!!$          do s1 = 1, ph%numbands
+!!$
+!!$             istate1 = mux_state(ph%numbands, s1, iq1_ibz)
+!!$
+!!$             ev1 = reshape(ph%evecs(iq1, s1, :), shape = [3, int(crys%numatoms, 4)])
+!!$             !$acc update device(ev1)
+!!$
+!!$             do s2 = 1, ph%numbands
+!!$                ev2 = reshape(ph%evecs(iq2, s2, :), shape = [3, int(crys%numatoms, 4)])
+!!$                !$acc update device(ev2)
+!!$
+!!$                do s3 = 1, ph%numbands
+!!$                   ev3 = reshape(ph%evecs(iq3_minus, s3, :), shape = [3, int(crys%numatoms, 4)])
+!!$                   !$acc update device(ev3)
+!!$
+!!$                   aux = Vm2_3ph_gpu_algo3(ev1, ev2, ev3, &
+!!$                        ph%Index_i(:), ph%Index_j(:), ph%Index_k(:), ph%ifc3(:,:,:,:), &
+!!$                        phases(:), ph%numtriplets, ph%numbands, R1, R3)
+!!$
+!!$                   V2(s3, iq3_minus, s2, iq2, istate1) = aux
+!!$                end do
+!!$             end do
+!!$          end do
+!!$       end do
+!!$    end do
+!!$    !$acc end data
+!!$  end subroutine calculate_3ph_interaction_gpu_algo3
 
 !!$  subroutine calculate_3ph_interaction_gpu_algo3(ph, crys, num, V2)
 !!$    type(phonon), intent(in) :: ph
@@ -731,66 +1056,66 @@ contains
 
     Vm2_3ph_gpu_algo2 = abs(sum(R3))**2
   end function Vm2_3ph_gpu_algo2
-
-  real(r64) function Vm2_3ph_gpu_algo3(ev1, ev2, ev3, &
-       Index_i, Index_j, Index_k, ifc3, phases, ntrip, nb, R1, R3)
-    !! Function to calculate the squared 3-ph interaction vertex |V-|^2.
-
-    integer(i64), intent(in) :: ntrip, Index_i(ntrip), Index_j(ntrip), Index_k(ntrip), nb
-    complex(r64), intent(in) :: phases(ntrip), ev1(3, nb/3), ev2(3, nb/3), ev3(3, nb/3)
-    real(r64), intent(in) :: ifc3(3, 3, 3, ntrip)
-    complex(r64), intent(inout) :: R1(3, 3, ntrip), R3(ntrip)
-
-    !Local variables
-    integer(i64) :: it, a, b, c, iat, jnd, knd
-    integer(i64) :: ijk, nijk, ndim, idim
-    complex(r64) :: aux1, aux2
-
-    nijk = ntrip
-    ndim = 3
-
-    !$acc parallel loop gang vector private(aux1, idim, iat, jnd, knd)
-    do ijk = 1, nijk
-       !$acc cache(ev1, ev2, ev3)
-       iat = Index_i(ijk)
-       jnd = Index_j(ijk)
-       knd = Index_k(ijk)
-
-       !R1(b, c, ijk)
-       do c = 1, ndim
-          do b = 1, ndim
-             aux1 = (0.0_r64, 0.0_r64)
-             do idim = 1, ndim
-                aux1 = aux1 + ifc3(idim, b, c, ijk)*ev1(idim, iat)
-             end do
-             R1(b, c, ijk) = aux1
-          end do
-       end do
-
-       !Contrat with ev2
-       do c = 1, ndim
-          aux1 = (0.0_r64, 0.0_r64)
-          do idim = 1, ndim
-             aux1 = aux1 + R1(idim, c, ijk)*conjg(ev2(idim, jnd))
-          end do
-          R1(c, 1, ijk) = aux1
-       end do
-
-       !Contract with ev3
-       R3(ijk) = (0.0_r64, 0.0_r64)
-       do idim = 1, ndim
-          R3(ijk) = R3(ijk) + R1(idim, 1, ijk)*conjg(ev3(idim, Index_K(ijk)))
-       end do
-
-       !Fourier phase
-       R3(ijk) = R3(ijk)*phases(ijk)
-    end do
-    !$acc update host(R3)
-
-    !And the Fourier transform
-    Vm2_3ph_gpu_algo3 = abs(sum(R3))**2
-  end function Vm2_3ph_gpu_algo3
-
+!!$
+!!$  real(r64) function Vm2_3ph_gpu_algo3(ev1, ev2, ev3, &
+!!$       Index_i, Index_j, Index_k, ifc3, phases, ntrip, nb, R1, R3)
+!!$    !! Function to calculate the squared 3-ph interaction vertex |V-|^2.
+!!$
+!!$    integer(i64), intent(in) :: ntrip, Index_i(ntrip), Index_j(ntrip), Index_k(ntrip), nb
+!!$    complex(r64), intent(in) :: phases(ntrip), ev1(3, nb/3), ev2(3, nb/3), ev3(3, nb/3)
+!!$    real(r64), intent(in) :: ifc3(3, 3, 3, ntrip)
+!!$    complex(r64), intent(inout) :: R1(3, 3, ntrip), R3(ntrip)
+!!$
+!!$    !Local variables
+!!$    integer(i64) :: it, a, b, c, iat, jnd, knd
+!!$    integer(i64) :: ijk, nijk, ndim, idim
+!!$    complex(r64) :: aux1, aux2
+!!$
+!!$    nijk = ntrip
+!!$    ndim = 3
+!!$
+!!$    !$acc parallel loop gang vector private(aux1, idim, iat, jnd, knd)
+!!$    do ijk = 1, nijk
+!!$       !$acc cache(ev1, ev2, ev3)
+!!$       iat = Index_i(ijk)
+!!$       jnd = Index_j(ijk)
+!!$       knd = Index_k(ijk)
+!!$
+!!$       !R1(b, c, ijk)
+!!$       do c = 1, ndim
+!!$          do b = 1, ndim
+!!$             aux1 = (0.0_r64, 0.0_r64)
+!!$             do idim = 1, ndim
+!!$                aux1 = aux1 + ifc3(idim, b, c, ijk)*ev1(idim, iat)
+!!$             end do
+!!$             R1(b, c, ijk) = aux1
+!!$          end do
+!!$       end do
+!!$
+!!$       !Contrat with ev2
+!!$       do c = 1, ndim
+!!$          aux1 = (0.0_r64, 0.0_r64)
+!!$          do idim = 1, ndim
+!!$             aux1 = aux1 + R1(idim, c, ijk)*conjg(ev2(idim, jnd))
+!!$          end do
+!!$          R1(c, 1, ijk) = aux1
+!!$       end do
+!!$
+!!$       !Contract with ev3
+!!$       R3(ijk) = (0.0_r64, 0.0_r64)
+!!$       do idim = 1, ndim
+!!$          R3(ijk) = R3(ijk) + R1(idim, 1, ijk)*conjg(ev3(idim, Index_K(ijk)))
+!!$       end do
+!!$
+!!$       !Fourier phase
+!!$       R3(ijk) = R3(ijk)*phases(ijk)
+!!$    end do
+!!$    !$acc update host(R3)
+!!$
+!!$    !And the Fourier transform
+!!$    Vm2_3ph_gpu_algo3 = abs(sum(R3))**2
+!!$  end function Vm2_3ph_gpu_algo3
+!!$
   subroutine calculate_phases_on_gpu(q2_cart, q3_minus_cart, R_j, R_k, phases, ntrip)
     real(r64), intent(in) :: q2_cart(3), q3_minus_cart(3)
     real(r64), intent(in) :: R_j(3, ntrip), R_k(3, ntrip)
@@ -806,4 +1131,27 @@ contains
             dot_product(q3_minus_cart, R_k(:, it))))
     end do
   end subroutine calculate_phases_on_gpu
+!!$
+!!$  subroutine outer_complex(A, B, C)
+!!$    !! Outer product of A and B
+!!$    !!
+!!$    !! C_ij = A_i.B_j
+!!$
+!!$    complex(r64), intent(in) :: A(:), B(:)
+!!$    complex(r64), intent(out) :: C(:, :) !2D-array
+!!$    integer :: j, len_a, len_b
+!!$
+!!$    !$acc routine seq
+!!$    len_a = size(A)
+!!$    len_b = size(B)
+!!$    if(len_a /= size(C, 1) &
+!!$         .or. len_b /= size(C, 2)) then
+!!$       print *, 'Dimension mismatch. Exiting.'
+!!$       call exit
+!!$    end if
+!!$
+!!$    do j = 1, len_b
+!!$       C(:, j) = A(:)*B(j)
+!!$    end do
+!!$  end subroutine outer_complex
 end program V3offload
