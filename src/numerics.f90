@@ -385,8 +385,8 @@ contains
        end if
 
        ! Stop the mesh size for Hilbert transform from blowing up
-       if(fft_next_pow2(self%ncont_mesh) > 16384) &
-            call exit_with_message('Mesh size for Hilbert transform exceed 16384. Decrease the value of ncont_mesh.')
+       !if(fft_next_pow2(self%ncont_mesh) > 16384) &
+       !     call exit_with_message('Mesh size for Hilbert transform exceed 16384. Decrease the value of ncont_mesh.')
     end if
 
     !Set BTE solution type
