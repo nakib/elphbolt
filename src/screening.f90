@@ -404,7 +404,7 @@ contains
                 spec_eps(iOmega) = spec_eps(iOmega) + &
                      (Fermi(ekp - Omegas(iOmega), el%chempot, crys%T) - &
                      Fermi(ekp, el%chempot, crys%T))*overlap* &
-                     deltafunc_pol(ik, m, ekp - ek - Omegas(iOmega), crys, el) 
+                     deltafunc_pol(ik, m, kpvel, ekp - ek - Omegas(iOmega), crys, el) 
 
 !!$                spec_eps(iOmega) = spec_eps(iOmega) + &
 !!$                     Fermi(ekp, el%chempot, crys%T)* &
@@ -526,7 +526,7 @@ contains
                      (Fermi(ek, el%chempot, crys%T) - &
                      (fnk - beta*fnk*(1.0_r64 - fnk)*hbar_eVps*&
                      dot_product(qcart, el%vels(ik, n, :))))*overlap* &
-                     deltafunc_pol(ik, m, ekp - ek - Omegas(iOmega), crys, el) 
+                     deltafunc_pol(ik, m, kpvel, ekp - ek - Omegas(iOmega), crys, el) 
 
 !$!                 if(Omegas(iOmega)>0.02) then 
 !$!                   spec_eps(iOmega) = spec_eps(iOmega) + &
@@ -575,9 +575,9 @@ contains
   end subroutine spectral_head_polarizability_2d_lowqpath_old
 
 
-  pure function deltafunc_pol(ik, m, en, crys, el) 
+  pure function deltafunc_pol(ik, m, kpvel, en, crys, el) 
     integer(i64), intent(in) :: ik, m
-    real(r64), intent(in) :: en
+    real(r64), intent(in) :: en, kpvel(3)
     type(electron), intent(in) :: el
     type(crystal), intent(in) :: crys
     real(r64) :: sigma, deltafunc_pol
@@ -595,7 +595,7 @@ contains
     aux = 0.0_r64
     do dim = 1, 3
        aux = aux + &
-            dot_product(el%vels(ik, m, :), Qs(dim, :))**2
+             dot_product(el%vels(ik, m, :), Qs(dim, :))**2
     end do
     sigma = hbar_eVps*onebyroot12*sqrt(aux)
     
