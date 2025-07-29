@@ -384,3 +384,4 @@ contains
   end subroutine average_over_degenerate_subspace
 
 end program check_interactions_symmetries
+

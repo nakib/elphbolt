@@ -1241,7 +1241,7 @@ contains
     integer, intent(in) :: dim
     logical, intent(in) :: blocks
 
-    !Locals
+    !Locals 
     real(r64) :: diff(3)
     real(r64), allocatable :: f_stencil(:, :, :)
     integer(i64) :: ik, ib, nk, nb, i, j, k, center(3), stencil(6), &
@@ -1252,10 +1252,9 @@ contains
     nb = size(f, 2)
 
     allocate(f_stencil(6, nb, 3))
-
+    f_stencil = 0.0_r64
     !k-mesh spacing between opposite stencil points (fractional)
     diff = 2.0_r64/kmesh
-
     !Calculate Jacobian using a nearest neighbor stencil
     gradf = 0.0_r64
     do ik = 1, nk !Run over all wave vectors in FBZ
@@ -1268,23 +1267,23 @@ contains
        i = center(1)
        j = center(2)
        k = center(3)
-
-       ! Contruct nearest neighbot stencil, taking into account
+       !  if (dim == 2) print *, "ik = ", ik, " center = ", center
+       ! Contruct nearest neighbor stencil, taking into account
        ! the periodic boundary condition
        sten_count = 0
        do dim_k = 1, dim
           !This component of the center of the stencil
           this = center(dim_k)
-          if(this == kmesh(dim_k)) then
+          if (kmesh(dim_k) == 1) then
              this_plus1 = 1
-             this_minus1 = this - 1
-          else if(this == 1) then
-             this_plus1 = this + 1
-             this_minus1 = kmesh(dim_k)
+             this_minus1 = 1
           else
-             this_plus1 = this + 1
-             this_minus1 = this - 1
+             this_plus1 = mod(this, kmesh(dim_k)) + 1
+             this_minus1 = mod(this - 2 + kmesh(dim_k), kmesh(dim_k)) + 1
           end if
+
+          !  if (dim == 2) print *, "dim_k = ", dim_k, " this = ", this, &
+          !       " this_plus1 = ", this_plus1, " this_minus1 = ", this_minus1
 
           if(dim_k == 1) then
              stencil(sten_count + 1) = mux_vector([this_minus1, j, k], kmesh, 1_i64)
@@ -1298,7 +1297,10 @@ contains
           end if
           sten_count = sten_count + 2
        end do
+       !  if (dim == 2) print *, "ik = ", ik, " stencil = ", stencil(:4)
 
+
+       !  print *, "HERERERERE"
        ! Get function values on the stencil
        do isten = 1, 2*dim !stencil points 5 (z - 1) and 6 (z + 1) might not be reached. Good.
           if(blocks) then
@@ -1314,13 +1316,15 @@ contains
                 f_stencil(isten, :, :) = f(ik, :, :)
              end if
           else
+             !  print *, "ik = ", ik, " sten = ", stencil(isten)
              f_stencil(isten, :, :) = f(stencil(isten), :, :)
           end if
        end do
+       !  print *, "ik = ", ik
 
        ! For the 2d case, the z-component is identically 0 since gradf was initialized
        ! to be zero.
-       do dim_f = 1, dim
+       do dim_f = 1, 3
           do dim_k = 1, dim
              gradf(ik, :, dim_k, dim_f) = &
                   (f_stencil(2*dim_k, :, dim_f) - f_stencil(2*dim_k - 1, :, dim_f)) &
@@ -1329,10 +1333,11 @@ contains
 
           ! Convert to cartesian coordinates
           do ib = 1, nb
-             gradf(ik, ib, :, dim_f) = matmul(lattvecs, gradf(ik, ib, :, dim_f))/twopi
+             gradf(ik, ib, :, dim_f) = matmul(gradf(ik, ib, :, dim_f), transpose(lattvecs))/twopi
           end do
        end do
     end do
+    !  print *, "gradf = ", gradf
   end subroutine Jacobian
 
   subroutine precompute_interpolation_corners_and_weights(coarsemesh, refinement, qs, idcorners, weights)
