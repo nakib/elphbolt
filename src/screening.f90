@@ -350,21 +350,6 @@ contains
           do iOmega = nOmegas/2 + 2, nOmegas
              do n = 1, wann%numwannbands
 
-                ! np and n
-                !no = sign(1_i64, n - el%indlowconduction)
-                !npo = sign(1_i64, m - el%indlowconduction)
-                if(n==4) then
-                  no = -1
-                else
-                  no = 1
-                end if
-                if(m==4) then
-                  npo = -1
-                else
-                  npo = 1
-                end if
-
-            
                 !kvec = matmul(crys%reclattvecs, el%wavevecs(ik, :))
                 !kpqvec = matmul(crys%reclattvecs, kppathvecs(1, :))
 !$!                 overlap = (1.0_r64 + no*npo*dot_product(el%vels(ik, m, :), kpvel(1, n, :))&
@@ -456,7 +441,7 @@ contains
     integer(i64) :: m, n, ik, iOmega, nOmegas, k_indvec(3), kp_indvec(3), no, npo
     real(r64) :: overlap, ek, ekp, delta, Omega_l, Omega_r, &
          el_ens_kp(1, el%numbands), kppathvecs(1, 3), kvec(3), kpqvec(3),&
-         kpvel(1, el%numbands, 3), beta, fnk, qcart(3), kunit(3)
+         kpvel(1, el%numbands, 3), beta, fnk, qcart(3), kunit(3), delta_func
     complex(r64) :: el_evecs_kp(1, el%numbands, el%numbands)
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
 
@@ -522,12 +507,14 @@ contains
 !$!                      el%simplex_count, el%simplex_evals)
                 
                 ! Delta replaced by Gaussian
+                delta_func = deltafunc_pol(ik, m, kpvel, ekp - ek - Omegas(iOmega), crys, el)
                 spec_eps(iOmega) = spec_eps(iOmega) + &
                      (Fermi(ek, el%chempot, crys%T) - &
                      (fnk - beta*fnk*(1.0_r64 - fnk)*hbar_eVps*&
                      dot_product(qcart, el%vels(ik, n, :))))*overlap* &
-                     deltafunc_pol(ik, m, kpvel, ekp - ek - Omegas(iOmega), crys, el) 
-
+                     delta_func 
+                !if (delta_func > 1e-5) print *,"Gauss overlap==>", delta_func
+                !write(1000, *) delta_func
 !$!                 if(Omegas(iOmega)>0.02) then 
 !$!                   spec_eps(iOmega) = spec_eps(iOmega) + &
 !$!                        (Fermi(ek, el%chempot, crys%T) - &
@@ -583,25 +570,28 @@ contains
     real(r64) :: sigma, deltafunc_pol
    
     integer(i64) :: dim
-    real (i64) :: onebyroot2pi, onebyroot12, Qs(3, 3), aux
+    real (i64) :: onebyroot2pi, onebyroot12, Qs(2, 3), aux
     
     ! Compute Qs for the sigma Gaussian
     onebyroot2pi = 1.0_r64/sqrt(2.0*pi)
     onebyroot12 = 1.0_r64/sqrt(12.0_r64)
-    do dim = 1, 3
-       Qs(dim, :) = crys%reclattvecs(dim, :)/el%wvmesh(dim)
+    do dim = 1, 2
+       !Qs(dim, :) = crys%reclattvecs(dim, :)/el%wvmesh(dim)
+       Qs(dim, :) = crys%reclattvecs(:, dim)/el%wvmesh(dim)
     end do
     ! Calculate adaptive smearing
     aux = 0.0_r64
-    do dim = 1, 3
+    do dim = 1, 2
        aux = aux + &
-             dot_product(el%vels(ik, m, :), Qs(dim, :))**2
+             dot_product(el%vels(ik, m, :) - kpvel, Qs(dim, :))**2
     end do
     sigma = hbar_eVps*onebyroot12*sqrt(aux)
     
     !sigma = 1e-2_r64
-    deltafunc_pol = onebyroot2pi/sigma/product(el%wvmesh)*&
-                    exp(-0.5_r64*(en/sigma)**2)
+    deltafunc_pol = max(onebyroot2pi/sigma/product(el%wvmesh)*&
+                    exp(-0.5_r64*(en/sigma)**2), 1.0e-10_r64)
+!$!     deltafunc_pol = onebyroot2pi/sigma/product(el%wvmesh)*&
+!$!                     exp(-0.5_r64*(en/sigma)**2)
   end function deltafunc_pol
 
 !!$  !DEBUG/TEST
