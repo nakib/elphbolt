@@ -22,6 +22,8 @@ module misc
   use fftpack, only: fft, ifft
 
   implicit none
+  
+
 
   public :: operator(.umklapp.)
   private :: sort_int, sort_real, Pade_coeffs, twonorm_real_rank1, twonorm_real_rank2, &
@@ -1300,7 +1302,6 @@ contains
        !  if (dim == 2) print *, "ik = ", ik, " stencil = ", stencil(:4)
 
 
-       !  print *, "HERERERERE"
        ! Get function values on the stencil
        do isten = 1, 2*dim !stencil points 5 (z - 1) and 6 (z + 1) might not be reached. Good.
           if(blocks) then
