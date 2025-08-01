@@ -13,7 +13,7 @@ program test_misc
 
   implicit none
 
-!   external :: pgbeg, pgenv, pgline, pgend
+  !   external :: pgbeg, pgenv, pgline, pgend
 
   integer :: itest, dim, nb, nk
   integer, parameter :: num_tests = 49
@@ -630,17 +630,17 @@ program test_misc
   b_matrix = twopi*lattvecs
   do ik1 = 1, size(indexlist)
      if (ik1 <= size(indexlist)/2) then 
-          kc1 = twopi* real(ik1-1)/kmesh(1)
-          nk = mux_vector([ik1*1_i64, 1_i64, 1_i64], kmesh, 1_i64)
+        kc1 = twopi* real(ik1-1)/kmesh(1)
+        nk = mux_vector([ik1*1_i64, 1_i64, 1_i64], kmesh, 1_i64)
      else 
-          kc1 = twopi* real(ik1+300-1)/kmesh(1)
-          nk = mux_vector([(ik1+300)*1_i64, 1_i64, 1_i64], kmesh, 1_i64)
+        kc1 = twopi* real(ik1+300-1)/kmesh(1)
+        nk = mux_vector([(ik1+300)*1_i64, 1_i64, 1_i64], kmesh, 1_i64)
      end if
      indexlist(ik1) = nk
      f(ik1, 1, 1) = cos(kc1*array_of_reals(1))**2 
      correct_gradf(ik1, 1, 1, 1) = -sin(2*kc1*array_of_reals(1))*array_of_reals(1)
      x_axis(ik1) = kc1
-  end do 
+  end do
 
   itest = itest + 1
   test_array(itest) = testify("Jacobian for blocks = .true. ")
@@ -652,38 +652,38 @@ program test_misc
 
   call test_array(itest)%assert(gradf(:, 1, 1, 1), correct_gradf(:, 1, 1, 1), tol = 3e-3_r64)
 
-!   open(unit=10, file='data_graph_ind.dat', status='replace')
-!   do i = 1, size(indexlist)
-!     write(10, *) x_axis(i), gradf(i, 1, 1, 1)
-!   end do
-!   close(10)
+  !   open(unit=10, file='data_graph_ind.dat', status='replace')
+  !   do i = 1, size(indexlist)
+  !     write(10, *) x_axis(i), gradf(i, 1, 1, 1)
+  !   end do
+  !   close(10)
 
-!   open(unit=10, file='correct_graph_ind.dat', status='replace')
-!   do i = 1, size(indexlist)
-!     write(10, *) x_axis(i), correct_gradf(i, 1, 1, 1)
-!   end do
-!   close(10)
+  !   open(unit=10, file='correct_graph_ind.dat', status='replace')
+  !   do i = 1, size(indexlist)
+  !     write(10, *) x_axis(i), correct_gradf(i, 1, 1, 1)
+  !   end do
+  !   close(10)
 
   kmesh = [100, 100, 300]*1_i64
   deallocate(f, gradf, array_of_reals, correct_gradf, x_axis)
   allocate(f(product(kmesh), nb, 3), gradf(product(kmesh), nb, 3, 3), correct_gradf(product(kmesh), nb, 3, 3), array_of_reals(3), &
-   x_axis(kmesh(1)))
+       x_axis(kmesh(1)))
   array_of_reals = [0.5_r64, 0.5_r64, 1.0_r64]
   lattvecs = reshape([0, 1, 1, 1, 0, 1, 1, 1, 0], [3, 3])/2.0_r64
   b_matrix = twopi*reshape([-1, 1, 1, 1, -1, 1, 1, 1, -1], [3, 3])
   do ik1 = 1, kmesh(1)
      do ik2 = 1, kmesh(2)
-          do ik3 = 1, kmesh(3)
-               k_f = [real(ik1-1, kind=r64), real(ik2-1, kind=r64),real(ik3-1, kind=r64)]/kmesh
-               nk = mux_vector([ik1*1_i64, ik2*1_i64, ik3*1_i64], kmesh, 1_i64) 
-               k_c = matmul(b_matrix, k_f)
-             do i = 1, 3
-               f(nk, 1, i) = cos(i*DOT_PRODUCT(k_c, array_of_reals))**2 
-               do j = 1, 3
-                    correct_gradf(nk, 1, j, i) = -i*sin(2*i*DOT_PRODUCT(k_c, array_of_reals))*array_of_reals(j)
-               end do
-             end do
-          end do
+        do ik3 = 1, kmesh(3)
+           k_f = [real(ik1-1, kind=r64), real(ik2-1, kind=r64),real(ik3-1, kind=r64)]/kmesh
+           nk = mux_vector([ik1*1_i64, ik2*1_i64, ik3*1_i64], kmesh, 1_i64) 
+           k_c = matmul(b_matrix, k_f)
+           do i = 1, 3
+              f(nk, 1, i) = cos(i*DOT_PRODUCT(k_c, array_of_reals))**2 
+              do j = 1, 3
+                 correct_gradf(nk, 1, j, i) = -i*sin(2*i*DOT_PRODUCT(k_c, array_of_reals))*array_of_reals(j)
+              end do
+           end do
+        end do
      end do
      x_axis(ik1) = k_c(1)
   end do
@@ -693,25 +693,25 @@ program test_misc
 
   call Jacobian(f, gradf, lattvecs, kmesh, indexlist, blocks = .false.)
   call test_array(itest)%assert(reshape(correct_gradf, [size(correct_gradf)]), reshape(gradf, [size(gradf)]), tol = 8e-2_r64)
-  
-  
-!   do i = 1, 3
-!      do j = 1, 3
-!           print *, "Max value Jij, i = ",i, "j =",j , maxval(abs(gradf(:, 1,j,i) - correct_gradf(:, 1,j,i)))
-!      end do
-! end do
 
-!   open(unit=10, file='data_graph.dat', status='replace')
-!   do i = 1, kmesh(1)
-!     write(10, *) x_axis(i), gradf(i, 1, 1, 3)
-!   end do
-!   close(10)
 
-!   open(unit=10, file='correct_graph.dat', status='replace')
-!   do i = 1, kmesh(1)
-!     write(10, *) x_axis(i), correct_gradf(i, 1, 1, 3)
-!   end do
-!   close(10)
+  !   do i = 1, 3
+  !      do j = 1, 3
+  !           print *, "Max value Jij, i = ",i, "j =",j , maxval(abs(gradf(:, 1,j,i) - correct_gradf(:, 1,j,i)))
+  !      end do
+  ! end do
+
+  !   open(unit=10, file='data_graph.dat', status='replace')
+  !   do i = 1, kmesh(1)
+  !     write(10, *) x_axis(i), gradf(i, 1, 1, 3)
+  !   end do
+  !   close(10)
+
+  !   open(unit=10, file='correct_graph.dat', status='replace')
+  !   do i = 1, kmesh(1)
+  !     write(10, *) x_axis(i), correct_gradf(i, 1, 1, 3)
+  !   end do
+  !   close(10)
 
   tests_all = testify(test_array)              
   call tests_all%report                                

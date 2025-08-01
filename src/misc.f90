@@ -22,7 +22,7 @@ module misc
   use fftpack, only: fft, ifft
 
   implicit none
-  
+
 
 
   public :: operator(.umklapp.)
@@ -1257,7 +1257,7 @@ contains
 
     !k-mesh spacing between opposite stencil points (fractional)
     diff = 2.0_r64/kmesh
-    
+
     if (kmesh(3) /= 1) then
        dim = 3 
     else if (kmesh(2) /= 1) then
@@ -1284,7 +1284,7 @@ contains
           if (kmesh(dim_k) /= 1) then
              this_plus(dim_k) = mod(center(dim_k), kmesh(dim_k)) + 1
              this_minus(dim_k) = mod(center(dim_k) - 2 + kmesh(dim_k), kmesh(dim_k)) + 1
-         end if
+          end if
           stencil(sten_count + 1) = mux_vector(this_minus, kmesh, 1_i64)
           stencil(sten_count + 2) = mux_vector(this_plus, kmesh, 1_i64)
           sten_count = sten_count + 2
