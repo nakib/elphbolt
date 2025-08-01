@@ -589,7 +589,7 @@ contains
     
     !sigma = 1e-2_r64
     deltafunc_pol = max(onebyroot2pi/sigma/product(el%wvmesh)*&
-                    exp(-0.5_r64*(en/sigma)**2), 1.0e-10_r64)
+                    exp(-0.5_r64*(en/sigma)**2), 1.0e-9_r64)
 !$!     deltafunc_pol = onebyroot2pi/sigma/product(el%wvmesh)*&
 !$!                     exp(-0.5_r64*(en/sigma)**2)
   end function deltafunc_pol
@@ -774,7 +774,8 @@ contains
 !$!        call spectral_head_polarizability_2d_qpath_old(&
 !$!             spec_X0, energylist, qcrys, el, wann, crys, num%tetrahedra)
       
-       if(q2norm<1e-1) then
+       !if(q2norm<1e-1) then
+       if(q2norm<crys%qTF/10) then
           call spectral_head_polarizability_2d_lowqpath_old(&
             spec_X0, energylist, qcrys, el, wann, crys, num%tetrahedra)
        else
