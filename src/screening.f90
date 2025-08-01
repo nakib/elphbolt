@@ -42,25 +42,23 @@ contains
     beta = 1.0_r64/kB/crys%T/qe !1/J
     crys%qTF = 0.0_r64
 
-    if(crys%epsilon0 /= 0) then
-       call print_message("Calculating Thomas-Fermi screening wave vector...")
+    call print_message("Calculating Thomas-Fermi screening wave vector...")
 
-       do ib = 1, el%numbands
-          do ik = 1, el%nwv
-             fFD = Fermi(el%ens(ik, ib), el%chempot, crys%T)
-             crys%qTF = crys%qTF + fFD*(1.0_r64 - fFD)
-          end do
+    do ib = 1, el%numbands
+       do ik = 1, el%nwv
+          fFD = Fermi(el%ens(ik, ib), el%chempot, crys%T)
+          crys%qTF = crys%qTF + fFD*(1.0_r64 - fFD)
        end do
+    end do
 
-       !Free-electron gas Thomas-Fermi model
-       ! qTF**2 = spindeg*e^2*beta/nptq/vol_pcell/perm0*Sum_{BZ}f0_{k}(1-f0_{k})
-       crys%qTF = sqrt(1.0e9_r64*crys%qTF*el%spindeg*beta*qe**2/product(el%wvmesh)&
-            /crys%volume/perm0) !nm^-1
-       if(crys%twod) crys%qTF = crys%thickness*crys%qTF**2/2  ! nm^-1
+    !Free-electron gas Thomas-Fermi model
+    ! qTF**2 = spindeg*e^2*beta/nptq/vol_pcell/perm0*Sum_{BZ}f0_{k}(1-f0_{k})
+    crys%qTF = sqrt(1.0e9_r64*crys%qTF*el%spindeg*beta*qe**2/product(el%wvmesh)&
+         /crys%volume/perm0) !nm^-1
+    if(crys%twod) crys%qTF = crys%thickness*crys%qTF**2/2  ! nm^-1
 
-       if(this_image() == 1) then
-          write(*, "(A, 1E16.8, A)") ' Thomas-Fermi screening wave vector = ', crys%qTF, ' 1/nm'
-       end if
+    if(this_image() == 1) then
+       write(*, "(A, 1E16.8, A)") ' Thomas-Fermi screening wave vector = ', crys%qTF, ' 1/nm'
     end if
   end subroutine calculate_qTF
 
@@ -775,7 +773,7 @@ contains
 !$!             spec_X0, energylist, qcrys, el, wann, crys, num%tetrahedra)
       
        !if(q2norm<1e-1) then
-       if(q2norm<crys%qTF/10) then
+       if(q2norm<crys%qTF/10.0_r64) then
           call spectral_head_polarizability_2d_lowqpath_old(&
             spec_X0, energylist, qcrys, el, wann, crys, num%tetrahedra)
        else
