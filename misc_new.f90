@@ -1229,7 +1229,7 @@ contains
     expm1 = exp(x + 0.0_r128) - 1.0_r128
   end function expm1
 
-  subroutine Jacobian(f, gradf, lattvecs, kmesh, indexlist, blocks)
+  subroutine Jacobian(f, gradf, lattvecs, kmesh, indexlist, dim, blocks)
     !! Calculates the Jacobian of vector function f.
     !! TODO Parallelize this. This becomes a blocking call.
     !
@@ -1243,11 +1243,12 @@ contains
     logical, intent(in) :: blocks
 
     !Locals 
+    integer, intent(in) :: dim
     real(r64) :: diff(3)
     real(r64), allocatable :: f_stencil(:, :, :)
     integer(i64) :: ik, ib, nk, nb, i, j, k, center(3), stencil(6), &
-         dim_k, dim_f, isten, sten_count, this, this_plus1, this_minus1, &
-         whereinlist, this_plus(3), this_minus(3), dim
+         dim_k, dim_f, isten, sten_count, this_plus(3), this_minus(3), &
+         whereinlist
 
     nk = size(f, 1)
     nb = size(f, 2)
@@ -1257,14 +1258,6 @@ contains
 
     !k-mesh spacing between opposite stencil points (fractional)
     diff = 2.0_r64/kmesh
-    
-    if (kmesh(3) /= 1) then
-       dim = 3 
-    else if (kmesh(2) /= 1) then
-       dim = 2 
-    else if (kmesh(1) /= 1) then
-       dim = 1
-    end if
 
     !Calculate Jacobian using a nearest neighbor stencil
     gradf = 0.0_r64
@@ -1275,7 +1268,8 @@ contains
           call demux_vector(ik, center, kmesh, 1_i64)
        end if
 
-       ! Contruct nearest neighbor stencil, taking into account the periodic boundary condition
+       ! Contruct nearest neighbor stencil, taking into account
+       ! the periodic boundary condition
        sten_count = 0
        do dim_k = 1, dim
           !This component of the center of the stencil
@@ -1284,9 +1278,9 @@ contains
           if (kmesh(dim_k) /= 1) then
              this_plus(dim_k) = mod(center(dim_k), kmesh(dim_k)) + 1
              this_minus(dim_k) = mod(center(dim_k) - 2 + kmesh(dim_k), kmesh(dim_k)) + 1
-         end if
-          stencil(sten_count + 1) = mux_vector(this_minus, kmesh, 1_i64)
-          stencil(sten_count + 2) = mux_vector(this_plus, kmesh, 1_i64)
+          end if
+          stencil(sten_count + 1) = mux_vector(this_plus, kmesh, 1_i64)
+          stencil(sten_count + 2) = mux_vector(this_minus, kmesh, 1_i64)
           sten_count = sten_count + 2
        end do
 
@@ -1305,9 +1299,11 @@ contains
                 f_stencil(isten, :, :) = f(ik, :, :)
              end if
           else
+             !  print *, "ik = ", ik, " sten = ", stencil(isten)
              f_stencil(isten, :, :) = f(stencil(isten), :, :)
           end if
        end do
+       !  print *, "ik = ", ik
 
        ! For the 2d case, the z-component is identically 0 since gradf was initialized
        ! to be zero.
@@ -1324,6 +1320,7 @@ contains
           end do
        end do
     end do
+    !  print *, "gradf = ", gradf
   end subroutine Jacobian
 
   subroutine precompute_interpolation_corners_and_weights(coarsemesh, refinement, qs, idcorners, weights)

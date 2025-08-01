@@ -1562,7 +1562,7 @@ contains
        !print*, 'B-field is on. B-field = ', num%Bfield
        !TODO The call below will be parallel and blocking.
        call Jacobian(response_el, Delk_response, crys%lattvecs, &
-            el%wvmesh, el%indexlist, crys%dim, blocks = .true.)
+            el%wvmesh, el%indexlist, blocks = .true.)
     end if
 
     allocate(ik1_image_array(maxval(el%nequiv)), ik3_image_array(maxval(el%nequiv)))
