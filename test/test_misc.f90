@@ -646,23 +646,25 @@ program test_misc
   test_array(itest) = testify("Jacobian for blocks = .true. ")
 
   call Jacobian(f, gradf, lattvecs, kmesh, indexlist, blocks = .true.)
+
+  !     open(unit=10, file='data_graph_ind.dat', status='replace')
+  !     do i = 1, size(indexlist)
+  !       write(10, *) x_axis(i), gradf(i, 1, 1, 1)
+  !     end do
+  !     close(10)
+
+  !     open(unit=10, file='correct_graph_ind.dat', status='replace')
+  !     do i = 1, size(indexlist)
+  !       write(10, *) x_axis(i), correct_gradf(i, 1, 1, 1)
+  !     end do
+  !     close(10)
+
   gradf(300, 1, 1, 1) = correct_gradf(300, 1, 1, 1)
   gradf(301, 1, 1, 1) = correct_gradf(301, 1, 1, 1)
   gradf(600, 1, 1, 1) = correct_gradf(600, 1, 1, 1)
 
   call test_array(itest)%assert(gradf(:, 1, 1, 1), correct_gradf(:, 1, 1, 1), tol = 3e-3_r64)
 
-  !   open(unit=10, file='data_graph_ind.dat', status='replace')
-  !   do i = 1, size(indexlist)
-  !     write(10, *) x_axis(i), gradf(i, 1, 1, 1)
-  !   end do
-  !   close(10)
-
-  !   open(unit=10, file='correct_graph_ind.dat', status='replace')
-  !   do i = 1, size(indexlist)
-  !     write(10, *) x_axis(i), correct_gradf(i, 1, 1, 1)
-  !   end do
-  !   close(10)
 
   kmesh = [100, 100, 300]*1_i64
   deallocate(f, gradf, array_of_reals, correct_gradf, x_axis)
