@@ -9,7 +9,7 @@ program test_task_manager
   integer :: itest
   integer, parameter :: num_tests = 6
   type(testify) :: test_array(num_tests), tests_all
-
+  ! Initialize test cases                   
   type(task_manager) :: job1
   integer(i64) :: num_batches, batch, batch_info(3)
 

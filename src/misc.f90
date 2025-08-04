@@ -1227,7 +1227,7 @@ contains
     expm1 = exp(x + 0.0_r128) - 1.0_r128
   end function expm1
 
-  subroutine Jacobian(f, gradf, lattvecs, kmesh, indexlist, dim, blocks)
+  subroutine Jacobian(f, gradf, lattvecs, kmesh, indexlist, blocks)
     !! Calculates the Jacobian of vector function f.
     !! TODO Parallelize this. This becomes a blocking call.
     !
@@ -1235,26 +1235,46 @@ contains
     !As such, the derivative initially gives a vector along the reciprocal lattice vectors.
     !This is then converted to Cartesian coordinates.
 
+    !! f is a rank-3 array of function F values for each wave vector and band 
+    !! gradf is a rank-4 array of the Jacobian, with the first index
+    !! being the wave vector index, the second being the band index,
+    !! the third being the component of the wave vector, and the fourth
+    !! being the component of the F function vector.  
+    !! lattvecs is a matrix of the lattice vectors in real space
+    !! kmesh is the number of wave vectors along the three reciprocal lattice vectors
+    !! indexlist is a list of wave vector indices in the first Brillouin zone
+    !! blocks is a logical flag that indicates whether the function is restricted to a Fermi window
+    !! or not. If it is, then the function values outside the Fermi window are
+    !! approximated by the function value at the center of the stencil.  
+
     real(r64), intent(in) :: f(:, :, :), lattvecs(3, 3)
     integer(i64), intent(in) :: kmesh(3), indexlist(:)
     real(r64), intent(out) :: gradf(:, :, :, :)
-    integer, intent(in) :: dim
     logical, intent(in) :: blocks
 
-    !Locals
+    !Locals 
     real(r64) :: diff(3)
     real(r64), allocatable :: f_stencil(:, :, :)
     integer(i64) :: ik, ib, nk, nb, i, j, k, center(3), stencil(6), &
          dim_k, dim_f, isten, sten_count, this, this_plus1, this_minus1, &
-         whereinlist
+         whereinlist, this_plus(3), this_minus(3), dim
 
     nk = size(f, 1)
     nb = size(f, 2)
 
     allocate(f_stencil(6, nb, 3))
+    f_stencil = 0.0_r64
 
     !k-mesh spacing between opposite stencil points (fractional)
     diff = 2.0_r64/kmesh
+
+    if(kmesh(3) /= 1) then
+       dim = 3 
+    else if(kmesh(2) /= 1) then
+       dim = 2 
+    else if(kmesh(1) /= 1) then
+       dim = 1
+    end if
 
     !Calculate Jacobian using a nearest neighbor stencil
     gradf = 0.0_r64
@@ -1265,37 +1285,18 @@ contains
           call demux_vector(ik, center, kmesh, 1_i64)
        end if
 
-       i = center(1)
-       j = center(2)
-       k = center(3)
-
-       ! Contruct nearest neighbot stencil, taking into account
-       ! the periodic boundary condition
+       ! Contruct nearest neighbor stencil, taking into account the periodic boundary condition
        sten_count = 0
        do dim_k = 1, dim
           !This component of the center of the stencil
-          this = center(dim_k)
-          if(this == kmesh(dim_k)) then
-             this_plus1 = 1
-             this_minus1 = this - 1
-          else if(this == 1) then
-             this_plus1 = this + 1
-             this_minus1 = kmesh(dim_k)
-          else
-             this_plus1 = this + 1
-             this_minus1 = this - 1
+          this_plus = center 
+          this_minus = center
+          if(kmesh(dim_k) /= 1) then
+             this_plus(dim_k) = mod(center(dim_k), kmesh(dim_k)) + 1
+             this_minus(dim_k) = mod(center(dim_k) - 2 + kmesh(dim_k), kmesh(dim_k)) + 1
           end if
-
-          if(dim_k == 1) then
-             stencil(sten_count + 1) = mux_vector([this_minus1, j, k], kmesh, 1_i64)
-             stencil(sten_count + 2) = mux_vector([this_plus1, j, k], kmesh, 1_i64)
-          else if(dim_k == 2) then
-             stencil(sten_count + 1) = mux_vector([i, this_minus1, k], kmesh, 1_i64)
-             stencil(sten_count + 2) = mux_vector([i, this_plus1, k], kmesh, 1_i64)
-          else if(dim_k == 3) then !This might not be reached. Good.
-             stencil(sten_count + 1) = mux_vector([i, j, this_minus1], kmesh, 1_i64)
-             stencil(sten_count + 2) = mux_vector([i, j, this_plus1], kmesh, 1_i64)
-          end if
+          stencil(sten_count + 1) = mux_vector(this_minus, kmesh, 1_i64)
+          stencil(sten_count + 2) = mux_vector(this_plus, kmesh, 1_i64)
           sten_count = sten_count + 2
        end do
 
@@ -1305,7 +1306,7 @@ contains
              !Which point in indexlist does the stencil correspond to?
              ! (whereinlist < 0 if search fails)
              call binsearch(indexlist, stencil(isten), whereinlist)
-             if (whereinlist > 0) then
+             if(whereinlist > 0) then
                 f_stencil(isten, :, :) = f(whereinlist, :, :)
              else
                 !Here I made the approximation that for any point lying outside the
@@ -1320,7 +1321,7 @@ contains
 
        ! For the 2d case, the z-component is identically 0 since gradf was initialized
        ! to be zero.
-       do dim_f = 1, dim
+       do dim_f = 1, 3
           do dim_k = 1, dim
              gradf(ik, :, dim_k, dim_f) = &
                   (f_stencil(2*dim_k, :, dim_f) - f_stencil(2*dim_k - 1, :, dim_f)) &
@@ -1329,7 +1330,7 @@ contains
 
           ! Convert to cartesian coordinates
           do ib = 1, nb
-             gradf(ik, ib, :, dim_f) = matmul(lattvecs, gradf(ik, ib, :, dim_f))/twopi
+            gradf(ik, ib, :, dim_f) = matmul(lattvecs, gradf(ik, ib, :, dim_f))/twopi
           end do
        end do
     end do
