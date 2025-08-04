@@ -13,10 +13,8 @@ program test_misc
 
   implicit none
 
-  !   external :: pgbeg, pgenv, pgline, pgend
-
   integer :: itest, dim, nb, nk
-  integer, parameter :: num_tests = 49
+  integer, parameter :: num_tests = 50
   type(testify) :: test_array(num_tests), tests_all
   integer(i64) :: index, quotient, remainder, int_array(5), v1(3), v2(3), &
        v1_muxed, v2_muxed, ik, ik1, ik2, ik3, ib1, ib2, ib3, wvmesh(3), &
@@ -29,7 +27,7 @@ program test_misc
        real_array(5), result, q1(3, 4), q2(3, 4), q3(3, 4), &
        lattvecs(3,3), b_matrix(3,3), k_c(3), k_f(3), kc1
   real(r64), allocatable :: integrand(:), domain(:), im_axis(:), real_func(:), &
-       widc(:, :), f_coarse(:), f_interp(:), array_of_reals(:), x_axis(:)
+       widc(:, :), f_coarse(:), f_interp(:), array_of_reals(:)
   real(r64), allocatable :: hfx1_even(:), hfx1_odd(:), hfx2_even(:), hfx2_odd(:), &
        x_even(:), x_odd(:), xmin, xmax, & 
        f(:, :, :), gradf(:, :, :, :), correct_gradf(:, :, :, :)
@@ -518,32 +516,39 @@ program test_misc
        [1, 3, 5, 7]*1.0_r64, [4, 14, 24, 34]*1.0_r64))
 
 
-  ! Jacobian test 
+  ! Jacobian tests
+  ! Number of bands everywhere is 1, indexlist is default [1], except for one test further 
+
 
   nb = 1 
   allocate(indexlist(1))
   indexlist = 1_i64 
-  lattvecs = reshape( [ ( (merge(1.0, 0.0, i==j), j=1,3), i=1,3 ) ], [3, 3] )
+
+  ! Lattice vectors matrix is unit matrix 
+  lattvecs = reshape([((merge(1.0, 0.0, i==j), j = 1, 3), i = 1, 3)], [3, 3])
+
+  ! First test: 1D mesh, 3 points on kx axis 
   kmesh = [3, 1, 1]
   deallocate(array_of_reals)
-  allocate(f(kmesh(1), nb, 3), gradf(kmesh(1), nb, 3, 3), correct_gradf(kmesh(1), nb, 3, 3), &
-       array_of_reals(3))
+  allocate(f(kmesh(1), nb, 3), gradf(kmesh(1), nb, 3, 3), correct_gradf(kmesh(1), nb, 3, 3),  array_of_reals(3))
+
   f = 0.0_r64
   do i = 1, kmesh(1)
-     f(i, 1, 1) = (i**2)*1.0_r64*twopi*2
-     f(i, 1, 2) = (i**3)*1.0_r64*twopi*2
+     f(i, 1, 1) = (i**2)*twopi*2
+     f(i, 1, 2) = (i**3)*twopi*2
      f(i, 1, 3) = 2.0_r64
-     array_of_reals = [-15.0_r64, 24.0_r64, -9.0_r64]
+     array_of_reals = [-15, 24, -9]*1.0_r64
      correct_gradf(i, 1, 1, 1) =  array_of_reals(i)
-     array_of_reals = [-57_r64, 78_r64,-21_r64]
+     array_of_reals = [-57, 78, -21]*1.0_r64
      correct_gradf(i, 1, 1, 2) =  array_of_reals(i)
   end do
+
   itest = itest + 1
   test_array(itest) = testify("Jacobian test 1d mesh 3x1x1")
-
   call Jacobian(f, gradf, lattvecs, kmesh, indexlist, blocks = .false.)
   call test_array(itest)%assert(reshape(correct_gradf, [size(correct_gradf)]), reshape(gradf, [size(gradf)]), tol = 3e-5_r64)
 
+  ! Second test: 2D mesh, 3 points on both axes 
   kmesh = [3, 3, 1]*1_i64
   deallocate(f, gradf, array_of_reals, correct_gradf)
   allocate(f(product(kmesh), nb, 3), gradf(product(kmesh), nb, 3, 3), correct_gradf(product(kmesh), nb, 3, 3), &
@@ -552,33 +557,34 @@ program test_misc
 
   do i = 1, kmesh(1)
      do j = 1, kmesh(2)
-        nk = mux_vector([i*1_i64, j*1_i64, 1*1_i64], kmesh, 1_i64)          
-        f(nk, 1, 1) = (i**2)*1.0_r64*twopi*2
-        f(nk, 1, 2) = (i**3)*1.0_r64*twopi*2
-        array_of_reals = [-15.0_r64, 24.0_r64, -9.0_r64]
+        nk = mux_vector([i, j, 1_i64], kmesh, 1_i64)          
+        f(nk, 1, 1) = (i**2)*twopi*2
+        f(nk, 1, 2) = (i**3)*twopi*2
+        array_of_reals = [-15, 24, -9]*1.0_r64
         correct_gradf(nk, 1, 1, 1) =  array_of_reals(i)
-        array_of_reals = [-57_r64, 78_r64,-21_r64]
+        array_of_reals = [-57, 78, -21]*1.0_r64
         correct_gradf(nk, 1, 1, 2) =  array_of_reals(i)
      end do
   end do
-  itest = itest + 1
 
-  test_array(itest) = testify("Jacobian test 2d mesh 3x3x1")
+  itest = itest + 1
+  test_array(itest) = testify("Jacobian test 2d mesh 3 x 3 x 1")
   call Jacobian(f, gradf, lattvecs, kmesh, indexlist, blocks = .false.)
   call test_array(itest)%assert(reshape(correct_gradf, [size(correct_gradf)]), reshape(gradf, [size(gradf)]), tol = 3e-5_r64)
 
+  ! Third test: 2D mesh, 3 points on both axes with additional component Fz depending on ky 
   do i = 1, kmesh(1)
      do j = 1, kmesh(2)
-        nk = mux_vector([i*1_i64, j*1_i64, 1*1_i64], kmesh, 1_i64)          
-        f(nk, 1, 3) = (sin(pi*(j-1)/3.0_r64)**2)*twopi*2
-        array_of_reals = [0.0_r64, 9.0/4.0*1.0_r64, -9.0/4.0*1.0_r64]
+        nk = mux_vector([i, j, 1_i64], kmesh, 1_i64)          
+        f(nk, 1, 3) = (sin(pi*(j - 1)/3.0)**2)*twopi*2
+        array_of_reals = [0.0, 9.0/4.0, -9.0/4.0]*1.0_r64
         correct_gradf(nk, 1, 2, 3) =  array_of_reals(j)
      end do
   end do
-  call Jacobian(f, gradf, lattvecs, kmesh, indexlist, blocks = .false.)
-
+  
   itest = itest + 1
-  test_array(itest) = testify("Jacobian test 2d mesh 3x3x1, with additional component")
+  test_array(itest) = testify("Jacobian test 2d mesh 3 x 3 x 1, with additional component")
+  call Jacobian(f, gradf, lattvecs, kmesh, indexlist, blocks = .false.)
   call test_array(itest)%assert(reshape(correct_gradf, [size(correct_gradf)]), reshape(gradf, [size(gradf)]), tol = 3e-5_r64)
 
   kmesh = [3, 3, 4]*1_i64
@@ -589,15 +595,15 @@ program test_misc
   do i = 1, kmesh(1)
      do j = 1, kmesh(2)
         do l = 1, kmesh(3)
-           nk = mux_vector([i*1_i64, j*1_i64, l*1_i64], kmesh, 1_i64) 
-           f(nk, 1, 1) = (i**2)*1.0_r64*twopi*2 + (cos(pi*(l-1)/4.0_r64)**2)*twopi*2
-           f(nk, 1, 2) = (i**3)*1.0_r64*twopi*2 + (cos(pi*(l-1)/4.0_r64)**2)*twopi*2        
-           f(nk, 1, 3) = (sin(pi*(j-1)/3.0_r64)**2)*twopi*2
-           array_of_reals = [0.0_r64, 9.0/4.0*1.0_r64, -9.0/4.0*1.0_r64]
+           nk = mux_vector([i, j, l], kmesh, 1_i64) 
+           f(nk, 1, 1) = (i**2)*twopi*2 + (cos(pi*(l - 1)/4.0)**2)*twopi*2
+           f(nk, 1, 2) = (i**3)*twopi*2 + (cos(pi*(l - 1)/4.0)**2)*twopi*2        
+           f(nk, 1, 3) = (sin(pi*(j - 1)/3.0)**2)*twopi*2
+           array_of_reals = [0.0, 9.0/4.0, -9.0/4.0]*1.0_r64
            correct_gradf(nk, 1, 2, 3) =  array_of_reals(j)
-           array_of_reals = [-15.0_r64, 24.0_r64, -9.0_r64]
+           array_of_reals = [-15, 24, -9]*1.0_r64
            correct_gradf(nk, 1, 1, 1) =  array_of_reals(i)
-           array_of_reals = [-57_r64, 78_r64,-21_r64]
+           array_of_reals = [-57, 78,-21]*1.0_r64
            correct_gradf(nk, 1, 1, 2) =  array_of_reals(i)
         end do
      end do
@@ -608,118 +614,110 @@ program test_misc
   do i = 1, kmesh(1)
      do j = 1, kmesh(2)
         do l = 1, kmesh(3)
-           nk = mux_vector([i*1_i64, j*1_i64, l*1_i64], kmesh, 1_i64) 
-           array_of_reals = [0.0_r64, -4.0_r64, 0.0_r64, 4.0_r64]
+           nk = mux_vector([i, j, l], kmesh, 1_i64) 
+           array_of_reals = [0, -4, 0, 4]*1.0_r64
            correct_gradf(nk, 1, 3, 1) =  array_of_reals(l)
            correct_gradf(nk, 1, 3, 2) =  array_of_reals(l)
         end do
      end do
   end do
-  itest = itest + 1
 
-  test_array(itest) = testify("Jacobian test 3d mesh 3x3x4")
+  itest = itest + 1
+  test_array(itest) = testify("Jacobian test 3d mesh 3 x 3 x 4")
   call Jacobian(f, gradf, lattvecs, kmesh, indexlist, blocks = .false.)
   call test_array(itest)%assert(reshape(correct_gradf, [size(correct_gradf)]), reshape(gradf, [size(gradf)]), tol = 3e-5_r64)
 
-  deallocate(indexlist)
-  allocate(indexlist(600), x_axis(600))
   kmesh = [1000, 1, 1]*1_i64 
-  deallocate(f, gradf, array_of_reals, correct_gradf)
-  allocate(f(size(indexlist), nb, 3), gradf(size(indexlist), nb, 3, 3), array_of_reals(3), correct_gradf(size(indexlist), nb, 3, 3))
-  array_of_reals = [0.5_r64, 0.5_r64, 1.0_r64]
+  deallocate(indexlist, f, gradf, array_of_reals, correct_gradf)
+  allocate(indexlist(600), f(600, nb, 3), gradf(600, nb, 3, 3), array_of_reals(3), correct_gradf(600, nb, 3, 3))
+  
+  array_of_reals = [0.5, 0.5, 1.0]*1.0_r64
   b_matrix = twopi*lattvecs
   do ik1 = 1, size(indexlist)
-     if (ik1 <= size(indexlist)/2) then 
-        kc1 = twopi* real(ik1-1)/kmesh(1)
-        nk = mux_vector([ik1*1_i64, 1_i64, 1_i64], kmesh, 1_i64)
+     if(ik1 <= size(indexlist)/2) then 
+        kc1 = twopi*(ik1 - 1)/kmesh(1)
+        nk = mux_vector([ik1, 1_i64, 1_i64], kmesh, 1_i64)
      else 
-        kc1 = twopi* real(ik1+300-1)/kmesh(1)
-        nk = mux_vector([(ik1+300)*1_i64, 1_i64, 1_i64], kmesh, 1_i64)
+        kc1 = twopi*(ik1 + 300 - 1)/kmesh(1)
+        nk = mux_vector([ik1 + 300, 1_i64, 1_i64], kmesh, 1_i64)
      end if
      indexlist(ik1) = nk
      f(ik1, 1, 1) = cos(kc1*array_of_reals(1))**2 
      correct_gradf(ik1, 1, 1, 1) = -sin(2*kc1*array_of_reals(1))*array_of_reals(1)
-     x_axis(ik1) = kc1
   end do
 
   itest = itest + 1
   test_array(itest) = testify("Jacobian for blocks = .true. ")
-
   call Jacobian(f, gradf, lattvecs, kmesh, indexlist, blocks = .true.)
-
-  !     open(unit=10, file='data_graph_ind.dat', status='replace')
-  !     do i = 1, size(indexlist)
-  !       write(10, *) x_axis(i), gradf(i, 1, 1, 1)
-  !     end do
-  !     close(10)
-
-  !     open(unit=10, file='correct_graph_ind.dat', status='replace')
-  !     do i = 1, size(indexlist)
-  !       write(10, *) x_axis(i), correct_gradf(i, 1, 1, 1)
-  !     end do
-  !     close(10)
-
   gradf(300, 1, 1, 1) = correct_gradf(300, 1, 1, 1)
   gradf(301, 1, 1, 1) = correct_gradf(301, 1, 1, 1)
   gradf(600, 1, 1, 1) = correct_gradf(600, 1, 1, 1)
-
   call test_array(itest)%assert(gradf(:, 1, 1, 1), correct_gradf(:, 1, 1, 1), tol = 3e-3_r64)
 
-
   kmesh = [100, 100, 300]*1_i64
-  deallocate(f, gradf, array_of_reals, correct_gradf, x_axis)
-  allocate(f(product(kmesh), nb, 3), gradf(product(kmesh), nb, 3, 3), correct_gradf(product(kmesh), nb, 3, 3), array_of_reals(3), &
-       x_axis(kmesh(1)))
-  array_of_reals = [0.5_r64, 0.5_r64, 1.0_r64]
+  deallocate(f, gradf, correct_gradf)
+  allocate(f(product(kmesh), nb, 3), gradf(product(kmesh), nb, 3, 3), correct_gradf(product(kmesh), nb, 3, 3))
+  array_of_reals = [0.5, 0.5, 1.0]*1.0_r64
   lattvecs = reshape([0, 1, 1, 1, 0, 1, 1, 1, 0], [3, 3])/2.0_r64
   b_matrix = twopi*reshape([-1, 1, 1, 1, -1, 1, 1, 1, -1], [3, 3])
   do ik1 = 1, kmesh(1)
      do ik2 = 1, kmesh(2)
         do ik3 = 1, kmesh(3)
-           k_f = [real(ik1-1, kind=r64), real(ik2-1, kind=r64),real(ik3-1, kind=r64)]/kmesh
-           nk = mux_vector([ik1*1_i64, ik2*1_i64, ik3*1_i64], kmesh, 1_i64) 
+           k_f = [ik1 - 1, ik2 - 1, ik3 - 1]*1.0_r64/kmesh
+           nk = mux_vector([ik1, ik2, ik3]*1_i64, kmesh, 1_i64) 
            k_c = matmul(b_matrix, k_f)
            do i = 1, 3
-              f(nk, 1, i) = cos(i*DOT_PRODUCT(k_c, array_of_reals))**2 
+              f(nk, 1, i) = cos(i*dot_product(k_c, array_of_reals))**2 
               do j = 1, 3
-                 correct_gradf(nk, 1, j, i) = -i*sin(2*i*DOT_PRODUCT(k_c, array_of_reals))*array_of_reals(j)
+                 correct_gradf(nk, 1, j, i) = -i*sin(2*i*dot_product(k_c, array_of_reals))*array_of_reals(j)
               end do
            end do
         end do
      end do
-     x_axis(ik1) = k_c(1)
   end do
 
   itest = itest + 1
-  test_array(itest) = testify("Jacobian for fcc crystal test 3d mesh 100x100x300")
-
+  test_array(itest) = testify("Jacobian for fcc crystal test 3d mesh 100 x 100 x 300")
   call Jacobian(f, gradf, lattvecs, kmesh, indexlist, blocks = .false.)
   call test_array(itest)%assert(reshape(correct_gradf, [size(correct_gradf)]), reshape(gradf, [size(gradf)]), tol = 8e-2_r64)
+  
+  deallocate(f, gradf, correct_gradf)
+  allocate(f(product(kmesh), nb, 3), gradf(product(kmesh), nb, 3, 3), correct_gradf(product(kmesh), nb, 3, 3))
+  lattvecs = reshape([0.2, 0.0, 0.0, 0.0, 0.5, 0.6, 0.0, 0.4, 0.3], [3, 3])
+  array_of_reals = lattvecs(:, 2) + lattvecs(:, 1) 
+  do i = 1, 3
+       j = mod(i, 3) + 1
+       l = mod(j, 3) + 1
+       b_matrix(:, i) = cross_product(lattvecs(:, j), lattvecs(:, l))
+  end do
+  b_matrix = b_matrix*twopi/dot_product(lattvecs(:, 1), cross_product(lattvecs(:, 2), lattvecs(:, 3)))
 
+  do ik1 = 1, kmesh(1)
+     do ik2 = 1, kmesh(2)
+        do ik3 = 1, kmesh(3)
+           k_f = [ik1 - 1, ik2 - 1, ik3 - 1]*1.0_r64/kmesh
+           nk = mux_vector([ik1, ik2, ik3]*1_i64, kmesh, 1_i64) 
+           k_c = matmul(b_matrix, k_f)
+           do i = 1, 3
+              f(nk, 1, i) = cos(i*dot_product(k_c, array_of_reals))**2 
+              do j = 1, 3
+                 correct_gradf(nk, 1, j, i) = -i*sin(2*i*dot_product(k_c, array_of_reals))*array_of_reals(j)
+              end do
+           end do
+        end do
+     end do
+  end do
 
-  !   do i = 1, 3
-  !      do j = 1, 3
-  !           print *, "Max value Jij, i = ",i, "j =",j , maxval(abs(gradf(:, 1,j,i) - correct_gradf(:, 1,j,i)))
-  !      end do
-  ! end do
-
-  !   open(unit=10, file='data_graph.dat', status='replace')
-  !   do i = 1, kmesh(1)
-  !     write(10, *) x_axis(i), gradf(i, 1, 1, 3)
-  !   end do
-  !   close(10)
-
-  !   open(unit=10, file='correct_graph.dat', status='replace')
-  !   do i = 1, kmesh(1)
-  !     write(10, *) x_axis(i), correct_gradf(i, 1, 1, 3)
-  !   end do
-  !   close(10)
+  itest = itest + 1
+  test_array(itest) = testify("Jacobian for monoclinic crystal test 3d mesh 100 x 100 x 300")
+  call Jacobian(f, gradf, lattvecs, kmesh, indexlist, blocks = .false.)
+  call test_array(itest)%assert(reshape(correct_gradf, [size(correct_gradf)]), reshape(gradf, [size(gradf)]), tol = 5e-2_r64)
 
   tests_all = testify(test_array)              
   call tests_all%report                                
 
   if(tests_all%get_status() .eqv. .false.) error stop -1
-  itest = itest + 1
+
 contains    
 
   ! Some reference functions and their Hilbert transforms:
@@ -758,6 +756,5 @@ contains
 
     hfx2 = (exp(-1.0_r64) - cos(x))/(1.0_r64 + x**2)
   end function hfx2
-
 
 end program test_misc

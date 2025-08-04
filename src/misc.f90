@@ -23,8 +23,6 @@ module misc
 
   implicit none
 
-
-
   public :: operator(.umklapp.)
   private :: sort_int, sort_real, Pade_coeffs, twonorm_real_rank1, twonorm_real_rank2, &
        invert_complex_square, add_and_fold, add_and_fold_array, shrink_int, shrink_real
@@ -1237,6 +1235,18 @@ contains
     !As such, the derivative initially gives a vector along the reciprocal lattice vectors.
     !This is then converted to Cartesian coordinates.
 
+    !! f is a rank-3 array of function F values for each wave vector and band 
+    !! gradf is a rank-4 array of the Jacobian, with the first index
+    !! being the wave vector index, the second being the band index,
+    !! the third being the component of the wave vector, and the fourth
+    !! being the component of the F function vector.  
+    !! lattvecs is a matrix of the lattice vectors in real space
+    !! kmesh is the number of wave vectors along the three reciprocal lattice vectors
+    !! indexlist is a list of wave vector indices in the first Brillouin zone
+    !! blocks is a logical flag that indicates whether the function is restricted to a Fermi window
+    !! or not. If it is, then the function values outside the Fermi window are
+    !! approximated by the function value at the center of the stencil.  
+
     real(r64), intent(in) :: f(:, :, :), lattvecs(3, 3)
     integer(i64), intent(in) :: kmesh(3), indexlist(:)
     real(r64), intent(out) :: gradf(:, :, :, :)
@@ -1258,11 +1268,11 @@ contains
     !k-mesh spacing between opposite stencil points (fractional)
     diff = 2.0_r64/kmesh
 
-    if (kmesh(3) /= 1) then
+    if(kmesh(3) /= 1) then
        dim = 3 
-    else if (kmesh(2) /= 1) then
+    else if(kmesh(2) /= 1) then
        dim = 2 
-    else if (kmesh(1) /= 1) then
+    else if(kmesh(1) /= 1) then
        dim = 1
     end if
 
@@ -1281,7 +1291,7 @@ contains
           !This component of the center of the stencil
           this_plus = center 
           this_minus = center
-          if (kmesh(dim_k) /= 1) then
+          if(kmesh(dim_k) /= 1) then
              this_plus(dim_k) = mod(center(dim_k), kmesh(dim_k)) + 1
              this_minus(dim_k) = mod(center(dim_k) - 2 + kmesh(dim_k), kmesh(dim_k)) + 1
           end if
@@ -1296,7 +1306,7 @@ contains
              !Which point in indexlist does the stencil correspond to?
              ! (whereinlist < 0 if search fails)
              call binsearch(indexlist, stencil(isten), whereinlist)
-             if (whereinlist > 0) then
+             if(whereinlist > 0) then
                 f_stencil(isten, :, :) = f(whereinlist, :, :)
              else
                 !Here I made the approximation that for any point lying outside the
@@ -1320,7 +1330,7 @@ contains
 
           ! Convert to cartesian coordinates
           do ib = 1, nb
-             gradf(ik, ib, :, dim_f) = matmul(gradf(ik, ib, :, dim_f), transpose(lattvecs))/twopi
+            gradf(ik, ib, :, dim_f) = matmul(lattvecs, gradf(ik, ib, :, dim_f))/twopi
           end do
        end do
     end do
