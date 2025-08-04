@@ -2,6 +2,7 @@
   - Nakib H. Protik (maintainer)
   - Dwaipayan Paul
   - Sally Issa
+  - Elena Trukhan
 
 - External contributors
    - Xavier Cartoixà Soler
