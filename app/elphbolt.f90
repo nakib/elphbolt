@@ -34,7 +34,8 @@ program elphbolt
   use bz_sums, only: calculate_dos, calculate_qTF, calculate_el_dos_fermi, calculate_el_Ws
   use interactions, only: calculate_gReq, calculate_gkRp, &
        calculate_eph_interaction_ibzq, calculate_eph_interaction_ibzk, &
-       calculate_echimp_interaction_ibzk, calculate_3ph_interaction
+       calculate_echimp_interaction_ibzk, calculate_3ph_interaction, &
+       calculate_3ph_interaction_perm
   use phonon_defect_module, only: phonon_defect
   use Green_function, only: calculate_retarded_phonon_D0
   use nano_module, only: nanostructure
@@ -245,6 +246,7 @@ program elphbolt
 
            !Calculate ph-ph vertex
            call calculate_3ph_interaction(ph, crys, num, 'V')
+!!$           call calculate_3ph_interaction_perm(ph, crys, num, 'V')
 
            call t_event%end_timer('IBZ q ph-ph interactions')
         end if
@@ -254,6 +256,7 @@ program elphbolt
 
            !Calculate ph-ph transition probabilities
            call calculate_3ph_interaction(ph, crys, num, 'W')
+!!$           call calculate_3ph_interaction_perm(ph, crys, num, 'W')
 
            call t_event%end_timer('IBZ ph-ph scattering rates')
         end if

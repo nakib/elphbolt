@@ -24,7 +24,7 @@ module interactions
        twonorm, write2file_rank2_real, demux_vector, interpolate, expm1, &
        precompute_interpolation_corners_and_weights, interpolate_using_precomputed, &
        create_set, coarse_grain, timer, eye, shrink, Hilbert_transform, interpolator_1d, &
-       linspace
+       linspace, permutations, lex_less_1d, permutations
   use resource_module, only: resource
   use screening_module, only: spectral_head_polarizability_3d_q
   use task_manager_module, only : task_manager
@@ -50,7 +50,8 @@ module interactions
        calculate_bound_scatt_rates, calculate_thinfilm_scatt_rates, &
        calculate_4ph_rta_rates, calculate_coarse_grained_3ph_vertex, &
        calculate_W_fromcgV2, calculate_W3ph_OTF, calculate_Y_OTF, &
-       Vm2_3ph, calculate_Xee_OTF, calculate_Xee_13_OTF, calculate_ph_rta_coherence_rates
+       Vm2_3ph, calculate_Xee_OTF, calculate_Xee_13_OTF, &
+       calculate_ph_rta_coherence_rates, calculate_3ph_interaction_perm
 
   !external chdir, system
 
@@ -1062,6 +1063,605 @@ contains
     sync all
   end subroutine calculate_3ph_interaction
 
+  subroutine calculate_3ph_interaction_perm(ph, crys, num, key)
+    !! Parallel driver of the 3-ph vertex calculator for all IBZ phonon wave vectors.
+    !! This subroutine calculates |V-(s1<q1>|s2q2,s3q3)|^2, W-(s1<q1>|s2q2,s3q3),
+    !! and W+(s1<q1>|s2q2,s3q3) for each irreducible phonon and saves the results to disk.
+    !!
+    !! key = 'V', 'W' for vertex, transition probabilitiy calculation, respectively.
+
+    type(phonon), intent(in) :: ph
+    type(crystal), intent(in) :: crys
+    type(numerics), intent(in) :: num
+    character(len = 1), intent(in) :: key
+    type(task_manager) :: job
+
+    !Local variables
+    integer(i64) :: istate1, istate1_fbz, nstates_irred, nstates, istate2, istate3, &
+         nprocs, s1, s2, s3, iq1_ibz, iq1, iq2, iq3_minus, it, &
+         q1_indvec(3), q2_indvec(3), q3_minus_indvec(3), index_minus, index_plus, &
+         neg_iq2, neg_q2_indvec(3), num_active_images, plus_count, minus_count, &
+         idim, jdim, nwv_gpu, ntrips_gpu, s2s3, nbands_gpu, proc_index, &
+         ibatch, num_batches, batch_range(3)
+    real(r64) :: en1, en2, en3, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
+         occup_fac, const, bose2, bose3, delta_minus, delta_plus, aux, load_split, Vm2_cantrip
+    !real(r64), allocatable :: Vm2_1(:), Vm2_2(:), Wm(:), Wp(:)
+    real(r64), allocatable :: Wm(:), Wp(:)
+    integer(i64), allocatable :: istate2_plus(:), istate3_plus(:), istate2_minus(:), istate3_minus(:)
+    integer(i64), allocatable :: chunk[:], index_start[:], index_end[:]
+    complex(r64) :: phases(ph%numtriplets)
+    character(len = 1024) :: filename, filename_Wm, filename_Wp, batch_filename
+    logical :: tetrahedra_gpu
+    !logical, allocatable :: minus_mask(:), plus_mask(:)
+    type(resource) :: compute_resource
+    procedure(delta_fn), pointer :: delta_fn_ptr => null()
+    integer(i64) :: perms_of_3_indices(3, 6), an_equivalent_triplet(3)
+    integer(i64), allocatable :: permutations_map_istate1(:, :)
+    
+    if(key /= 'V' .and. key /= 'W') then
+       call exit_with_message("Invalid value of key in call to calculate_3ph_interaction. Exiting.")
+    end if
+
+    if(key == 'V') then
+       call print_message("Calculating 3-ph vertices for all IBZ phonons...")
+
+       call compute_resource%initialize
+
+       call compute_resource%report
+    else
+       call print_message("Calculating 3-ph transition probabilities for all IBZ phonons...")
+    end if
+
+    !Associate delta function procedure pointer
+    delta_fn_ptr => get_delta_fn_pointer(num%tetrahedra)
+
+    !Conversion factor in transition probability expression
+    const = pi/4.0_r64*hbar_eVps**5*(qe/amu)**3*1.0d-12
+
+    !Total number of IBZ blocks states
+    nstates_irred = ph%nwv_irred*ph%numbands
+
+    !Total number of FBZ blocks states
+    nstates = ph%nwv*ph%numbands
+
+    !Get the permutations of 3 indices
+    perms_of_3_indices = permutations(3_i64)
+
+    !Select the appropriate batch record filename based on the simulation key.
+    select case(key)
+    case('V')
+       batch_filename = trim(adjustl(num%cwd))//"/Vq2_batches"
+    case('W')
+       batch_filename = trim(adjustl(num%cwd_T))//"/Wq_batches"
+    end select
+
+    !Maximum total number of 3-phonon processes for a given initial phonon state
+    nprocs = ph%nwv*ph%numbands**2
+
+    allocate(chunk[*], index_start[*], index_end[*])
+
+    if(key == 'V') then       
+       !Split load among cpus and gpus
+       ! Defaults (no gpu): 
+       load_split = 0.0
+
+       !Deep copies for the gpu
+       ntrips_gpu = ph%numtriplets
+       nwv_gpu = ph%nwv
+       nbands_gpu = ph%numbands
+       tetrahedra_gpu = num%tetrahedra
+
+       !Associations will work with openacc
+       associate(wavevecs => ph%wavevecs, wvmesh => ph%wvmesh, &
+            reclattvecs => crys%reclattvecs, &
+            atomtypes => crys%atomtypes, &
+            R_j => ph%R_j, R_k => ph%R_k, ens => ph%ens, &
+            simplex_map => ph%simplex_map, &
+            simplex_count => ph%simplex_count, simplex_evals => ph%simplex_evals, &
+            evecs => ph%evecs, ifc3 => ph%ifc3, &
+            Index_i => ph%Index_i, Index_j => ph%Index_j, Index_k => ph%Index_k)
+
+         !allocate(minus_mask(nprocs), plus_mask(nprocs))
+
+         !Allocate |V^-|^2
+         !allocate(Vm2_1(nprocs), Vm2_2(nprocs))
+         ! Above, we split the |V-|^2 vertices into two parts:
+         ! 1. that are non-zero when the minus-type processes are energetically allowed
+         ! 2. that are non-zero when the symmetry-related plus-type processes are energetically allowed
+
+         !Distribute the total number of states across batches.
+         call job%distribute_load(nstates_irred, num%num_batches, &
+              num%restart_from_batch_record, batch_filename)
+
+         !Check whether the batch record file contains an end marker.
+         if(job%end_marker()) then
+            if(this_image() == 1) print *, 'All batches already completed.'
+            return
+         end if
+
+         !Change to data output directory
+         call chdir(trim(adjustl(num%Vdir)))
+
+         !Starting from the next unfinished batch.
+         do ibatch = job%get_num_finished_batches() + 1, num%num_batches
+            if(this_image() == 1) then
+               write(*, '(A, I0, A, I0)') "Processing batch ", ibatch, " of ", num%num_batches
+            end if
+
+            !Get the start, end, and the size of the current batch.
+            batch_range = job%get_batch_range(ibatch)
+
+            !Distribute tasks among images and add batch dependent shift.
+            call compute_resource%balance_load(load_split, batch_range(3), &
+                 chunk, index_start, index_end, num_active_images)
+            index_start = index_start + batch_range(1) - 1
+            index_end = index_end + batch_range(1) - 1
+
+            if(this_image() == 1) then
+               write(*, "(A, I10)") " batch # ", ibatch
+               write(*, "(A, I10)") " #states = ", nstates_irred/num%num_batches
+               write(*, "(A, I10)") " #states/image <= ", chunk
+            end if
+
+            !Only work with the active images
+            if(this_image() <= num_active_images) then            
+               !Run over first phonon IBZ states
+               do istate1 = index_start, index_end
+                  !Demux state index into branch (s) and wave vector (iq) indices
+                  call demux_state(istate1, ph%numbands, s1, iq1_ibz)
+
+                  !Muxed index of wave vector from the IBZ index list.
+                  !This will be used to access IBZ information from the FBZ quantities.
+                  iq1 = ph%indexlist_irred(iq1_ibz)
+
+                  !Energy of phonon 1
+                  en1 = ph%ens(iq1, s1)
+
+                  !Initial (IBZ blocks) wave vector (crystal coords.)
+                  q1 = ph%wavevecs(iq1, :)
+
+                  !Convert from crystal to 0-based index vector
+                  q1_indvec = nint(q1*ph%wvmesh)
+
+                  istate1_fbz = mux_state(ph%numbands, s1, iq1)
+                  
+                  !Initialize + and - process masks
+                  !minus_mask = .false.
+                  !plus_mask = .false.
+
+                  call map_triplet_full_to_reduced_ilambda1(ph%numbands, &
+                       ph%wvmesh, istate1, nstates, ph%indexlist_irred, &
+                       permutations_map_istate1)
+
+                  do iq2 = 1, nwv_gpu
+                     !Initial (IBZ blocks) wave vector (crystal coords.)
+                     q2 = wavevecs(iq2, :)
+
+                     !Convert from crystal to 0-based index vector
+                     q2_indvec = nint(q2*wvmesh)
+
+                     !Folded final phonon wave vector
+                     q3_minus_indvec = modulo(q1_indvec - q2_indvec, wvmesh) !0-based index vector
+                     q3_minus = q3_minus_indvec/dble(wvmesh) !crystal coords.
+
+                     !Muxed index of q3_minus
+                     iq3_minus = mux_vector(q3_minus_indvec, wvmesh, 0_i64)
+
+                     q2_cart = matmul(reclattvecs, q2)
+                     q3_minus_cart = matmul(reclattvecs, q3_minus)
+                     do it = 1, ntrips_gpu
+                        !Note: expi won't work on the accelerator
+                        phases(it) = exp((0.0_r64, -1.0_r64)* &
+                             (dot_product(q2_cart, (R_j(:, it))) + &
+                             dot_product(q3_minus_cart, (R_k(:, it)))))
+                     end do
+
+                     !Combined loop over the 2nd and 3rd phonon bands
+                     do s2s3 = 1, nbands_gpu**2
+                        s2 = int((s2s3 - 1)/nbands_gpu) + 1 !changes slow
+                        s3 = modulo(s2s3 - 1, nbands_gpu) + 1 !changes fast
+
+                        istate2 = mux_state(ph%numbands, s2, iq2)
+                        istate3 = mux_state(ph%numbands, s3, iq3_minus)
+
+                        proc_index = (iq2 - 1)*nbands_gpu**2 + s2s3
+
+                        !Energy of phonon 2
+                        en2 = ens(iq2, s2)
+
+                        !Get index of -q2
+                        neg_q2_indvec = modulo(-q2_indvec, wvmesh)
+                        neg_iq2 = mux_vector(neg_q2_indvec, wvmesh, 0_i64)
+
+                        !Energy of phonon 3
+                        en3 = ens(iq3_minus, s3)
+
+                        delta_minus = delta_fn_ptr(en1 - en3, iq2, s2, wvmesh, simplex_map, &
+                             simplex_count, simplex_evals) !minus process
+
+                        delta_plus = delta_fn_ptr(en3 - en1, neg_iq2, s2, wvmesh, simplex_map, &
+                             simplex_count, simplex_evals) !plus process      
+
+                        if(en1*en2*en3 == 0.0_r64) cycle
+
+                        if(delta_minus > 0.0_r64 .or. delta_plus > 0.0_r64) then
+                           !Need to compute the matrix element for just one of the permutations
+                           if(all([istate1, istate2, istate3] == &
+                                permutations_map_istate1(:, istate2))) then
+
+                              aux = Vm2_3ph(evecs(iq1, s1, :), &
+                                   evecs(iq2, s2, :), evecs(iq3_minus, s3, :), &
+                                   Index_i(:), Index_j(:), Index_k(:), ifc3(:,:,:,:), &
+                                   phases(:), ntrips_gpu, nbands_gpu)
+
+                              !Write data in binary format
+                              !Note: this will overwrite existing data!
+
+!!$                              !TODO I think the file name will be a bit effed up. Have to
+!!$                              !convert each state index to a string and trim before concating.
+!!$                              !Best to do it in a separate function as this will be called again in W.
+!!$                              write (filename, '(I9, A, I9, A, I9)') &
+!!$                                   permutations_map_istate1(1, istate2) // '.' // &
+!!$                                   permutations_map_istate1(2, istate2) // '.' // &
+!!$                                   permutations_map_istate1(3, istate2)
+
+                              filename = &
+                                   canonical_triplet_filetag(permutations_map_istate1(:, istate2))
+
+                              filename = 'Vm2.cantrip.'//trim(adjustl(filename))
+
+                              open(1, file = trim(filename), status = 'replace', access = 'stream')
+                              write(1) aux
+                              close(1)
+                           end if
+                        end if
+                     end do !s2s3
+                  end do !iq2
+               end do !istate1
+            end if !num_active_images
+
+            sync all
+            if(this_image() == 1) call job%write_record(ibatch)
+         end do !over the batch
+       end associate
+
+       !Change back to run directory
+       call chdir(trim(adjustl(num%cwd)))
+    end if !key
+
+    !Just on the cpus...
+    if(key == 'W') then
+       !Allocate W- and W+
+       allocate(Wp(nprocs), Wm(nprocs))
+       allocate(istate2_plus(nprocs), istate3_plus(nprocs),&
+            istate2_minus(nprocs),istate3_minus(nprocs))
+
+       !Distribute the total number of states across batches.
+       call job%distribute_load(nstates_irred, num%num_batches, &
+            num%restart_from_batch_record, batch_filename)
+
+       !Check whether the batch record file contains an end marker.
+       if(job%end_marker()) then
+          if(this_image() == 1) print *, 'All batches already completed.'
+          return  
+       end if
+
+       !Starting from the next unfinished batch.
+       do ibatch = job%get_num_finished_batches() + 1, num%num_batches
+          if(this_image() == 1) then
+             write(*, '(A, I0, A, I0)') "Processing batch ", ibatch, " of ", num%num_batches
+          end if
+
+          !Get the start, end, and size of the current batch.
+          batch_range = job%get_batch_range(ibatch)
+
+          !Distribute tasks among images and add batch dependent shift.
+          call distribute_points(batch_range(3), chunk, index_start, index_end, num_active_images)
+          index_start = index_start + batch_range(1) - 1
+          index_end = index_end + batch_range(1) - 1
+
+          if(this_image() == 1) then
+             write(*, "(A, I10)") " batch # = ", ibatch
+             write(*, "(A, I10)") " #states = ", nstates_irred/num%num_batches
+             write(*, "(A, I10)") " #states/image <= ", chunk
+          end if
+
+          !Only work with the active images
+          if(this_image() <= num_active_images) then
+             !Run over first phonon IBZ states
+             do istate1 = index_start, index_end
+                !Load |V^-|^2 from disk for scattering rates calculation
+
+                !Change to data output directory
+                call chdir(trim(adjustl(num%Vdir)))
+
+!!$                !Change back to working directory
+!!$                call chdir(num%cwd)
+
+                !Initialize transition probabilities
+                Wp(:) = 0.0_r64
+                Wm(:) = 0.0_r64
+                istate2_plus(:) = 0_i64
+                istate3_plus(:) = 0_i64
+                istate2_minus(:) = 0_i64
+                istate3_minus(:) = 0_i64
+
+                !Initialize process counters
+                plus_count = 0_i64
+                minus_count = 0_i64
+
+                !Demux state index into branch (s) and wave vector (iq) indices
+                call demux_state(istate1, ph%numbands, s1, iq1_ibz)
+
+                !Muxed index of wave vector from the IBZ index list.
+                !This will be used to access IBZ information from the FBZ quantities.
+                iq1 = ph%indexlist_irred(iq1_ibz)
+
+                istate1_fbz = mux_state(ph%numbands, s1, iq1)
+
+                !Energy of phonon 1
+                en1 = ph%ens(iq1, s1)
+
+                !Initial (IBZ blocks) wave vector (crystal coords.)
+                q1 = ph%wavevecs(iq1, :)
+
+                !Convert from crystal to 0-based index vector
+                q1_indvec = nint(q1*ph%wvmesh)
+
+                call map_triplet_full_to_reduced_ilambda1(ph%numbands, &
+                     ph%wvmesh, istate1, nstates, ph%indexlist_irred, &
+                     permutations_map_istate1)
+
+                !Run over second (FBZ) phonon wave vectors
+                do iq2 = 1, ph%nwv
+                   !Initial (IBZ blocks) wave vector (crystal coords.)
+                   q2 = ph%wavevecs(iq2, :)
+
+                   !Convert from crystal to 0-based index vector
+                   q2_indvec = nint(q2*ph%wvmesh)
+
+                   !Folded final phonon wave vector
+                   q3_minus_indvec = modulo(q1_indvec - q2_indvec, ph%wvmesh) !0-based index vector
+                   q3_minus = q3_minus_indvec/dble(ph%wvmesh) !crystal coords.
+
+                   !Muxed index of q3_minus
+                   iq3_minus = mux_vector(q3_minus_indvec, ph%wvmesh, 0_i64)
+
+                   !Run over second phonon bands
+                   do s2 = 1, ph%numbands
+                      istate2 = mux_state(ph%numbands, s2, iq2)
+
+                      !Energy of phonon 2
+                      en2 = ph%ens(iq2, s2)
+                      
+                      !Bose factor for phonon 2
+                      bose2 = Bose(en2, crys%T)
+
+                      !Run over second phonon bands
+                      do s3 = 1, ph%numbands
+                         istate3 = mux_state(ph%numbands, s3, iq3_minus)
+
+                         !Get index of -q2
+                         neg_q2_indvec = modulo(-q2_indvec, ph%wvmesh)
+                         neg_iq2 = mux_vector(neg_q2_indvec, ph%wvmesh, 0_i64)
+
+                         !Minus process index
+                         index_minus = ((iq2 - 1)*ph%numbands + (s2 - 1))*ph%numbands + s3
+
+                         !Energy of phonon 3
+                         en3 = ph%ens(iq3_minus, s3)
+
+                         !Evaluate delta functions
+                         delta_minus = delta_fn_ptr(en1 - en3, iq2, s2, ph%wvmesh, ph%simplex_map, &
+                              ph%simplex_count, ph%simplex_evals) !minus process
+
+                         delta_plus = delta_fn_ptr(en3 - en1, neg_iq2, s2, ph%wvmesh, ph%simplex_map, &
+                              ph%simplex_count, ph%simplex_evals) !plus process
+
+                         if(en1*en2*en3 == 0.0_r64) cycle
+                         
+                         !Read the canonical triplet V
+                         if(delta_minus > 0.0_r64 .or. delta_plus > 0.0_r64) then
+                            filename = &
+                                 canonical_triplet_filetag(permutations_map_istate1(:, istate2))
+                            filename = 'Vm2.cantrip.'//trim(adjustl(filename))
+
+                            open(1, file = trim(filename), status = 'old', access = 'stream')
+                            read(1) Vm2_cantrip
+                            close(1)
+                         end if
+
+                         !Bose factor for phonon 3
+                         bose3 = Bose(en3, crys%T)
+
+                         !Calculate W-:
+
+                         !Temperature dependent occupation factor
+                         !(bose1 + 1)*bose2*bose3/(bose1*(bose1 + 1))
+                         ! = (bose2 + bose3 + 1)
+                         occup_fac = (bose2 + bose3 + 1.0_r64)
+
+                         if(delta_minus > 0.0_r64) then
+                            !Non-zero process counter
+                            minus_count = minus_count + 1
+
+                            !Save W-
+                            Wm(minus_count) = Vm2_cantrip*occup_fac*delta_minus/en1/en2/en3
+                            istate2_minus(minus_count) = mux_state(ph%numbands, s2, iq2)
+                            istate3_minus(minus_count) = mux_state(ph%numbands, s3, iq3_minus)
+                         end if
+
+                         !Calculate W+:
+
+                         !Grab index of corresponding plus process using
+                         !|V-(s1q1|s2q2,s3q3)|^2 = |V+(s1q1|s2-q2,s3q3)|^2
+                         index_plus = ((neg_iq2 - 1)*ph%numbands + (s2 - 1))*ph%numbands + s3
+
+                         !TODO Wait...don't I have to find a different V for the + process?
+
+                         !Temperature dependent occupation factor
+                         !(bose1 + 1)*(bose2 + 1)*bose3/(bose1*(bose1 + 1))
+                         ! = bose2 - bose3.
+                         occup_fac = (bose2 - bose3)
+
+                         if(delta_plus > 0.0_r64) then
+                            !Non-zero process counter
+                            plus_count = plus_count + 1
+
+                            !Save W+
+                            Wp(plus_count) = Vm2_cantrip*occup_fac*delta_plus/en1/en2/en3
+                            istate2_plus(plus_count) = mux_state(ph%numbands, s2, neg_iq2)
+                            istate3_plus(plus_count) = mux_state(ph%numbands, s3, iq3_minus)
+                         end if
+                      end do !s2
+                   end do !s3
+                end do !iq2
+
+                !Multiply constant factor, unit factor, etc.
+                Wm(:) = const*Wm(:) !THz
+                Wp(:) = const*Wp(:) !THz
+
+                !Write W+ and W- to disk
+                !Change to data output directory
+                call chdir(trim(adjustl(num%Wdir)))
+
+                !Write data in binary format
+                !Note: this will overwrite existing data!
+                write (filename, '(I9)') istate1
+
+                filename_Wm = 'Wm.istate'//trim(adjustl(filename))
+                open(1, file = trim(filename_Wm), status = 'replace', access = 'stream')
+                write(1) minus_count
+                write(1) Wm(1:minus_count)
+                write(1) istate2_minus(1:minus_count)
+                write(1) istate3_minus(1:minus_count)
+                close(1)
+
+                filename_Wp = 'Wp.istate'//trim(adjustl(filename))
+                open(1, file = trim(filename_Wp), status = 'replace', access = 'stream')
+                write(1) plus_count
+                write(1) Wp(1:plus_count)
+                write(1) istate2_plus(1:plus_count)
+                write(1) istate3_plus(1:plus_count)
+                close(1)
+
+                !Change back to working directory
+                call chdir(num%cwd)
+             end do!istate1
+          end if!num_active_image
+
+          sync all
+          if(this_image() == 1) call job%write_record(ibatch)
+       end do!over the batches.
+    end if!key
+
+    if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
+
+    sync all
+  end subroutine calculate_3ph_interaction_perm
+
+  function canonical_triplet_filetag(canonical_triplet)
+    integer(i64), intent(in) :: canonical_triplet(3)
+    character(len = 1024) :: canonical_triplet_filetag
+
+    !character(len = 1024) :: state1_string, state2_string, state3_string
+    character(len = 300) :: state1_string, state2_string, state3_string
+
+    !print*, 'About to write the following numbers to string:', canonical_triplet
+    write (state1_string, '(I9)') canonical_triplet(1)
+    write (state2_string, '(I9)') canonical_triplet(2)
+    write (state3_string, '(I9)') canonical_triplet(3)
+    !print*, 'done'
+    !call exit
+
+    canonical_triplet_filetag = &
+         trim(adjustl(state1_string)) // '.' // &
+         trim(adjustl(state2_string)) // '.' // &
+         trim(adjustl(state3_string))
+  end function canonical_triplet_filetag
+  
+  subroutine map_triplet_full_to_reduced_ilambda1(nbands, mesh_size, ilambda1, nstates, indexlist_irred, M)
+    !! This subroutine maps the canonical triplet back to (ilambda2, ilambda1) and stores it in M_ilambda1(:, ilambda2).
+    !!
+    !! nbands Number of bands
+    !! mesh_size Wavevector discretization
+    !! ilambda1 Initial phonon state
+    !! nstates Number of states
+    !! M Mapping of every interaction triplet of states to its canonical representative
+
+    integer(i64), intent(in) :: nbands, mesh_size(3), ilambda1, nstates, &
+         indexlist_irred(:)
+    integer(i64), allocatable, intent(out) :: M(:, :)
+
+    integer(i64) :: ilambda2, iband1, iband2, iband3, ik1_ibz, ik1, ik2, ik3
+    integer(i64) :: q1(3), q2(3), q3(3)
+    integer(i64), allocatable :: all_perms(:, :)
+    integer(i64) :: triplet_full(3), permuted_triplet(3), canonical_triplet(3)
+    integer(i64) :: i, j
+
+    allocate(M(3, nstates))
+
+    ! Get all permutations of 3 indices
+    all_perms = permutations(3_i64)
+
+    ! Demux the initial phonon state
+    call demux_state(ilambda1, nbands, iband1, ik1_ibz)
+
+    ik1 = indexlist_irred(ik1_ibz)
+
+    ! Demux vector to get q1
+    call demux_vector(ik1, q1, mesh_size, base = 0_i64)
+
+    do ilambda2 = 1, nstates
+       ! Demux state for lambda2_list: for each lambda2_list value, convert its index to (iband2, ik2)
+       call demux_state(ilambda2, nbands, iband2, ik2)
+
+       ! Demux vector to get q1
+       call demux_vector(ik2, q2, mesh_size, base = 0_i64)
+
+       ! Compute q3 using modular arithmetic: such that momentum is conserved: q1 - q2 - q3 = 0 mod G
+       q3 = modulo(q1 - q2, mesh_size)
+
+       ! Compute ik3 using mux_vector
+       ik3 = mux_vector(q3, mesh_size, base = 0_i64)
+
+       ! Iterate over all possible bands for third state: to have (iband3, ik3)
+       do iband3 = 1, nbands
+!!$          triplet_full = [mux_state(nbands, iband1, ik1_ibz), &
+!!$               mux_state(nbands, iband2, ik2), &
+!!$               mux_state(nbands, iband3, ik3)]
+!!$
+          triplet_full = [mux_state(nbands, iband1, ik1), &
+               mux_state(nbands, iband2, ik2), &
+               mux_state(nbands, iband3, ik3)]
+
+          ! Initialize the canonical form of the triplet to the original (unpermuted) triplet, before trying other triplet
+          ! triplet_full is a 3x2 array: ((iband1, ik1), (iband2, ik2), (iband3, ik3))
+          canonical_triplet = triplet_full
+
+          do i = 1, size(all_perms, 2)
+             do j = 1, 3
+                permuted_triplet(j) = triplet_full(all_perms(j, i))
+             end do
+
+             ! Use a lexicographic comparison function to keep the smallest permutation
+             if(lex_less_1d(permuted_triplet, canonical_triplet)) canonical_triplet = permuted_triplet
+          end do
+
+          ! after elaborating the triplet (lambda1, lambda2, lambda3) as linear state indices
+          ! and after generating all 6 permutations
+          ! keep only the lexicographically smallest permutation (the irreducible triplet)
+          ! Store it in M(:, ilambda2, ilambda1)
+
+          M(:, ilambda2) = canonical_triplet
+
+          ! once the first valid canonical triplet is found (for a given lambda1 and lambda2, we can store it and skip checking (with exit) other values of iband3
+          ! symmetry will handle all others, we only interested in one representative triplet identified using lex_less_1d.
+          exit
+       end do
+    end do
+  end subroutine map_triplet_full_to_reduced_ilambda1
+  
 !!$  subroutine calculate_3ph_interaction_perm(ph, crys, num, key)
 !!$    !! Parallel driver of the 3-ph vertex calculator for all IBZ phonon wave vectors.
 !!$    !! This subroutine calculates |V-(s1<q1>|s2q2,s3q3)|^2, W-(s1<q1>|s2q2,s3q3),
@@ -1278,7 +1878,7 @@ contains
 !!$                                   canonical_triplet = permuted_triplet
 !!$                           end do
 !!$                           !!
-!!$                           
+!!$
 !!$                           !Then, apply the permutation symmetry
 !!$                           if(all([istate1, istate2, istate3] == canonical_triplet)) then
 !!$                              aux = Vm2_3ph(evecs(iq1, s1, :), &
@@ -1472,9 +2072,9 @@ contains
 !!$                      !TODO: Here have to use the permutation symmetry map
 !!$                      !to somehow extract the V computed for the canonical triplet
 !!$                      if(delta_minus > 0.0_r64 .or. delta_plus > 0.0_r64) then
-!!$                         
+!!$
 !!$                      end if
-!!$                      
+!!$
 !!$                      !Bose factor for phonon 3
 !!$                      bose3 = Bose(en3, crys%T)
 !!$
