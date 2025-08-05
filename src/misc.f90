@@ -1330,7 +1330,7 @@ contains
 
           ! Convert to cartesian coordinates
           do ib = 1, nb
-            gradf(ik, ib, :, dim_f) = matmul(lattvecs, gradf(ik, ib, :, dim_f))/twopi
+             gradf(ik, ib, :, dim_f) = matmul(lattvecs, gradf(ik, ib, :, dim_f))/twopi
           end do
        end do
     end do

@@ -581,7 +581,7 @@ program test_misc
         correct_gradf(nk, 1, 2, 3) =  array_of_reals(j)
      end do
   end do
-  
+
   itest = itest + 1
   test_array(itest) = testify("Jacobian test 2d mesh 3 x 3 x 1, with additional component")
   call Jacobian(f, gradf, lattvecs, kmesh, indexlist, blocks = .false.)
@@ -630,7 +630,7 @@ program test_misc
   kmesh = [1000, 1, 1]*1_i64 
   deallocate(indexlist, f, gradf, array_of_reals, correct_gradf)
   allocate(indexlist(600), f(600, nb, 3), gradf(600, nb, 3, 3), array_of_reals(3), correct_gradf(600, nb, 3, 3))
-  
+
   array_of_reals = [0.5, 0.5, 1.0]*1.0_r64
   b_matrix = twopi*lattvecs
   do ik1 = 1, size(indexlist)
@@ -680,15 +680,15 @@ program test_misc
   test_array(itest) = testify("Jacobian for fcc crystal test 3d mesh 100 x 100 x 300")
   call Jacobian(f, gradf, lattvecs, kmesh, indexlist, blocks = .false.)
   call test_array(itest)%assert(reshape(correct_gradf, [size(correct_gradf)]), reshape(gradf, [size(gradf)]), tol = 8e-2_r64)
-  
+
   deallocate(f, gradf, correct_gradf)
   allocate(f(product(kmesh), nb, 3), gradf(product(kmesh), nb, 3, 3), correct_gradf(product(kmesh), nb, 3, 3))
   lattvecs = reshape([0.2, 0.0, 0.0, 0.0, 0.5, 0.6, 0.0, 0.4, 0.3], [3, 3])
   array_of_reals = lattvecs(:, 2) + lattvecs(:, 1) 
   do i = 1, 3
-       j = mod(i, 3) + 1
-       l = mod(j, 3) + 1
-       b_matrix(:, i) = cross_product(lattvecs(:, j), lattvecs(:, l))
+     j = mod(i, 3) + 1
+     l = mod(j, 3) + 1
+     b_matrix(:, i) = cross_product(lattvecs(:, j), lattvecs(:, l))
   end do
   b_matrix = b_matrix*twopi/dot_product(lattvecs(:, 1), cross_product(lattvecs(:, 2), lattvecs(:, 3)))
 
