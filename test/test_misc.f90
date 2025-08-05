@@ -588,7 +588,6 @@ program test_misc
   call test_array(itest)%assert(reshape(correct_gradf, [size(correct_gradf)]), reshape(gradf, [size(gradf)]), tol = 3e-5_r64)
 
   ! Fourth test: 3D mesh 
-  ! Fourth test: 3D mesh 
   kmesh = [3, 3, 4]*1_i64
   deallocate(f, gradf, array_of_reals, correct_gradf)
   allocate(f(product(kmesh), nb, 3), gradf(product(kmesh), nb, 3, 3), correct_gradf(product(kmesh), nb, 3, 3), array_of_reals(3))
@@ -630,7 +629,6 @@ program test_misc
   call test_array(itest)%assert(reshape(correct_gradf, [size(correct_gradf)]), reshape(gradf, [size(gradf)]), tol = 3e-5_r64)
 
   ! Fifth test: 1D dense mesh with blocks = .true., the Fermi window cuts off states in the middle of the segment 
-  ! Fifth test: 1D dense mesh with blocks = .true., the Fermi window cuts off states in the middle of the segment 
   kmesh = [1000, 1, 1]*1_i64 
   deallocate(indexlist, f, gradf, array_of_reals, correct_gradf)
   allocate(indexlist(600), f(600, nb, 3), gradf(600, nb, 3, 3), array_of_reals(3), correct_gradf(600, nb, 3, 3))
@@ -659,7 +657,6 @@ program test_misc
   call test_array(itest)%assert(gradf(:, 1, 1, 1), correct_gradf(:, 1, 1, 1), tol = 3e-3_r64)
 
   ! Fifth test: 3D dense mesh, fcc crystal 
-  ! Fifth test: 3D dense mesh, fcc crystal 
   kmesh = [100, 100, 300]*1_i64
   deallocate(f, gradf, correct_gradf)
   allocate(f(product(kmesh), nb, 3), gradf(product(kmesh), nb, 3, 3), correct_gradf(product(kmesh), nb, 3, 3))
@@ -686,7 +683,7 @@ program test_misc
   test_array(itest) = testify("Jacobian for fcc crystal test 3d mesh 100 x 100 x 300")
   call Jacobian(f, gradf, lattvecs, kmesh, indexlist, blocks = .false.)
   call test_array(itest)%assert(reshape(correct_gradf, [size(correct_gradf)]), reshape(gradf, [size(gradf)]), tol = 8e-2_r64)
-
+  
   ! Sixth test: 3D dense mesh, monoclinic crystal 
   deallocate(f, gradf, correct_gradf)
   allocate(f(product(kmesh), nb, 3), gradf(product(kmesh), nb, 3, 3), correct_gradf(product(kmesh), nb, 3, 3))
