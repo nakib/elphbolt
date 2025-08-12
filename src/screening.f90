@@ -307,9 +307,11 @@ contains
          kpvel(1, el%numbands, 3)
     complex(r64) :: el_evecs_kp(1, el%numbands, el%numbands)
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
-    real(r64) :: onebyroot2pi, sigma 
+    real(r64) :: onebyroot2pi, sigma, delta_func 
+    real(r64) :: qcart(3), overlap_sum, delta_sum, fermidiff_sum, fermidiff, qmag
 
     onebyroot2pi = 1.0_r64/sqrt(2.0*pi)
+    qmag = twonorm(matmul(crys%reclattvecs, qcrys))
 
     nOmegas = size(Omegas)
 
@@ -320,6 +322,9 @@ contains
     !delta_fn_ptr => get_delta_fn_pointer(tetrahedra)
 
     spec_eps = 0.0
+    fermidiff_sum = 0.0
+    delta_sum = 0.0
+    overlap_sum = 0.0
     do ik = 1, el%nwv
        
        kppathvecs(1, :) = el%wavevecs(ik, :).umklapp.qcrys
@@ -384,10 +389,16 @@ contains
 !$!                      el%wvmesh, el%simplex_map, &
 !$!                      el%simplex_count, el%simplex_evals)
                 ! Delta replaced by Gaussian
+                delta_func = deltafunc_pol(ik, m, kpvel, ekp - ek - Omegas(iOmega), crys, el)
+                fermidiff = Fermi(ekp - Omegas(iOmega), el%chempot, crys%T) -&
+                            Fermi(ekp, el%chempot, crys%T)  
                 spec_eps(iOmega) = spec_eps(iOmega) + &
-                     (Fermi(ekp - Omegas(iOmega), el%chempot, crys%T) - &
-                     Fermi(ekp, el%chempot, crys%T))*overlap* &
-                     deltafunc_pol(ik, m, kpvel, ekp - ek - Omegas(iOmega), crys, el) 
+                                   fermidiff*overlap*delta_func 
+                if(qmag<0.4 .and. Omegas(iOmega)>0.0606 .and. Omegas(iOmega)<0.1818) then
+                   delta_sum = delta_sum + delta_func
+                   fermidiff_sum = fermidiff_sum + fermidiff
+                   overlap_sum = overlap_sum + overlap
+                end if
 
 !!$                spec_eps(iOmega) = spec_eps(iOmega) + &
 !!$                     Fermi(ekp, el%chempot, crys%T)* &
@@ -403,6 +414,8 @@ contains
     end do
 
     spec_eps = spec_eps*el%spindeg/crys%volume*crys%thickness
+    if(qmag<0.4) write(170, '(F8.3, 1X, E12.3, 1X, E12.3, 1X, E12.3)') &
+                 qmag, fermidiff_sum, delta_sum, overlap_sum
     
     do iOmega = 1, nOmegas/2 ! negative sector
        !Recall that the resolvent is already normalized in the full wave vector mesh.
@@ -558,7 +571,8 @@ contains
        end do
     end do
 
-    write(170, '(F8.3, 1X, E12.3, 1X, E12.3)') qmag, fermidiff_sum, delta_sum
+    write(170, '(F8.3, 1X, E12.3, 1X, E12.3, 1X, E12.3)') &
+                 qmag, fermidiff_sum, delta_sum, overlap_sum
     spec_eps = spec_eps*el%spindeg/crys%volume*crys%thickness
     
     do iOmega = 1, nOmegas/2 ! negative sector
@@ -777,6 +791,7 @@ contains
     prefac = 1.0e9_r64*qe/perm0 ! ev.nm 
     if(crys%twod) prefac = prefac/2
 
+    open(170, file="testing", status='replace')
     do iq = start, end !Over IBZ k points
        qcrys = qlist(iq, :) !crystal coordinates
        qcart = matmul(crys%reclattvecs, qcrys) !cartesian coordinates
@@ -840,6 +855,7 @@ contains
        !end do
 
     end do
+    close(170)
 
     call co_sum(pol)
     call co_sum(diel_rpa)
