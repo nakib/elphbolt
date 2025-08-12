@@ -442,7 +442,7 @@ contains
          kpvel(1, el%numbands, 3), beta, fnk, qcart(3), kunit(3), delta_func
     complex(r64) :: el_evecs_kp(1, el%numbands, el%numbands)
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
-    real(r64) :: delta_sum, fermidiff_sum, fermidiff, qmag
+    real(r64) :: overlap_sum, delta_sum, fermidiff_sum, fermidiff, qmag
 
     beta = 1.0_r64/kB/crys%T
     qcart = matmul(crys%reclattvecs, qcrys)
@@ -459,6 +459,7 @@ contains
     spec_eps = 0.0
     fermidiff_sum = 0.0
     delta_sum = 0.0
+    overlap_sum = 0.0
     do ik = 1, el%nwv
        
        kppathvecs(1, :) = el%wavevecs(ik, :).umklapp.qcrys
@@ -516,6 +517,7 @@ contains
                 if(Omegas(iOmega)>0.0606 .and. Omegas(iOmega)<0.1818) then
                    delta_sum = delta_sum + delta_func
                    fermidiff_sum = fermidiff_sum + fermidiff
+                   overlap_sum = overlap_sum + overlap
                 end if
                 spec_eps(iOmega) = spec_eps(iOmega) + &
                                    fermidiff*overlap*delta_func
