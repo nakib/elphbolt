@@ -442,9 +442,11 @@ contains
          kpvel(1, el%numbands, 3), beta, fnk, qcart(3), kunit(3), delta_func
     complex(r64) :: el_evecs_kp(1, el%numbands, el%numbands)
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
+    real(r64) :: delta_sum, fermidiff_sum, fermidiff, qmag
 
     beta = 1.0_r64/kB/crys%T
     qcart = matmul(crys%reclattvecs, qcrys)
+    qmag = twonorm(qcart)
 
     nOmegas = size(Omegas)
 
@@ -455,6 +457,8 @@ contains
     !delta_fn_ptr => get_delta_fn_pointer(tetrahedra)
 
     spec_eps = 0.0
+    fermidiff_sum = 0.0
+    delta_sum = 0.0
     do ik = 1, el%nwv
        
        kppathvecs(1, :) = el%wavevecs(ik, :).umklapp.qcrys
@@ -506,11 +510,16 @@ contains
                 
                 ! Delta replaced by Gaussian
                 delta_func = deltafunc_pol(ik, m, kpvel, ekp - ek - Omegas(iOmega), crys, el)
+                fermidiff = Fermi(ek, el%chempot, crys%T) - &
+                            (fnk - beta*fnk*(1.0_r64 - fnk)*hbar_eVps*&
+                            dot_product(qcart, el%vels(ik, n, :)))
+                if(Omegas(iOmega)>0.0606 .and. Omegas(iOmega)<0.1818) then
+                   delta_sum = delta_sum + delta_func
+                   fermidiff_sum = fermidiff_sum + fermidiff
+                end if
                 spec_eps(iOmega) = spec_eps(iOmega) + &
-                     (Fermi(ek, el%chempot, crys%T) - &
-                     (fnk - beta*fnk*(1.0_r64 - fnk)*hbar_eVps*&
-                     dot_product(qcart, el%vels(ik, n, :))))*overlap* &
-                     delta_func 
+                                   fermidiff*overlap*delta_func
+
                 !if (delta_func > 1e-5) print *,"Gauss overlap==>", delta_func
                 !write(1000, *) delta_func
 !$!                 if(Omegas(iOmega)>0.02) then 
@@ -547,6 +556,7 @@ contains
        end do
     end do
 
+    write(170, '(F8.3, 1X, E12.3, 1X, E12.3)') qmag, fermidiff_sum, delta_sum
     spec_eps = spec_eps*el%spindeg/crys%volume*crys%thickness
     
     do iOmega = 1, nOmegas/2 ! negative sector
@@ -706,6 +716,9 @@ contains
     character(len = 1024) :: filename
     real(r64) :: omega_plasma, prefac, q2norm, dim_norm
     real(r64), parameter :: plus0 = 1
+    integer :: ik1, ik2, ik3
+    real(r64) :: W_qw_msq, Gplusq(3), Gplusq_2norm
+    real(r64), allocatable :: diel_qw(:) 
 
     !Silicon
     !omega_plasma = 1.0e-9_r64*hbar*sqrt(el%conc_el/perm0/crys%epsiloninf/(0.267*me)) !eV
@@ -739,6 +752,7 @@ contains
     !Create energy grid
     numomega = num%ncont_mesh !601 !6 !5 !1001
     allocate(energylist(numomega))
+    allocate(diel_qw(numomega))
     call linspace(energylist, -3.5_r64, 3.5_r64, numomega)
     
     !Allocate diel_ik to hold maximum possible Omega
@@ -763,7 +777,8 @@ contains
 
     do iq = start, end !Over IBZ k points
        qcrys = qlist(iq, :) !crystal coordinates
-
+       qcart = matmul(crys%reclattvecs, qcrys) !cartesian coordinates
+       
        ! print *, "q->", iq
        ! |G + q|^2 or |G + q|, for 3D or 2D case
        q2norm = qmaglist(iq)**(crys%dim-1)
@@ -773,7 +788,7 @@ contains
 !$!             spec_X0, energylist, qcrys, el, wann, crys, num%tetrahedra)
       
        !if(q2norm<1e-1) then
-       if(q2norm<crys%qTF/10.0_r64) then
+       if(qmaglist(iq)<crys%qTF/29.0_r64) then
           call spectral_head_polarizability_2d_lowqpath_old(&
             spec_X0, energylist, qcrys, el, wann, crys, num%tetrahedra)
        else
@@ -786,6 +801,26 @@ contains
        X0_qw = ReX0 + oneI*ImX0
        pol(iq, :) = X0_qw
           
+!$!        W_qw_msq = 0.0_r64
+!$!        diel_qw = 0.0_r64
+!$!        do concurrent(ik1 = -1:1, ik2 = -1:1, ik3 = -1:1)
+!$!           Gplusq = (ik1*crys%reclattvecs(:, 1) &
+!$!                + ik2*crys%reclattvecs(:, 2) &
+!$!                + ik3*crys%reclattvecs(:, 3)) + qcart
+!$! 
+!$!           !|G + q|^2 or |G + q|, for 3D or 2D case
+!$!           Gplusq_2norm = twonorm(Gplusq)**(crys%dim-1)
+!$! 
+!$!           !Dielectric matrix elements 
+!$!           diel_qw = diel_qw + prefac*X0_qw/Gplusq_2norm
+!$! 
+!$!           !Squared Coulomb matrix elements without the prefactor
+!$!           !W_qw_msq = W_qw_msq + abs(1.0_r64/diel_qw/Gplusq_2norm)**2
+!$!        end do
+!$! 
+!$!        !gCoul2_RPA = W_qw_msq*prefac**2*overlap/dim_norm ! eV^2
+!$!        diel_rpa(iq, :) = 1.0_r64 - diel_qw
+
        !Calculate RPA dielectric (diagonal in G-G' space)
 !$!        diel_rpa(iq, :) = crys%epsiloninf - &
 !$!             1.0_r64/qmaglist(iq)**2* &
