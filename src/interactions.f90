@@ -24,7 +24,7 @@ module interactions
        twonorm, write2file_rank2_real, demux_vector, interpolate, expm1, &
        precompute_interpolation_corners_and_weights, interpolate_using_precomputed, &
        create_set, coarse_grain, timer, eye, shrink, Hilbert_transform, interpolator_1d, &
-       linspace, permutations, lex_less_1d, permutations
+       linspace, permutations, lex_less_1d, permutations, sort
   use resource_module, only: resource
   use screening_module, only: spectral_head_polarizability_3d_q
   use task_manager_module, only : task_manager
@@ -1070,6 +1070,8 @@ contains
     !!
     !! key = 'V', 'W' for vertex, transition probabilitiy calculation, respectively.
 
+    use fhash, only: fhash_tbl_t, hashkey=>fhash_key
+
     type(phonon), intent(in) :: ph
     type(crystal), intent(in) :: crys
     type(numerics), intent(in) :: num
@@ -1085,32 +1087,31 @@ contains
          ibatch, num_batches, batch_range(3), neg_istate2
     real(r64) :: en1, en2, en3, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
          occup_fac, const, bose2, bose3, delta_minus, delta_plus, aux, load_split, Vm2_cantrip
-    !real(r64), allocatable :: Vm2_1(:), Vm2_2(:), Wm(:), Wp(:)
     real(r64), allocatable :: Wm(:), Wp(:)
     integer(i64), allocatable :: istate2_plus(:), istate3_plus(:), istate2_minus(:), istate3_minus(:)
     integer(i64), allocatable :: chunk[:], index_start[:], index_end[:]
     complex(r64) :: phases(ph%numtriplets)
     character(len = 1024) :: filename, filename_Wm, filename_Wp, batch_filename
-    !logical, allocatable :: minus_mask(:), plus_mask(:)
     type(resource) :: compute_resource
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
-    integer(i64) :: perms_of_3_indices(3, 6), an_equivalent_triplet(3), cantrip(3)
-    integer(i64), allocatable :: permutations_map(:, :, :, :), permutations_map_istate1(:, :, :)
-    logical, allocatable :: V_cantrip_computed(:, :, :)
+    integer(i64) :: cantrip(3)
+    logical :: this_was_computed
+    type(fhash_tbl_t) :: tbl
+    integer :: hashstat
 
     if(key /= 'V' .and. key /= 'W') then
        call exit_with_message("Invalid value of key in call to calculate_3ph_interaction. Exiting.")
     end if
 
-!!$    if(key == 'V') then
-    call print_message("Calculating 3-ph vertices for all IBZ phonons...")
+    if(key == 'V') then
+       call print_message("Calculating 3-ph vertices for all IBZ phonons...")
 
-    call compute_resource%initialize
+       call compute_resource%initialize
 
-    call compute_resource%report
-!!$    else
-!!$       call print_message("Calculating 3-ph transition probabilities for all IBZ phonons...")
-!!$    end if
+       call compute_resource%report
+    else
+       call print_message("Calculating 3-ph transition probabilities for all IBZ phonons...")
+    end if
 
     !Associate delta function procedure pointer
     delta_fn_ptr => get_delta_fn_pointer(num%tetrahedra)
@@ -1123,14 +1124,6 @@ contains
 
     !Total number of FBZ blocks states
     nstates = ph%nwv*ph%numbands
-
-    !Get the permutations of 3 indices
-    perms_of_3_indices = permutations(3_i64)
-
-    if(key == 'V') then
-       allocate(V_cantrip_computed(nstates, nstates, nstates))
-       V_cantrip_computed = .false.
-    end if
 
     !Select the appropriate batch record filename based on the simulation key.
     select case(key)
@@ -1145,49 +1138,19 @@ contains
     !Compute permutations_map_istate1_fbz
 
     !Distribute tasks among images and add batch dependent shift.
-    load_split = 0.0
+    !load_split = 0.0
 
-    call compute_resource%balance_load(load_split, nstates, &
-         chunk, index_start, index_end, num_active_images)
-
-    allocate(permutations_map(3, ph%numbands, nstates, nstates))
-
-    !Run over first phonon *FBZ* states
-    !TODO Parallelize this
-    do istate1 = 1, nstates
-       call map_triplet_full_to_reduced_ilambda1(ph, istate1, permutations_map_istate1)
-
-       permutations_map(:, :, :, istate1) = permutations_map_istate1
-    end do
-
-!!$    do istate1 = 1, nstates_irred
-!!$       !Demux state index into branch (s) and wave vector (iq) indices
-!!$       call demux_state(istate1, ph%numbands, s1, iq1_ibz)
-!!$
-!!$       !Muxed index of wave vector from the IBZ index list.
-!!$       !This will be used to access IBZ information from the FBZ quantities.
-!!$       iq1 = ph%indexlist_irred(iq1_ibz)
-!!$
-!!$       istate1_fbz = mux_state(ph%numbands, s1, iq1)
-!!$
-!!$       call map_triplet_full_to_reduced_ilambda1(ph, istate1_fbz, permutations_map_istate1)
-!!$
-!!$       permutations_map(:, :, :, istate1_fbz) = permutations_map_istate1
-!!$    end do
-
-    !TODO [ ] Compute W with lazy/just-in-time evaluation of V, taking permutation symmetry into account
+    !call compute_resource%balance_load(load_split, nstates, &
+    !     chunk, index_start, index_end, num_active_images)
 
     !Maximum total number of 3-phonon processes for a given initial phonon state
     nprocs = ph%nwv*ph%numbands**2
 
     if(key == 'V') then
-       !Allocate W- and W+
-       !allocate(Wp(nprocs), Wm(nprocs))
-       !allocate(istate2_plus(nprocs), istate3_plus(nprocs),&
-       !     istate2_minus(nprocs),istate3_minus(nprocs))
-
        !Distribute the total number of states across batches.
-       call job%distribute_load(nstates_irred, num%num_batches, &
+!!$       call job%distribute_load(nstates_irred, num%num_batches, &
+!!$            num%restart_from_batch_record, batch_filename)
+       call job%distribute_load(ph%nwv_irred, num%num_batches, &
             num%restart_from_batch_record, batch_filename)
 
        !Check whether the batch record file contains an end marker.
@@ -1212,36 +1175,48 @@ contains
 
           if(this_image() == 1) then
              write(*, "(A, I10)") " batch # = ", ibatch
-             write(*, "(A, I10)") " #states = ", nstates_irred/num%num_batches
-             write(*, "(A, I10)") " #states/image <= ", chunk
+             !write(*, "(A, I10)") " #states = ", nstates_irred/num%num_batches
+             write(*, "(A, I10)") " #IBZ q-points = ", ph%nwv_irred/num%num_batches
+             write(*, "(A, I10)") " #IBZ q-points/image <= ", chunk
           end if
 
           !Only work with the active images
           if(this_image() <= num_active_images) then
              !Run over first phonon *IBZ* states
-             do istate1 = index_start, index_end
-                !Load |V^-|^2 from disk for scattering rates calculation
-
-                !Change to data output directory
-                call chdir(trim(adjustl(num%Vdir)))
-
-                !Demux state index into branch (s) and wave vector (iq) indices
-                call demux_state(istate1, ph%numbands, s1, iq1_ibz)
-
-                !Muxed index of wave vector from the IBZ index list.
-                !This will be used to access IBZ information from the FBZ quantities.
+             !do istate1 = index_start, index_end
+             do iq1_ibz = index_start, index_end
                 iq1 = ph%indexlist_irred(iq1_ibz)
-
-                istate1_fbz = mux_state(ph%numbands, s1, iq1)
-
-                !Energy of phonon 1
-                en1 = ph%ens(iq1, s1)
 
                 !Initial (IBZ blocks) wave vector (crystal coords.)
                 q1 = ph%wavevecs(iq1, :)
 
                 !Convert from crystal to 0-based index vector
                 q1_indvec = nint(q1*ph%wvmesh)
+
+                !do s1 = 1, ph%numbands
+
+                !istate1 = mux_state(ph%numbands, s1, iq1_ibz)
+
+                !Change to data output directory
+                call chdir(trim(adjustl(num%Vdir)))
+
+                !Demux state index into branch (s) and wave vector (iq) indices
+                !call demux_state(istate1, ph%numbands, s1, iq1_ibz)
+
+                !Muxed index of wave vector from the IBZ index list.
+                !This will be used to access IBZ information from the FBZ quantities.
+                !iq1 = ph%indexlist_irred(iq1_ibz)
+
+                !istate1_fbz = mux_state(ph%numbands, s1, iq1)
+
+                !Energy of phonon 1
+                !en1 = ph%ens(iq1, s1)
+
+                !Initial (IBZ blocks) wave vector (crystal coords.)
+                !q1 = ph%wavevecs(iq1, :)
+
+                !Convert from crystal to 0-based index vector
+                !q1_indvec = nint(q1*ph%wvmesh)
 
                 !Run over second (FBZ) phonon wave vectors
                 do iq2 = 1, ph%nwv
@@ -1267,115 +1242,121 @@ contains
                            dot_product(q3_minus_cart, (ph%R_k(:, it)))))
                    end do
 
-                   !Run over second phonon bands
-                   do s2 = 1, ph%numbands
-                      istate2 = mux_state(ph%numbands, s2, iq2)
+                   !Get index of -q2
+                   neg_q2_indvec = modulo(-q2_indvec, ph%wvmesh)
+                   neg_iq2 = mux_vector(neg_q2_indvec, ph%wvmesh, 0_i64)
 
-                      !Energy of phonon 2
-                      en2 = ph%ens(iq2, s2)
+                   do s1 = 1, ph%numbands
 
-                      !Bose factor for phonon 2
-                      bose2 = Bose(en2, crys%T)
+                      !istate1 = mux_state(ph%numbands, s1, iq1_ibz)
+
+                      istate1_fbz = mux_state(ph%numbands, s1, iq1)
+
+                      !Energy of phonon 1
+                      en1 = ph%ens(iq1, s1)
 
                       !Run over second phonon bands
-                      do s3 = 1, ph%numbands
-                         istate3 = mux_state(ph%numbands, s3, iq3_minus)
+                      do s2 = 1, ph%numbands
+                         istate2 = mux_state(ph%numbands, s2, iq2)
 
-                         !Get index of -q2
-                         neg_q2_indvec = modulo(-q2_indvec, ph%wvmesh)
-                         neg_iq2 = mux_vector(neg_q2_indvec, ph%wvmesh, 0_i64)
+                         !Energy of phonon 2
+                         en2 = ph%ens(iq2, s2)
 
-                         !Minus process index
-                         index_minus = ((iq2 - 1)*ph%numbands + (s2 - 1))*ph%numbands + s3
+                         !Run over second phonon bands
+                         do s3 = 1, ph%numbands
+                            istate3 = mux_state(ph%numbands, s3, iq3_minus)
 
-                         !Energy of phonon 3
-                         en3 = ph%ens(iq3_minus, s3)
+                            !Energy of phonon 3
+                            en3 = ph%ens(iq3_minus, s3)
 
-                         !Evaluate delta functions
-                         delta_minus = delta_fn_ptr(en1 - en3, iq2, s2, ph%wvmesh, ph%simplex_map, &
-                              ph%simplex_count, ph%simplex_evals) !minus process
+                            if(en1*en2*en3 == 0.0_r64) cycle
 
-                         delta_plus = delta_fn_ptr(en3 - en1, neg_iq2, s2, ph%wvmesh, ph%simplex_map, &
-                              ph%simplex_count, ph%simplex_evals) !plus process
+                            !Evaluate delta functions
+                            delta_minus = delta_fn_ptr(en1 - en3, iq2, s2, ph%wvmesh, ph%simplex_map, &
+                                 ph%simplex_count, ph%simplex_evals) !minus process
 
-                         if(en1*en2*en3 == 0.0_r64) cycle
+                            delta_plus = delta_fn_ptr(en3 - en1, neg_iq2, s2, ph%wvmesh, ph%simplex_map, &
+                                 ph%simplex_count, ph%simplex_evals) !plus process
 
-                         !Bose factor for phonon 3
-                         bose3 = Bose(en3, crys%T)
+                            !The delta^- selected sector:
 
-                         !Calculate W-:
+                            if(delta_minus > 0.0_r64) then
+                               !if(delta_minus > 0.0_r64 .or. delta_plus > 0.0_r64) then
+                               !This canonical triplet
+                               !cantrip = permutations_map(:, s3, istate2, istate1_fbz)
 
-                         !Temperature dependent occupation factor
-                         !(bose1 + 1)*bose2*bose3/(bose1*(bose1 + 1))
-                         ! = (bose2 + bose3 + 1)
-                         occup_fac = (bose2 + bose3 + 1.0_r64)
+                               !Set cantrip OTF
+                               cantrip = [istate1_fbz, istate2, istate3]
+                               call sort(cantrip)
 
-                         if(delta_minus > 0.0_r64) then
-                            !This canonical triplet
-                            cantrip = permutations_map(:, s3, istate2, istate1_fbz)
+                               !Whether I need to read or write, these will be needed anyway
+                               filename = &
+                                    canonical_triplet_filetag(cantrip(:))
+                               filename = 'Vm2.cantrip.'//trim(adjustl(filename))
 
-                            !Whether I need to read or write, these will be needed anyway
-                            filename = &
-                                 canonical_triplet_filetag(cantrip(:))
-                            filename = 'Vm2.cantrip.'//trim(adjustl(filename))
+                               !inquire(file = filename, exist = this_was_computed)
+                               !call tbl%get(hashkey(cantrip), this_was_computed, hashstat)
+                               call tbl%check_key(hashkey(cantrip), hashstat)
+                               !hashstat = 0 when key was not logged
 
-                            if(.not. V_cantrip_computed(cantrip(1), cantrip(2), cantrip(3))) then
-                               !Compute V(lambda1, lambda2, lambda3)_canonical
-                               Vm2_cantrip = Vm2_3ph(ph%evecs(iq1, s1, :), &
-                                    ph%evecs(iq2, s2, :), ph%evecs(iq3_minus, s3, :), &
-                                    ph%Index_i(:), ph%Index_j(:), ph%Index_k(:), ph%ifc3(:,:,:,:), &
-                                    phases(:), ph%numtriplets, ph%numbands)
+                               !if(.not. this_was_computed) then
+                               if(hashstat /= 0) then
+                                  !Compute V(lambda1, lambda2, lambda3)_canonical
+                                  Vm2_cantrip = Vm2_3ph(ph%evecs(iq1, s1, :), &
+                                       ph%evecs(iq2, s2, :), ph%evecs(iq3_minus, s3, :), &
+                                       ph%Index_i(:), ph%Index_j(:), ph%Index_k(:), ph%ifc3(:,:,:,:), &
+                                       phases(:), ph%numtriplets, ph%numbands)
 
-                               !Save to disk
-                               open(1, file = trim(filename), status = 'replace', access = 'stream')
-                               write(1) Vm2_cantrip
-                               close(1)
+                                  !Save to disk
+                                  open(1, file = trim(filename), status = 'replace', access = 'stream')
+                                  write(1) Vm2_cantrip
+                                  close(1)
 
-                               V_cantrip_computed(cantrip(1), cantrip(2), cantrip(3)) = .true.
+                                  call tbl%set(hashkey(cantrip), value = .true.)
+                               end if
                             end if
-                         end if
 
-                         !Calculate W+:
+                            !The delta^+ selected sector:
 
-                         !Grab index of corresponding plus process using
-                         !|V-(s1q1|s2q2,s3q3)|^2 = |V+(s1q1|s2-q2,s3q3)|^2
-                         index_plus = ((neg_iq2 - 1)*ph%numbands + (s2 - 1))*ph%numbands + s3
+                            neg_istate2 = mux_state(ph%numbands, s3, neg_iq2)
 
-                         !TODO compute the time-revered state index of the 2nd phonon
-                         neg_istate2 = mux_state(ph%numbands, s3, neg_iq2)
+                            if(delta_plus > 0.0_r64) then
+                               !This canonical triplet
+                               !cantrip = permutations_map(:, s3, neg_istate2, istate1_fbz)
+                               !Set cantrip OTF
+                               cantrip = [istate1_fbz, neg_istate2, istate3]
+                               call sort(cantrip)
 
-                         !Temperature dependent occupation factor
-                         !(bose1 + 1)*(bose2 + 1)*bose3/(bose1*(bose1 + 1))
-                         ! = bose2 - bose3.
-                         occup_fac = (bose2 - bose3)
+                               filename = &
+                                    canonical_triplet_filetag(cantrip(:))
+                               filename = 'Vm2.cantrip.'//trim(adjustl(filename))
 
-                         if(delta_plus > 0.0_r64) then
-                            !This canonical triplet
-                            cantrip = permutations_map(:, s3, neg_istate2, istate1_fbz)
+                               !inquire(file = filename, exist = this_was_computed)
+                               !call tbl%get(hashkey(cantrip), this_was_computed, hashstat)
+                               call tbl%check_key(hashkey(cantrip), hashstat)
 
-                            filename = &
-                                 canonical_triplet_filetag(cantrip(:))
-                            filename = 'Vm2.cantrip.'//trim(adjustl(filename))
+                               !if(.not. this_was_computed) then
+                               if(hashstat /= 0) then
+                                  !Compute V(lambda1, lambda2, lambda3)_canonical
+                                  Vm2_cantrip = Vm2_3ph(ph%evecs(iq1, s1, :), &
+                                       ph%evecs(iq2, s2, :), ph%evecs(iq3_minus, s3, :), &
+                                       ph%Index_i(:), ph%Index_j(:), ph%Index_k(:), ph%ifc3(:,:,:,:), &
+                                       phases(:), ph%numtriplets, ph%numbands)
 
-                            if(.not. V_cantrip_computed(cantrip(1), cantrip(2), cantrip(3))) then
-                               !Compute V(lambda1, lambda2, lambda3)_canonical
-                               Vm2_cantrip = Vm2_3ph(ph%evecs(iq1, s1, :), &
-                                    ph%evecs(iq2, s2, :), ph%evecs(iq3_minus, s3, :), &
-                                    ph%Index_i(:), ph%Index_j(:), ph%Index_k(:), ph%ifc3(:,:,:,:), &
-                                    phases(:), ph%numtriplets, ph%numbands)
+                                  !Save to disk
+                                  open(1, file = trim(filename), status = 'replace', access = 'stream')
+                                  write(1) Vm2_cantrip
+                                  close(1)
 
-                               !Save to disk
-                               open(1, file = trim(filename), status = 'replace', access = 'stream')
-                               write(1) Vm2_cantrip
-                               close(1)
-
-                               V_cantrip_computed(cantrip(1), cantrip(2), cantrip(3)) = .true.
+                                  call tbl%set(hashkey(cantrip), value = .true.)
+                               end if
                             end if
-                         end if
-                      end do !s2
-                   end do !s3
-                end do !iq2
-             end do!istate1
+                         end do !s2
+                      end do !s3
+                   end do !iq2
+                   !end do!istate1
+                end do !s1
+             end do !iq1
           end if!num_active_image
 
           sync all
@@ -1520,9 +1501,12 @@ contains
                             !Non-zero process counter
                             minus_count = minus_count + 1
 
-                            !Whether I need to read or write, these will be needed anyway
+                            !Set cantrip OTF
+                            cantrip = [istate1_fbz, istate2, istate3]
+                            call sort(cantrip)
+
                             filename = &
-                                 canonical_triplet_filetag(permutations_map(:, s3, istate2, istate1_fbz))
+                                 canonical_triplet_filetag(cantrip(:))
                             filename = 'Vm2.cantrip.'//trim(adjustl(filename))
 
                             !Read V(lambda1, lambda2, lambda3)_canonical from disk
@@ -1554,9 +1538,12 @@ contains
                             !Non-zero process counter
                             plus_count = plus_count + 1
 
-                            !Whether I need to read or write, these will be needed anyway
+                            !Set cantrip OTF
+                            cantrip = [istate1_fbz, neg_istate2, istate3]
+                            call sort(cantrip)
+
                             filename = &
-                                 canonical_triplet_filetag(permutations_map(:, s3, neg_istate2, istate1_fbz))
+                                 canonical_triplet_filetag(cantrip(:))
                             filename = 'Vm2.cantrip.'//trim(adjustl(filename))
 
                             !Read V(lambda1, lambda2, lambda3)_canonical from disk
@@ -1635,65 +1622,6 @@ contains
          trim(adjustl(state2_string)) // '.' // &
          trim(adjustl(state3_string))
   end function canonical_triplet_filetag
-
-  subroutine map_triplet_full_to_reduced_ilambda1(ph, ilambda1, M)
-    type(phonon), intent(in) :: ph
-    integer(i64), intent(in) :: ilambda1
-    !integer(i64), allocatable, intent(out) :: M(:, :)
-    integer(i64), allocatable, intent(out) :: M(:, :, :)
-
-    integer(i64) :: ilambda2, iband1, iband2, iband3, ik1, ik2, ik3
-    integer(i64) :: q1(3), q2(3), q3(3)
-    integer(i64), allocatable :: all_perms(:, :)
-    integer(i64) :: triplet_full(3), permuted_triplet(3), canonical_triplet(3)
-    integer(i64) :: i, j, nstates
-
-    nstates = ph%nwv*ph%numbands
-
-    allocate(M(3, ph%numbands, nstates))
-
-    ! Get all permutations of 3 indices
-    all_perms = permutations(3_i64)
-
-    ! Demux the initial (FBZ) phonon state
-    call demux_state(ilambda1, ph%numbands, iband1, ik1)
-
-    q1 = nint(ph%wavevecs(ik1, :)*ph%wvmesh)
-
-    do ik2 = 1, ph%nwv
-
-       q2 = nint(ph%wavevecs(ik2, :)*ph%wvmesh)
-
-       q3 = modulo(q1 - q2, ph%wvmesh)
-
-       ik3 = mux_vector(q3, ph%wvmesh, base = 0_i64)
-
-       do iband2 = 1, ph%numbands
-
-          ilambda2 = mux_state(ph%numbands, iband2, ik2)
-
-          do iband3 = 1, ph%numbands
-
-             triplet_full = [ilambda1, ilambda2, mux_state(ph%numbands, iband3, ik3)]
-
-             canonical_triplet = triplet_full
-
-             do i = 1, size(all_perms, 2)
-                do j = 1, 3
-                   permuted_triplet(j) = triplet_full(all_perms(j, i))
-                end do
-
-                ! Use a lexicographic comparison function to keep the smallest permutation
-                if(lex_less_1d(permuted_triplet, canonical_triplet)) canonical_triplet = permuted_triplet
-             end do
-
-             M(:, iband3, ilambda2) = canonical_triplet
-             !DBG Not sure why this exit was needed
-             !exit
-          end do
-       end do
-    end do
-  end subroutine map_triplet_full_to_reduced_ilambda1
 
   subroutine calculate_W3ph_OTF(ph, num, istate1, T, &
        Wm, Wp, istate2_plus, istate3_plus, istate2_minus, istate3_minus)
