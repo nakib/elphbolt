@@ -1280,7 +1280,8 @@ contains
 
                             !The delta^- selected sector:
 
-                            if(delta_minus > 0.0_r64) then
+                            !if(delta_minus > 0.0_r64) then
+                            if(delta_minus > 0.0_r64 .or. delta_plus > 0.0_r64) then
                                !if(delta_minus > 0.0_r64 .or. delta_plus > 0.0_r64) then
                                !This canonical triplet
                                !cantrip = permutations_map(:, s3, istate2, istate1_fbz)
@@ -1315,52 +1316,15 @@ contains
                                   call tbl%set(hashkey(cantrip), value = .true.)
                                end if
                             end if
-
-                            !The delta^+ selected sector:
-
-                            neg_istate2 = mux_state(ph%numbands, s3, neg_iq2)
-
-                            if(delta_plus > 0.0_r64) then
-                               !This canonical triplet
-                               !cantrip = permutations_map(:, s3, neg_istate2, istate1_fbz)
-                               !Set cantrip OTF
-                               cantrip = [istate1_fbz, neg_istate2, istate3]
-                               call sort(cantrip)
-
-                               filename = &
-                                    canonical_triplet_filetag(cantrip(:))
-                               filename = 'Vm2.cantrip.'//trim(adjustl(filename))
-
-                               !inquire(file = filename, exist = this_was_computed)
-                               !call tbl%get(hashkey(cantrip), this_was_computed, hashstat)
-                               call tbl%check_key(hashkey(cantrip), hashstat)
-
-                               !if(.not. this_was_computed) then
-                               if(hashstat /= 0) then
-                                  !Compute V(lambda1, lambda2, lambda3)_canonical
-                                  Vm2_cantrip = Vm2_3ph(ph%evecs(iq1, s1, :), &
-                                       ph%evecs(iq2, s2, :), ph%evecs(iq3_minus, s3, :), &
-                                       ph%Index_i(:), ph%Index_j(:), ph%Index_k(:), ph%ifc3(:,:,:,:), &
-                                       phases(:), ph%numtriplets, ph%numbands)
-
-                                  !Save to disk
-                                  open(1, file = trim(filename), status = 'replace', access = 'stream')
-                                  write(1) Vm2_cantrip
-                                  close(1)
-
-                                  call tbl%set(hashkey(cantrip), value = .true.)
-                               end if
-                            end if
                          end do !s2
                       end do !s3
                    end do !iq2
-                   !end do!istate1
                 end do !s1
              end do !iq1
           end if!num_active_image
 
           sync all
-          !if(this_image() == 1) call job%write_record(ibatch)
+          if(this_image() == 1) call job%write_record(ibatch)
        end do!over the batches.
     end if!key
 
@@ -1539,7 +1503,8 @@ contains
                             plus_count = plus_count + 1
 
                             !Set cantrip OTF
-                            cantrip = [istate1_fbz, neg_istate2, istate3]
+                            !Note: |V-(s1q1|s2q2,s3q3)|^2 = |V+(s1q1|s2-q2,s3q3)|^2
+                            cantrip = [istate1_fbz, istate2, istate3]
                             call sort(cantrip)
 
                             filename = &
@@ -1607,15 +1572,11 @@ contains
     integer(i64), intent(in) :: canonical_triplet(3)
     character(len = 1024) :: canonical_triplet_filetag
 
-    !character(len = 1024) :: state1_string, state2_string, state3_string
     character(len = 300) :: state1_string, state2_string, state3_string
 
-    !print*, 'About to write the following numbers to string:', canonical_triplet
     write (state1_string, '(I9)') canonical_triplet(1)
     write (state2_string, '(I9)') canonical_triplet(2)
     write (state3_string, '(I9)') canonical_triplet(3)
-    !print*, 'done'
-    !call exit
 
     canonical_triplet_filetag = &
          trim(adjustl(state1_string)) // '.' // &
