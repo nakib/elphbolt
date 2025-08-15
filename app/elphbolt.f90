@@ -241,7 +241,7 @@ program elphbolt
 !!$     end if
 
      if(num%onlyphbte .or. num%drag) then
-        if(.not. num%read_V) then
+        if(.not. (num%read_V .or. num%read_W)) then
            call t_event%start_timer('IBZ q ph-ph interactions')
 
            !Calculate ph-ph vertex
@@ -251,7 +251,7 @@ program elphbolt
            call t_event%end_timer('IBZ q ph-ph interactions')
         end if
 
-        if(.not. num%W_OTF) then
+        if(.not. (num%W_OTF .or. num%read_W)) then
            call t_event%start_timer('IBZ ph-ph scattering rates')
 
            !Calculate ph-ph transition probabilities
