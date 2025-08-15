@@ -595,31 +595,32 @@ contains
     !! This subroutine calculates |V-(s1<q1>|s2q2,s3q3)|^2, W-(s1<q1>|s2q2,s3q3),
     !! and W+(s1<q1>|s2q2,s3q3) for each irreducible phonon and saves the results to disk.
     !!
+    !! ph Phonon object
+    !! crys Crystal object
+    !! num Numerics object
     !! key = 'V', 'W' for vertex, transition probabilitiy calculation, respectively.
 
     type(phonon), intent(in) :: ph
     type(crystal), intent(in) :: crys
     type(numerics), intent(in) :: num
     character(len = 1), intent(in) :: key
-    type(task_manager) :: job
 
     !Local variables
     integer(i64) :: istate1, nstates_irred, &
          nprocs, s1, s2, s3, iq1_ibz, iq1, iq2, iq3_minus, it, &
          q1_indvec(3), q2_indvec(3), q3_minus_indvec(3), index_minus, index_plus, &
          neg_iq2, neg_q2_indvec(3), num_active_images, plus_count, minus_count, &
-         idim, jdim, nwv_gpu, ntrips_gpu, s2s3, nbands_gpu, proc_index, &
-         ibatch, num_batches, batch_range(3)
+         idim, jdim, s2s3, proc_index, ibatch, num_batches, batch_range(3)
     real(r64) :: en1, en2, en3, q1(3), q2(3), q3_minus(3), q2_cart(3), q3_minus_cart(3), &
-         occup_fac, const, bose2, bose3, delta_minus, delta_plus, aux, load_split
+         occup_fac, const, bose2, bose3, delta_minus, delta_plus, aux
     real(r64), allocatable :: Vm2_1(:), Vm2_2(:), Wm(:), Wp(:)
     integer(i64), allocatable :: istate2_plus(:), istate3_plus(:), istate2_minus(:), istate3_minus(:)
     integer(i64), allocatable :: chunk[:], index_start[:], index_end[:]
     complex(r64) :: phases(ph%numtriplets)
     character(len = 1024) :: filename, filename_Wm, filename_Wp, batch_filename
-    logical :: tetrahedra_gpu
     logical, allocatable :: minus_mask(:), plus_mask(:)
     type(resource) :: compute_resource
+    type(task_manager) :: job
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
 
     if(key /= 'V' .and. key /= 'W') then
@@ -658,185 +659,166 @@ contains
 
     allocate(chunk[*], index_start[*], index_end[*])
 
-    if(key == 'V') then       
-       !Split load among cpus and gpus
-       ! Defaults (no gpu): 
-       load_split = 0.0
+    if(key == 'V') then
+       !Allocate the process masks
+       allocate(minus_mask(nprocs), plus_mask(nprocs))
 
-       !Deep copies for the gpu
-       ntrips_gpu = ph%numtriplets
-       nwv_gpu = ph%nwv
-       nbands_gpu = ph%numbands
-       tetrahedra_gpu = num%tetrahedra
+       !Allocate |V^-|^2
+       allocate(Vm2_1(nprocs), Vm2_2(nprocs))
+       ! Above, we split the |V-|^2 vertices into two parts:
+       ! 1. that are non-zero when the minus-type processes are energetically allowed
+       ! 2. that are non-zero when the symmetry-related plus-type processes are energetically allowed
 
-       !Associations will work with openacc
-       associate(wavevecs => ph%wavevecs, wvmesh => ph%wvmesh, &
-            reclattvecs => crys%reclattvecs, &
-            atomtypes => crys%atomtypes, &
-            R_j => ph%R_j, R_k => ph%R_k, ens => ph%ens, &
-            simplex_map => ph%simplex_map, &
-            simplex_count => ph%simplex_count, simplex_evals => ph%simplex_evals, &
-            evecs => ph%evecs, ifc3 => ph%ifc3, &
-            Index_i => ph%Index_i, Index_j => ph%Index_j, Index_k => ph%Index_k)
+       !Distribute the total number of states across batches.
+       call job%distribute_load(nstates_irred, num%num_batches, &
+            num%restart_from_batch_record, batch_filename)
 
-         allocate(minus_mask(nprocs), plus_mask(nprocs))
+       !Check whether the batch record file contains an end marker.
+       if(job%end_marker()) then
+          if(this_image() == 1) print *, 'All batches already completed.'
+          return
+       end if
 
-         !Allocate |V^-|^2
-         allocate(Vm2_1(nprocs), Vm2_2(nprocs))
-         ! Above, we split the |V-|^2 vertices into two parts:
-         ! 1. that are non-zero when the minus-type processes are energetically allowed
-         ! 2. that are non-zero when the symmetry-related plus-type processes are energetically allowed
+       !Starting from the next unfinished batch.
+       do ibatch = job%get_num_finished_batches() + 1, num%num_batches
+          if(this_image() == 1) then
+             write(*, '(A, I0, A, I0)') "Processing batch ", ibatch, " of ", num%num_batches
+          end if
 
-         !Distribute the total number of states across batches.
-         call job%distribute_load(nstates_irred, num%num_batches, &
-              num%restart_from_batch_record, batch_filename)
+          !Get the start, end, and the size of the current batch.
+          batch_range = job%get_batch_range(ibatch)
 
-         !Check whether the batch record file contains an end marker.
-         if(job%end_marker()) then
-            if(this_image() == 1) print *, 'All batches already completed.'
-            return
-         end if
+          !Distribute tasks among images and add batch dependent shift.
+          call compute_resource%balance_load(0.0_r64, batch_range(3), &
+               chunk, index_start, index_end, num_active_images)
+          index_start = index_start + batch_range(1) - 1
+          index_end = index_end + batch_range(1) - 1
 
-         !Starting from the next unfinished batch.
-         do ibatch = job%get_num_finished_batches() + 1, num%num_batches
-            if(this_image() == 1) then
-               write(*, '(A, I0, A, I0)') "Processing batch ", ibatch, " of ", num%num_batches
-            end if
+          if(this_image() == 1) then
+             write(*, "(A, I10)") " batch # ", ibatch
+             write(*, "(A, I10)") " #states = ", nstates_irred/num%num_batches
+             write(*, "(A, I10)") " #states/image <= ", chunk
+          end if
 
-            !Get the start, end, and the size of the current batch.
-            batch_range = job%get_batch_range(ibatch)
+          !Only work with the active images
+          if(this_image() <= num_active_images) then            
+             !Run over first phonon IBZ states
+             do istate1 = index_start, index_end
+                !Demux state index into branch (s) and wave vector (iq) indices
+                call demux_state(istate1, ph%numbands, s1, iq1_ibz)
 
-            !Distribute tasks among images and add batch dependent shift.
-            call compute_resource%balance_load(load_split, batch_range(3), &
-                 chunk, index_start, index_end, num_active_images)
-            index_start = index_start + batch_range(1) - 1
-            index_end = index_end + batch_range(1) - 1
+                !Muxed index of wave vector from the IBZ index list.
+                !This will be used to access IBZ information from the FBZ quantities.
+                iq1 = ph%indexlist_irred(iq1_ibz)
 
-            if(this_image() == 1) then
-               write(*, "(A, I10)") " batch # ", ibatch
-               write(*, "(A, I10)") " #states = ", nstates_irred/num%num_batches
-               write(*, "(A, I10)") " #states/image <= ", chunk
-            end if
+                !Energy of phonon 1
+                en1 = ph%ens(iq1, s1)
 
-            !Only work with the active images
-            if(this_image() <= num_active_images) then            
-               !Run over first phonon IBZ states
-               do istate1 = index_start, index_end
-                  !Demux state index into branch (s) and wave vector (iq) indices
-                  call demux_state(istate1, ph%numbands, s1, iq1_ibz)
+                !Initial (IBZ blocks) wave vector (crystal coords.)
+                q1 = ph%wavevecs(iq1, :)
 
-                  !Muxed index of wave vector from the IBZ index list.
-                  !This will be used to access IBZ information from the FBZ quantities.
-                  iq1 = ph%indexlist_irred(iq1_ibz)
+                !Convert from crystal to 0-based index vector
+                q1_indvec = nint(q1*ph%wvmesh)
 
-                  !Energy of phonon 1
-                  en1 = ph%ens(iq1, s1)
+                !Initialize + and - process masks
+                minus_mask = .false.
+                plus_mask = .false.
 
-                  !Initial (IBZ blocks) wave vector (crystal coords.)
-                  q1 = ph%wavevecs(iq1, :)
+                do iq2 = 1, ph%nwv!nwv_gpu
+                   !Initial (IBZ blocks) wave vector (crystal coords.)
+                   q2 = ph%wavevecs(iq2, :)
 
-                  !Convert from crystal to 0-based index vector
-                  q1_indvec = nint(q1*ph%wvmesh)
+                   !Convert from crystal to 0-based index vector
+                   q2_indvec = nint(q2*ph%wvmesh)
 
-                  !Initialize + and - process masks
-                  minus_mask = .false.
-                  plus_mask = .false.
+                   !Folded final phonon wave vector
+                   q3_minus_indvec = modulo(q1_indvec - q2_indvec, ph%wvmesh) !0-based index vector
+                   q3_minus = q3_minus_indvec/dble(ph%wvmesh) !crystal coords.
 
-                  do iq2 = 1, nwv_gpu
-                     !Initial (IBZ blocks) wave vector (crystal coords.)
-                     q2 = wavevecs(iq2, :)
+                   !Muxed index of q3_minus
+                   iq3_minus = mux_vector(q3_minus_indvec, ph%wvmesh, 0_i64)
 
-                     !Convert from crystal to 0-based index vector
-                     q2_indvec = nint(q2*wvmesh)
+                   q2_cart = matmul(crys%reclattvecs, q2)
+                   q3_minus_cart = matmul(crys%reclattvecs, q3_minus)
+                   do it = 1, ph%numtriplets !ntrips_gpu
+                      !Note: expi won't work on the accelerator
+                      phases(it) = exp((0.0_r64, -1.0_r64)* &
+                           (dot_product(q2_cart, (ph%R_j(:, it))) + &
+                           dot_product(q3_minus_cart, (ph%R_k(:, it)))))
+                   end do
 
-                     !Folded final phonon wave vector
-                     q3_minus_indvec = modulo(q1_indvec - q2_indvec, wvmesh) !0-based index vector
-                     q3_minus = q3_minus_indvec/dble(wvmesh) !crystal coords.
+                   !Combined loop over the 2nd and 3rd phonon bands
+                   do s2s3 = 1, ph%numbands**2!nbands_gpu**2
+                      s2 = int((s2s3 - 1)/ph%numbands) + 1 !changes slow
+                      s3 = modulo(s2s3 - 1, ph%numbands) + 1 !changes fast
 
-                     !Muxed index of q3_minus
-                     iq3_minus = mux_vector(q3_minus_indvec, wvmesh, 0_i64)
+                      proc_index = (iq2 - 1)*ph%numbands**2 + s2s3
 
-                     q2_cart = matmul(reclattvecs, q2)
-                     q3_minus_cart = matmul(reclattvecs, q3_minus)
-                     do it = 1, ntrips_gpu
-                        !Note: expi won't work on the accelerator
-                        phases(it) = exp((0.0_r64, -1.0_r64)* &
-                             (dot_product(q2_cart, (R_j(:, it))) + &
-                             dot_product(q3_minus_cart, (R_k(:, it)))))
-                     end do
+                      !Energy of phonon 2
+                      en2 = ph%ens(iq2, s2)
 
-                     !Combined loop over the 2nd and 3rd phonon bands
-                     do s2s3 = 1, nbands_gpu**2
-                        s2 = int((s2s3 - 1)/nbands_gpu) + 1 !changes slow
-                        s3 = modulo(s2s3 - 1, nbands_gpu) + 1 !changes fast
+                      !Get index of -q2
+                      neg_q2_indvec = modulo(-q2_indvec, ph%wvmesh)
+                      neg_iq2 = mux_vector(neg_q2_indvec, ph%wvmesh, 0_i64)
 
-                        proc_index = (iq2 - 1)*nbands_gpu**2 + s2s3
+                      !Energy of phonon 3
+                      en3 = ph%ens(iq3_minus, s3)
 
-                        !Energy of phonon 2
-                        en2 = ens(iq2, s2)
+                      delta_minus = delta_fn_ptr(en1 - en3, iq2, s2, ph%wvmesh, ph%simplex_map, &
+                           ph%simplex_count, ph%simplex_evals) !minus process
 
-                        !Get index of -q2
-                        neg_q2_indvec = modulo(-q2_indvec, wvmesh)
-                        neg_iq2 = mux_vector(neg_q2_indvec, wvmesh, 0_i64)
+                      delta_plus = delta_fn_ptr(en3 - en1, neg_iq2, s2, ph%wvmesh, ph%simplex_map, &
+                           ph%simplex_count, ph%simplex_evals) !plus process      
 
-                        !Energy of phonon 3
-                        en3 = ens(iq3_minus, s3)
+                      if(en1*en2*en3 == 0.0_r64) cycle
 
-                        delta_minus = delta_fn_ptr(en1 - en3, iq2, s2, wvmesh, simplex_map, &
-                             simplex_count, simplex_evals) !minus process
+                      if(delta_minus > 0.0_r64 .or. delta_plus > 0.0_r64) &
+                           aux = Vm2_3ph(ph%evecs(iq1, s1, :), &
+                           ph%evecs(iq2, s2, :), ph%evecs(iq3_minus, s3, :), &
+                           ph%Index_i(:), ph%Index_j(:), ph%Index_k(:), ph%ifc3(:,:,:,:), &
+                           phases(:), ph%numtriplets, ph%numbands)
 
-                        delta_plus = delta_fn_ptr(en3 - en1, neg_iq2, s2, wvmesh, simplex_map, &
-                             simplex_count, simplex_evals) !plus process      
+                      if(delta_minus > 0.0_r64) then
+                         !Record energetically available minus process
+                         minus_mask(proc_index) = .true.
+                         Vm2_1(proc_index) = aux
+                      end if
 
-                        if(en1*en2*en3 == 0.0_r64) cycle
+                      if(delta_plus > 0.0_r64) then
+                         !Record energetically available plus process
+                         plus_mask(proc_index) = .true.
+                         Vm2_2(proc_index) = aux
+                      end if
+                   end do !s2s3
+                end do !iq2
 
-                        if(delta_minus > 0.0_r64 .or. delta_plus > 0.0_r64) &
-                             aux = Vm2_3ph(evecs(iq1, s1, :), &
-                             evecs(iq2, s2, :), evecs(iq3_minus, s3, :), &
-                             Index_i(:), Index_j(:), Index_k(:), ifc3(:,:,:,:), &
-                             phases(:), ntrips_gpu, nbands_gpu)
+                !Change to data output directory
+                call chdir(trim(adjustl(num%Vdir)))
 
-                        if(delta_minus > 0.0_r64) then
-                           !Record energetically available minus process
-                           minus_mask(proc_index) = .true.
-                           Vm2_1(proc_index) = aux
-                        end if
+                !Write data in binary format
+                !Note: this will overwrite existing data!
+                write (filename, '(I9)') istate1
+                filename = 'Vm2.istate'//trim(adjustl(filename))
+                open(1, file = trim(filename), status = 'replace', access = 'stream')
+                write(1) count(minus_mask, kind = i64)
+                do proc_index = 1, nprocs
+                   if(minus_mask(proc_index)) write(1) Vm2_1(proc_index)
+                end do
+                write(1) count(plus_mask, kind = i64)
+                do proc_index = 1, nprocs
+                   if(plus_mask(proc_index)) write(1) Vm2_2(proc_index)
+                end do
+                close(1)
 
-                        if(delta_plus > 0.0_r64) then
-                           !Record energetically available plus process
-                           plus_mask(proc_index) = .true.
-                           Vm2_2(proc_index) = aux
-                        end if
-                     end do !s2s3
-                  end do !iq2
+                !Change back to run directory
+                call chdir(trim(adjustl(num%cwd)))
+             end do !istate1
+          end if !num_active_images
 
-                  !Change to data output directory
-                  call chdir(trim(adjustl(num%Vdir)))
-
-                  !Write data in binary format
-                  !Note: this will overwrite existing data!
-                  write (filename, '(I9)') istate1
-                  filename = 'Vm2.istate'//trim(adjustl(filename))
-                  open(1, file = trim(filename), status = 'replace', access = 'stream')
-                  write(1) count(minus_mask, kind = i64)
-                  do proc_index = 1, nprocs
-                     if(minus_mask(proc_index)) write(1) Vm2_1(proc_index)
-                  end do
-                  write(1) count(plus_mask, kind = i64)
-                  do proc_index = 1, nprocs
-                     if(plus_mask(proc_index)) write(1) Vm2_2(proc_index)
-                  end do
-                  close(1)
-
-                  !Change back to run directory
-                  call chdir(trim(adjustl(num%cwd)))
-               end do !istate1
-            end if !num_active_images
-
-            sync all
-            if(this_image() == 1) call job%write_record(ibatch)
-         end do !over the batch
-       end associate
+          sync all
+          if(this_image() == 1) call job%write_record(ibatch)
+       end do !over the batch
+       !end associate
     end if !key
 
     !Just on the cpus...
