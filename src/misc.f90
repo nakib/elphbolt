@@ -1338,9 +1338,7 @@ contains
        end do
     end do
 
-    sync all
     call co_sum(gradf)
-    sync all
 
   end subroutine Jacobian
 
