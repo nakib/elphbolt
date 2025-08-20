@@ -245,8 +245,11 @@ program elphbolt
            call t_event%start_timer('IBZ q ph-ph interactions')
 
            !Calculate ph-ph vertex
-           call calculate_3ph_interaction(ph, crys, num, 'V')
-!!$           call calculate_3ph_interaction_perm(ph, crys, num, 'V')
+           if(num%use_perm) then
+              call calculate_3ph_interaction_perm(ph, crys, num, 'V')
+           else
+              call calculate_3ph_interaction(ph, crys, num, 'V')
+           end if
 
            call t_event%end_timer('IBZ q ph-ph interactions')
         end if
@@ -255,8 +258,11 @@ program elphbolt
            call t_event%start_timer('IBZ ph-ph scattering rates')
 
            !Calculate ph-ph transition probabilities
-           call calculate_3ph_interaction(ph, crys, num, 'W')
-!!$           call calculate_3ph_interaction_perm(ph, crys, num, 'W')
+           if(num%use_perm) then
+              call calculate_3ph_interaction_perm(ph, crys, num, 'W')
+           else
+              call calculate_3ph_interaction(ph, crys, num, 'W')
+           end if
 
            call t_event%end_timer('IBZ ph-ph scattering rates')
         end if

@@ -1257,7 +1257,7 @@ contains
     real(r64), allocatable :: f_stencil(:, :, :)
     integer(i64) :: ik, ib, nk, nb, i, j, k, center(3), stencil(6), &
          dim_k, dim_f, isten, sten_count, this, this_plus1, this_minus1, &
-         whereinlist, this_plus(3), this_minus(3), dim
+         whereinlist, this_plus(3), this_minus(3), dim, chunk, start, end, num_active_images
 
     nk = size(f, 1)
     nb = size(f, 2)
@@ -1278,7 +1278,10 @@ contains
 
     !Calculate Jacobian using a nearest neighbor stencil
     gradf = 0.0_r64
-    do ik = 1, nk !Run over all wave vectors in FBZ
+
+    call distribute_points(nk, chunk, start, end, num_active_images)
+
+    do ik = start, end !Run over all wave vectors in FBZ
        if(blocks) then !For energy window restricted FBZ
           call demux_vector(indexlist(ik), center, kmesh, 1_i64)
        else !For unrestristed FBZ
@@ -1334,6 +1337,9 @@ contains
           end do
        end do
     end do
+
+    call co_sum(gradf)
+
   end subroutine Jacobian
 
   subroutine precompute_interpolation_corners_and_weights(coarsemesh, refinement, qs, idcorners, weights)
