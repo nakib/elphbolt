@@ -1562,6 +1562,11 @@ contains
        call zheev("V", "U", self%numbands, dyn_total, self%numbands, omega2, &
             work, nwork, rwork, i)
 
+       !Fix gauge
+       if(abs(dyn_total(1, 1)) /= 0.0_r64) then
+          dyn_total(:, :) = dyn_total(:, :)/(dyn_total(1, 1)/abs(dyn_total(1, 1)))
+       end if
+
        ! Eigenvectors are also returned if required.
        if(present(eigenvect)) then
           eigenvect(iq, :, :) = transpose(dyn_total)
@@ -1578,6 +1583,13 @@ contains
           end do
           velocities(iq, i, :) = velocities(iq, i, :)/(2.0_r64*omegas(iq, i))
        end do
+
+       !Take care of gamma point.
+       if(all(qpoints(iq, 1:3) == 0)) then
+          omegas(iq, 1:3) = 0.0_r64
+          if(present(velocities)) velocities(iq, :, :) = 0.0_r64
+       end if
+
     end do
 
     !Units conversion
