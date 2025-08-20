@@ -483,8 +483,6 @@ contains
 
     !Phonopy format:
     if(phonopy_format_file_exists) then
-       !r = transpose(matmul(crys%lattvecs, crys%basis))/bohr2nm
-
        open(1, file = "FORCE_CONSTANTS", status = "old")
 
        !Note here that I am assuming that the phonopy IFC2 file has been
@@ -594,6 +592,7 @@ contains
 
     !Our internal format uses Espresso units for the mass matrix.
     self%mm = self%mm/massfactor
+
   contains
 
     subroutine phonopy_demux_atom_position(atom_in_supercell_muxed, &
@@ -1589,7 +1588,6 @@ contains
           omegas(iq, 1:3) = 0.0_r64
           if(present(velocities)) velocities(iq, :, :) = 0.0_r64
        end if
-
     end do
 
     !Units conversion
@@ -1597,87 +1595,87 @@ contains
     if(present(velocities)) velocities = velocities*bohr2nm*toTHz !Km/s
   end subroutine phonon_phonopy
 
-  ! Read FORCE_CONSTANTS_2ND.
-  subroutine read2fc(fc, scell, crys, filename_2fc)
-    real(r64),allocatable,intent(out) :: fc(:,:,:,:,:,:,:)
-    integer(i64), intent(in) :: scell(3)
-    type(crystal), intent(in) :: crys
-    character(*), intent(in) :: filename_2fc
+!!$  ! Read FORCE_CONSTANTS_2ND.
+!!$  subroutine read2fc(fc, scell, crys, filename_2fc)
+!!$    real(r64),allocatable,intent(out) :: fc(:,:,:,:,:,:,:)
+!!$    integer(i64), intent(in) :: scell(3)
+!!$    type(crystal), intent(in) :: crys
+!!$    character(*), intent(in) :: filename_2fc
+!!$
+!!$    integer(i64) :: ntot,atom1,atom2,i,j,ip,ierr
+!!$    integer(i64) :: ix1,iy1,iz1,ix2,iy2,iz2,iatom1,iatom2
+!!$    real(r64) :: mm(crys%numatoms,crys%numatoms)
+!!$
+!!$    real(r64), parameter :: unitfactor=9648.53336213 ! from eV/(A^2*amu) to THz^2
+!!$
+!!$    do i=1,crys%numatoms
+!!$       mm(i,i)=crys%masses(crys%atomtypes(i))
+!!$       do j=i+1,crys%numatoms
+!!$          mm(i,j)=sqrt(crys%masses(crys%atomtypes(i))*crys%masses(crys%atomtypes(j)))
+!!$          mm(j,i)=mm(i,j)
+!!$       end do
+!!$    end do
+!!$
+!!$    allocate(fc(crys%numatoms,3,scell(1),scell(2),scell(3),crys%numatoms,3))
+!!$
+!!$    ! Phonopy's 2nd-order format is quite straightforward. Each file
+!!$    ! is essentially a sequence of 3x3 blocks, one for each pair of atoms
+!!$    ! in the supercell. A single header line contains the number of atoms.
+!!$    open(1,file=filename_2fc,status="old")
+!!$    read(1,*) ntot
+!!$    if(ntot.ne.scell(1)*scell(2)*scell(3)*crys%numatoms) then
+!!$       if(this_image() == 1) &
+!!$            write(1, *) "Error: wrong number of force constants for the specified scell"
+!!$    end if
+!!$    do i=1,ntot
+!!$       do j=1,ntot
+!!$          read(1,*) atom1,atom2
+!!$          call split_index(atom1,scell(1),scell(2),scell(3),&
+!!$               ix1,iy1,iz1,iatom1)
+!!$          call split_index(atom2,scell(1),scell(2),scell(3),&
+!!$               ix2,iy2,iz2,iatom2)
+!!$          if(ix1.eq.1.and.iy1.eq.1.and.iz1.eq.1) then
+!!$             do ip=1,3
+!!$                read(1,*) fc(iatom1,ip,ix2,iy2,iz2,iatom2,:)
+!!$             end do
+!!$          else
+!!$             do ip=1,3
+!!$                read(1,*)
+!!$             end do
+!!$          end if
+!!$       end do
+!!$    end do
+!!$    close(1)
+!!$
+!!$    ! After reading the force constants, they are reduced using the
+!!$    ! tensor product of the square root of the atomic masses. It is these
+!!$    ! reduced constants that enter the expression of the dynamical matrix.
+!!$    do iatom1=1,crys%numatoms
+!!$       do iatom2=1,crys%numatoms
+!!$          fc(iatom1,:,:,:,:,iatom2,:)=&
+!!$               fc(iatom1,:,:,:,:,iatom2,:)/mm(iatom1,iatom2)
+!!$       end do
+!!$    end do
+!!$    fc=unitfactor*fc
+!!$  end subroutine read2fc
 
-    integer(i64) :: ntot,atom1,atom2,i,j,ip,ierr
-    integer(i64) :: ix1,iy1,iz1,ix2,iy2,iz2,iatom1,iatom2
-    real(r64) :: mm(crys%numatoms,crys%numatoms)
-
-    real(r64), parameter :: unitfactor=9648.53336213 ! from eV/(A^2*amu) to THz^2
-
-    do i=1,crys%numatoms
-       mm(i,i)=crys%masses(crys%atomtypes(i))
-       do j=i+1,crys%numatoms
-          mm(i,j)=sqrt(crys%masses(crys%atomtypes(i))*crys%masses(crys%atomtypes(j)))
-          mm(j,i)=mm(i,j)
-       end do
-    end do
-
-    allocate(fc(crys%numatoms,3,scell(1),scell(2),scell(3),crys%numatoms,3))
-
-    ! Phonopy's 2nd-order format is quite straightforward. Each file
-    ! is essentially a sequence of 3x3 blocks, one for each pair of atoms
-    ! in the supercell. A single header line contains the number of atoms.
-    open(1,file=filename_2fc,status="old")
-    read(1,*) ntot
-    if(ntot.ne.scell(1)*scell(2)*scell(3)*crys%numatoms) then
-       if(this_image() == 1) &
-            write(1, *) "Error: wrong number of force constants for the specified scell"
-    end if
-    do i=1,ntot
-       do j=1,ntot
-          read(1,*) atom1,atom2
-          call split_index(atom1,scell(1),scell(2),scell(3),&
-               ix1,iy1,iz1,iatom1)
-          call split_index(atom2,scell(1),scell(2),scell(3),&
-               ix2,iy2,iz2,iatom2)
-          if(ix1.eq.1.and.iy1.eq.1.and.iz1.eq.1) then
-             do ip=1,3
-                read(1,*) fc(iatom1,ip,ix2,iy2,iz2,iatom2,:)
-             end do
-          else
-             do ip=1,3
-                read(1,*)
-             end do
-          end if
-       end do
-    end do
-    close(1)
-
-    ! After reading the force constants, they are reduced using the
-    ! tensor product of the square root of the atomic masses. It is these
-    ! reduced constants that enter the expression of the dynamical matrix.
-    do iatom1=1,crys%numatoms
-       do iatom2=1,crys%numatoms
-          fc(iatom1,:,:,:,:,iatom2,:)=&
-               fc(iatom1,:,:,:,:,iatom2,:)/mm(iatom1,iatom2)
-       end do
-    end do
-    fc=unitfactor*fc
-  end subroutine read2fc
-
-  ! Convert a supercell index of the kind used by Phonopy into
-  ! a set of unit cell+atom indices.
-  subroutine split_index(index,nx,ny,nz,ix,iy,iz,iatom)
-    integer(i64),intent(in) :: index,nx,ny,nz
-    integer(i64),intent(out) :: ix,iy,iz,iatom
-
-    integer(i64) :: tmp1,tmp2
-
-    call int_div(index-1,nx,tmp1,ix)
-    call int_div(tmp1,ny,tmp2,iy)
-    call int_div(tmp2,nz,iatom,iz)
-
-    ix=ix+1
-    iy=iy+1
-    iz=iz+1
-    iatom=iatom+1
-  end subroutine split_index
+!!$  ! Convert a supercell index of the kind used by Phonopy into
+!!$  ! a set of unit cell+atom indices.
+!!$  subroutine split_index(index,nx,ny,nz,ix,iy,iz,iatom)
+!!$    integer(i64),intent(in) :: index,nx,ny,nz
+!!$    integer(i64),intent(out) :: ix,iy,iz,iatom
+!!$
+!!$    integer(i64) :: tmp1,tmp2
+!!$
+!!$    call int_div(index-1,nx,tmp1,ix)
+!!$    call int_div(tmp1,ny,tmp2,iy)
+!!$    call int_div(tmp2,nz,iatom,iz)
+!!$
+!!$    ix=ix+1
+!!$    iy=iy+1
+!!$    iz=iz+1
+!!$    iatom=iatom+1
+!!$  end subroutine split_index
 
   subroutine allocate_xmassvar(self, ph, usetetra, Tmat)
     !! Intializes the xmass var matrix elements size (for that image)
@@ -1687,9 +1685,9 @@ contains
     !! Tmat - are we using Green functions to compute the maatrix elements 
 
     class(Xmassvar), intent(inout) :: self
-    type(phonon), intent(in)       :: ph
-    logical, intent(in)            :: usetetra
-    logical, intent(in)            :: Tmat 
+    type(phonon), intent(in) :: ph
+    logical, intent(in) :: usetetra
+    logical, intent(in) :: Tmat 
 
     !Locals
     integer(i64) :: iq, ib, iqp, ibp, chunk, num_active_images
@@ -1718,7 +1716,7 @@ contains
                       delta = delta_fn_ptr(e, iqp, ibp, ph%wvmesh, ph%simplex_map, &
                            ph%simplex_count, ph%simplex_evals)
 
-                      if (delta .gt. 0.0_r64) self%nels = self%nels + 1_i64
+                      if (delta > 0.0_r64) self%nels = self%nels + 1_i64
 
                    end do !ibp
                 end do !iqp
@@ -1734,7 +1732,7 @@ contains
 
     ! Allocate arrays
     allocate(self%matel(self%nels))
-    allocate(self%indexes(self%nels,2))
+    allocate(self%indexes(self%nels, 2))
   end subroutine allocate_xmassvar
 
   subroutine clean_xmassvar(self)
@@ -1745,11 +1743,10 @@ contains
 
     if(allocated(self%matel)) deallocate(self%matel)
     if(allocated(self%indexes)) deallocate(self%indexes)
-
   end subroutine clean_xmassvar
 
   subroutine save_xmassvar(self, nb, iq1, iq2, ib1, ib2, matel)
-    !! Cleans stuff
+    !! Saves stuff
     !! self - Xmassvar object
     !! nb - number of bands
     !! iq1 - iq of first phonon
@@ -1762,15 +1759,12 @@ contains
     integer(i64), intent(in) :: nb, iq1, iq2, ib1, ib2
     real(r64), intent(in) :: matel
 
-
-
     self%matel(self%nels) = matel
-    self%indexes(self%nels,:) = (/mux_state(nb,ib1,iq1), &
-         mux_state(nb,ib2,iq2)/)
+    self%indexes(self%nels,:) = &
+         [mux_state(nb, ib1, iq1), mux_state(nb, ib2, iq2)]
 
     self%nels = self%nels - 1_i64
-    if (self%nels .eq. 0_i64) self%nels = size(self%matel)
-
+    if (self%nels == 0_i64) self%nels = size(self%matel)
   end subroutine save_xmassvar
 
 
