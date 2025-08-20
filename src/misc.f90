@@ -1229,7 +1229,7 @@ contains
 
   subroutine Jacobian(f, gradf, lattvecs, kmesh, indexlist, blocks)
     !! Calculates the Jacobian of vector function f.
-    !! TODO Parallelize this. This becomes a blocking call.
+    !! This is a parallelized over images and is a blocking call.
     !
     !The stencil used here is on the fractional coordinates system.
     !As such, the derivative initially gives a vector along the reciprocal lattice vectors.
@@ -1237,15 +1237,15 @@ contains
 
     !! f is a rank-3 array of function F values for each wave vector and band 
     !! gradf is a rank-4 array of the Jacobian, with the first index
-    !! being the wave vector index, the second being the band index,
-    !! the third being the component of the wave vector, and the fourth
-    !! being the component of the F function vector.  
+    !!       being the wave vector index, the second being the band index,
+    !!       the third being the component of the wave vector, and the fourth
+    !!       being the component of the F function vector.  
     !! lattvecs is a matrix of the lattice vectors in real space
     !! kmesh is the number of wave vectors along the three reciprocal lattice vectors
     !! indexlist is a list of wave vector indices in the first Brillouin zone
     !! blocks is a logical flag that indicates whether the function is restricted to a Fermi window
-    !! or not. If it is, then the function values outside the Fermi window are
-    !! approximated by the function value at the center of the stencil.  
+    !!        or not. If it is, then the function values outside the Fermi window are
+    !!        approximated by the function value at the center of the stencil.  
 
     real(r64), intent(in) :: f(:, :, :), lattvecs(3, 3)
     integer(i64), intent(in) :: kmesh(3), indexlist(:)
@@ -1256,18 +1256,23 @@ contains
     real(r64) :: diff(3)
     real(r64), allocatable :: f_stencil(:, :, :)
     integer(i64) :: ik, ib, nk, nb, i, j, k, center(3), stencil(6), &
-         dim_k, dim_f, isten, sten_count, this, this_plus1, this_minus1, &
-         whereinlist, this_plus(3), this_minus(3), dim, chunk, start, end, num_active_images
+         dim_k, dim_f, isten, sten_count, this, whereinlist, &
+         this_plus(3), this_minus(3), dim, chunk, start, end, num_active_images
 
+    !Number of wave vectors
     nk = size(f, 1)
+
+    !Number of bands
     nb = size(f, 2)
 
+    !Allocate and initialize finite diff stencil
     allocate(f_stencil(6, nb, 3))
     f_stencil = 0.0_r64
 
     !k-mesh spacing between opposite stencil points (fractional)
     diff = 2.0_r64/kmesh
 
+    !Deduce problem dimensions
     if(kmesh(3) /= 1) then
        dim = 3 
     else if(kmesh(2) /= 1) then
@@ -1276,70 +1281,78 @@ contains
        dim = 1
     end if
 
-    !Calculate Jacobian using a nearest neighbor stencil
+    !Below, we calculate Jacobian using a nearest neighbor stencil
+
+    !Initialize Jaocian
     gradf = 0.0_r64
 
+    !Distribute tasks among images
     call distribute_points(nk, chunk, start, end, num_active_images)
 
-    do ik = start, end !Run over all wave vectors in FBZ
-       if(blocks) then !For energy window restricted FBZ
-          call demux_vector(indexlist(ik), center, kmesh, 1_i64)
-       else !For unrestristed FBZ
-          call demux_vector(ik, center, kmesh, 1_i64)
-       end if
-
-       ! Contruct nearest neighbor stencil, taking into account the periodic boundary condition
-       sten_count = 0
-       do dim_k = 1, dim
-          !This component of the center of the stencil
-          this_plus = center 
-          this_minus = center
-          if(kmesh(dim_k) /= 1) then
-             this_plus(dim_k) = mod(center(dim_k), kmesh(dim_k)) + 1
-             this_minus(dim_k) = mod(center(dim_k) - 2 + kmesh(dim_k), kmesh(dim_k)) + 1
+    if(this_image() <= num_active_images) then !Only active image must work
+       do ik = start, end !Run over all wave vectors in FBZ
+          !Handle non-contiguous (blocks = .true.) case
+          if(blocks) then !For energy window restricted FBZ
+             call demux_vector(indexlist(ik), center, kmesh, 1_i64)
+          else !For unrestristed FBZ
+             call demux_vector(ik, center, kmesh, 1_i64)
           end if
-          stencil(sten_count + 1) = mux_vector(this_minus, kmesh, 1_i64)
-          stencil(sten_count + 2) = mux_vector(this_plus, kmesh, 1_i64)
-          sten_count = sten_count + 2
-       end do
 
-       ! Get function values on the stencil
-       do isten = 1, 2*dim !stencil points 5 (z - 1) and 6 (z + 1) might not be reached. Good.
-          if(blocks) then
-             !Which point in indexlist does the stencil correspond to?
-             ! (whereinlist < 0 if search fails)
-             call binsearch(indexlist, stencil(isten), whereinlist)
-             if(whereinlist > 0) then
-                f_stencil(isten, :, :) = f(whereinlist, :, :)
-             else
-                !Here I made the approximation that for any point lying outside the
-                !Fermi window, the function value at that point is the function value
-                !at the center of the stencil (which is guaranteed to be within the window).
-                f_stencil(isten, :, :) = f(ik, :, :)
-             end if
-          else
-             f_stencil(isten, :, :) = f(stencil(isten), :, :)
-          end if
-       end do
-
-       ! For the 2d case, the z-component is identically 0 since gradf was initialized
-       ! to be zero.
-       do dim_f = 1, 3
+          ! Contruct nearest neighbor stencil, taking into account the periodic boundary condition
+          sten_count = 0
           do dim_k = 1, dim
-             gradf(ik, :, dim_k, dim_f) = &
-                  (f_stencil(2*dim_k, :, dim_f) - f_stencil(2*dim_k - 1, :, dim_f)) &
-                  /diff(dim_k)
+             !This component of the center of the stencil
+             this_plus = center 
+             this_minus = center
+
+             if(kmesh(dim_k) /= 1) then
+                this_plus(dim_k) = mod(center(dim_k), kmesh(dim_k)) + 1
+                this_minus(dim_k) = mod(center(dim_k) - 2 + kmesh(dim_k), kmesh(dim_k)) + 1
+             end if
+
+             stencil(sten_count + 1) = mux_vector(this_minus, kmesh, 1_i64)
+             stencil(sten_count + 2) = mux_vector(this_plus, kmesh, 1_i64)
+
+             sten_count = sten_count + 2
           end do
 
-          ! Convert to cartesian coordinates
-          do ib = 1, nb
-             gradf(ik, ib, :, dim_f) = matmul(lattvecs, gradf(ik, ib, :, dim_f))/twopi
+          ! Get function values on the stencil
+          do isten = 1, 2*dim !stencil points 5 (z - 1) and 6 (z + 1) might not be reached. Good.
+             if(blocks) then
+                !Which point in indexlist does the stencil correspond to?
+                ! (whereinlist < 0 if search fails)
+                call binsearch(indexlist, stencil(isten), whereinlist)
+
+                if(whereinlist > 0) then
+                   f_stencil(isten, :, :) = f(whereinlist, :, :)
+                else
+                   !Here I made the approximation that for any point lying outside the
+                   !Fermi window, the function value at that point is the function value
+                   !at the center of the stencil (which is guaranteed to be within the window).
+                   f_stencil(isten, :, :) = f(ik, :, :)
+                end if
+             else
+                f_stencil(isten, :, :) = f(stencil(isten), :, :)
+             end if
+          end do
+
+          ! For the 2d case, the z-component is identically 0 since gradf was initialized
+          ! to be zero.
+          do dim_f = 1, 3
+             do dim_k = 1, dim
+                gradf(ik, :, dim_k, dim_f) = &
+                     (f_stencil(2*dim_k, :, dim_f) - f_stencil(2*dim_k - 1, :, dim_f))/diff(dim_k)
+             end do
+
+             ! Convert to cartesian coordinates
+             do ib = 1, nb
+                gradf(ik, ib, :, dim_f) = matmul(lattvecs, gradf(ik, ib, :, dim_f))/twopi
+             end do
           end do
        end do
-    end do
+    end if
 
     call co_sum(gradf)
-
   end subroutine Jacobian
 
   subroutine precompute_interpolation_corners_and_weights(coarsemesh, refinement, qs, idcorners, weights)
