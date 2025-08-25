@@ -390,15 +390,15 @@ contains
 !$!                      el%simplex_count, el%simplex_evals)
                 ! Delta replaced by Gaussian
                 delta_func = deltafunc_pol(ik, m, kpvel, ekp - ek - Omegas(iOmega), crys, el)
-                fermidiff = Fermi(ekp - Omegas(iOmega), el%chempot, crys%T) -&
+                fermidiff = Fermi(ek, el%chempot, crys%T) -&
                             Fermi(ekp, el%chempot, crys%T)  
                 spec_eps(iOmega) = spec_eps(iOmega) + &
                                    fermidiff*overlap*delta_func 
-                if(qmag<0.4 .and. Omegas(iOmega)>0.0606 .and. Omegas(iOmega)<0.1818) then
-                   delta_sum = delta_sum + delta_func
-                   fermidiff_sum = fermidiff_sum + fermidiff
-                   overlap_sum = overlap_sum + overlap
-                end if
+!$!                 if(qmag<0.4 .and. Omegas(iOmega)>0.0606 .and. Omegas(iOmega)<0.1818) then
+!$!                    delta_sum = delta_sum + delta_func
+!$!                    fermidiff_sum = fermidiff_sum + fermidiff
+!$!                    overlap_sum = overlap_sum + overlap
+!$!                 end if
 
 !!$                spec_eps(iOmega) = spec_eps(iOmega) + &
 !!$                     Fermi(ekp, el%chempot, crys%T)* &
@@ -414,8 +414,8 @@ contains
     end do
 
     spec_eps = spec_eps*el%spindeg/crys%volume*crys%thickness
-    if(qmag<0.4) write(170, '(F8.3, 1X, E12.3, 1X, E12.3, 1X, E12.3)') &
-                 qmag, fermidiff_sum, delta_sum, overlap_sum
+    !if(qmag<0.4) write(170, '(F8.3, 1X, E12.3, 1X, E12.3, 1X, E12.3)') &
+    !             qmag, fermidiff_sum, delta_sum, overlap_sum
     
     do iOmega = 1, nOmegas/2 ! negative sector
        !Recall that the resolvent is already normalized in the full wave vector mesh.
@@ -527,11 +527,11 @@ contains
                 fermidiff = Fermi(ek, el%chempot, crys%T) - &
                             (fnk - beta*fnk*(1.0_r64 - fnk)*hbar_eVps*&
                             dot_product(qcart, el%vels(ik, n, :)))
-                if(Omegas(iOmega)>0.0606 .and. Omegas(iOmega)<0.1818) then
-                   delta_sum = delta_sum + delta_func
-                   fermidiff_sum = fermidiff_sum + fermidiff
-                   overlap_sum = overlap_sum + overlap
-                end if
+!$!                 if(Omegas(iOmega)>0.0606 .and. Omegas(iOmega)<0.1818) then
+!$!                    delta_sum = delta_sum + delta_func
+!$!                    fermidiff_sum = fermidiff_sum + fermidiff
+!$!                    overlap_sum = overlap_sum + overlap
+!$!                 end if
                 spec_eps(iOmega) = spec_eps(iOmega) + &
                                    fermidiff*overlap*delta_func
 
@@ -571,8 +571,8 @@ contains
        end do
     end do
 
-    write(170, '(F8.3, 1X, E12.3, 1X, E12.3, 1X, E12.3)') &
-                 qmag, fermidiff_sum, delta_sum, overlap_sum
+    !write(170, '(F8.3, 1X, E12.3, 1X, E12.3, 1X, E12.3)') &
+    !             qmag, fermidiff_sum, delta_sum, overlap_sum
     spec_eps = spec_eps*el%spindeg/crys%volume*crys%thickness
     
     do iOmega = 1, nOmegas/2 ! negative sector
@@ -733,7 +733,7 @@ contains
     real(r64) :: omega_plasma, prefac, q2norm, dim_norm
     real(r64), parameter :: plus0 = 1
     integer :: ik1, ik2, ik3
-    real(r64) :: W_qw_msq, Gplusq(3), Gplusq_2norm
+    real(r64) :: W_qw_msq, Gplusq(3), Gplusq_2norm, kv(3)
     real(r64), allocatable :: diel_qw(:) 
 
     !Silicon
@@ -748,19 +748,22 @@ contains
     !end if
 
     !TEST
-    numq = el%wvmesh(1)
+    numq = el%wvmesh(1)*3
     qxmesh = numq
     !Create qlist in crystal coordinates
     allocate(qlist(numq, 3), qmaglist(numq))
     do iq = 1, numq
        ! Gamma -> 1, 1, 0
-       !qlist(iq, :) = [(iq - 1.0_r64)/qxmesh, (iq - 1.0_r64)/qxmesh, 0.0_r64]
+       qlist(iq, :) = [(iq - 1.0_r64)/qxmesh, (iq - 1.0_r64)/qxmesh, 0.0_r64]
        ! Gamma -> K (0.333, 0.333, 0)
        !qlist(iq, :) = [(iq - 1.0_r64)/(qxmesh - 1)/3, (iq - 1.0_r64)/(qxmesh - 1)/3, &
        !                 0.0_r64] 
        ! Gamma -> K (0.1, 0.1, 0)
-       qlist(iq, :) = [(iq - 1.0_r64)/(qxmesh - 1)/10, (iq - 1.0_r64)/(qxmesh - 1)/10, &
-                        0.0_r64] 
+       !qlist(iq, :) = [(iq - 1.0_r64)/(qxmesh - 1)/10, (iq - 1.0_r64)/(qxmesh - 1)/10, &
+       !                 0.0_r64] 
+       ! Gamma -> M (0.5, 0.0, 0)
+       !qlist(iq, :) = [(iq - 1.0_r64)/(qxmesh - 1)/2, 0.0_r64, 0.0_r64] 
+       
        qmaglist(iq) = twonorm(matmul(crys%reclattvecs, qlist(iq, :)))
     end do
     call sort(qmaglist)
@@ -790,8 +793,9 @@ contains
 
     prefac = 1.0e9_r64*qe/perm0 ! ev.nm 
     if(crys%twod) prefac = prefac/2
-
-    open(170, file="testing", status='replace')
+    kv = [0.3333333333, 0.3333333333, 0.0000000000]
+    if (this_image()==1) print *, "Distance->", twonorm(matmul(crys%reclattvecs, kv))
+    !open(170, file="testing", status='replace')
     do iq = start, end !Over IBZ k points
        qcrys = qlist(iq, :) !crystal coordinates
        qcart = matmul(crys%reclattvecs, qcrys) !cartesian coordinates
@@ -805,7 +809,8 @@ contains
 !$!             spec_X0, energylist, qcrys, el, wann, crys, num%tetrahedra)
       
        !if(q2norm<1e-1) then
-       if(qmaglist(iq)<crys%qTF/29.0_r64) then
+       !if(this_image()==1) print*,"Cut-off:",crys%qTF/80.0_r64
+       if(qmaglist(iq)<crys%qTF/100.0_r64) then
           call spectral_head_polarizability_2d_lowqpath_old(&
             spec_X0, energylist, qcrys, el, wann, crys, num%tetrahedra)
        else
@@ -855,7 +860,7 @@ contains
        !end do
 
     end do
-    close(170)
+    !close(170)
 
     call co_sum(pol)
     call co_sum(diel_rpa)
