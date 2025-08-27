@@ -1289,7 +1289,7 @@ contains
     !Distribute tasks among images
     call distribute_points(nk, chunk, start, end, num_active_images)
 
-    if(this_image() <= num_active_images) then !Only active image must work
+    if(this_image() <= num_active_images) then !Only active images must work
        do ik = start, end !Run over all wave vectors in FBZ
           !Handle non-contiguous (blocks = .true.) case
           if(blocks) then !For energy window restricted FBZ
