@@ -2965,6 +2965,7 @@ contains
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
     type(vec) :: k1_vec, k2_vec, k3_vec, k4_vec, q_vec
     logical :: keep_interaction_tally, screening_computed, g2_computed
+    character(len = 1024) :: filename, filename1, filename2
 
     !Do I need to keep a tally of the all the interacting states?
     keep_interaction_tally = present(istate_el2) .and. present(istate_el4)
@@ -3075,10 +3076,40 @@ contains
 
                 if(.not. screening_computed) then
                    if(num%Coulomb_screening_type == 'RPA') then
+                      !Read or write data in binary format
+                      !Note: this will overwrite existing data!
+                      write (filename1, '(I9)') istate1
+                      write (filename2, '(I9)') istate3
+                      filename = 'Pol_head.istate'//trim(adjustl(filename1))&
+                                                 //'_'//trim(adjustl(filename2))
+                      filepath_Xp = trim(adjustl(num%Xdir))//'/Xplus.istate'//trim(adjustl(tag))
                       !Calculate polarizablity
-                      call spectral_head_polarizability_3d_q(&
-                           ImX0_cont, Omegas_cont, q_vec, el, crys, num%tetrahedra)
+                      ! If not computed before
+                      if(.not. read_ee_pol13) then
+                         call spectral_head_polarizability_3d_q(&
+                              ImX0_cont, Omegas_cont, q_vec, el, crys, num%tetrahedra)
+                         
+                         ! Change to data output directory
+                         call chdir(trim(adjustl(num%Xdir)))
+
+                         ! Saving spectral polarisability(1, 3) for reuse
+                         open(1, file = trim(filename), status = 'replace', access = 'stream')
+                         write(1) ImX0_cont(1:Omegas_cont)
+                         close(1)       
+
+                         !Change back to working directory
+                         call chdir(num%cwd)
+                      else
+                         ! Read from already computed spectral polarizability
+                         open(1, file = trim(adjustl(filepath)), status = 'old', access = 'stream')
+                         !Read Xchimp from file
+                         if(allocated(X)) deallocate(X)
+                         call read_transition_probs_e(trim(adjustl(filepath_Xchimp)), &
+                              nprocs_echimp, X, istate_el_echimp)
+                      end if
+
                       ImX0_cont = -pi*ImX0_cont
+                      !ImX0_cont = -pi*1.0_r64
 
                       call hilbert_transform(-ImX0_cont, ReX0_cont)
                    end if

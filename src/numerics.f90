@@ -74,6 +74,8 @@ module numerics_module
      !! Choose if earlier ph-ph (IBZ q) vertices are to be used.
      logical :: read_W
      !! Choose if earlier ph-ph (IBZ q) transition probabilities are to be used.
+     logical :: read_ee_pol13
+     !! Choose if earlier polarisabilty are to be used in e-e.
      logical :: tetrahedra
      !! Choose if the tetrahedron method for 3d delta function evaluation will be used.
      logical :: phe
@@ -183,14 +185,14 @@ contains
     character(len = 6) :: phiso_1B_theory
     character(len = 3) :: Coulomb_screening_type
     character(len = 1) :: numcols
-    logical :: read_gq2, read_gk2, read_V, read_W, tetrahedra, phe, phiso, phsubs, &
+    logical :: read_gq2, read_gk2, read_V, read_W, read_ee_pol13, tetrahedra, phe, phiso, phsubs, &
          phbound, phdef_Tmat, onlyphbte, onlyebte, elchimp, elbound, drag, plot_along_path, &
          phthinfilm, phthinfilm_ballistic, fourph, use_Wannier_ifc2s, phiso_Tmat, Bfield_on, &
          W_OTF, Y_OTF, solve_bulk, solve_nano, elel, &
          restart_from_batch_record, use_perm
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
-         read_V, read_W, tetrahedra, phe, phiso, phsubs, onlyphbte, onlyebte, maxiter, &
+         read_V, read_W, read_ee_pol13, tetrahedra, phe, phiso, phsubs, onlyphbte, onlyebte, maxiter, &
          conv_thres, drag, elchimp, plot_along_path, runlevel, ph_en_min, ph_en_max, &
          ph_en_num, el_en_min, el_en_max, el_en_num, phbound, elbound, phdef_Tmat, &
          ph_mfp_npts, ph_abs_q_npts, phthinfilm, phthinfilm_ballistic, &
@@ -213,6 +215,7 @@ contains
     read_gk2 = .false.
     read_V = .false.
     read_W = .false.
+    read_ee_pol13 = .false.
     tetrahedra = .false.
     phe = .false.
     phiso = .false.
@@ -330,6 +333,7 @@ contains
        self%read_gq2 = read_gq2
        self%read_V = read_V
        self%read_W = read_W
+       self%read_ee_pol13 = read_ee_pol13
        self%W_OTF = W_OTF
        self%phe = phe
        self%phiso = phiso
@@ -557,6 +561,7 @@ contains
              write(*, "(A, A)") "Type of Coulomb screening: ", trim(self%Coulomb_screening_type)
              if(self%Coulomb_screening_type == 'RPA') then
                 write(*, "(A, I5)") "Size of continuous energy mesh: ", self%ncont_mesh
+                write(*, "(A, L)") "Reuse e-e polarisability: ", self%read_ee_pol13
              end if
           end if
           write(*, "(A, L)") "Include el-boundary interaction: ", self%elbound
