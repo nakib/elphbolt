@@ -1517,7 +1517,7 @@ contains
     real(r64), allocatable :: Xphplus(:), Xphminus(:),  Xchimp(:), Xee(:), Xee_13(:), &
          response_el_reduce(:,:,:), Delk_response(:, :, :, :), scratch(:, :)
     integer(i64), allocatable :: ik1_image_array(:), ik3_image_array(:)
-    character(1024) :: filepath_Xphminus, filepath_Xphplus, filepath_Xechimp, tag
+    character(1024) :: filepath_Xphminus, filepath_Xphplus, filepath_Xechimp, filename, tag
 
     !Factor to make B-field term have units of
     !C.nm for the E-field BTE and
@@ -1612,8 +1612,16 @@ contains
              call binsearch(el%indexlist, el%ibz2fbz_map(ieq, ik_ibz, 2), ik1_image_array(ieq))
           end do
 
-          !Treat the e-e scattering in a special way for the sake of using less memory
           if(num%elel) then
+             !Treat the e-e scattering in a special way for the sake of using less memory
+             ! But we have already saved spectral polarizability (only needed for RPA)
+             if(num%Coulomb_screening_type == 'RPA') then 
+                write (filename, '(I9)') istate
+                filename = trim(adjustl(num%Xdir))//&
+                              '/Pol_head.istate'//trim(adjustl(filename))
+                ! Read from already computed spectral polarizability
+                open(2, file = trim(adjustl(filename)), status = 'old', access = 'stream')
+             end if
              do istate3 = 1, nstates !over FBZ blocks states
                 !Demux state index into band (n3) and wave vector (ik3) indices
                 call demux_state(istate3, numbands, n3, ik3)
@@ -1623,7 +1631,7 @@ contains
 
                 !Calculate all the transition rates of processes involving states 1 and 3
                 call calculate_Xee_13_OTF(el, num, istate, istate3, crys, Xee_13, &
-                     istate_el_ee2, istate_el_ee4)
+                     istate_el_ee2, istate_el_ee4, read_pol1 = .true.)
 
                 !Number of such allowed processes
                 nprocs_ee_13 = size(Xee_13)
@@ -1660,6 +1668,7 @@ contains
                    end do
                 end do
              end do
+             if(num%Coulomb_screening_type == 'RPA') close(2) 
           end if
 
           !Sum over the number of equivalent k-points of the IBZ point

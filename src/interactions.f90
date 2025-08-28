@@ -2931,7 +2931,7 @@ contains
   end subroutine calculate_Xee_OTF
 
   subroutine calculate_Xee_13_OTF(el, num, istate1, istate3, crys, X, &
-       istate_el2, istate_el4)
+       istate_el2, istate_el4, read_pol1)
     !! On-the-fly serial calculator of the e-e transition probability.
     !! for a given IBZ state (1) and FBZ state (3) pair within the transport window.
     !!
@@ -2949,23 +2949,22 @@ contains
     type(crystal), intent(in) :: crys
     integer(i64), intent(in) :: istate1
     integer(i64), intent(in) :: istate3
+    logical, intent(in), optional :: read_pol1
     real(r64), intent(out), allocatable :: X(:)
     integer(i64), intent(out), allocatable, optional :: istate_el2(:), istate_el4(:)
 
     !Local variables
     integer(i64) :: istate, &
          n1, ik1, n2, ik2, n3, ik3, n4, ik4, &
-         count, nprocs
+         count, nprocs, filetag
     real(r64) :: const, beta, fermi1, fermi2, fermi3, fermi4, &
          delta_val, occup_fac, en1, en2, en3, en4, g2 
     real(r64), allocatable :: Omegas_cont(:), specX0_cont(:), ImX0_cont(:), &
          ReX0_cont(:)
     complex(r64) :: temp(1), X0_qw 
-    character(len = 1024) :: filename
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
     type(vec) :: k1_vec, k2_vec, k3_vec, k4_vec, q_vec
     logical :: keep_interaction_tally, screening_computed, g2_computed
-    character(len = 1024) :: filename, filename1, filename2
 
     !Do I need to keep a tally of the all the interacting states?
     keep_interaction_tally = present(istate_el2) .and. present(istate_el4)
@@ -3076,36 +3075,18 @@ contains
 
                 if(.not. screening_computed) then
                    if(num%Coulomb_screening_type == 'RPA') then
-                      !Read or write data in binary format
-                      !Note: this will overwrite existing data!
-                      write (filename1, '(I9)') istate1
-                      write (filename2, '(I9)') istate3
-                      filename = 'Pol_head.istate'//trim(adjustl(filename1))&
-                                                 //'_'//trim(adjustl(filename2))
-                      filepath_Xp = trim(adjustl(num%Xdir))//'/Xplus.istate'//trim(adjustl(tag))
-                      !Calculate polarizablity
+                      !Calculate polarizablity 
                       ! If not computed before
-                      if(.not. read_ee_pol13) then
+                      if(.not. read_pol1) then
                          call spectral_head_polarizability_3d_q(&
                               ImX0_cont, Omegas_cont, q_vec, el, crys, num%tetrahedra)
                          
-                         ! Change to data output directory
-                         call chdir(trim(adjustl(num%Xdir)))
+                         ! Write it in the spec_polfile !Note: overwritting issue? 
+                         write(2) ImX0_cont(:)
 
-                         ! Saving spectral polarisability(1, 3) for reuse
-                         open(1, file = trim(filename), status = 'replace', access = 'stream')
-                         write(1) ImX0_cont(1:Omegas_cont)
-                         close(1)       
-
-                         !Change back to working directory
-                         call chdir(num%cwd)
                       else
-                         ! Read from already computed spectral polarizability
-                         open(1, file = trim(adjustl(filepath)), status = 'old', access = 'stream')
-                         !Read Xchimp from file
-                         if(allocated(X)) deallocate(X)
-                         call read_transition_probs_e(trim(adjustl(filepath_Xchimp)), &
-                              nprocs_echimp, X, istate_el_echimp)
+                         !Read spectral polarizability from the file
+                         read(2) ImX0_cont(:)
                       end if
 
                       ImX0_cont = -pi*ImX0_cont
@@ -3708,7 +3689,7 @@ contains
     integer(i64), allocatable :: istate_el_echimp(:)
     real(r64), allocatable :: X(:), X_13(:)
     real(r64) :: k(3), kp(3)
-    character(len = 1024) :: filepath_Xp, filepath_Xm, filepath_Xchimp, tag
+    character(len = 1024) :: filepath_Xp, filepath_Xm, filepath_Xchimp, filename, tag
 
     !Set output directory of transition probilities
     write(tag, "(E9.3)") crys%T
@@ -3748,16 +3729,28 @@ contains
 
              !Recall that storing Xee(1) is prohibitively memory intensive.
              !This is why we compute Xee(1, 3) instead.
+             ! But we can save spectral polarizability (only for RPA)
+             !Note: this will overwrite existing data!
+             if(num%Coulomb_screening_type == 'RPA') then 
+                write (filename, '(I9)') istate
+                filename = trim(adjustl(num%Xdir))//&
+                              '/Pol_head.istate'//trim(adjustl(filename))
+
+                ! Saving spectral polarisability(1, 3) for reuse
+                open(2, file = trim(filename), status = 'replace', access = 'stream')
+             end if
+
              do istate3 = 1, nstates !over FBZ blocks states
                 !Demux state index into band (m3) and wave vector (ik3) indices
                 call demux_state(istate3, el%numbands, m3, ik3)
-
-                call calculate_Xee_13_OTF(el, num, istate, istate3, crys, X_13)
+                
+                call calculate_Xee_13_OTF(el, num, istate, istate3, crys, X_13, read_pol1 = .false.)
 
                 do iproc = 1, size(X_13)
                    rta_rates_ee(ik, m) = rta_rates_ee(ik, m) + X_13(iproc)
                 end do
              end do
+             if(num%Coulomb_screening_type == 'RPA') close(2) 
           end if
 
           !Set X+ filename
