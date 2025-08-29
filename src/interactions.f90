@@ -3690,6 +3690,7 @@ contains
     real(r64), allocatable :: X(:), X_13(:)
     real(r64) :: k(3), kp(3)
     character(len = 1024) :: filepath_Xp, filepath_Xm, filepath_Xchimp, filename, tag
+    logical :: read_pol1
 
     !Set output directory of transition probilities
     write(tag, "(E9.3)") crys%T
@@ -3737,14 +3738,24 @@ contains
                               '/Pol_head.istate'//trim(adjustl(filename))
 
                 ! Saving spectral polarisability(1, 3) for reuse
-                open(2, file = trim(filename), status = 'replace', access = 'stream')
+                !open(2, file = trim(filename), status = 'replace', access = 'stream')
+                read_pol1 = .false.
+                if(num%read_ee_pol1) then
+                   ! Read from already computed spectral polarizability
+                   open(2, file = trim(adjustl(filename)), status = 'old', access = 'stream')
+                   ! Overides the need to compute for first time
+                   read_pol1 = .true.
+                else
+                   ! Saving spectral polarisability(1, 3) for reuse (only needed once)
+                   open(2, file = trim(filename), status = 'replace', access = 'stream')
+                end if
              end if
 
              do istate3 = 1, nstates !over FBZ blocks states
                 !Demux state index into band (m3) and wave vector (ik3) indices
                 call demux_state(istate3, el%numbands, m3, ik3)
                 
-                call calculate_Xee_13_OTF(el, num, istate, istate3, crys, X_13, read_pol1 = .false.)
+                call calculate_Xee_13_OTF(el, num, istate, istate3, crys, X_13, read_pol1 = read_pol1)
 
                 do iproc = 1, size(X_13)
                    rta_rates_ee(ik, m) = rta_rates_ee(ik, m) + X_13(iproc)
