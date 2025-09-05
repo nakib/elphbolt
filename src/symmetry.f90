@@ -22,7 +22,7 @@ module symmetry_module
   use misc, only: mux_vector, demux_mesh, demux_vector, &
        exit_with_message, subtitle, distribute_points, shrink
   use crystal_module, only : crystal
-
+  use numerics_module, only: numerics
   use iso_c_binding
   use spglib_f08, only: SpglibDataset, spg_get_dataset
 
@@ -39,6 +39,8 @@ module symmetry_module
      !! Number of spacegroup symmetries.
      integer(i64) :: nsymm_rot
      !! Number of rotations.
+     integer(i64) :: nsymm_Bfield  
+     !! Number of B-field compatible symmetries.
      integer(i64), allocatable :: rotations_orig(:,:,:)
      !! Rotations without time-reversal, real space, crystal coordinates.
      real(r64), allocatable :: crotations_orig(:,:,:)
@@ -54,6 +56,8 @@ module symmetry_module
      !! Rotations with time-reversal, reciprocal space, crystal coordinates.
      character(len=10) :: international
      !! Spacegroup in Hermann–Mauguin (or international) notation.
+     real(r64), allocatable :: crotations_Bfield(:,:,:)
+     !! Rotations in the presence of magentic field real space, Cartesian coordinates.
 
    contains
 
@@ -63,13 +67,14 @@ module symmetry_module
 
 contains
 
-  subroutine calculate_symmetries(self, crys, mesh)
+  subroutine calculate_symmetries(self, crys, mesh, num)
     !! Subroutine to generate the symmetry related data for a given crystal.
     !!
     !! This subroutine closely follows parts of config.f90 of the ShengBTE code.
 
     class(symmetry), intent(out) :: self
     type(crystal), intent(in) :: crys
+    type(numerics), intent(in), optional :: num
     integer(i64), intent(in) :: mesh(3)
 
     !Internal variables:
@@ -209,6 +214,55 @@ contains
        call move_alloc(crtmp,self%crotations)
        call move_alloc(qrtmp,self%qrotations)
     end if
+
+    ! Find symmetries that are compatible with an applied magnetic field.
+    ! These are the rotations R for which R * B = B.
+    ! Only valid if a magnetic field is present in the numerics object.
+    if(present(num)) then
+      if(any(num%Bfield(:) /= 0.0_r64)) then ! Check if B-field is non-zero
+
+        ! Allocate space for the B-field compatible symmetries.
+        ! We don't know the final count yet, so allocate to maximum possible size.
+        allocate(crtmp(3, 3, self%nsymm_rot))
+        kk = 0 ! Counter for valid symmetries
+
+        ! Loop over all finalized symmetry operations (including time-reversal)
+        do ii = 1, self%nsymm_rot
+          ! Apply the symmetry operation to the B-field vector
+          tmp1(:, 1) = num%Bfield ! Represent B-field as a column vector
+          tmp2 = matmul(self%crotations(:, :, ii), tmp1) ! R * B
+
+          ! Check if the transformed field is parallel to the original.
+          ! We use a tolerance for floating-point comparison.
+          ! R * B = B for a symmetry of the system with applied field.
+          if (norm2(tmp2(:,1) - num%Bfield) < 1.0e-5_r64) then
+            kk = kk + 1
+            crtmp(:, :, kk) = self%crotations(:, :, ii)
+          end if
+        end do
+
+        ! Now, we know the number of valid operations: kk
+        ! Allocate the final storage and copy the valid operations.
+        allocate(self%crotations_Bfield(3, 3, kk))
+        self%crotations_Bfield(:, :, 1:kk) = crtmp(:, :, 1:kk)
+        self%nsymm_Bfield = kk ! Store the number of B-field compatible symms
+
+        ! Clean up temporary storage
+        deallocate(crtmp)
+
+      else
+        ! B-field is zero. All symmetries are compatible.
+        self%nsymm_Bfield = self%nsymm_rot
+        allocate(self%crotations_Bfield(3, 3, self%nsymm_rot))
+        self%crotations_Bfield(:, :, :) = self%crotations(:, :, :)
+      end if
+    else
+      ! No numerics object provided, assume no B-field. All symmetries are compatible.
+      self%nsymm_Bfield = self%nsymm_rot
+      allocate(self%crotations_Bfield(3, 3, self%nsymm_rot))
+      self%crotations_Bfield(:, :, :) = self%crotations(:, :, :)
+    end if
+
   end subroutine calculate_symmetries
 
   subroutine find_star(q_in,q_out,mesh,qrotations)

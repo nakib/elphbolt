@@ -513,7 +513,6 @@ contains
     ! Calculate field term (E=>G0)
     call calculate_field_term('ph', 'E', ph%nequiv, ph%ibz2fbz_map, &
          crys%T, 0.0_r64, ph%ens, ph%vels, self%ph_rta_rates_ibz, self%ph_field_term_E)
-     ! self%ph_field_term_E = 0.0_r64
 
     ! RTA solution of BTE
     allocate(self%ph_response_E(ph%nwv, ph%numbands, 3))
