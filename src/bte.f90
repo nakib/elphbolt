@@ -33,7 +33,8 @@ module bte_module
   use phonon_module, only: phonon
   use electron_module, only: electron
   use interactions, only: calculate_ph_rta_rates, read_transition_probs_e, &
-       calculate_el_rta_rates, calculate_bound_scatt_rates, calculate_thinfilm_scatt_rates, &
+       calculate_el_rta_rates, calculate_bound_scatt_rates, &
+       calculate_elbound_scatt_rates, calculate_thinfilm_scatt_rates, &
        calculate_4ph_rta_rates, calculate_W3ph_OTF, calculate_Y_OTF, calculate_Xee_OTF, &
        calculate_Xee_13_OTF
   use bz_sums, only: calculate_transport_coeff, calculate_spectral_transport_coeff, &
@@ -213,9 +214,9 @@ contains
          self%el_rta_rates_ee_ibz, num, crys, el)
 
     ! e-boundary
-    call calculate_bound_scatt_rates(el%prefix, num%elbound, crys%bound_length, &
-         el%vels, el%indexlist_irred, self%el_rta_rates_bound_ibz)
-
+    call calculate_elbound_scatt_rates(num%elbound, crys%bound_length, &
+         el%vels_irred, self%el_rta_rates_bound_ibz)
+    
     !Allocate total RTA scattering rates
     allocate(self%el_rta_rates_ibz(el%nwv_irred, el%numbands))
 
