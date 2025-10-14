@@ -47,7 +47,8 @@ module interactions
        calculate_ph_rta_rates, read_transition_probs_e, &
        calculate_eph_interaction_ibzq, calculate_eph_interaction_ibzk, &
        calculate_echimp_interaction_ibzk, calculate_el_rta_rates, &
-       calculate_bound_scatt_rates, calculate_thinfilm_scatt_rates, &
+       calculate_bound_scatt_rates, calculate_elbound_scatt_rates, &
+       calculate_thinfilm_scatt_rates, &
        calculate_4ph_rta_rates, calculate_coarse_grained_3ph_vertex, &
        calculate_W_fromcgV2, calculate_W3ph_OTF, calculate_Y_OTF, &
        Vm2_3ph, calculate_Xee_OTF, calculate_Xee_13_OTF, &
@@ -3878,8 +3879,10 @@ contains
     if(finite_crys) then
        do ik = 1, nk_irred
           do ib = 1, nb
-             scatt_rates(ik, ib) = twonorm(vels_fbz(indexlist_irred(ik), ib, :))&
-                  /length*1.e-6_r64 !THz
+!!$             scatt_rates(ik, ib) = twonorm(vels_fbz(indexlist_irred(ik), ib, :))&
+!!$                  /length*1.e-6_r64 !THz
+
+             scatt_rates(ik, ib) = twonorm(vels_fbz(indexlist_irred(ik), ib, :))
           end do
        end do
     end if
@@ -3887,6 +3890,44 @@ contains
     !Write to file
     call write2file_rank2_real(prefix // '.W_rta_'//prefix//'bound', scatt_rates)
   end subroutine calculate_bound_scatt_rates
+
+  subroutine calculate_elbound_scatt_rates(finite_crys, length, vels_ibz, scatt_rates)
+    !! Subroutine to calculate the phonon/electron-boundary scattering rates.
+    !!
+    !! finite_crys Is the crystal finite?
+    !! length Characteristic boundary scattering length scale in mm
+    !! vels Velocities on the FBZ
+    !! scatt_rates Boundary scattering rates on the IBZ
+
+    logical, intent(in) :: finite_crys
+    real(r64), intent(in) :: length
+    real(r64), intent(in) :: vels_ibz(:,:,:)
+    real(r64), allocatable, intent(out) :: scatt_rates(:,:)
+
+    !Local variables
+    integer(i64) :: ik, ib, nk_irred, nb
+
+    !Number of IBZ wave vectors and bands
+    nk_irred = size(vels_ibz, 1)
+    nb = size(vels_ibz, 2)
+
+    !Allocate boundary scattering rates and initialize to infinite crystal values
+    allocate(scatt_rates(nk_irred, nb))
+    scatt_rates = 0.0_r64
+
+    !Check finiteness of crystal
+    if(finite_crys) then
+       do ik = 1, nk_irred
+          do ib = 1, nb
+             scatt_rates(ik, ib) = twonorm(vels_ibz(ik, ib, :))&
+                  /length*1.e-6_r64 !THz
+          end do
+       end do
+    end if
+
+    !Write to file
+    call write2file_rank2_real('el.W_rta_elbound', scatt_rates)
+  end subroutine calculate_elbound_scatt_rates
 
   subroutine calculate_thinfilm_scatt_rates(prefix, finite_crys, ballistic_limit, specfac, &
        height, normal, vels_fbz, indexlist_irred, other_scatt_rates, thin_film_scatt_rates)
