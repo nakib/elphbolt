@@ -3882,7 +3882,8 @@ contains
 !!$             scatt_rates(ik, ib) = twonorm(vels_fbz(indexlist_irred(ik), ib, :))&
 !!$                  /length*1.e-6_r64 !THz
 
-             scatt_rates(ik, ib) = twonorm(vels_fbz(indexlist_irred(ik), ib, :))
+             scatt_rates(ik, ib) = twonorm(vels_fbz(indexlist_irred(ik), ib, :)) &
+                  /length*1.e-6_r64 !THz
           end do
        end do
     end if
