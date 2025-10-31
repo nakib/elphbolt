@@ -18,7 +18,7 @@ module screening_module
 
   private
   public calculate_qTF, &
-       spectral_head_polarizability_3d_q!, &
+       spectral_head_polarizability_q!spectral_head_polarizability_3d_q!, &
   !calculate_RPA_dielectric_3d_G0_scratch, &
 
 contains
@@ -56,6 +56,7 @@ contains
        ! qTF**2 = spindeg*e^2*beta/nptq/vol_pcell/perm0*Sum_{BZ}f0_{k}(1-f0_{k})
        crys%qTF = sqrt(1.0e9_r64*crys%qTF*el%spindeg*beta*qe**2/product(el%wvmesh)&
             /crys%volume/perm0) !nm^-1
+       if(crys%twod) crys%qTF = crys%thickness*crys%qTF**2/2  ! nm^-1
 
        if(this_image() == 1) then
           write(*, "(A, 1E16.8, A)") ' Thomas-Fermi screening wave vector = ', crys%qTF, ' 1/nm'
@@ -63,9 +64,110 @@ contains
     end if
   end subroutine calculate_qTF
 
-  subroutine spectral_head_polarizability_3d_q(spec_eps, Omegas, qvec, &
+!$!   subroutine spectral_head_polarizability_3d_q(spec_eps, Omegas, qvec, &
+!$!        el, crys, tetrahedra)
+!$!     !! Spectral head of the bare polarizability of the 3d Kohn-Sham system using
+!$!     !! Eq. 16 of Shishkin and Kresse Phys. Rev. B 74, 035101 (2006).
+!$!     !!
+!$!     !! Here we calculate the diagonal in G-G' space. Moreover,
+!$!     !! we use the approximation G.r -> 0.
+!$!     !!
+!$!     !! spec_eps Spectral head of the bare polarizability
+!$!     !! Omega Energy of excitation in the electron gas
+!$!     !! qvec Transfer wave vector
+!$!     !! el Electron data type
+!$!     !! crys Crystal data type
+!$!     !! tetrahedra Delta evaulator selector
+!$! 
+!$!     real(r64), intent(in) :: Omegas(:)
+!$!     type(vec), intent(in) :: qvec
+!$!     type(electron), intent(in) :: el
+!$!     type(crystal), intent(in) :: crys
+!$!     logical, intent(in) :: tetrahedra
+!$!     real(r64), allocatable, intent(out) :: spec_eps(:)
+!$! 
+!$!     !Locals
+!$!     integer(i64) :: m, n, ik, iOmega, nOmegas, k_indvec(3), kp_indvec(3), where_in_indexlist
+!$!     real(r64) :: overlap, ek, ekp, el_ens_kp(1, el%numbands), kppathvecs(1, 3)
+!$!     complex(r64) :: el_evecs_kp(1, el%numbands, el%numbands)
+!$!     procedure(delta_fn), pointer :: delta_fn_ptr => null()
+!$!     type(vec) :: kvec, kpvec
+!$!     real(r64) :: dOmega
+!$! 
+!$!     nOmegas = size(Omegas)
+!$! 
+!$!     dOmega = Omegas(2) - Omegas(1)
+!$! 
+!$!     allocate(spec_eps(nOmegas))
+!$! 
+!$!     !Associate delta function procedure pointer
+!$!     delta_fn_ptr => get_delta_fn_pointer(tetrahedra)
+!$! 
+!$!     spec_eps = 0.0
+!$!     !Below, we will sum over k, m, and n
+!$!     do ik = 1, el%nwv
+!$!        !This k vector
+!$!        kvec = vec(el%indexlist(ik), el%wvmesh, crys%reclattvecs)
+!$! 
+!$!        !This k' = k + q vector
+!$!        kpvec = vec_add(kvec, qvec, el%wvmesh, crys%reclattvecs)
+!$! 
+!$!        !Binary search for k' in in k-vectors (full BZ) index list
+!$!        call binsearch(el%indexlist, kpvec%muxed_index, where_in_indexlist)
+!$! 
+!$!        !Ignore terms for which k' is outside the Fermi shell
+!$!        if(where_in_indexlist < 0) cycle
+!$! 
+!$!        el_ens_kp(1, :) = el%ens(where_in_indexlist, :)
+!$!        el_evecs_kp(1, :, :) = el%evecs(where_in_indexlist, :, :)
+!$! 
+!$!        do m = 1, el%numbands
+!$!           ek = el%ens(ik, m)
+!$! 
+!$!           !Apply energy window to initial electron
+!$!           if(abs(ek - el%enref) > el%fsthick) cycle
+!$! 
+!$!           do iOmega = nOmegas/2 + 2, nOmegas !positive energy sector
+!$!              do n = 1, el%numbands
+!$! 
+!$!                 ekp = el_ens_kp(1, n)
+!$! 
+!$!                 !Apply energy window to final electron
+!$!                 if(abs(ekp - el%enref) > el%fsthick) cycle
+!$! 
+!$!                 !This is |U(k')U^\dagger(k)|_nm squared
+!$!                 !(Recall that U^\dagger(k) is the diagonalizer of the electronic hamiltonian.)
+!$!                 overlap = (abs(dot_product(el_evecs_kp(1, n, :), el%evecs(ik, m, :))))**2
+!$! 
+!$!                 spec_eps(iOmega) = spec_eps(iOmega) + &
+!$!                      (Fermi(ek, el%chempot, crys%T) - &
+!$!                      Fermi(ekp, el%chempot, crys%T))*overlap* &
+!$!                      delta_fn_ptr(ekp - Omegas(iOmega), ik, m, &
+!$!                      el%wvmesh, el%simplex_map, &
+!$!                      el%simplex_count, el%simplex_evals)
+!$!              end do
+!$!           end do
+!$!        end do
+!$!     end do
+!$! 
+!$!     do iOmega = 1, nOmegas
+!$!        !Recall that the resolvent is already normalized in the full wave vector mesh.
+!$!        !As such, the 1/product(el%wvmesh) is not needed in the expression below.
+!$!        spec_eps(iOmega) = spec_eps(iOmega)*el%spindeg/crys%volume
+!$!     end do
+!$!     !At this point [spec_eps] = nm^-3.eV^-1
+!$! 
+!$!     !The negative energy sector
+!$!     do iOmega = 1, nOmegas/2
+!$!        spec_eps(iOmega) = -spec_eps(nOmegas + 1 - iOmega)
+!$!     end do
+!$! 
+!$!     if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
+!$!   end subroutine spectral_head_polarizability_3d_q
+  
+  subroutine spectral_head_polarizability_q(spec_eps, Omegas, qvec, &
        el, crys, tetrahedra)
-    !! Spectral head of the bare polarizability of the 3d Kohn-Sham system using
+    !! Spectral head of the bare polarizability of the 2d or 3d Kohn-Sham system using
     !! Eq. 16 of Shishkin and Kresse Phys. Rev. B 74, 035101 (2006).
     !!
     !! Here we calculate the diagonal in G-G' space. Moreover,
@@ -91,7 +193,10 @@ contains
     complex(r64) :: el_evecs_kp(1, el%numbands, el%numbands)
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
     type(vec) :: kvec, kpvec
-    real(r64) :: dOmega
+    real(r64) :: dOmega, qmag, fermidiff, kpvel(3), beta, fnk
+
+    qmag = twonorm(qvec%cart)
+    beta = 1.0_r64/kB/crys%T
 
     nOmegas = size(Omegas)
 
@@ -133,28 +238,43 @@ contains
 
                 !Apply energy window to final electron
                 if(abs(ekp - el%enref) > el%fsthick) cycle
+                if(ekp < ek) cycle
+
+                fnk = Fermi(el%ens(ik, n), el%chempot, crys%T)
 
                 !This is |U(k')U^\dagger(k)|_nm squared
                 !(Recall that U^\dagger(k) is the diagonalizer of the electronic hamiltonian.)
+                kpvel = el%vels(where_in_indexlist, n, :)
                 overlap = (abs(dot_product(el_evecs_kp(1, n, :), el%evecs(ik, m, :))))**2
 
+                if(qmag < crys%qtf/100.0_r64) then
+                   fermidiff = Fermi(ek, el%chempot, crys%T) - &
+                            (fnk - beta*fnk*(1.0_r64 - fnk)*hbar_eVps*&
+                            dot_product(qvec%cart, el%vels(ik, n, :)))
+                else
+                   fermidiff = Fermi(ek, el%chempot, crys%T) - &
+                            Fermi(ekp, el%chempot, crys%T)
+                end if
                 spec_eps(iOmega) = spec_eps(iOmega) + &
-                     (Fermi(ek, el%chempot, crys%T) - &
-                     Fermi(ekp, el%chempot, crys%T))*overlap* &
-                     delta_fn_ptr(ekp - Omegas(iOmega), ik, m, &
-                     el%wvmesh, el%simplex_map, &
-                     el%simplex_count, el%simplex_evals)
+                     fermidiff*overlap*& 
+                     adaptive_gaussian(ik, m, kpvel, ekp - ek - Omegas(iOmega), crys, el)
+
+!$!                 spec_eps(iOmega) = spec_eps(iOmega) + &
+!$!                      fermidiff*overlap* &
+!$!                      delta_fn_ptr(ekp - Omegas(iOmega), ik, m, &
+!$!                      el%wvmesh, el%simplex_map, &
+!$!                      el%simplex_count, el%simplex_evals)
              end do
           end do
        end do
     end do
 
-    do iOmega = 1, nOmegas
-       !Recall that the resolvent is already normalized in the full wave vector mesh.
-       !As such, the 1/product(el%wvmesh) is not needed in the expression below.
-       spec_eps(iOmega) = spec_eps(iOmega)*el%spindeg/crys%volume
-    end do
-    !At this point [spec_eps] = nm^-3.eV^-1
+    if(crys%twod) then
+       spec_eps = spec_eps*el%spindeg/crys%volume*crys%thickness
+    else
+       spec_eps = spec_eps*el%spindeg/crys%volume
+    end if
+       
 
     !The negative energy sector
     do iOmega = 1, nOmegas/2
@@ -162,8 +282,40 @@ contains
     end do
 
     if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
-  end subroutine spectral_head_polarizability_3d_q
+  end subroutine spectral_head_polarizability_q
+  
+  pure function adaptive_gaussian(ik, m, kpvel, en, crys, el)
+    integer(i64), intent(in) :: ik, m
+    real(r64), intent(in) :: en, kpvel(3)
+    type(electron), intent(in) :: el
+    type(crystal), intent(in) :: crys
+    real(r64) :: sigma, adaptive_gaussian
 
+    integer(i64) :: dim
+    real (i64) :: onebyroot2pi, onebyroot12, Qs(2, 3), aux
+
+    ! Compute Qs for the sigma Gaussian
+    onebyroot2pi = 1.0_r64/sqrt(2.0*pi)
+    onebyroot12 = 1.0_r64/sqrt(12.0_r64)
+    do dim = 1, 2
+       !Qs(dim, :) = crys%reclattvecs(dim, :)/el%wvmesh(dim)
+       Qs(dim, :) = crys%reclattvecs(:, dim)/el%wvmesh(dim)
+    end do
+    ! Calculate adaptive smearing
+    aux = 0.0_r64
+    do dim = 1, 2
+       aux = aux + &
+             dot_product(el%vels(ik, m, :) - kpvel, Qs(dim, :))**2
+    end do
+    sigma = hbar_eVps*onebyroot12*sqrt(aux)
+
+    !sigma = 1e-2_r64
+    adaptive_gaussian = max(onebyroot2pi/sigma/product(el%wvmesh)*&
+                    exp(-0.5_r64*(en/sigma)**2), 1.0e-9_r64)
+!$!     deltafunc_pol = onebyroot2pi/sigma/product(el%wvmesh)*&
+!$!                     exp(-0.5_r64*(en/sigma)**2)
+  end function adaptive_gaussian
+  
   subroutine spectral_head_polarizability_3d_qpath(spec_eps, Omegas, qvec, &
        el, wann, crys, tetrahedra)
     !! Spectral head of the bare polarizability of the 3d Kohn-Sham system using
