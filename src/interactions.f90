@@ -3091,7 +3091,9 @@ contains
                       !Calculate polarizablity 
                       ! If not computed before
                       if(.not. read_pol1) then
-                         call spectral_head_polarizability_3d_q(&
+!$!                          call spectral_head_polarizability_3d_q(&
+!$!                               ImX0_cont, Omegas_cont, q_vec, el, crys, num%tetrahedra)
+                         call spectral_head_polarizability_q(&
                               ImX0_cont, Omegas_cont, q_vec, el, crys, num%tetrahedra)
                          
                          ! Write it in the spec_polfile !Note: overwritting issue? 
