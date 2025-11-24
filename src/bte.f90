@@ -216,7 +216,7 @@ contains
     ! e-boundary
     call calculate_elbound_scatt_rates(num%elbound, crys%bound_length, &
          el%vels_irred, self%el_rta_rates_bound_ibz)
-    
+
     !Allocate total RTA scattering rates
     allocate(self%el_rta_rates_ibz(el%nwv_irred, el%numbands))
 

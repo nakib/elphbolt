@@ -156,6 +156,8 @@ module numerics_module
      !! Use old batch processing records for restarts?
      logical :: use_perm
      !! Use permutation symmetries in ph-ph?
+     logical :: calculate_3ph_phasespace
+     !! Calculate 3ph phasespace?
    contains
 
      procedure :: initialize=>read_input_and_setup, create_chempot_dirs
@@ -187,7 +189,7 @@ contains
          phbound, phdef_Tmat, onlyphbte, onlyebte, elchimp, elbound, drag, plot_along_path, &
          phthinfilm, phthinfilm_ballistic, fourph, use_Wannier_ifc2s, phiso_Tmat, Bfield_on, &
          W_OTF, Y_OTF, solve_bulk, solve_nano, elel, &
-         restart_from_batch_record, use_perm
+         restart_from_batch_record, use_perm, calculate_3ph_phasespace
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
          read_V, read_W, tetrahedra, phe, phiso, phsubs, onlyphbte, onlyebte, maxiter, &
@@ -196,7 +198,8 @@ contains
          ph_mfp_npts, ph_abs_q_npts, phthinfilm, phthinfilm_ballistic, &
          fourph, fourph_mesh_ref, use_Wannier_ifc2s, elel, Coulomb_screening_type, ncont_mesh,&
          phiso_Tmat, phiso_1B_theory, Bfield_on, Bfield, W_OTF, Y_OTF, &
-         solve_bulk, solve_nano, num_batches, restart_from_batch_record, use_perm
+         solve_bulk, solve_nano, num_batches, restart_from_batch_record, use_perm, &
+         calculate_3ph_phasespace
 
     call subtitle("Reading numerics information...")
 
@@ -254,6 +257,7 @@ contains
     num_batches = 1
     restart_from_batch_record = .false.
     use_perm = .false.
+    calculate_3ph_phasespace = .false.
     read(1, nml = numerics)
 
     if(read_W .and. W_OTF) &
@@ -354,6 +358,7 @@ contains
        self%solve_nano = solve_nano
        self%num_batches = num_batches
        self%restart_from_batch_record = restart_from_batch_record
+       self%calculate_3ph_phasespace = calculate_3ph_phasespace
     else
        self%mesh_ref = 1 !Enforce this for superconductivity mode
     end if

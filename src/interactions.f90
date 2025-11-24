@@ -52,7 +52,8 @@ module interactions
        calculate_4ph_rta_rates, calculate_coarse_grained_3ph_vertex, &
        calculate_W_fromcgV2, calculate_W3ph_OTF, calculate_Y_OTF, &
        Vm2_3ph, calculate_Xee_OTF, calculate_Xee_13_OTF, &
-       calculate_ph_rta_coherence_rates, calculate_3ph_interaction_perm
+       calculate_ph_rta_coherence_rates, calculate_3ph_interaction_perm, &
+       calculate_3ph_phasespace
 
   !external chdir, system
 
@@ -590,6 +591,135 @@ contains
 
     sync all
   end subroutine calculate_W_fromcgV2
+
+  subroutine calculate_3ph_phasespace(ph, crys, num)
+    !! Calculates the 3ph scattering phase space for all IBZ states.
+    !!
+    !! ph Phonon object
+    !! crys Crystal object
+    !! num Numerics object
+
+    type(phonon), intent(in) :: ph
+    type(crystal), intent(in) :: crys
+    type(numerics), intent(in) :: num
+
+    !Local variables
+    integer(i64) :: istate1, nstates_irred, &
+         s1, s2, s3, iq1_ibz, iq1, iq2, iq3_minus, &
+         q1_indvec(3), q2_indvec(3), q3_minus_indvec(3), &
+         neg_iq2, neg_q2_indvec(3), num_active_images
+    real(r64) :: en1, en2, en3, q1(3), q2(3), delta_minus, delta_plus
+    real(r64) :: phase_space_minus(ph%nwv_irred, ph%numbands), phase_space_plus(ph%nwv_irred, ph%numbands), &
+         phase_space_total(ph%nwv_irred, ph%numbands)
+    integer(i64), allocatable :: chunk[:], index_start[:], index_end[:]
+    type(resource) :: compute_resource
+    procedure(delta_fn), pointer :: delta_fn_ptr => null()
+
+    call print_message("Calculating 3-ph phasespace for all IBZ phonon....")
+
+    !Associate delta function procedure pointer
+    delta_fn_ptr => get_delta_fn_pointer(num%tetrahedra)
+
+    !Total number of IBZ blocks states
+    nstates_irred = ph%nwv_irred*ph%numbands
+
+    !Distribute tasks among images
+    allocate(chunk[*], index_start[*], index_end[*])
+    call distribute_points(nstates_irred, chunk, index_start, index_end, num_active_images)
+
+    if(this_image() == 1) then
+       write(*, "(A, I10)") " #states = ", nstates_irred
+       write(*, "(A, I10)") " #states/image <= ", chunk
+    end if
+
+    !Initialize phase spaces
+    phase_space_plus = 0.0_r64
+    phase_space_minus = 0.0_r64
+    phase_space_total = 0.0_r64
+
+    !Only work with the active images
+    if(this_image() <= num_active_images) then
+       !Run over first phonon IBZ states
+       do istate1 = index_start, index_end
+          !Demux state index into branch (s) and wave vector (iq) indices
+          call demux_state(istate1, ph%numbands, s1, iq1_ibz)
+
+          !Muxed index of wave vector from the IBZ index list.
+          !This will be used to access IBZ information from the FBZ quantities.
+          iq1 = ph%indexlist_irred(iq1_ibz)
+
+          !Energy of phonon 1
+          en1 = ph%ens(iq1, s1)
+
+          !Initial (IBZ blocks) wave vector (crystal coords.)
+          q1 = ph%wavevecs(iq1, :)
+
+          !Convert from crystal to 0-based index vector
+          q1_indvec = nint(q1*ph%wvmesh)
+
+          !Run over second (FBZ) phonon wave vectors
+          do iq2 = 1, ph%nwv
+             !Initial (IBZ blocks) wave vector (crystal coords.)
+             q2 = ph%wavevecs(iq2, :)
+
+             !Convert from crystal to 0-based index vector
+             q2_indvec = nint(q2*ph%wvmesh)
+
+             !Folded final phonon wave vector
+             q3_minus_indvec = modulo(q1_indvec - q2_indvec, ph%wvmesh) !0-based index vector
+
+             !Muxed index of q3_minus
+             iq3_minus = mux_vector(q3_minus_indvec, ph%wvmesh, 0_i64)
+
+             do s2 = 1, ph%numbands
+                !Energy of phonon 2
+                en2 = ph%ens(iq2, s2)
+
+                !Get index of -q2
+                neg_q2_indvec = modulo(-q2_indvec, ph%wvmesh)
+                neg_iq2 = mux_vector(neg_q2_indvec, ph%wvmesh, 0_i64)
+
+                do s3 = 1, ph%numbands
+                   !Energy of phonon 3
+                   en3 = ph%ens(iq3_minus, s3)
+
+                   !Evaluate delta functions
+                   delta_minus = delta_fn_ptr(en1 - en3, iq2, s2, ph%wvmesh, ph%simplex_map, &
+                        ph%simplex_count, ph%simplex_evals) !minus process
+
+                   delta_plus = delta_fn_ptr(en3 - en1, neg_iq2, s2, ph%wvmesh, ph%simplex_map, &
+                        ph%simplex_count, ph%simplex_evals) !plus process
+
+                   if(delta_minus > 0.0_r64) &
+                        phase_space_minus(iq1_ibz, s1) = phase_space_minus(iq1_ibz, s1) + delta_minus
+
+                   if(delta_plus > 0.0_r64) &
+                        phase_space_plus(iq1_ibz, s1) = phase_space_plus(iq1_ibz, s1) + delta_plus
+                end do !s2
+             end do !s3
+          end do !iq2
+       end do!istate1
+
+       !Multiply constant factor, unit factor, etc.
+       phase_space_minus = 0.5*phase_space_minus !eV^-1
+       phase_space_total = phase_space_minus + phase_space_plus
+    end if!num_active_image
+
+    !Reduce the phases spaces
+    call co_sum(phase_space_minus)
+    call co_sum(phase_space_plus)
+    call co_sum(phase_space_total)
+
+    !Write to disk
+    call chdir(num%cwd)
+    call write2file_rank2_real('ph.phase_space3_minus', phase_space_minus)
+    call write2file_rank2_real('ph.phase_space3_plus', phase_space_plus)
+    call write2file_rank2_real('ph.phase_space3_total', phase_space_total)
+
+    if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
+
+    sync all
+  end subroutine calculate_3ph_phasespace
 
   subroutine calculate_3ph_interaction(ph, crys, num, key)
     !! Parallel driver of the 3-ph vertex calculator for all IBZ phonon wave vectors.
