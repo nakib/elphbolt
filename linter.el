@@ -16,4 +16,4 @@
         (indent-region (point-min) (point-max))  ;; "TAB" entire buffer
         (write-file file)))))
 
-(mapcar #'lint-all-files '("./src/" "./app/" "./test/"))
+(mapcar #'lint-all-files '("./src/" "./app/" "./test/" "./V3gpu/"))
