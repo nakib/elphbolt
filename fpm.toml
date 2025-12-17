@@ -32,7 +32,7 @@ fftpack = { git = "https://github.com/fortran-lang/fftpack.git" }
 [build]
 #By default, I will use try to use the forlapack and forblas builds from ~/.local/lib/
 #These will have been put there by the configuration step.
-link = ["forlapack", "forblas"]
+link = ["gpu_v3", "cudart", "cuda", "forlapack", "forblas"] 
 #
 #Alternatively, you can use your preexisting blas and lapack, or openblas,
 #or whatever other implementation by commenting out the above and uncommenting

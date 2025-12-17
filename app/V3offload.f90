@@ -6,11 +6,14 @@ program V3offload
 
   use precision, only: i64, r64
   use misc, only: print_message, subtitle, timer, exit_with_message, mux_vector, demux_state, &
-       mux_state, twonorm, demux_vector
+       mux_state, twonorm, demux_vector, int_div
+  use delta, only: delta_fn_triang, delta_fn_tetra
   use numerics_module, only: numerics
   use crystal_module, only: crystal
   use symmetry_module, only: symmetry
   use phonon_module, only: phonon
+  use iso_c_binding, only: c_int
+  use gpu_interface, only: compute_V2_on_gpu
 
   implicit none
 
@@ -35,6 +38,28 @@ program V3offload
   complex(r64) :: ev1(3, 2), ev2(3, 2), ev3(3, 2)
 
   real(r64), allocatable :: V2(:, :, :, :, :)
+  real(r64), allocatable :: V2_minus(:, :, :, :, :), V2_plus(:, :, :, :, :)
+  integer(c_int) :: istat
+  integer(i64) :: count_minus, count_plus
+
+  !gpu side
+  real(r64), allocatable :: V2gpu(:)
+  integer(i64), allocatable :: S_list(:, :)
+  integer(i64) :: S_count
+  ! cpu side
+  real(r64), allocatable :: V2_cpu(:)
+  integer(i64), allocatable :: S_list_cpu(:,:)
+  integer(i64) :: S_count_cpu
+
+  real(r64) :: estimated_size_gb, gpu_memory_gb
+
+  ! ESR / delta-function data
+  integer(i64), allocatable :: simplex_map(:, :, :)
+  integer(i64), allocatable :: simplex_count(:)
+  real(r64), allocatable :: simplex_evals(:, :, :)
+  real(r64), allocatable :: ens(:, :)
+  logical :: use_tetra
+  integer(i64) :: nTot
 
   if(this_image() == 1) then
      write(*, '(A)')  'V3offload playground'
@@ -53,36 +78,137 @@ program V3offload
   !Calculate phonons
   call ph%initialize(crys, sym, num)
 
-  !Calculate ph-ph vertex (cpu, original)
-  Vm2_calculator => Vm2_3ph_reference
-  call t_event%start_timer('reference V- on cpu')
-  call calculate_3ph_interaction(ph, crys, num, V2, Vm2_calculator)
-  call t_event%end_timer('reference V- on cpu')
-  print*, 'value = ', twonorm(pack(V2, .true.))
+  write(*, '(A)') 'Phonon data dimensions:'
+  write(*, '(A, I0)') 'ph%numbands = ', ph%numbands
+  write(*, '(A, I0)') 'ph%nwv_irred = ', ph%nwv_irred
+  write(*, '(A, I0)') 'ph%nwv = ', ph%nwv
+  write(*, '(A, I0)') 'ph%numtriplets = ', ph%numtriplets
 
-  !Calculate ph-ph vertex (cpu, refactor)
-  Vm2_calculator => Vm2_3ph_refactor
-  call t_event%start_timer('refactored V- on cpu')
-  call calculate_3ph_interaction(ph, crys, num, V2, Vm2_calculator)
-  call t_event%end_timer('refactored V- on cpu')
-  print*, 'value = ', twonorm(pack(V2, .true.))
+  if (ph%numbands <= 0 .or. ph%nwv_irred <= 0 .or. ph%nwv <= 0) then
+     write(*, '(A)') 'Invalid phonon dimensions!'
+     stop
+  end if
+  estimated_size_gb = real(ph%numbands*ph%nwv*ph%numbands*ph%nwv* &
+       ph%nwv_irred*ph%numbands*8, r64) / 1.0e9_r64  !1Gb 10**9 bytes
 
-  !Calculate ph-ph vertex (gpu, algo 1)
-  call t_event%start_timer('V- on gpu, algo 1')
-  call calculate_3ph_interaction_gpu(ph, crys, num, V2)
-  call t_event%end_timer('V- on gpu, algo 1')
-  print*, 'value = ', twonorm(pack(V2, .true.))
+  print*, 'Estimated full V2 size: ', estimated_size_gb, ' GB'
 
-  call t_event%start_timer('V- on gpu, low transfer')
-  call calculate_3ph_interaction_lowtransfer(ph, crys, num, V2)
-  call t_event%end_timer('V- on gpu, low transfer')
-  print*, 'value = ', twonorm(pack(V2, .true.))
+  gpu_memory_gb = 20.0_r64  
 
-  !Calculate ph-ph vertex (gpu, algo 2)
-  call t_event%start_timer('V- on gpu, algo 2')
-  call calculate_3ph_interaction_gpu_algo2(ph, crys, num, V2)
-  call t_event%end_timer('V- on gpu, algo 2')
-  print*, 'value = ', twonorm(pack(V2, .true.))
+  if(allocated(ph%simplex_map)) then
+     ! Use existing ESR data from phonon module
+     simplex_map = ph%simplex_map
+     simplex_count = ph%simplex_count
+     simplex_evals = ph%simplex_evals
+     ens = ph%ens
+     use_tetra = num%tetrahedra
+  else
+     allocate(simplex_map(2, ph%nwv, 1))
+     allocate(simplex_count(ph%nwv))
+     allocate(simplex_evals(1, ph%numbands, 3))  ! triangles (3 vertices)
+     allocate(ens(ph%nwv, ph%numbands))
+
+     simplex_map = 1_i64
+     simplex_count = 0_i64
+     simplex_evals = 0.0_r64
+
+     ! Copy phonon energies if available
+     if(allocated(ph%ens)) then
+        ens = ph%ens
+     else
+        ens = 0.0_r64
+     end if
+
+     use_tetra = .true.
+
+     write(*, '(A)') 'ESR data not found in phonon module.'
+  end if
+
+  !  !Calculate ph-ph vertex (cpu, original)
+  !  Vm2_calculator => Vm2_3ph_reference
+  !  call t_event%start_timer('reference V- on cpu')
+  !  call calculate_3ph_interaction(ph, crys, num, V2, Vm2_calculator)
+  !  call t_event%end_timer('reference V- on cpu')
+  !  print*, 'value = ', twonorm(pack(V2, .true.))
+
+  ! !  !Calculate ph-ph vertex (cpu, refactor)
+  !  Vm2_calculator => Vm2_3ph_refactor
+  !  call t_event%start_timer('refactored V- on cpu')
+  !  call calculate_3ph_interaction(ph, crys, num, V2, Vm2_calculator)
+  !  call t_event%end_timer('refactored V- on cpu')
+  !  print*, 'value = ', twonorm(pack(V2, .true.))
+  !
+  !  !Calculate ph-ph vertex (gpu, algo 1)
+  !  call t_event%start_timer('V- on gpu, algo 1')
+  !  call calculate_3ph_interaction_gpu(ph, crys, num, V2)
+  !  call t_event%end_timer('V- on gpu, algo 1')
+  !  print*, 'value = ', twonorm(pack(V2, .true.))
+  !
+  !  call t_event%start_timer('V- on gpu, low transfer')
+  !  call calculate_3ph_interaction_lowtransfer(ph, crys, num, V2)
+  !  call t_event%end_timer('V- on gpu, low transfer')
+  !  print*, 'value = ', twonorm(pack(V2, .true.))
+  !
+  !  !Calculate ph-ph vertex (gpu, algo 2)
+  !  call t_event%start_timer('V- on gpu, algo 2')
+  !  call calculate_3ph_interaction_gpu_algo2(ph, crys, num, V2)
+  !  call t_event%end_timer('V- on gpu, algo 2')
+  !  print*, 'value = ', twonorm(pack(V2, .true.))
+
+  !    !Calculate ph-ph vertex (V on gpu)- 2 kernel MSR
+  !    call t_event%start_timer('V- on gpu, CUDA Fortran (cuf)')
+  !    call compute_V2_on_gpu( ph%numbands, ph%nwv_irred, ph%nwv, ph%numtriplets, &
+  !                         ph%evecs, ph%Index_i, ph%Index_j, ph%Index_k, ph%ifc3, &
+  !                         ph%indexlist_irred, ph%wavevecs, ph%wvmesh, &
+  !                         crys%reclattvecs, ph%R_j, ph%R_k, V2, istat)
+  !    call t_event%end_timer('V- on gpu, CUDA Fortran (cuf)')
+  !    print*, 'value = ', twonorm(pack(V2, .true.))
+
+  !  !Calculate ph-ph vertex (V on cpu to compare with gpu)
+  !  call t_event%start_timer('V on cpu')
+  !  call compute_V2_cpu(ph%numbands, ph%nwv_irred, ph%nwv, ph%numtriplets, &
+  !       ph%evecs, ph%Index_i, ph%Index_j, ph%Index_k, ph%ifc3, &
+  !       ph%indexlist_irred, ph%wavevecs, ph%wvmesh, &
+  !       crys%reclattvecs,  ph%R_j, ph%R_k, &
+  !       simplex_map, simplex_count, simplex_evals, &
+  !       ens, use_tetra, V2_cpu, S_list_cpu, S_count_cpu)
+  !  call t_event%end_timer('V on cpu')
+  !  print*, 'V2 norm = ', twonorm(V2_cpu)
+
+  !Calculate ph-ph vertex (V on gpu)- tripletlist on cpu and Vm2 on gpu
+  call t_event%start_timer('Triplet list on cpu and V on gpu, CUDA Fortran (cuf)')
+  call compute_V2_on_gpu( ph%numbands, ph%nwv_irred, ph%nwv, ph%numtriplets, &
+       ph%evecs, ph%Index_i, ph%Index_j, ph%Index_k, ph%ifc3, &
+       ph%indexlist_irred, ph%wavevecs, ph%wvmesh, &
+       crys%reclattvecs, ph%R_j, ph%R_k, &
+       simplex_map, simplex_count, simplex_evals, ens, use_tetra, &
+       V2gpu, S_list, S_count, istat)
+  call t_event%end_timer('Triplet list on cpu and V on gpu, CUDA Fortran (cuf)')
+
+  if(istat /= 0) then
+     write(*, '(A, I0)') 'GPU computation failed with status = ', istat
+  else
+     print*, 'Number of valid transitions (S_count) = ', S_count
+     print*, 'V2 norm = ', twonorm(V2gpu)
+  end if
+
+  ! Cleanup
+  if(allocated(V2gpu)) deallocate(V2gpu)
+  if(allocated(S_list)) deallocate(S_list)
+  deallocate( simplex_map, simplex_count, simplex_evals, ens)
+
+  !  !Calculate ph-ph vertex (V on gpu kernel)-MSR-ESR
+  !  call t_event%start_timer('V- on gpu, CUDA Fortran (cuf)')
+  !  call compute_V2_on_gpu( &
+  !       ph%numbands, ph%nwv_irred, ph%nwv, ph%numtriplets, &
+  !       ph%evecs, ph%Index_i, ph%Index_j, ph%Index_k, ph%ifc3, &
+  !       ph%indexlist_irred, ph%wavevecs, ph%wvmesh, &
+  !       crys%reclattvecs, ph%R_j, ph%R_k, &
+  !       ph%ens, V2_minus, V2_plus, istat)
+  !  call t_event%end_timer('V- on gpu, CUDA Fortran (cuf)')
+  !  print *, 'V2_minus = ', twonorm(pack(V2_minus, .true.))
+  !  print *, 'V2_plus = ', twonorm(pack(V2_plus, .true.))
+  !
 !!$
 !!$  !Calculate ph-ph vertex (gpu, algo 3)
 !!$  call t_event%start_timer('V- on gpu, algo 3')
@@ -97,6 +223,292 @@ program V3offload
 !!$  print*, 'value = ', twonorm(pack(V2, .true.))
 
 contains
+
+  subroutine compute_V2_cpu(nb, nwv_irred, nwv, ntrip, evecs, Index_i, Index_j, Index_k, ifc3, &
+       indexlist_irred, wavevecs, wvmesh, reclatt, Rj, Rk, &
+       simplex_map, simplex_count, simplex_evals, ens, use_tetra, &
+       V2_cpu, S_list_cpu, S_count_cpu)
+    !! CPU reference that builds Slist and compute V2
+
+    integer(i64), intent(in) :: nb, nwv_irred, nwv, ntrip
+    complex(r64), intent(in) :: evecs(nwv, nb, nb)
+    integer(i64), intent(in) :: Index_i(ntrip), Index_j(ntrip), Index_k(ntrip)
+    real(r64), intent(in) :: ifc3(3, 3, 3, ntrip)
+    integer(i64), intent(in) :: indexlist_irred(nwv_irred)
+    real(r64), intent(in) :: wavevecs(nwv, 3)
+    integer(i64), intent(in) :: wvmesh(3)
+    real(r64), intent(in) :: reclatt(3, 3)
+    real(r64), intent(in) :: Rj(3, ntrip), Rk(3, ntrip)
+    integer(i64), intent(in) :: simplex_map(:, :, :)
+    integer(i64), intent(in) :: simplex_count(:)
+    real(r64), intent(in) :: simplex_evals(:, :, :)
+    real(r64), intent(in) :: ens(nwv, nb)
+    logical, intent(in) :: use_tetra
+
+    ! for the outputs
+    real(r64), allocatable, intent(out) :: V2_cpu(:)
+    integer(i64), allocatable, intent(out) :: S_list_cpu(:, :)
+    integer(i64), intent(out) :: S_count_cpu
+
+    ! Local variables
+    integer(i64) :: nTot, idx, i0, q, r, current_capacity, initial_capacity
+    integer(i64) :: iq1_ibz, iq1, iq2, iq3_minus, iq3_plus, s1, s2, s3, i
+    integer(i64) :: ilambda1, ilambda2, ilambda3_minus, ilambda3_plus
+    real(r64) :: q1f(3), q2f(3), q3f(3), en1, en2, en3_minus, en3_plus
+    integer(i64) :: q1i(3), q2i(3), q3i(3), neg_q2i(3), neg_iq2
+    real(r64) :: delta_minus, delta_plus
+    logical :: has_minus, has_plus
+    integer(i64) :: stat_minus, stat_plus, stat_both, stat_neither
+    real(r64) :: q2c(3), q3c(3), Vm2_val
+    complex(r64) :: ev1(nb), ev2(nb), ev3(nb)
+    real(r64) :: time_slist_total, time_v2_total
+    real(r64) :: tstart_v2, tend_v2, tstart_all, tend_all
+    real(r64) :: tstart, tend, time_s_full, time_all
+
+    S_count_cpu = 0_i64
+    stat_minus = 0_i64
+    stat_plus = 0_i64
+    stat_both = 0_i64
+    stat_neither = 0_i64 
+    time_slist_total = 0.0_r64
+    time_v2_total = 0.0_r64
+
+    nTot = nwv_irred*nwv*nb*nb*nb
+    print *, "Total possible transitions:", nTot
+
+    ! Start with 5% of total capacity
+    initial_capacity = max(int(0.05_r64*real(nTot, r64), i64), 1000_i64)
+    allocate(S_list_cpu(3, initial_capacity))
+    allocate(V2_cpu(initial_capacity))
+
+    !S_count_cpu = 0_i64
+    current_capacity = initial_capacity
+
+    call cpu_time(tstart_all)
+    ! Compute all possible transitions
+    do idx = 1_i64, nTot
+       i0 = idx - 1_i64
+
+       ! Decompose index into (iq1_ibz, iq2, s1, s2, s3)
+       call int_div(i0, nwv_irred, q, r)
+       iq1_ibz = r + 1_i64 !because int_div return 0 so +1 for fortran index.
+
+       call int_div(q, nwv, q, r)
+       iq2 = r + 1_i64
+
+       call int_div(q, nb, q, r)
+       s1 = r + 1_i64
+
+       call int_div(q, nb, q, r)
+       s3 = r + 1_i64
+
+       call int_div(q, nb, q, r)
+       s2 = r + 1_i64
+
+       ! Map IBZ to FBZ
+       iq1 = indexlist_irred(iq1_ibz)
+
+       ! Momentum selection rule: calculate q3
+       q1f = wavevecs(iq1, :)
+       q2f = wavevecs(iq2, :)
+
+       q1i = int(nint(q1f*real(wvmesh, r64)), i64)
+       q2i = int(nint(q2f*real(wvmesh, r64)), i64)
+
+       ! q3- = fold(q1 - q2)
+       q3i = modulo(q1i - q2i, wvmesh)
+       iq3_minus = mux_vector(q3i, wvmesh, 0_i64)
+
+       ! q3+ = fold(q1 + q2)
+       q3i = modulo(q1i + q2i, wvmesh)
+       iq3_plus = mux_vector(q3i, wvmesh, 0_i64)
+
+       ! Index of -q2 for plus process
+       neg_q2i = modulo(-q2i, wvmesh)
+       neg_iq2 = mux_vector(neg_q2i, wvmesh, 0_i64)
+
+       ! Energy selection rule
+       en1 = ens(iq1, s1)
+       en2 = ens(iq2, s2)
+       en3_minus = ens(iq3_minus, s3)
+       en3_plus = ens(iq3_plus, s3)
+
+       ! Skip if all energies are zero
+       if(en1*en2*en3_minus == 0.0_r64 .and. en1*en2*en3_plus == 0.0_r64) then
+          stat_neither = stat_neither + 1_i64
+          cycle
+       end if
+
+       ! Calculate delta functions for energy conservation
+       if(use_tetra) then
+          delta_minus = delta_fn_tetra(en1 - en3_minus, iq2, s2, wvmesh, &
+               simplex_map, simplex_count, simplex_evals)
+          delta_plus = delta_fn_tetra(en3_plus - en1, neg_iq2, s2, wvmesh, &
+               simplex_map, simplex_count, simplex_evals)
+       else
+          delta_minus = delta_fn_triang(en1 - en3_minus, iq2, s2, wvmesh, &
+               simplex_map, simplex_count, simplex_evals)
+          delta_plus = delta_fn_triang(en3_plus - en1, neg_iq2, s2, wvmesh, &
+               simplex_map, simplex_count, simplex_evals)
+       end if
+
+       has_minus = (delta_minus > 0.0_r64)
+       has_plus = (delta_plus > 0.0_r64)
+
+       ! Count statistics
+       if(has_minus .and. has_plus) then
+          stat_both = stat_both + 1_i64
+          stat_minus = stat_minus + 1_i64
+          stat_plus = stat_plus + 1_i64
+       else if(has_minus) then
+          stat_minus = stat_minus + 1_i64
+       else if(has_plus) then
+          stat_plus = stat_plus + 1_i64
+       else
+          stat_neither = stat_neither + 1_i64
+       end if
+
+       ! Convert to state indices (ilambda)
+       ilambda1 = mux_state(nb, s1, iq1)
+       ilambda2 = mux_state(nb, s2, iq2)
+       ilambda3_minus = mux_state(nb, s3, iq3_minus)
+       ilambda3_plus = mux_state(nb, s3, iq3_plus)
+
+       ! Minus process
+       if(has_minus) then
+          ! call cpu_time(tstart_slist)
+          !      ilambda3_minus = mux_state(nb, s3, iq3_minus)
+
+          S_count_cpu = S_count_cpu + 1_i64
+
+          ! Expand arrays if needed
+          if(S_count_cpu > current_capacity) then
+             call expand_2d(S_list_cpu, 1.3_r64)
+             call expand_1d(V2_cpu, 1.3_r64)
+             ! update the capacity.
+             current_capacity = size(S_list_cpu, 2)
+          end if
+
+          ! Store indices in Slist
+          S_list_cpu(1, S_count_cpu) = ilambda1
+          S_list_cpu(2, S_count_cpu) = ilambda2
+          S_list_cpu(3, S_count_cpu) = ilambda3_minus
+
+          !call cpu_time(tend_slist)
+          !time_slist_total = time_slist_total + (tend_slist - tstart_slist)
+
+          !timing V2 computation
+          call cpu_time(tstart_v2)
+
+          ! Calculate V2 for this transition
+          q3f = real(modulo(q1i - q2i, wvmesh), r64) / real(wvmesh, r64)
+          q2c = matmul(reclatt, q2f)
+          q3c = matmul(reclatt, q3f)
+
+          ! Gather eigenvectors
+          do i = 1, nb
+             ev1(i) = evecs(iq1, s1, i)
+             ev2(i) = evecs(iq2, s2, i)
+             ev3(i) = evecs(iq3_minus, s3, i)
+          end do
+
+          ! Compute norm V2
+          Vm2_val = Vm2_3ph_cpu(ev1, ev2, ev3, Index_i, Index_j, Index_k, &
+               ifc3, q2c, q3c, Rj, Rk, ntrip, nb)
+
+          V2_cpu(S_count_cpu) = Vm2_val
+          call cpu_time(tend_v2)
+          time_v2_total = time_v2_total + (tend_v2 - tstart_v2)
+       end if
+
+       ! Plus process
+       if(has_plus) then
+
+          S_count_cpu = S_count_cpu + 1_i64
+
+          ! Expand arrays if needed
+          if(S_count_cpu > current_capacity) then
+             call expand_2d(S_list_cpu, 1.3_r64)
+             call expand_1d(V2_cpu, 1.3_r64)
+             current_capacity = size(S_list_cpu, 2)
+          end if
+
+          ! Store indices
+          S_list_cpu(1, S_count_cpu) = ilambda1
+          S_list_cpu(2, S_count_cpu) = ilambda2
+          S_list_cpu(3, S_count_cpu) = ilambda3_plus
+
+          !timing V2 computation
+          call cpu_time(tstart_v2)
+
+          ! Calculate V2 for this transition
+          q3f = real(modulo(q1i + q2i, wvmesh), r64) / real(wvmesh, r64)
+          q2c = matmul(reclatt, q2f)
+          q3c = matmul(reclatt, q3f)
+
+          ! eigenvectors (nwv, nb, nb)
+          do i = 1, nb
+             ev1(i) = evecs(iq1, s1, i)
+             ev2(i) = evecs(iq2, s2, i)
+             ev3(i) = evecs(iq3_plus, s3, i)
+          end do
+
+          ! Compute norm V2
+          Vm2_val = Vm2_3ph_cpu(ev1, ev2, ev3, Index_i, Index_j, Index_k, &
+               ifc3, q2c, q3c, Rj, Rk, ntrip, nb)
+
+          V2_cpu(S_count_cpu) = Vm2_val
+          call cpu_time(tend_v2)
+          time_v2_total = time_v2_total + (tend_v2 - tstart_v2)
+       end if
+    end do
+    call cpu_time(tend_all)
+    time_all = tend_all - tstart_all
+    time_s_full = time_all - time_v2_total
+
+    print *, ""
+    print *, "=== Timing Results ==="
+    print *, "Time for S_list construction (s):", time_s_full
+    print *, "Time for V2 computation (s):", time_v2_total
+    print *, "Total time (S_list + V2) (s):", time_all
+    print *, "Percentage in S_list:", 100.0_r64*time_s_full / (time_s_full + time_v2_total), "%"
+    print *, "Percentage in V2:", 100.0_r64*time_v2_total / (time_s_full + time_v2_total), "%"
+    print *, "======================"
+
+    print *, ""
+    print *, "=== S_list cpu debugg ==="
+    print *, "S_list_cpu(1:3, 1):", S_list_cpu(:, 1)
+    if(S_count_cpu >= 100) then
+       print *, "S_list_cpu(1:3, 100):", S_list_cpu(:, 100)
+    end if
+    print *, "S_list_cpu(1:3, S_count_cpu):", S_list_cpu(:, S_count_cpu)
+    print *, "Min ilambda1:", minval(S_list_cpu(1, 1:S_count_cpu))
+    print *, "Max ilambda1:", maxval(S_list_cpu(1, 1:S_count_cpu))
+    print *, "Min ilambda2:", minval(S_list_cpu(2, 1:S_count_cpu))
+    print *, "Max ilambda2:", maxval(S_list_cpu(2, 1:S_count_cpu))
+    print *, "Min ilambda3:", minval(S_list_cpu(3, 1:S_count_cpu))
+    print *, "Max ilambda3:", maxval(S_list_cpu(3, 1:S_count_cpu))
+    print *, "Expected max ilambda:", nwv*nb
+    print *, "=============================="
+
+    print *, ""
+    print *, "Statistics"
+    print *, "Total transitions checked:", nTot
+    print *, "Neither satisfied:", stat_neither
+    print *, "Only minus satisfied:", stat_minus - stat_both
+    print *, "Only plus satisfied:", stat_plus - stat_both
+    print *, "Both satisfied:", stat_both
+    print *, "Total minus processes:", stat_minus
+    print *, "Total plus processes:", stat_plus
+    print *, "Expected S_count:", stat_minus + stat_plus
+    print *, "Actual S_count:", S_count_cpu
+    print *, "Discrepancy:", S_count_cpu - (stat_minus + stat_plus)
+    print *, ""
+
+    ! Shrink to actual size
+    call shrink_2d(S_list_cpu, S_count_cpu)
+    call shrink_1d(V2_cpu, S_count_cpu)
+  end subroutine compute_V2_cpu
 
   subroutine calculate_3ph_interaction(ph, crys, num, V2, Vm2_calculator)
     type(phonon), intent(in) :: ph
@@ -1154,4 +1566,128 @@ contains
 !!$       C(:, j) = A(:)*B(j)
 !!$    end do
 !!$  end subroutine outer_complex
+
+  subroutine shrink_2d(arr, actual_count)
+    !! Shrink 2D integer array to actual used size
+    !!
+    !! Keeps first dimension, shrinks second dimension to actual_count
+
+    integer(i64), allocatable, intent(inout) :: arr(:, :) !2D: (6 indices per transition, S_count transitions)
+    integer(i64), intent(in) :: actual_count
+    integer(i64) :: dim1
+    integer(i64), allocatable :: tmparr(:,:)
+
+    dim1 = size(arr, 1)
+
+    ! Allocate smaller array
+    ! what does in my case? allocate(tmp(3, S_count))
+    !tmp(:, 1:S_count) = S_list(:, 1:S_count)
+    !call move_alloc(tmp, S_list), that means during the copy, I temporarily have: old S_list and new tmp.
+    allocate(tmparr(dim1, actual_count))
+
+    ! Copy only the used portion
+    tmparr = arr(:, 1:actual_count)
+    call move_alloc(tmparr, arr)
+
+    print *, "Shrunk S_list to actual size:", actual_count
+  end subroutine shrink_2d
+
+  subroutine expand_2d(arr, factor)
+    !! Expand 2D integer array along second dimension by given factor
+    !!
+    !! First dimension size is preserved
+
+    integer(i64), allocatable, intent(inout) :: arr(:, :) !2D: (6 indices per transition, S_count transitions)
+    real(r64), intent(in) :: factor
+    integer(i64) :: dim1, dim2, new_dim2
+    integer(i64), allocatable :: tmparr(:, :)
+    real(r64) :: expansion_factor
+
+    ! Calculate new size
+    dim1 = size(arr, 1)
+    dim2 = size(arr, 2)
+    new_dim2 = int(real(dim2, r64)*factor, i64)
+
+    ! Allocate new larger array
+    allocate(tmparr(dim1, new_dim2))
+    tmparr = 0_i64
+    tmparr(:, 1:dim2) = arr
+
+    ! Move allocation
+    call move_alloc(tmparr, arr)
+
+    print *, "Expanded S_list from", dim2, "to", new_dim2
+  end subroutine expand_2d
+
+  subroutine expand_1d(arr, factor)
+    !! Expand 1D real array by given factor
+
+    real(r64), allocatable, intent(inout) :: arr(:)
+    real(r64), intent(in) :: factor
+    integer(i64) :: dim1, new_dim1
+    real(r64), allocatable :: tmparr(:)
+
+    dim1 = size(arr)
+    new_dim1 = int(real(dim1, r64)*factor, i64)
+
+    allocate(tmparr(new_dim1))
+    tmparr = 0.0_r64
+    tmparr(1:dim1) = arr
+
+    call move_alloc(tmparr, arr)
+
+    print *, "Expanded V2_cpu from", dim1, "to", new_dim1
+  end subroutine expand_1d
+
+  subroutine shrink_1d(arr, actual_count)
+    !! Shrink 1D real array to actual used size
+
+    real(r64), allocatable, intent(inout) :: arr(:)
+    integer(i64), intent(in) :: actual_count
+    real(r64), allocatable :: tmparr(:)
+
+    allocate(tmparr(actual_count))
+    tmparr = arr(1:actual_count)
+    call move_alloc(tmparr, arr)
+
+    print *, "Shrunk V2_cpu to actual size:", actual_count
+  end subroutine shrink_1d
+
+  pure real(r64) function Vm2_3ph_cpu(ev1_s1, ev2_s2, ev3_s3, &
+       Index_i, Index_j, Index_k, ifc3, q2c, q3c, Rj, Rk, ntrip, nb)
+    !! Function to calculate the squared 3-ph interaction vertex |V-|^2.
+
+    integer(i64), intent(in) :: ntrip, nb
+    integer(i64), intent(in) :: Index_i(ntrip), Index_j(ntrip), Index_k(ntrip)
+    complex(r64), intent(in) :: ev1_s1(nb), ev2_s2(nb), ev3_s3(nb)
+    real(r64), intent(in) :: ifc3(3, 3, 3, ntrip), q2c(3), q3c(3)
+    real(r64), intent(in) :: Rj(3, ntrip), Rk(3, ntrip)
+
+    integer(i64) :: it, a, b, c, aind, bind, cind
+    complex(r64) :: aux1, aux2, aux3, V0, phase
+    real(r64) :: arg
+
+    aux1 = (0.0_r64, 0.0_r64)
+    do it = 1, ntrip
+       aind = 3*(Index_k(it) - 1)
+       bind = 3*(Index_j(it) - 1)
+       cind = 3*(Index_i(it) - 1)
+       V0 = (0.0_r64, 0.0_r64)
+       do a = 1, 3
+          aux2 = conjg(ev3_s3(a + aind))
+          do b = 1, 3
+             aux3 = aux2*conjg(ev2_s2(b + bind))
+             do c = 1, 3
+                if(ifc3(c, b, a, it) /= 0.0_r64) then
+                   V0 = V0 + ifc3(c, b, a, it)*ev1_s1(c + cind)*aux3
+                end if
+             end do
+          end do
+       end do
+       arg = dot_product(q2c, Rj(:, it)) + dot_product(q3c, Rk(:, it))
+       phase = exp((0.0_r64, -1.0_r64)*arg)
+       aux1 = aux1 + V0*phase
+    end do
+    Vm2_3ph_cpu = abs(aux1)**2
+  end function Vm2_3ph_cpu
 end program V3offload
