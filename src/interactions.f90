@@ -180,14 +180,24 @@ contains
 
     !Here ignore local field effects. That is, epsilon^{-1}(G /= G') = 0. 
     Gsum = 0.0_r64
-    do concurrent(ik1 = -1:1, ik2 = -1:1, ik3 = -1:1)
-       Gplusq = (ik1*crys%reclattvecs(:, 1) &
-            + ik2*crys%reclattvecs(:, 2) &
-            + ik3*crys%reclattvecs(:, 3)) + qcart
+    if(crys%twod) then
+       do concurrent(ik1 = -1:1, ik2 = -1:1)
+          Gplusq = (ik1*crys%reclattvecs(:, 1) &
+               + ik2*crys%reclattvecs(:, 2)) + qcart
 
-       Gsum = Gsum + &
-            1.0_r64/(twonorm(Gplusq)**(crys%dim-1) + screened_qTF)**2 !eV^2
-    end do
+          Gsum = Gsum + &
+               1.0_r64/(twonorm(Gplusq) + screened_qTF)**2 !eV^2
+       end do
+    else
+       do concurrent(ik1 = -1:1, ik2 = -1:1, ik3 = -1:1)
+          Gplusq = (ik1*crys%reclattvecs(:, 1) &
+               + ik2*crys%reclattvecs(:, 2) &
+               + ik3*crys%reclattvecs(:, 3)) + qcart
+
+          Gsum = Gsum + &
+               1.0_r64/(twonorm(Gplusq)**2 + screened_qTF)**2 !eV^2
+       end do
+    end if
 
     gCoul2_TF = Gsum*prefac*overlap
   end function gCoul2_TF

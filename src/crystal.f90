@@ -291,6 +291,7 @@ contains
     self%volume = abs(dot_product(self%lattvecs(:, 1),self%reclattvecs(:, 1)))
     self%volume_bz = twopi/self%volume
     self%reclattvecs(:,:) = self%volume_bz*self%reclattvecs(:,:)
+    if(twod) self%reclattvecs(3,3) = 0.0_r64
 
     !Calculate the number of atoms of each type
     num_atomtypes(:) = 0_i64
