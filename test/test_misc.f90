@@ -487,8 +487,9 @@ program test_misc
   kmesh = [3, 1, 1]
   deallocate(array_of_reals)
   allocate(f(kmesh(1), nb, 3), gradf(kmesh(1), nb, 3, 3), correct_gradf(kmesh(1), nb, 3, 3),  array_of_reals(3))
-
   f = 0.0_r64
+  correct_gradf = 0.0_r64 
+
   do i = 1, kmesh(1)
      f(i, 1, 1) = (i**2)*twopi*2
      f(i, 1, 2) = (i**3)*twopi*2
@@ -509,7 +510,8 @@ program test_misc
   deallocate(f, gradf, array_of_reals, correct_gradf)
   allocate(f(product(kmesh), nb, 3), gradf(product(kmesh), nb, 3, 3), correct_gradf(product(kmesh), nb, 3, 3), &
        array_of_reals(3))
-  correct_gradf = 0.0_r64
+  f = 0.0_r64
+  correct_gradf = 0.0_r64 
 
   do i = 1, kmesh(1)
      do j = 1, kmesh(2)
@@ -526,8 +528,6 @@ program test_misc
   itest = itest + 1
   test_array(itest) = testify("Jacobian test 2d mesh 3 x 3 x 1")
   call Jacobian(f, gradf, lattvecs, kmesh, indexlist, blocks = .false.)
-  print *, 'correct', reshape(correct_gradf, [size(correct_gradf)])
-  print *, 'answer', reshape(gradf, [size(gradf)])
   call test_array(itest)%assert(reshape(correct_gradf, [size(correct_gradf)]), reshape(gradf, [size(gradf)]), tol = 1e-3_r64)
   
   ! Third test: 2D mesh, 3 points on both axes with additional component Fz depending on ky 
@@ -549,6 +549,7 @@ program test_misc
   kmesh = [3, 3, 4]*1_i64
   deallocate(f, gradf, array_of_reals, correct_gradf)
   allocate(f(product(kmesh), nb, 3), gradf(product(kmesh), nb, 3, 3), correct_gradf(product(kmesh), nb, 3, 3), array_of_reals(3))
+  f = 0.0_r64
   correct_gradf = 0.0_r64 
 
   do i = 1, kmesh(1)
@@ -590,6 +591,8 @@ program test_misc
   kmesh = [1000, 1, 1]*1_i64 
   deallocate(indexlist, f, gradf, array_of_reals, correct_gradf)
   allocate(indexlist(600), f(600, nb, 3), gradf(600, nb, 3, 3), array_of_reals(3), correct_gradf(600, nb, 3, 3))
+  f = 0.0_r64
+  correct_gradf = 0.0_r64 
 
   array_of_reals = [0.5, 0.5, 1.0]*1.0_r64
   b_matrix = twopi*lattvecs
@@ -618,6 +621,9 @@ program test_misc
   kmesh = [100, 100, 300]*1_i64
   deallocate(f, gradf, correct_gradf)
   allocate(f(product(kmesh), nb, 3), gradf(product(kmesh), nb, 3, 3), correct_gradf(product(kmesh), nb, 3, 3))
+  f = 0.0_r64
+  correct_gradf = 0.0_r64 
+
   array_of_reals = [0.5, 0.5, 1.0]*1.0_r64
   lattvecs = reshape([0, 1, 1, 1, 0, 1, 1, 1, 0], [3, 3])/2.0_r64
   b_matrix = twopi*reshape([-1, 1, 1, 1, -1, 1, 1, 1, -1], [3, 3])
@@ -645,6 +651,9 @@ program test_misc
   ! Sixth test: 3D dense mesh, monoclinic crystal 
   deallocate(f, gradf, correct_gradf)
   allocate(f(product(kmesh), nb, 3), gradf(product(kmesh), nb, 3, 3), correct_gradf(product(kmesh), nb, 3, 3))
+  f = 0.0_r64
+  correct_gradf = 0.0_r64 
+
   lattvecs = reshape([0.2, 0.0, 0.0, 0.0, 0.5, 0.6, 0.0, 0.4, 0.3], [3, 3])
   array_of_reals = lattvecs(:, 2) + lattvecs(:, 1) 
   do i = 1, 3
