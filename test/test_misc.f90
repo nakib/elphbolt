@@ -526,8 +526,10 @@ program test_misc
   itest = itest + 1
   test_array(itest) = testify("Jacobian test 2d mesh 3 x 3 x 1")
   call Jacobian(f, gradf, lattvecs, kmesh, indexlist, blocks = .false.)
+  print *, 'correct', reshape(correct_gradf, [size(correct_gradf)])
+  print *, 'answer', reshape(gradf, [size(gradf)])
   call test_array(itest)%assert(reshape(correct_gradf, [size(correct_gradf)]), reshape(gradf, [size(gradf)]), tol = 1e-3_r64)
-
+  
   ! Third test: 2D mesh, 3 points on both axes with additional component Fz depending on ky 
   do i = 1, kmesh(1)
      do j = 1, kmesh(2)
@@ -541,7 +543,7 @@ program test_misc
   itest = itest + 1
   test_array(itest) = testify("Jacobian test 2d mesh 3 x 3 x 1, with additional component")
   call Jacobian(f, gradf, lattvecs, kmesh, indexlist, blocks = .false.)
-  call test_array(itest)%assert(reshape(correct_gradf, [size(correct_gradf)]), reshape(gradf, [size(gradf)]), tol = 1e-4_r64)
+  call test_array(itest)%assert(reshape(correct_gradf, [size(correct_gradf)]), reshape(gradf, [size(gradf)]), tol = 1e-4_r64) 
 
   ! Fourth test: 3D mesh 
   kmesh = [3, 3, 4]*1_i64
