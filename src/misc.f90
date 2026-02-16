@@ -1273,13 +1273,14 @@ contains
     diff = 2.0_r64/kmesh
 
     !Deduce problem dimensions
-    if(kmesh(3) /= 1) then
-       dim = 3 
-    else if(kmesh(2) /= 1) then
-       dim = 2 
-    else if(kmesh(1) /= 1) then
-       dim = 1
-    end if
+    !  if(kmesh(3) /= 1) then
+    !     dim = 3 
+    !  else if(kmesh(2) /= 1) then
+    !     dim = 2 
+    !  else if(kmesh(1) /= 1) then
+    !     dim = 1
+    !  end if
+    dim = 3
 
     !Below, we calculate Jacobian using a nearest neighbor stencil
 
@@ -2007,4 +2008,14 @@ contains
        end if
     end do
   end function interpolator_1d
+
+  pure function det_3x3(A) result(det)
+    !! Determinant of a 3x3 matrix A.
+
+    real(r64), intent(in) :: A(3,3)
+    real(r64) :: det
+
+    det = A(1,1)*(A(2,2)*A(3,3) - A(2,3)*A(3,2)) - A(1,2)*(A(2,1)*A(3,3) - A(2,3)*A(3,1)) + A(1,3)*(A(2,1)*A(3,2) - A(2,2)*A(3,1))
+  end function det_3x3
+
 end module misc
