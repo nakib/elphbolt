@@ -84,11 +84,11 @@ contains
     logical, allocatable :: valid(:)
     real(r64), allocatable :: crtmp(:,:,:), qrtmp(:,:,:)
     real(r64), allocatable :: translations(:,:), ctranslations(:,:)
-    real(r64) :: tmp1(3, 3), tmp2(3, 3), tmp3(3, 3)
+    real(r64) :: tmp1(3, 3), tmp2(3, 3), tmp3(3, 3), tmp4(3)
     type(spglibdataset) :: symdataset
     integer(kind = C_INT) :: numatoms_cint
     integer(kind = C_INT) :: atomtypes_cint(crys%numatoms)
-
+    logical :: reduce_symmetry  
     !External procedures
     external :: dgesv
 
@@ -217,42 +217,35 @@ contains
 
     ! Find symmetries that are compatible with an applied magnetic field.
     ! These are the rotations R for which det(R) * R * B = B.
+    reduce_symmetry = .false. 
     if(present(Bfield)) then
-       if(any(Bfield(:) /= 0.0_r64)) then ! Check if B-field is non-zero
+       if(any(Bfield(:) /= 0.0_r64)) reduce_symmetry = .true. 
+    end if
+    if(reduce_symmetry) then
+       ! Allocate space for the B-field compatible symmetries.
+       allocate(crtmp(3, 3, self%nsymm))
+       kk = 0 ! Counter for valid symmetries
 
-          ! Allocate space for the B-field compatible symmetries.
-          allocate(crtmp(3, 3, self%nsymm))
-          kk = 0 ! Counter for valid symmetries
+       ! Loop over all finalized symmetry operations 
+       do ii = 1, self%nsymm
+          ! Apply the symmetry operation to the B-field vector
+          tmp4 = det_3x3(self%crotations_orig(:, :, ii))*matmul(self%crotations_orig(:, :, ii), Bfield) ! det(R) * R * B
+          ! Check if the transformed field is parallel to the original.
+          if (norm2(tmp4 - Bfield) < 1.0e-5_r64) then
+             kk = kk + 1
+             crtmp(:, :, kk) = self%crotations_orig(:, :, ii)
+          end if
+       end do
 
-          ! Loop over all finalized symmetry operations 
-          do ii = 1, self%nsymm
-             ! Apply the symmetry operation to the B-field vector
-             tmp1(:, 1) = Bfield ! Represent B-field as a column vector
-             tmp2 = det_3x3(self%crotations_orig(:, :, ii))*matmul(self%crotations_orig(:, :, ii), tmp1) ! det(R) * R * B
+       ! Allocate the final storage and copy the valid operations.
+       allocate(self%crotations_Bfield(3, 3, kk))
+       self%crotations_Bfield(:, :, 1:kk) = crtmp(:, :, 1:kk)
+       self%nsymm_Bfield = kk ! Store the number of B-field compatible symms
 
-             ! Check if the transformed field is parallel to the original.
-             if (norm2(tmp2(:,1) - Bfield) < 1.0e-5_r64) then
-                kk = kk + 1
-                crtmp(:, :, kk) = self%crotations_orig(:, :, ii)
-             end if
-          end do
-
-          ! Allocate the final storage and copy the valid operations.
-          allocate(self%crotations_Bfield(3, 3, kk))
-          self%crotations_Bfield(:, :, 1:kk) = crtmp(:, :, 1:kk)
-          self%nsymm_Bfield = kk ! Store the number of B-field compatible symms
-
-          ! Clean up temporary storage
-          deallocate(crtmp)
-
-       else
-          ! B-field is zero. All symmetries are compatible.
-          self%nsymm_Bfield = self%nsymm
-          allocate(self%crotations_Bfield(3, 3, self%nsymm))
-          self%crotations_Bfield(:, :, :) = self%crotations_orig(:, :, :)
-       end if
+       ! Clean up temporary storage
+       deallocate(crtmp)
     else
-       ! B-field is not provided. All symmetries are compatible.
+       ! B-field is not provided or zero. All symmetries are compatible.
        self%nsymm_Bfield = self%nsymm 
        allocate(self%crotations_Bfield(3, 3, self%nsymm))
        self%crotations_Bfield(:, :, :) = self%crotations_orig(:, :, :)

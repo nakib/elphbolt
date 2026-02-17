@@ -41,4 +41,5 @@ jobs:
         fpm build; fpm install && \
         fpm test test_autodiff test_misc test_periodictable && \
         fpm test test_vector test_task_manager && \
+        fpm test test_symmetry && \
         fpm test bte_regression --runner="sh test/3C-SiC/fpm_run_bte_caf.sh"
