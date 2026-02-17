@@ -372,9 +372,9 @@ contains
             trans%el_alphabyT, trans%el_sigma, Bfield = num%Bfield)
        trans%el_alphabyT = trans%el_alphabyT/crys%T
 
-       !delT field:
-       call iterate_bte_el(num, el, crys, &
-            self%el_rta_rates_ibz, self%el_field_term_T, self%el_response_T)
+       !   !delT field:
+     !   call iterate_bte_el(num, el, crys, &
+     !        self%el_rta_rates_ibz, self%el_field_term_T, self%el_response_T)
        !Enforce Kelvin-Onsager relation
        do icart = 1, 3
           self%el_response_T(:,:,icart) = (el%ens(:,:) - el%chempot)/qe/crys%T*&
@@ -570,7 +570,7 @@ contains
   end subroutine dragless_phbte_RTA
 
   subroutine dragless_phbte_full(Tdir, self, num, crys, sym, ph, el)
-    !! Dragless phonon BTE calculator in the relaxation time approximation.
+    !! Dragless full phonon BTE calculator.
     !! It is impure as it mutates the phonon sector of the bte data type and
     !! writes to disk. It should be kept private to this data type unless made safer.
 

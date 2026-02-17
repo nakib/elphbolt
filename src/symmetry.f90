@@ -20,9 +20,9 @@ module symmetry_module
 
   use precision, only: r64, i64
   use misc, only: mux_vector, demux_mesh, demux_vector, &
-       exit_with_message, subtitle, distribute_points, shrink
+       exit_with_message, subtitle, distribute_points, shrink, det_3x3
   use crystal_module, only : crystal
-
+  use numerics_module, only: numerics
   use iso_c_binding
   use spglib_f08, only: SpglibDataset, spg_get_dataset
 
@@ -39,6 +39,8 @@ module symmetry_module
      !! Number of spacegroup symmetries.
      integer(i64) :: nsymm_rot
      !! Number of rotations.
+     integer(i64) :: nsymm_Bfield  
+     !! Number of B-field compatible symmetries.
      integer(i64), allocatable :: rotations_orig(:,:,:)
      !! Rotations without time-reversal, real space, crystal coordinates.
      real(r64), allocatable :: crotations_orig(:,:,:)
@@ -54,6 +56,8 @@ module symmetry_module
      !! Rotations with time-reversal, reciprocal space, crystal coordinates.
      character(len=10) :: international
      !! Spacegroup in Hermann–Mauguin (or international) notation.
+     real(r64), allocatable :: crotations_Bfield(:,:,:)
+     !! Rotations in the presence of magentic field real space, Cartesian coordinates.
 
    contains
 
@@ -63,7 +67,7 @@ module symmetry_module
 
 contains
 
-  subroutine calculate_symmetries(self, crys, mesh)
+  subroutine calculate_symmetries(self, crys, mesh, Bfield)
     !! Subroutine to generate the symmetry related data for a given crystal.
     !!
     !! This subroutine closely follows parts of config.f90 of the ShengBTE code.
@@ -71,6 +75,7 @@ contains
     class(symmetry), intent(out) :: self
     type(crystal), intent(in) :: crys
     integer(i64), intent(in) :: mesh(3)
+    real(r64), intent(in), optional :: Bfield(3)
 
     !Internal variables:
     integer(i64) :: i, ii, jj, kk, ll, info, nq, nlen
@@ -79,11 +84,11 @@ contains
     logical, allocatable :: valid(:)
     real(r64), allocatable :: crtmp(:,:,:), qrtmp(:,:,:)
     real(r64), allocatable :: translations(:,:), ctranslations(:,:)
-    real(r64) :: tmp1(3, 3), tmp2(3, 3), tmp3(3, 3)
+    real(r64) :: tmp1(3, 3), tmp2(3, 3), tmp3(3, 3), tmp4(3)
     type(spglibdataset) :: symdataset
     integer(kind = C_INT) :: numatoms_cint
     integer(kind = C_INT) :: atomtypes_cint(crys%numatoms)
-
+    logical :: reduce_symmetry  
     !External procedures
     external :: dgesv
 
@@ -209,6 +214,43 @@ contains
        call move_alloc(crtmp,self%crotations)
        call move_alloc(qrtmp,self%qrotations)
     end if
+
+    ! Find symmetries that are compatible with an applied magnetic field.
+    ! These are the rotations R for which det(R) * R * B = B.
+    reduce_symmetry = .false. 
+    if(present(Bfield)) then
+       if(any(Bfield(:) /= 0.0_r64)) reduce_symmetry = .true. 
+    end if
+    if(reduce_symmetry) then
+       ! Allocate space for the B-field compatible symmetries.
+       allocate(crtmp(3, 3, self%nsymm))
+       kk = 0 ! Counter for valid symmetries
+
+       ! Loop over all finalized symmetry operations 
+       do ii = 1, self%nsymm
+          ! Apply the symmetry operation to the B-field vector
+          tmp4 = det_3x3(self%crotations_orig(:, :, ii))*matmul(self%crotations_orig(:, :, ii), Bfield) ! det(R) * R * B
+          ! Check if the transformed field is parallel to the original.
+          if (norm2(tmp4 - Bfield) < 1.0e-5_r64) then
+             kk = kk + 1
+             crtmp(:, :, kk) = self%crotations_orig(:, :, ii)
+          end if
+       end do
+
+       ! Allocate the final storage and copy the valid operations.
+       allocate(self%crotations_Bfield(3, 3, kk))
+       self%crotations_Bfield(:, :, 1:kk) = crtmp(:, :, 1:kk)
+       self%nsymm_Bfield = kk ! Store the number of B-field compatible symms
+
+       ! Clean up temporary storage
+       deallocate(crtmp)
+    else
+       ! B-field is not provided or zero. All symmetries are compatible.
+       self%nsymm_Bfield = self%nsymm 
+       allocate(self%crotations_Bfield(3, 3, self%nsymm))
+       self%crotations_Bfield(:, :, :) = self%crotations_orig(:, :, :)
+    end if
+
   end subroutine calculate_symmetries
 
   subroutine find_star(q_in,q_out,mesh,qrotations)
