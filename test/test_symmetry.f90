@@ -73,7 +73,7 @@ program test_symmetry
 
   itest = itest + 1
   test_array(itest) = testify("Zincblende SiC, total symmetry group with B-field along z-axis")
-  call test_array(itest)%assert(matmul(S3x3,Bfield), Bfield, tol = 1e-5_r64)  
+  call test_array(itest)%assert(matmul(S3x3, Bfield), Bfield, tol = 1e-5_r64)  
 
   ! 5th test: symmetrization of a 3x3 tensor for S_4 group
   sigma = tensor

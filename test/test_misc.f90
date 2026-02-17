@@ -519,7 +519,6 @@ program test_misc
   call Jacobian(f, gradf, lattvecs, kmesh, indexlist, blocks = .false.)
   call test_array(itest)%assert(reshape(correct_gradf, [size(correct_gradf)]), reshape(gradf, [size(gradf)]), tol = 1e-3_r64)
 
-
   ! 3rd test: 2D mesh in XY plane
   kmesh = [3, 3, 1]*1_i64
   deallocate(f, gradf, correct_gradf)
