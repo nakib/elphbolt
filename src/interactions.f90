@@ -899,7 +899,7 @@ contains
                            ph%simplex_count, ph%simplex_evals) !minus process
 
                       delta_plus = delta_fn_ptr(en3 - en1, neg_iq2, s2, ph%wvmesh, ph%simplex_map, &
-                           ph%simplex_count, ph%simplex_evals) !plus process      
+                           ph%simplex_count, ph%simplex_evals) !plus process
 
                       if(en1*en2*en3 == 0.0_r64) cycle
 

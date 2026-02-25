@@ -373,8 +373,8 @@ contains
        trans%el_alphabyT = trans%el_alphabyT/crys%T
 
        !   !delT field:
-     !   call iterate_bte_el(num, el, crys, &
-     !        self%el_rta_rates_ibz, self%el_field_term_T, self%el_response_T)
+       !   call iterate_bte_el(num, el, crys, &
+       !        self%el_rta_rates_ibz, self%el_field_term_T, self%el_response_T)
        !Enforce Kelvin-Onsager relation
        do icart = 1, 3
           self%el_response_T(:,:,icart) = (el%ens(:,:) - el%chempot)/qe/crys%T*&
