@@ -98,13 +98,13 @@ contains
 
     !Set flag for printing
     if (present(print_flag)) then 
-      print_actual = print_flag
+       print_actual = print_flag
     else 
-      print_actual = .true.
-    end if 
-    
+       print_actual = .true.
+    end if
+
     if (print_actual) then
-      call subtitle("Analyzing symmetry...")
+       call subtitle("Analyzing symmetry...")
     end if
     !Number of points in wave vector mesh
     nq = product(mesh)

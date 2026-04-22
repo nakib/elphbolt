@@ -2027,38 +2027,38 @@ contains
     real(8), intent(in) :: A(3,3)
     real(8) :: Ainv(3,3)
     real(8) :: det
-    
+
     ! Calculate determinant
     det =  det_3x3(A)
-    
+
     if (abs(det) < 1e-12) then
-        print *, "Matrix is singular"
-        Ainv = 0.0d0
-        return
+       print *, "Matrix is singular"
+       Ainv = 0.0d0
+       return
     end if
-    
+
     ! Calculate inverse using adjugate matrix / determinant
     Ainv(1,1) = (A(2,2)*A(3,3) - A(2,3)*A(3,2)) / det
     Ainv(1,2) = (A(1,3)*A(3,2) - A(1,2)*A(3,3)) / det
     Ainv(1,3) = (A(1,2)*A(2,3) - A(1,3)*A(2,2)) / det
-    
+
     Ainv(2,1) = (A(2,3)*A(3,1) - A(2,1)*A(3,3)) / det
     Ainv(2,2) = (A(1,1)*A(3,3) - A(1,3)*A(3,1)) / det
     Ainv(2,3) = (A(1,3)*A(2,1) - A(1,1)*A(2,3)) / det
-    
+
     Ainv(3,1) = (A(2,1)*A(3,2) - A(2,2)*A(3,1)) / det
     Ainv(3,2) = (A(1,2)*A(3,1) - A(1,1)*A(3,2)) / det
     Ainv(3,3) = (A(1,1)*A(2,2) - A(1,2)*A(2,1)) / det
-    
-end function inverse_3x3
 
-function solve_transposed_dgesv(A, B) result(X)
-     !! Solves the linear system  X*A^T = B for X using the LAPACK routine dgesv.
-     !! A is a nxn matrix, B is a nxn matrix, and X is the solution matrix.
+  end function inverse_3x3
+
+  function solve_transposed_dgesv(A, B) result(X)
+    !! Solves the linear system  X*A^T = B for X using the LAPACK routine dgesv.
+    !! A is a nxn matrix, B is a nxn matrix, and X is the solution matrix.
     real(r64), intent(in) :: A(:, :), B(:, :)
     real(r64) :: X(size(B, 1), size(B, 2))
 
-     ! Local variables
+    ! Local variables
 
     integer(i4) :: n, info    
     integer(i4), allocatable :: ipiv(:)
@@ -2066,100 +2066,100 @@ function solve_transposed_dgesv(A, B) result(X)
 
     n = int(size(A, 1),kind = i4)
     allocate(ipiv(n), A_copy(n, n))
-    
+
     A_copy = A
     X = transpose(B)
-    
+
     call dgesv(n, n, A_copy, n, ipiv, X, n, info)
 
     if (info == 0_i4) then
-        X = transpose(X)
+       X = transpose(X)
     else
-        print *, "Error solving linear system. info = ", info, " Returning matrix of ones."
-        X = 1.0_r64
+       print *, "Error solving linear system. info = ", info, " Returning matrix of ones."
+       X = 1.0_r64
     end if
-    
+
     deallocate(ipiv, A_copy)
 
-   end function solve_transposed_dgesv
+  end function solve_transposed_dgesv
 
-   function solve_matrix_equation_iteratively(A, D) result(X)
-     !! Subroutine to find iteratively the solution of the  matrix equation 1) X * A^T = A * X^T or 2) X * A^T = D + A * X^T
-     !! A Input 3x3 matrix
-     !! X Output 3x3 matrix
-     real(r64), intent(in):: A(3,3) 
-     real(r64), intent(in), optional:: D(3,3)
-     real(r64) :: X(3,3)
-     real(r64) :: X_next(3,3)
-     integer :: i, max_iter = 1000
-     real(r64) :: threshold = 1.0e-6_r64
+  function solve_matrix_equation_iteratively(A, D) result(X)
+    !! Subroutine to find iteratively the solution of the  matrix equation 1) X * A^T = A * X^T or 2) X * A^T = D + A * X^T
+    !! A Input 3x3 matrix
+    !! X Output 3x3 matrix
+    real(r64), intent(in):: A(3,3) 
+    real(r64), intent(in), optional:: D(3,3)
+    real(r64) :: X(3,3)
+    real(r64) :: X_next(3,3)
+    integer :: i, max_iter = 1000
+    real(r64) :: threshold = 1.0e-6_r64
 
-     ! Initialize X_next with the values from A
-     X = eye(3_i64)*1.0_r64
+    ! Initialize X_next with the values from A
+    X = eye(3_i64)*1.0_r64
 
-     do i = 1,max_iter
-          if (present(D)) then
-              X_next = solve_transposed_dgesv(A, matmul(A, transpose(X)) + D)
-          else
-              X_next = solve_transposed_dgesv(A, matmul(A, transpose(X)))
-          end if
-          if (maxval(abs(X_next - X)) < threshold) then
-               exit
-          end if
-          X = X_next
-     end do 
+    do i = 1,max_iter
+       if (present(D)) then
+          X_next = solve_transposed_dgesv(A, matmul(A, transpose(X)) + D)
+       else
+          X_next = solve_transposed_dgesv(A, matmul(A, transpose(X)))
+       end if
+       if (maxval(abs(X_next - X)) < threshold) then
+          exit
+       end if
+       X = X_next
+    end do
 
-end function solve_matrix_equation_iteratively
+  end function solve_matrix_equation_iteratively
 
-    ! Compute eigenvalues of symmetric matrix using LAPACK
-    subroutine compute_eigenvalues(A, eigenvalues_real, eigenvalues_imag)
-        real(r64), intent(in), dimension(:,:) :: A
-        real(r64), intent(out), dimension(:) :: eigenvalues_real, eigenvalues_imag
-        integer :: n, info, lwork
-        real(r64), allocatable :: work(:)
-        real(r64), allocatable :: A_copy(:, :)
-        real(r64), allocatable :: VL(:, :), VR(:, :)
-        
-        n = size(A, 1)
-        
-        ! Allocate copy of A, since DGEEV overwrites input
-        allocate(A_copy(n, n))
-        A_copy = A
-        
-        ! Allocate dummy eigenvector matrices (not needed)
-        allocate(VL(1, 1), VR(1, 1))
-        
-        ! Query optimal workspace
-        allocate(work(1))
-        lwork = -1
-        call dgeev('N', 'N', n, A_copy, n, eigenvalues_real, eigenvalues_imag, &
-                   VL, 1, VR, 1, work, lwork, info)
-        if (info /= 0) then
-            print *, "DGEEV workspace query failed with info = ", info
-            return
-        end if
-        
-        lwork = int(work(1))
-        deallocate(work)
-        allocate(work(lwork))
-        
-        ! Compute eigenvalues
-        call dgeev('N', 'N', n, A_copy, n, eigenvalues_real, eigenvalues_imag, &
-                   VL, 1, VR, 1, work, lwork, info)
-        
-        if (info /= 0) then
-            print *, "DGEEV failed with info = ", info
-        end if
-        
-        deallocate(work, A_copy, VL, VR)
-        
-    end subroutine compute_eigenvalues
+  ! Compute eigenvalues of symmetric matrix using LAPACK
+  subroutine compute_eigenvalues(A, eigenvalues_real, eigenvalues_imag)
+    real(r64), intent(in), dimension(:,:) :: A
+    real(r64), intent(out), dimension(:) :: eigenvalues_real, eigenvalues_imag
+    integer :: n, info, lwork
+    real(r64), allocatable :: work(:)
+    real(r64), allocatable :: A_copy(:, :)
+    real(r64), allocatable :: VL(:, :), VR(:, :)
 
-    function F_norm(A) result(norm)
-        real(r64), intent(in) :: A(:, :)
-        real(r64) :: norm
+    n = size(A, 1)
 
-        norm = sqrt(sum(A**2))
-    end function F_norm
+    ! Allocate copy of A, since DGEEV overwrites input
+    allocate(A_copy(n, n))
+    A_copy = A
+
+    ! Allocate dummy eigenvector matrices (not needed)
+    allocate(VL(1, 1), VR(1, 1))
+
+    ! Query optimal workspace
+    allocate(work(1))
+    lwork = -1
+    call dgeev('N', 'N', n, A_copy, n, eigenvalues_real, eigenvalues_imag, &
+         VL, 1, VR, 1, work, lwork, info)
+    if (info /= 0) then
+       print *, "DGEEV workspace query failed with info = ", info
+       return
+    end if
+
+    lwork = int(work(1))
+    deallocate(work)
+    allocate(work(lwork))
+
+    ! Compute eigenvalues
+    call dgeev('N', 'N', n, A_copy, n, eigenvalues_real, eigenvalues_imag, &
+         VL, 1, VR, 1, work, lwork, info)
+
+    if (info /= 0) then
+       print *, "DGEEV failed with info = ", info
+    end if
+
+    deallocate(work, A_copy, VL, VR)
+
+  end subroutine compute_eigenvalues
+
+  function F_norm(A) result(norm)
+    real(r64), intent(in) :: A(:, :)
+    real(r64) :: norm
+
+    norm = sqrt(sum(A**2))
+  end function F_norm
 
 end module misc
