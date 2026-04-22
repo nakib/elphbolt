@@ -110,10 +110,11 @@ module crystal_module
 
 contains
 
-  subroutine read_input_and_setup_crystal(self)
+  subroutine read_input_and_setup_crystal(self, print_flag)
     !! Read input file and initialize crystal data.
 
     class(crystal), intent(out) :: self
+    logical, intent(in), optional :: print_flag
 
     !Local variables
     integer(i64) :: i, j, k, numelements, numatoms
@@ -126,7 +127,7 @@ contains
     character(len=3), allocatable :: elements(:)
     character(len=100) :: name
     character(1) :: thinfilm_normal
-    logical :: polar, VCA, DIB, read_epsiloninf, twod
+    logical :: polar, VCA, DIB, read_epsiloninf, twod, print_actual
 
     namelist /allocations/ numelements, numatoms
     namelist /crystal_info/ name, elements, atomtypes, basis, lattvecs, &
@@ -134,12 +135,19 @@ contains
          masses, T, VCA, DIB, twod, subs_masses, subs_conc, bound_length, &
          numdopants_types, dopant_masses, dopant_conc, thinfilm_height, &
          thinfilm_normal, specfac
-
-    call subtitle("Setting up crystal...")
+    if (print_actual) then
+      call subtitle("Setting up crystal...")
+    end if 
 
     !Open input file
     open(1, file = 'input.nml', status = 'old')
 
+    !Set flag for printing
+    if (present(print_flag)) then 
+      print_actual = print_flag
+    else 
+      print_actual = .true.
+    end if 
     !Set values from input:
 
     !Read allocations
@@ -318,7 +326,7 @@ contains
     self%subs_gfactors = self%subs_gfactors/100.0_r64
 
     !Print out crystal and reciprocal lattice information.
-    if(this_image() == 1) then
+    if(this_image() == 1 .and. print_actual) then
        write(*, "(A, A)") 'Material: ', self%name
 
        if(self%VCA) write(*,"(A)") 'Isotopic average of masses (VCA) will be used.'

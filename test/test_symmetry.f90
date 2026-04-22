@@ -51,7 +51,6 @@ program test_symmetry
 
   itest = itest + 1
   test_array(itest) = testify("Symmetrization of 3x3 tensor for T_d group")
-  print *, "Symmetrized tensor for T_d group: ", sigma(1, 1)
   call test_array(itest)%assert(reshape(sigma, [9]), [sigma(1, 1), 0.0_r64, 0.0_r64, &
        0.0_r64, sigma(1, 1), 0.0_r64, &
        0.0_r64, 0.0_r64, sigma(1, 1)], tol = 1e-5_r64)

@@ -30,7 +30,7 @@ module symmetry_module
 
   private
   public symmetry, find_equiv_map, find_irred_wedge, create_fbz2ibz_map, &
-       fbz2ibz, symmetrize_3x3_tensor, symmetrize_3x3_tensor_noTR
+       fbz2ibz, symmetrize_3x3_tensor
 
   type symmetry
      !! Data and procedure related to symmetries.
@@ -58,6 +58,8 @@ module symmetry_module
      !! Spacegroup in Hermann–Mauguin (or international) notation.
      real(r64), allocatable :: crotations_Bfield(:,:,:)
      !! Rotations in the presence of magentic field real space, Cartesian coordinates.
+     logical :: Bfield_on
+     !! Is B-field on?
 
    contains
 
@@ -67,7 +69,7 @@ module symmetry_module
 
 contains
 
-  subroutine calculate_symmetries(self, crys, mesh, Bfield)
+  subroutine calculate_symmetries(self, crys, mesh, Bfield, print_flag)
     !! Subroutine to generate the symmetry related data for a given crystal.
     !!
     !! This subroutine closely follows parts of config.f90 of the ShengBTE code.
@@ -76,6 +78,8 @@ contains
     type(crystal), intent(in) :: crys
     integer(i64), intent(in) :: mesh(3)
     real(r64), intent(in), optional :: Bfield(3)
+    logical, intent(in), optional :: print_flag
+
 
     !Internal variables:
     integer(i64) :: i, ii, jj, kk, ll, info, nq, nlen
@@ -88,12 +92,20 @@ contains
     type(spglibdataset) :: symdataset
     integer(kind = C_INT) :: numatoms_cint
     integer(kind = C_INT) :: atomtypes_cint(crys%numatoms)
-    logical :: reduce_symmetry  
     !External procedures
     external :: dgesv
+    logical :: print_actual
 
-    call subtitle("Analyzing symmetry...")
-
+    !Set flag for printing
+    if (present(print_flag)) then 
+      print_actual = print_flag
+    else 
+      print_actual = .true.
+    end if 
+    
+    if (print_actual) then
+      call subtitle("Analyzing symmetry...")
+    end if
     !Number of points in wave vector mesh
     nq = product(mesh)
 
@@ -130,7 +142,7 @@ contains
     self%international = trim(adjustl(symdataset%international_symbol))
     !!
 
-    if(this_image() == 1) then
+    if(this_image() == 1 .and. print_actual) then
        write(*, "(A, A)") "Crystal symmetry group = ", self%international
        write(*, "(A, I3)") "Spacegroup number = ", symdataset%spacegroup_number
        write(*, "(A, I5)") "Number of crystal symmetries (without time-reversal) = ", self%nsymm
@@ -190,7 +202,7 @@ contains
           end if
        end do
     end do
-    if(this_image() == 1 .and. ll == 0) then
+    if(this_image() == 1 .and. ll == 0 .and. print_actual) then
        write(*, "(A, I5)") "Number of duplicated rotations to be discarded = ", ll
     end if
 
@@ -217,11 +229,11 @@ contains
 
     ! Find symmetries that are compatible with an applied magnetic field.
     ! These are the rotations R for which det(R) * R * B = B.
-    reduce_symmetry = .false. 
+    self%Bfield_on = .false. 
     if(present(Bfield)) then
-       if(any(Bfield(:) /= 0.0_r64)) reduce_symmetry = .true. 
+       if(any(Bfield(:) /= 0.0_r64)) self%Bfield_on = .true. 
     end if
-    if(reduce_symmetry) then
+    if(self%Bfield_on) then
        ! Allocate space for the B-field compatible symmetries.
        allocate(crtmp(3, 3, self%nsymm))
        kk = 0 ! Counter for valid symmetries
@@ -554,34 +566,4 @@ contains
     tensor(:,:) = aux(:,:)/nrots
   end subroutine symmetrize_3x3_tensor
 
-  subroutine symmetrize_3x3_tensor_noTR(tensor, crotations, Bfield)
-    !! Symmetrize a 3x3 tensor in the presence of a B-field.
-    !! Note: Only for B-field of the form [0 0 Bz]
-
-    real(r64), intent(inout) :: tensor(3, 3)
-    real(r64), intent(in) :: crotations(:, :, :)
-    real(r64), intent(in) :: Bfield(3) !At the moment not doing anything with it.
-    integer :: irot, nrots, i
-    real(r64) :: aux(3,3)
-
-    nrots = size(crotations(1, 1, :))/2
-
-    aux = 0.0_r64
-    do irot = 1, nrots
-       aux(:, :) = aux(:, :) + matmul(crotations(:, :, irot),&
-            matmul(tensor, transpose(crotations(:, :, irot))))
-    end do
-
-    !Symmetrize along z:
-    tensor(3, 1:2) = aux(3, 1:2)/nrots
-    tensor(1:2, 3) = aux(1:2, 3)/nrots
-
-    !Symmetrize diagonals
-    do i = 1, 2
-       tensor(i, i) = aux(i, i)/nrots
-    end do
-
-    !Enforce Onsager in the simplest way. Will refine later.
-    tensor(2, 1) = -tensor(1, 2)
-  end subroutine symmetrize_3x3_tensor_noTR
 end module symmetry_module
