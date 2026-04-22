@@ -138,18 +138,18 @@ contains
          numdopants_types, dopant_masses, dopant_conc, thinfilm_height, &
          thinfilm_normal, specfac
     if (print_actual) then
-      call subtitle("Setting up crystal...")
-    end if 
+       call subtitle("Setting up crystal...")
+    end if
 
     !Open input file
     open(1, file = 'input.nml', status = 'old')
 
     !Set flag for printing
     if (present(print_flag)) then 
-      print_actual = print_flag
+       print_actual = print_flag
     else 
-      print_actual = .true.
-    end if 
+       print_actual = .true.
+    end if
     !Set values from input:
 
     !Read allocations
