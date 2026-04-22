@@ -23,6 +23,8 @@ module misc
 
   implicit none
 
+  integer, parameter :: i4 = selected_int_kind(9)
+
   public :: operator(.umklapp.)
   private :: sort_int, sort_real, Pade_coeffs, twonorm_real_rank1, twonorm_real_rank2, &
        invert_complex_square, add_and_fold, add_and_fold_array, shrink_int, shrink_real
@@ -1616,8 +1618,9 @@ contains
     real(r64), intent(in) :: f(:)
     real(r64), intent(out) :: interpolation
 
-    integer(i64) :: info, r0(3), r1(3), ipol, mode, count
-    integer(i64), allocatable :: pivot(:)
+    integer(i64) :: r0(3), r1(3), ipol, mode, count
+    integer(i4), allocatable :: pivot(:)
+    integer(i4) :: info
     integer(i64) :: i000, i100, i010, i110, i001, i101, i011, i111, equalpol
     real(r64) :: x0, x1, y0, y1, z0, z1, x, y, z, v(2), v0(2), v1(2)
     real(r64), allocatable :: T(:, :), c(:)
@@ -1646,7 +1649,7 @@ contains
     !mode = 3: no interpolation needed
     select case(mode)
     case(0) !3d
-       allocate(pivot(8), T(8, 8), c(8))
+       allocate(pivot(8_i4), T(8, 8), c(8))
 
        !Fine mesh point
        x =  q(1)/dble(refinement(1)*coarsemesh(1))
@@ -1687,14 +1690,14 @@ contains
 
        !Solve Ta = c for a,
        !where c is an array containing the function values at the 8 corners.
-       call dgesv(8,1,T,8,pivot,c,8,info)
+       call dgesv(8_i4,1_i4,T,8_i4,pivot,c,8_i4,info)
 
        !Approximate f(x,y,z) in terms of a.
        aux = c(1) + c(2)*x + c(3)*y + c(4)*z +&
             c(5)*x*y + c(6)*x*z + c(7)*y*z + c(8)*x*y*z
 
     case(1) !2d
-       allocate(pivot(4), T(4, 4), c(4))
+       allocate(pivot(4_i4), T(4, 4), c(4))
 
        count = 1
        do ipol = 1, 3
@@ -1730,7 +1733,7 @@ contains
        T(3,:) = [1.0_r64, v1(1), v0(2), v1(1)*v0(2)]
        T(4,:) = [1.0_r64, v1(1), v1(2), v1(1)*v1(2)]
 
-       call dgesv(4,1,T,4,pivot,c,4,info)
+       call dgesv(4_i4,1_i4,T,4_i4,pivot,c,4_i4,info)
 
        aux = c(1) + c(2)*v(1) + c(3)*v(2) + c(4)*v(1)*v(2)
 
@@ -1841,8 +1844,8 @@ contains
     complex(r64), intent(inout) :: mat(:, :)
 
     !Local variables
-    integer :: N, info, lwork
-    integer, allocatable :: ipivot(:)
+    integer(i4) :: N, info, lwork
+    integer(i4), allocatable :: ipivot(:)
     complex(r64), allocatable :: work(:)
 
     !Size of matrix
@@ -1852,7 +1855,7 @@ contains
          call exit_with_message("invert_complex_square called with non-square matrix. Exiting.")
 
     !Set and allocate zgetr* variables
-    lwork = 32*N
+    lwork = 32_i4*N
     allocate(work(lwork), ipivot(N))
 
     call zgetrf(N, N, mat, N, ipivot, info)
@@ -2019,5 +2022,144 @@ contains
          A(1, 2)*(A(2, 1)*A(3, 3) - A(2, 3)*A(3, 1)) + &
          A(1, 3)*(A(2, 1)*A(3, 2) - A(2, 2)*A(3, 1))
   end function det_3x3
+
+  function inverse_3x3(A) result(Ainv)
+    real(8), intent(in) :: A(3,3)
+    real(8) :: Ainv(3,3)
+    real(8) :: det
+    
+    ! Calculate determinant
+    det =  det_3x3(A)
+    
+    if (abs(det) < 1e-12) then
+        print *, "Matrix is singular"
+        Ainv = 0.0d0
+        return
+    end if
+    
+    ! Calculate inverse using adjugate matrix / determinant
+    Ainv(1,1) = (A(2,2)*A(3,3) - A(2,3)*A(3,2)) / det
+    Ainv(1,2) = (A(1,3)*A(3,2) - A(1,2)*A(3,3)) / det
+    Ainv(1,3) = (A(1,2)*A(2,3) - A(1,3)*A(2,2)) / det
+    
+    Ainv(2,1) = (A(2,3)*A(3,1) - A(2,1)*A(3,3)) / det
+    Ainv(2,2) = (A(1,1)*A(3,3) - A(1,3)*A(3,1)) / det
+    Ainv(2,3) = (A(1,3)*A(2,1) - A(1,1)*A(2,3)) / det
+    
+    Ainv(3,1) = (A(2,1)*A(3,2) - A(2,2)*A(3,1)) / det
+    Ainv(3,2) = (A(1,2)*A(3,1) - A(1,1)*A(3,2)) / det
+    Ainv(3,3) = (A(1,1)*A(2,2) - A(1,2)*A(2,1)) / det
+    
+end function inverse_3x3
+
+function solve_transposed_dgesv(A, B) result(X)
+     !! Solves the linear system  X*A^T = B for X using the LAPACK routine dgesv.
+     !! A is a nxn matrix, B is a nxn matrix, and X is the solution matrix.
+    real(r64), intent(in) :: A(:, :), B(:, :)
+    real(r64) :: X(size(B, 1), size(B, 2))
+
+     ! Local variables
+
+    integer(i4) :: n, info    
+    integer(i4), allocatable :: ipiv(:)
+    real(r64), allocatable :: A_copy(:, :)
+
+    n = int(size(A, 1),kind = i4)
+    allocate(ipiv(n), A_copy(n, n))
+    
+    A_copy = A
+    X = transpose(B)
+    
+    call dgesv(n, n, A_copy, n, ipiv, X, n, info)
+
+    if (info == 0_i4) then
+        X = transpose(X)
+    else
+        print *, "Error solving linear system. info = ", info, " Returning matrix of ones."
+        X = 1.0_r64
+    end if
+    
+    deallocate(ipiv, A_copy)
+
+   end function solve_transposed_dgesv
+
+   function solve_matrix_equation_iteratively(A, D) result(X)
+     !! Subroutine to find iteratively the solution of the  matrix equation 1) X * A^T = A * X^T or 2) X * A^T = D + A * X^T
+     !! A Input 3x3 matrix
+     !! X Output 3x3 matrix
+     real(r64), intent(in):: A(3,3) 
+     real(r64), intent(in), optional:: D(3,3)
+     real(r64) :: X(3,3)
+     real(r64) :: X_next(3,3)
+     integer :: i, max_iter = 1000
+     real(r64) :: threshold = 1.0e-6_r64
+
+     ! Initialize X_next with the values from A
+     X = eye(3_i64)*1.0_r64
+
+     do i = 1,max_iter
+          if (present(D)) then
+              X_next = solve_transposed_dgesv(A, matmul(A, transpose(X)) + D)
+          else
+              X_next = solve_transposed_dgesv(A, matmul(A, transpose(X)))
+          end if
+          if (maxval(abs(X_next - X)) < threshold) then
+               exit
+          end if
+          X = X_next
+     end do 
+
+end function solve_matrix_equation_iteratively
+
+    ! Compute eigenvalues of symmetric matrix using LAPACK
+    subroutine compute_eigenvalues(A, eigenvalues_real, eigenvalues_imag)
+        real(r64), intent(in), dimension(:,:) :: A
+        real(r64), intent(out), dimension(:) :: eigenvalues_real, eigenvalues_imag
+        integer :: n, info, lwork
+        real(r64), allocatable :: work(:)
+        real(r64), allocatable :: A_copy(:, :)
+        real(r64), allocatable :: VL(:, :), VR(:, :)
+        
+        n = size(A, 1)
+        
+        ! Allocate copy of A, since DGEEV overwrites input
+        allocate(A_copy(n, n))
+        A_copy = A
+        
+        ! Allocate dummy eigenvector matrices (not needed)
+        allocate(VL(1, 1), VR(1, 1))
+        
+        ! Query optimal workspace
+        allocate(work(1))
+        lwork = -1
+        call dgeev('N', 'N', n, A_copy, n, eigenvalues_real, eigenvalues_imag, &
+                   VL, 1, VR, 1, work, lwork, info)
+        if (info /= 0) then
+            print *, "DGEEV workspace query failed with info = ", info
+            return
+        end if
+        
+        lwork = int(work(1))
+        deallocate(work)
+        allocate(work(lwork))
+        
+        ! Compute eigenvalues
+        call dgeev('N', 'N', n, A_copy, n, eigenvalues_real, eigenvalues_imag, &
+                   VL, 1, VR, 1, work, lwork, info)
+        
+        if (info /= 0) then
+            print *, "DGEEV failed with info = ", info
+        end if
+        
+        deallocate(work, A_copy, VL, VR)
+        
+    end subroutine compute_eigenvalues
+
+    function F_norm(A) result(norm)
+        real(r64), intent(in) :: A(:, :)
+        real(r64) :: norm
+
+        norm = sqrt(sum(A**2))
+    end function F_norm
 
 end module misc

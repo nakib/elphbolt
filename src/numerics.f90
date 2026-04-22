@@ -187,7 +187,7 @@ contains
     character(len = 1) :: numcols
     logical :: read_gq2, read_gk2, read_V, read_W, tetrahedra, phe, phiso, phsubs, &
          phbound, phdef_Tmat, onlyphbte, onlyebte, elchimp, elbound, drag, plot_along_path, &
-         phthinfilm, phthinfilm_ballistic, fourph, use_Wannier_ifc2s, phiso_Tmat, Bfield_on, &
+         phthinfilm, phthinfilm_ballistic, fourph, use_Wannier_ifc2s, phiso_Tmat, &
          W_OTF, Y_OTF, solve_bulk, solve_nano, elel, &
          restart_from_batch_record, use_perm, calculate_3ph_phasespace
 
@@ -197,7 +197,7 @@ contains
          ph_en_num, el_en_min, el_en_max, el_en_num, phbound, elbound, phdef_Tmat, &
          ph_mfp_npts, ph_abs_q_npts, phthinfilm, phthinfilm_ballistic, &
          fourph, fourph_mesh_ref, use_Wannier_ifc2s, elel, Coulomb_screening_type, ncont_mesh,&
-         phiso_Tmat, phiso_1B_theory, Bfield_on, Bfield, W_OTF, Y_OTF, &
+         phiso_Tmat, phiso_1B_theory, Bfield, W_OTF, Y_OTF, &
          solve_bulk, solve_nano, num_batches, restart_from_batch_record, use_perm, &
          calculate_3ph_phasespace
 
@@ -237,7 +237,6 @@ contains
     drag = .true.
     use_Wannier_ifc2s = .false.
     plot_along_path = .false.
-    Bfield_on = .false.
     Bfield = [0.0_r64, 0.0_r64, 0.0_r64]
     maxiter = 50
     conv_thres = 1e-4_r64
@@ -298,18 +297,6 @@ contains
        end if
     end if
 
-    !Only allow B-field along z for now.
-    if(Bfield_on) then
-       if(.not. (Bfield(1) == 0.0_r64 .and. Bfield(2) == 0.0_r64 .and. Bfield(3) /= 0.0_r64)) then
-          call exit_with_message("B-field has to be of the form [0 0 B]. Exiting.")
-       end if
-!!$       if( .not. (Bfield(1) /= 0.0_r64 .and. Bfield(2) == 0.0_r64 .and. Bfield(3) == 0.0_r64) .or. &
-!!$            (Bfield(1) == 0.0_r64 .and. Bfield(2) /= 0.0_r64 .and. Bfield(3 == 0.0_r64)) .or. &
-!!$            (Bfield(1) == 0.0_r64 .and. Bfield(2) == 0.0_r64 .and. Bfield(3 /= 0.0_r64))) then
-!!$          call exit_with_message("B-field has to be of the form [B 0 0], [0 B 0], or [0 0 B]. Exiting.")
-!!$       end if
-    end if
-
     !TODO
     !! [ ] Read eco mode info from input
     !! [ ] Check for valid choice of econess
@@ -319,7 +306,8 @@ contains
     !self%econess = [2, 2, 2]
     !!
 
-    self%Bfield_on = Bfield_on
+    self%Bfield_on = .false.  
+    if(any(Bfield(:) /= 0.0_r64)) self%Bfield_on = .true. 
     self%Bfield = Bfield
 
     self%qmesh = qmesh

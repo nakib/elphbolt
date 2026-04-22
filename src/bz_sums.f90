@@ -28,7 +28,7 @@ module bz_sums
   use crystal_module, only: crystal
   use numerics_module, only: numerics
   use delta, only: delta_fn, get_delta_fn_pointer
-  use symmetry_module, only: symmetry, symmetrize_3x3_tensor, symmetrize_3x3_tensor_noTR
+  use symmetry_module, only: symmetry, symmetrize_3x3_tensor
   use Green_function, only: resolvent
 
   implicit none
@@ -482,7 +482,7 @@ contains
   end subroutine calculate_ph_dos_iso
 
   subroutine calculate_transport_coeff(species_prefix, field, T, deg, chempot, ens, vels, &
-       volume, mesh, response, sym, trans_coeff_hc, trans_coeff_cc, Bfield, symmetrize)
+       volume, mesh, response, sym, trans_coeff_hc, trans_coeff_cc, symmetrize)
     !! Subroutine to calculate transport coefficients.
     !!
     !! species_prefix Prefix of particle type
@@ -504,7 +504,6 @@ contains
     integer(i64), intent(in) :: mesh(3), deg
     real(r64), intent(in) :: T, chempot, ens(:,:), vels(:,:,:), volume, response(:,:,:)
     type(symmetry), intent(in) :: sym
-    real(r64), optional, intent(in) :: Bfield(3)
     logical, optional, intent(in)   :: symmetrize
     real(r64), intent(out) :: trans_coeff_hc(:,:,:), trans_coeff_cc(:,:,:)
     ! Above, h(c)c = heat(charge) current
@@ -592,16 +591,13 @@ contains
     trans_coeff_hc = A_hc*trans_coeff_hc
     if(A_cc /= 0.0_r64) trans_coeff_cc = A_cc*trans_coeff_cc
 
-    !TODO The following has to be generalized in the presence of a B-field
     !Symmetrize transport tensor
     if (symmetrize_local) then
        do ib = 1, nbands
           !Note that fortran does not short-circuit logical expression chains
-          if(present(Bfield)) then
-             if(any(Bfield /= 0.0_r64)) then
-                call symmetrize_3x3_tensor_noTR(trans_coeff_hc(ib, :, :), sym%crotations, Bfield)
-                if(A_cc /= 0.0_r64) call symmetrize_3x3_tensor_noTR(trans_coeff_cc(ib, :, :), sym%crotations, Bfield)
-             end if
+          if(sym%Bfield_on) then
+            call symmetrize_3x3_tensor(trans_coeff_hc(ib, :, :), sym%crotations_Bfield)
+            if(A_cc /= 0.0_r64) call symmetrize_3x3_tensor(trans_coeff_cc(ib, :, :), sym%crotations_Bfield)  
           else
              call symmetrize_3x3_tensor(trans_coeff_hc(ib, :, :), sym%crotations)
              if(A_cc /= 0.0_r64) call symmetrize_3x3_tensor(trans_coeff_cc(ib, :, :), sym%crotations)

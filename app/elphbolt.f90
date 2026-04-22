@@ -68,8 +68,13 @@ program elphbolt
   !Set up numerics data
   call num%initialize(crys)
 
+
   !Calculate crystal and BZ symmetries
-  call sym%calculate_symmetries(crys, num%qmesh)
+  if(num%Bfield_on) then
+     call sym%calculate_symmetries(crys, num%qmesh, num%Bfield)
+  else
+     call sym%calculate_symmetries(crys, num%qmesh)
+  end if
 
   sync all
   call t_event%end_timer('Initialization')
