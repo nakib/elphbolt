@@ -48,6 +48,8 @@ module wannier_module
 
      character(1024) :: Wannier_engine_name
      !! Name of external Wannier calculator
+     logical :: old_ws
+     !! Use old Wigner-Seitz representation in EPW
      integer(i64) :: numwannbands
      !! Number of Wannier bands.
      integer(i64) :: numbranches
@@ -67,17 +69,28 @@ module wannier_module
      !integer(i64), allocatable :: rcells_g(:, :)
      integer(i64), allocatable :: rcells_g(:, :)[:]
      !! Real space cell locations for electron-phonon vertex.     
-     integer(i64), allocatable :: elwsdeg(:)
+!$!      integer(i64), allocatable :: elwsdeg(:)
+!$!      !! Real space cell multiplicity for electrons.
+!$!      integer(i64), allocatable :: phwsdeg(:)
+!$!      !! Real space cell multiplicity for phonons.
+!$!      !integer(i64), allocatable :: gwsdeg(:)
+!$!      integer(i64), allocatable :: gwsdeg(:)[:]
+!$!      !! Real space cell multiplicity for electron-phonon vertex.
+     integer(i64), allocatable :: elwsdeg(:,:,:)
      !! Real space cell multiplicity for electrons.
-     integer(i64), allocatable :: phwsdeg(:)
+     integer(i64), allocatable :: phwsdeg(:,:,:)
      !! Real space cell multiplicity for phonons.
      !integer(i64), allocatable :: gwsdeg(:)
-     integer(i64), allocatable :: gwsdeg(:)[:]
+     integer(i64), allocatable :: gwsdeg(:,:,:)[:]
      !! Real space cell multiplicity for electron-phonon vertex.
      complex(r64), allocatable :: Hwann(:, :, :)
      !! Hamiltonian in Wannier representation.
      complex(r64), allocatable :: Dphwann(:, :, :)
      !! Dynamical matrix in Wannier representation.
+     integer(i64) :: wigparam(3)
+     !! Stores sizes of rcell_k, rcell_q, rcell_g
+     integer(i64) :: dims(2)
+     !! Stores values of nbands and nat
      !complex(r64), allocatable :: gwann(:, :, :, :, :)
 
      !FOR NOW...
@@ -104,8 +117,9 @@ contains
     !Local
     integer(i64) :: coarse_qmesh(3)
     character(1024) :: Wannier_engine_name
+    logical :: old_ws
 
-    namelist /wannier/ coarse_qmesh, Wannier_engine_name
+    namelist /wannier/ coarse_qmesh, Wannier_engine_name, old_ws
 
     call subtitle("Setting up Wannier...")
 
@@ -114,6 +128,7 @@ contains
 
     coarse_qmesh = [0, 0, 0]
     Wannier_engine_name = 'epw'
+    old_ws = .false.
     read(1, nml = wannier)
     if(any(coarse_qmesh <= 0)) then
        call exit_with_message('Bad input(s) in wannier.')
@@ -131,6 +146,7 @@ contains
        call self%read_exciting_Wannier(num)
     case("epw")
        if(this_image() == 1) write(*, '(A)') "Wannier data from EPW will be read."
+       self%old_ws = old_ws
        call self%read_epw_Wannier(num)
     case default
        write(*, '(A, A)') "Error: Unknown Wannier engine for Wannier data: ", &
@@ -303,12 +319,15 @@ contains
     ! EPW File names:
     character(len=*), parameter :: filename_epwdata = "epwdata.fmt"
     character(len=*), parameter :: filename_epwgwann = "epmatwp1"
+    ! ----Old format-----
     character(len=*), parameter :: filename_elwscells = "rcells_k"
     character(len=*), parameter :: filename_phwscells = "rcells_q"
     character(len=*), parameter :: filename_gwscells = "rcells_g"
     character(len=*), parameter :: filename_elwsdeg = "wsdeg_k"
     character(len=*), parameter :: filename_phwsdeg = "wsdeg_q"
     character(len=*), parameter :: filename_gwsdeg = "wsdeg_g"
+    ! -----New format----
+    character(len=*), parameter :: filename_epwwigner = "wigner.fmt"
 
     open(1,file=filename_epwdata,status='old')
     read(1,*) ef !Fermi energy. Read but ignored here.
@@ -376,56 +395,417 @@ contains
     end if
 
     !Read cell maps of q, k, g meshes.
-    call print_message("Reading Wannier cells and multiplicities...")
-    allocate(self%rcells_k(self%nwsk,3))
-    allocate(self%elwsdeg(self%nwsk))
-    open(1, file = filename_elwscells, status = "old")
-    open(2, file = filename_elwsdeg, status = "old")
-    do iuc = 1,self%nwsk
-       read(1, *) self%rcells_k(iuc, :)
-       read(2, *) self%elwsdeg(iuc)
-    end do
-    close(1)
-    close(2)
-
-    allocate(self%rcells_q(self%nwsq, 3))
-    allocate(self%phwsdeg(self%nwsq))
-    open(1, file = filename_phwscells, status = "old")
-    open(2, file = filename_phwsdeg, status = "old")
-    do iuc = 1,self%nwsq
-       read(1, *) self%rcells_q(iuc, :)
-       read(2, *) self%phwsdeg(iuc)
-    end do
-    close(1)
-    close(2)
-
-    allocate(self%rcells_g(self%gwann_distrib_chunk[1], 3)[*])
-    allocate(self%gwsdeg(self%gwann_distrib_chunk[1])[*])
-    self%gwsdeg = 0
-
-    if(this_image() == 1) then
-       allocate(rcells_g_aux(self%gwann_distrib_chunk[1], 3)) !chunk for the 1st image is the largest 
-       allocate(gwsdeg_aux(self%gwann_distrib_chunk[1]))
-
-       open(1, file = filename_gwscells, status = "old")
-       open(2, file = filename_gwsdeg, status = "old")
-
-       do image = 1, self%gwann_distrib_num_active_images
-          do iuc = 1, self%gwann_distrib_chunk[image]
-             read(1, *) rcells_g_aux(iuc, :)
-             read(2, *) gwsdeg_aux(iuc)
-          end do
-
-          self%rcells_g(:, :)[image] = rcells_g_aux(:, :)
-          self%gwsdeg(:)[image] = gwsdeg_aux(:)
+    if(self%old_ws) then
+       call print_message("Reading Wannier cells and multiplicities (old representation)...")
+       allocate(self%rcells_k(self%nwsk,3))
+       allocate(self%elwsdeg(self%nwsk, 1, 1))
+       open(1, file = filename_elwscells, status = "old")
+       open(2, file = filename_elwsdeg, status = "old")
+       do iuc = 1,self%nwsk
+          read(1, *) self%rcells_k(iuc, :)
+          read(2, *) self%elwsdeg(iuc, 1, 1)
        end do
-
        close(1)
        close(2)
+
+       allocate(self%rcells_q(self%nwsq, 3))
+       allocate(self%phwsdeg(self%nwsq, 1, 1))
+       open(1, file = filename_phwscells, status = "old")
+       open(2, file = filename_phwsdeg, status = "old")
+       do iuc = 1,self%nwsq
+          read(1, *) self%rcells_q(iuc, :)
+          read(2, *) self%phwsdeg(iuc, 1, 1)
+       end do
+       close(1)
+       close(2)
+
+       allocate(self%rcells_g(self%gwann_distrib_chunk[1], 3)[*])
+       allocate(self%gwsdeg(self%gwann_distrib_chunk[1])[*])
+       self%gwsdeg = 0
+
+       if(this_image() == 1) then
+          allocate(rcells_g_aux(self%gwann_distrib_chunk[1], 3)) !chunk for the 1st image is the largest 
+          allocate(gwsdeg_aux(self%gwann_distrib_chunk[1]))
+
+          open(1, file = filename_gwscells, status = "old")
+          open(2, file = filename_gwsdeg, status = "old")
+
+          do image = 1, self%gwann_distrib_num_active_images
+             do iuc = 1, self%gwann_distrib_chunk[image]
+                read(1, *) rcells_g_aux(iuc, :)
+                read(2, *) gwsdeg_aux(iuc)
+             end do
+
+             self%rcells_g(:, :)[image] = rcells_g_aux(:, :)
+             self%gwsdeg(:)[image] = gwsdeg_aux(:)
+          end do
+
+          close(1)
+          close(2)
+       end if
+    else
+       call print_message("Reading Wannier cells and multiplicities from wigner.fmt...")
+       open(1, file = filename_epwwigner, status = "old")
+       read(1,*) self%wigparam(:), self%dims(:) 
+       ! 1-nrr_k, 2-nrr_q, 3-nrr_g, 4-dims, 5-dims2
+
+       allocate(self%rcells_k_nw(3,self%nwsk))
+       allocate(self%elwsdeg_nw(self%nwsk,self%wigparam(4),self%wigparam(4)))
+       allocate(self%wslen_k(self%nwsk))
+       do iuc = 1,self%nwsk
+          read(1, *) self%rcells_k_nw(:,iuc), self%wslen_k(iuc)
+          do juc = 1,self%dims(1)
+              read(1, *) self%elwsdeg_nw(iuc,juc,:)
+          end do
+       end do
+
+       allocate(self%rcells_q_nw(3,self%nwsq))
+       allocate(self%phwsdeg_nw(self%nwsq,self%wigparam(5),self%wigparam(5)))
+       allocate(self%wslen_q(self%nwsq))
+       do iuc = 1,self%nwsq
+          read(1, *) self%rcells_q_nw(:,iuc), self%wslen_q(iuc)
+          do juc = 1,self%dims(2)
+              read(1, *) self%phwsdeg_nw(iuc,juc,:)
+          end do
+       end do
+
+       allocate(self%rcells_g_nw(3,self%gwann_distrib_chunk[1])[*])
+       allocate(self%gwsdeg_nw(self%dims(1),self%gwann_distrib_chunk[1],self%dims(2))[*])
+       allocate(self%wslen_g(self%gwann_distrib_chunk[1])[*])
+       self%gwsdeg_nw = 0
+
+       if(this_image() == 1) then
+          allocate(rcells_g_aux_nw(3,self%gwann_distrib_chunk[1])) !chunk for the 1st image is the largest
+          allocate(gwsdeg_aux_nw(self%wigparam(4),self%gwann_distrib_chunk[1],self%wigparam(5)))
+          allocate(wslen_g_aux(self%gwann_distrib_chunk[1]))
+
+          do image = 1, self%gwann_distrib_num_active_images
+             do iuc = 1, self%gwann_distrib_chunk[image]
+                read(1, *) rcells_g_aux_nw(:,iuc), wslen_g_aux(iuc)
+                do juc = 1,self%wigparam(4)
+                    read(1, *) gwsdeg_aux_nw(juc,iuc,:)
+                end do
+             end do
+
+             self%rcells_g_nw(:, :)[image] = rcells_g_aux_nw(:, :)
+             self%gwsdeg_nw(:,:,:)[image] = gwsdeg_aux_nw(:,:,:)
+             self%wslen_g(:)[image] = wslen_g_aux(:)
+          end do
+
+          close(1)
+       end if
     end if
 
     sync all
   end subroutine read_EPW_Wannier
+  
+!$!   subroutine read_EPW_Wannier(self, num)
+!$!     !! Read Wannier representation of the hamiltonian, dynamical matrix, and the
+!$!     !! e-ph matrix elements from file epwdata.fmt.
+!$! 
+!$!     class(wannier), intent(inout) :: self
+!$!     type(numerics), intent(in) :: num
+!$! 
+!$!     !Local variables
+!$!     integer(i64) :: iuc, ib, jb, image
+!$!     real(r64) :: ef
+!$!     real(r64), allocatable :: dummy(:)
+!$!     complex(r64), allocatable :: gwann_aux(:, :, :, :, :)
+!$!     integer(i64), allocatable :: rcells_g_aux(:, :)
+!$!     integer(i64), allocatable :: gwsdeg_aux(:)
+!$!     ! EPW File names:
+!$!     character(len=*), parameter :: filename_epwdata = "epwdata.fmt"
+!$!     character(len=*), parameter :: filename_epwgwann = "epmatwp1"
+!$!     character(len=*), parameter :: filename_elwscells = "rcells_k"
+!$!     character(len=*), parameter :: filename_phwscells = "rcells_q"
+!$!     character(len=*), parameter :: filename_gwscells = "rcells_g"
+!$!     character(len=*), parameter :: filename_elwsdeg = "wsdeg_k"
+!$!     character(len=*), parameter :: filename_phwsdeg = "wsdeg_q"
+!$!     character(len=*), parameter :: filename_gwsdeg = "wsdeg_g"
+!$! 
+!$!     open(1,file=filename_epwdata,status='old')
+!$!     read(1,*) ef !Fermi energy. Read but ignored here.
+!$!     read(1,*) self%numwannbands, self%nwsk, self%numbranches, self%nwsq, self%nwsg
+!$!     allocate(dummy((self%numbranches/3 + 1)*9)) !numatoms*9 Born, 9 epsilon elements.
+!$!     read(1,*) dummy !Born, epsilon. Read but ignored here.
+!$! 
+!$!     !Read real space hamiltonian
+!$!     call print_message("Reading Wannier rep. Hamiltonian...")
+!$!     allocate(self%Hwann(self%nwsk,self%numwannbands,self%numwannbands))
+!$!     do ib = 1,self%numwannbands
+!$!        do jb = 1,self%numwannbands
+!$!           do iuc = 1,self%nwsk !Number of real space electron cells
+!$!              read (1, *) self%Hwann(iuc,ib,jb)
+!$!           end do
+!$!        end do
+!$!     end do
+!$! 
+!$!     !Read real space dynamical matrix (i.e. 2nd order force constants)
+!$!     call print_message("Reading Wannier rep. dynamical matrix...")
+!$!     allocate(self%Dphwann(self%nwsq,self%numbranches,self%numbranches))
+!$!     do ib = 1,self%numbranches
+!$!        do jb = 1,self%numbranches
+!$!           do iuc = 1,self%nwsq !Number of real space phonon cells
+!$!              read (1, *) self%Dphwann(iuc,ib,jb)
+!$!           end do
+!$!        end do
+!$!     end do
+!$!     close(1)
+!$! 
+!$!     !Divide wave vectors among images
+!$!     allocate(self%gwann_distrib_start[*], self%gwann_distrib_end[*], self%gwann_distrib_chunk[*])
+!$!     call distribute_points(self%nwsg, self%gwann_distrib_chunk, self%gwann_distrib_start, &
+!$!          self%gwann_distrib_end, self%gwann_distrib_num_active_images)
+!$! 
+!$!     if(.not. num%read_gk2 .or. .not. num%read_gq2 .or. &
+!$!          num%plot_along_path) then
+!$! 
+!$!        allocate(gwann(self%numwannbands,self%numwannbands,self%nwsk,&
+!$!             self%numbranches, self%gwann_distrib_chunk[1])[*])
+!$!        gwann = 0.0_r64
+!$! 
+!$!        !Below, image 1 will read Wannierized g(Re,Rp) and distribute to all images.
+!$!        if(this_image() == 1) then
+!$!           call print_message("Reading Wannier rep. e-ph vertex and distributing...")
+!$! 
+!$!           open(1, file = filename_epwgwann, status = 'old', access = 'stream')
+!$! 
+!$!           allocate(gwann_aux(self%numwannbands,self%numwannbands,self%nwsk,&
+!$!                self%numbranches,self%gwann_distrib_chunk[1])) !chunk for the 1st image is the largest
+!$!           gwann_aux = 0.0_r64
+!$! 
+!$!           do image = 1, self%gwann_distrib_num_active_images
+!$!              read(1) gwann_aux(:, :, :, :, 1:self%gwann_distrib_chunk[image])
+!$! 
+!$!              gwann(:,:,:,:,:)[image] = gwann_aux(:,:,:,:,:)
+!$!           end do
+!$! 
+!$!           close(1)
+!$!        end if
+!$! 
+!$!        sync all
+!$! 
+!$!        if(this_image() == 1) deallocate(gwann_aux)
+!$!     end if
+!$! 
+!$!     !Read cell maps of q, k, g meshes.
+!$!     call print_message("Reading Wannier cells and multiplicities...")
+!$!     allocate(self%rcells_k(self%nwsk,3))
+!$!     allocate(self%elwsdeg(self%nwsk))
+!$!     open(1, file = filename_elwscells, status = "old")
+!$!     open(2, file = filename_elwsdeg, status = "old")
+!$!     do iuc = 1,self%nwsk
+!$!        read(1, *) self%rcells_k(iuc, :)
+!$!        read(2, *) self%elwsdeg(iuc)
+!$!     end do
+!$!     close(1)
+!$!     close(2)
+!$! 
+!$!     allocate(self%rcells_q(self%nwsq, 3))
+!$!     allocate(self%phwsdeg(self%nwsq))
+!$!     open(1, file = filename_phwscells, status = "old")
+!$!     open(2, file = filename_phwsdeg, status = "old")
+!$!     do iuc = 1,self%nwsq
+!$!        read(1, *) self%rcells_q(iuc, :)
+!$!        read(2, *) self%phwsdeg(iuc)
+!$!     end do
+!$!     close(1)
+!$!     close(2)
+!$! 
+!$!     allocate(self%rcells_g(self%gwann_distrib_chunk[1], 3)[*])
+!$!     allocate(self%gwsdeg(self%gwann_distrib_chunk[1])[*])
+!$!     self%gwsdeg = 0
+!$! 
+!$!     if(this_image() == 1) then
+!$!        allocate(rcells_g_aux(self%gwann_distrib_chunk[1], 3)) !chunk for the 1st image is the largest 
+!$!        allocate(gwsdeg_aux(self%gwann_distrib_chunk[1]))
+!$! 
+!$!        open(1, file = filename_gwscells, status = "old")
+!$!        open(2, file = filename_gwsdeg, status = "old")
+!$! 
+!$!        do image = 1, self%gwann_distrib_num_active_images
+!$!           do iuc = 1, self%gwann_distrib_chunk[image]
+!$!              read(1, *) rcells_g_aux(iuc, :)
+!$!              read(2, *) gwsdeg_aux(iuc)
+!$!           end do
+!$! 
+!$!           self%rcells_g(:, :)[image] = rcells_g_aux(:, :)
+!$!           self%gwsdeg(:)[image] = gwsdeg_aux(:)
+!$!        end do
+!$! 
+!$!        close(1)
+!$!        close(2)
+!$!     end if
+!$! 
+!$!     sync all
+!$!   end subroutine read_EPW_Wannier
+
+!$!   subroutine read_EPW_Wannier_newwigner(self, num)
+!$!     !! New wigner parser
+!$!     !! Read Wannier representation of the hamiltonian, dynamical matrix, and the
+!$!     !! e-ph matrix elements from file epwdata.fmt.
+!$! 
+!$!     class(wannier), intent(inout) :: self
+!$!     type(numerics), intent(in) :: num
+!$! 
+!$!     !Local variables
+!$!     integer(i64) :: iuc, juc, ib, jb, image
+!$!     real(r64) :: ef
+!$!     real(r64), allocatable :: dummy(:)
+!$!     complex(r64), allocatable :: gwann_aux(:, :, :, :, :)
+!$!     integer(i64), allocatable :: rcells_g_aux_nw(:, :)
+!$!     integer(i64), allocatable :: gwsdeg_aux_nw(:,:,:)
+!$!     real(r64), allocatable :: wslen_g_aux(:)
+!$! 
+!$!     ! EPW File names:
+!$!     character(len=*), parameter :: filename_epwdata = "epwdata.fmt"
+!$!     character(len=*), parameter :: filename_epwgwann = "epmatwp1"
+!$!     character(len=*), parameter :: filename_epwwigner = "wigner.fmt"
+!$! 
+!$!     open(1,file=filename_epwdata,status='old')
+!$!     read(1,*) ef !Fermi energy. Read but ignored here.
+!$!     read(1,*) self%numwannbands, self%nwsk, self%numbranches, self%nwsq, self%nwsg
+!$!     allocate(dummy((self%numbranches/3 + 1)*9)) !numatoms*9 Born, 9 epsilon elements.
+!$!     read(1,*) dummy !Born, epsilon. Read but ignored here.
+!$! 
+!$!     !Read real space hamiltonian
+!$!     call print_message("Reading Wannier rep. Hamiltonian...")
+!$!     allocate(self%Hwann(self%nwsk,self%numwannbands,self%numwannbands))
+!$!     do ib = 1,self%numwannbands
+!$!        do jb = 1,self%numwannbands
+!$!           do iuc = 1,self%nwsk !Number of real space electron cells
+!$!              read (1, *) self%Hwann(iuc,ib,jb)
+!$!           end do
+!$!        end do
+!$!     end do
+!$! 
+!$!     !Read real space dynamical matrix (i.e. 2nd order force constants)
+!$!     call print_message("Reading Wannier rep. dynamical matrix...")
+!$!     allocate(self%Dphwann(self%nwsq,self%numbranches,self%numbranches))
+!$!     do ib = 1,self%numbranches
+!$!        do jb = 1,self%numbranches
+!$!           do iuc = 1,self%nwsq !Number of real space phonon cells
+!$!              read (1, *) self%Dphwann(iuc,ib,jb)
+!$!           end do
+!$!        end do
+!$!     end do
+!$!     close(1)
+!$! 
+!$!     !Divide wave vectors among images
+!$!     allocate(self%gwann_distrib_start[*], self%gwann_distrib_end[*], self%gwann_distrib_chunk[*])
+!$!     call distribute_points(self%nwsg, self%gwann_distrib_chunk, self%gwann_distrib_start, &
+!$!          self%gwann_distrib_end, self%gwann_distrib_num_active_images)
+!$! 
+!$!     if(.not. num%read_gk2 .or. .not. num%read_gq2 .or. &
+!$!          num%plot_along_path) then
+!$! 
+!$!        allocate(gwann(self%numwannbands,self%numwannbands,self%nwsk,&
+!$!             self%numbranches, self%gwann_distrib_chunk[1])[*])
+!$!        gwann = 0.0_r64
+!$! 
+!$!        !Below, image 1 will read Wannierized g(Re,Rp) and distribute to all images.
+!$!        if(this_image() == 1) then
+!$!           call print_message("Reading Wannier rep. e-ph vertex and distributing...")
+!$! 
+!$!           open(1, file = filename_epwgwann, status = 'old', access = 'stream')
+!$! 
+!$!           allocate(gwann_aux(self%numwannbands,self%numwannbands,self%nwsk,&
+!$!                self%numbranches,self%gwann_distrib_chunk[1])) !chunk for the 1st image is the largest
+!$!           gwann_aux = 0.0_r64
+!$! 
+!$!           do image = 1, self%gwann_distrib_num_active_images
+!$!              read(1) gwann_aux(:, :, :, :, 1:self%gwann_distrib_chunk[image])
+!$! 
+!$!              gwann(:,:,:,:,:)[image] = gwann_aux(:,:,:,:,:)
+!$!           end do
+!$! 
+!$!           close(1)
+!$!        end if
+!$! 
+!$!        sync all
+!$! 
+!$!        if(this_image() == 1) deallocate(gwann_aux)
+!$!     end if
+!$! 
+!$!     !Read cell maps of q, k, g meshes.
+!$!     call print_message("Reading Wannier cells and multiplicities from wigner.fmt...")
+!$!     open(1, file = filename_epwwigner, status = "old")
+!$!     read(1,*) self%wigparam(:)  ! 1-nrr_k, 2-nrr_q, 3-nrr_g, 4-dims, 5-dims2
+!$! 
+!$!     allocate(self%rcells_k_nw(3,self%nwsk))
+!$!     allocate(self%elwsdeg_nw(self%nwsk,self%wigparam(4),self%wigparam(4)))
+!$!     allocate(self%wslen_k(self%nwsk))
+!$!     do iuc = 1,self%nwsk
+!$!        read(1, *) self%rcells_k_nw(:,iuc), self%wslen_k(iuc)
+!$!        do juc = 1,self%wigparam(4)
+!$!            read(1, *) self%elwsdeg_nw(iuc,juc,:)
+!$!        end do
+!$!     end do
+!$! 
+!$!     allocate(self%rcells_q_nw(3,self%nwsq))
+!$!     allocate(self%phwsdeg_nw(self%nwsq,self%wigparam(5),self%wigparam(5)))
+!$!     allocate(self%wslen_q(self%nwsq))
+!$!     do iuc = 1,self%nwsq
+!$!        read(1, *) self%rcells_q_nw(:,iuc), self%wslen_q(iuc)
+!$!        do juc = 1,self%wigparam(5)
+!$!            read(1, *) self%phwsdeg_nw(iuc,juc,:)
+!$!        end do
+!$!     end do
+!$! 
+!$!     allocate(self%rcells_g_nw(3,self%gwann_distrib_chunk[1])[*])
+!$!     allocate(self%gwsdeg_nw(self%wigparam(4),self%gwann_distrib_chunk[1],self%wigparam(5))[*])
+!$!     allocate(self%wslen_g(self%gwann_distrib_chunk[1])[*])
+!$!     self%gwsdeg_nw = 0
+!$! 
+!$!     if(this_image() == 1) then
+!$!        allocate(rcells_g_aux_nw(3,self%gwann_distrib_chunk[1])) !chunk for the 1st image is the largest
+!$!        allocate(gwsdeg_aux_nw(self%wigparam(4),self%gwann_distrib_chunk[1],self%wigparam(5)))
+!$!        allocate(wslen_g_aux(self%gwann_distrib_chunk[1]))
+!$! 
+!$!        do image = 1, self%gwann_distrib_num_active_images
+!$!           do iuc = 1, self%gwann_distrib_chunk[image]
+!$!              read(1, *) rcells_g_aux_nw(:,iuc),wslen_g_aux(iuc)
+!$!              do juc = 1,self%wigparam(4)
+!$!                  read(1, *) gwsdeg_aux_nw(juc,iuc,:)
+!$!              end do
+!$!           end do
+!$! 
+!$!           self%rcells_g_nw(:, :)[image] = rcells_g_aux_nw(:, :)
+!$!           self%gwsdeg_nw(:,:,:)[image] = gwsdeg_aux_nw(:,:,:)
+!$!           self%wslen_g(:)[image] = wslen_g_aux(:)
+!$!        end do
+!$! 
+!$!        close(1)
+!$!     end if
+!$! 
+!$!     sync all
+!$!     ! ! Testing the new data parser
+!$!     !if (this_image() == 1) then
+!$!     !     print *,"Testing the new wigner parser::"
+!$!     !     print *,"--K points--"
+!$!     !     print *,self%rcells_k_nw(:,1), self%wslen_k(1)
+!$!     !     print *,self%elwsdeg_nw(1,1,:)
+!$!     !     print *,self%elwsdeg_nw(1,2,:)
+!$!     !     print *,"Next Row:"
+!$!     !     print *,self%elwsdeg_nw(2,1,:)
+!$!     !     print *,self%elwsdeg_nw(2,2,:)
+!$!     !     print *,"--Q points--"
+!$!     !     print *,self%rcells_q_nw(:,1), self%wslen_q(1)
+!$!     !     print *,self%phwsdeg_nw(1,1,:)
+!$!     !     print *,self%phwsdeg_nw(1,2,:)
+!$!     !     print *,"Next Row:"
+!$!     !     print *,self%phwsdeg_nw(2,1,:)
+!$!     !     print *,self%phwsdeg_nw(2,2,:)
+!$!     !     print *,"--G points--"
+!$!     !     print *,self%rcells_g_nw(:,1), self%wslen_q(1)
+!$!     !     print *,self%gwsdeg_nw(1,1,:)
+!$!     !     print *,self%gwsdeg_nw(1,2,:)
+!$!     !     print *,"Next Row:"
+!$!     !     print *,self%gwsdeg_nw(2,1,:)
+!$!     !     print *,self%gwsdeg_nw(2,2,:)
+!$!     !end if
+!$! 
+!$!   end subroutine read_EPW_Wannier_newwigner
 
   subroutine el_wann(self, crys, nk, kvecs, energies, velocities, evecs, scissor)
     !! Wannier interpolate electrons on list of arb. k-vecs
@@ -1131,6 +1511,62 @@ contains
     call chdir(num%cwd)
   end subroutine gkRp
 
+!$!   subroutine gReq(self, num, iq, qvec)
+!$!     !! Calculate the Bloch-Wannier mixed rep. e-ph matrix elements g(Re,q),
+!$!     !! where q is an IBZ phonon wave vector and Re is a phonon unit cell.
+!$!     !! Note: this step *DOES NOT* perform the rotation over the Wannier bands space.
+!$!     !!
+!$!     !! The result will be saved to disk tagged with k-index.
+!$! 
+!$!     class(wannier), intent(in) :: self
+!$!     type(numerics), intent(in) :: num
+!$!     integer(i64), intent(in) :: iq
+!$!     real(r64), intent(in) :: qvec(3)
+!$! 
+!$!     !Local variables
+!$!     integer(i64) :: iuc, s, image, i, image_order(self%gwann_distrib_num_active_images)
+!$!     complex(r64) :: phase
+!$!     complex(r64), allocatable:: gmixed(:,:,:,:)
+!$!     character(len = 1024) :: filename
+!$! 
+!$!     allocate(gmixed(self%numwannbands, self%numwannbands, self%numbranches, self%nwsk))
+!$! 
+!$!     !Fourier transform to q-space
+!$!     gmixed = 0
+!$! 
+!$!     !Staggering the order of reading of gwann from the diffent images to reduce
+!$!     !simultaneous reading of the same chunk by all images.
+!$!     do i = 0, self%gwann_distrib_num_active_images - 1
+!$!        image_order(i + 1) = modulo(i + this_image() - 1, self%gwann_distrib_num_active_images) + 1
+!$!     end do
+!$! 
+!$!     do i = 1, self%gwann_distrib_num_active_images
+!$!        image = image_order(i)
+!$! 
+!$!        do iuc = 1, self%gwann_distrib_chunk[image]
+!$!           phase = expi(twopi*dot_product(qvec, self%rcells_g(iuc,:)[image]))/self%gwsdeg(iuc)[image]
+!$! 
+!$!           do s = 1, self%numbranches
+!$!              gmixed(:,:,s,:) = gmixed(:,:,s,:) + phase*gwann(:,:,:,s,iuc)[image]
+!$!           end do
+!$!        end do
+!$!     end do
+!$! 
+!$!     !Change to data output directory
+!$!     call chdir(trim(adjustl(num%g2dir)))
+!$! 
+!$!     !Write data in binary format
+!$!     !Note: this will overwrite existing data!
+!$!     write (filename, '(I9)') iq
+!$!     filename = 'gReq.iq'//trim(adjustl(filename))
+!$!     open(1, file = trim(filename), status = 'replace', access = 'stream')
+!$!     write(1) gmixed
+!$!     close(1)
+!$! 
+!$!     !Change back to working directory
+!$!     call chdir(num%cwd)
+!$!   end subroutine gReq
+  
   subroutine gReq(self, num, iq, qvec)
     !! Calculate the Bloch-Wannier mixed rep. e-ph matrix elements g(Re,q),
     !! where q is an IBZ phonon wave vector and Re is a phonon unit cell.
@@ -1145,7 +1581,7 @@ contains
 
     !Local variables
     integer(i64) :: iuc, s, image, i, image_order(self%gwann_distrib_num_active_images)
-    complex(r64) :: phase
+    complex(r64) ::
     complex(r64), allocatable:: gmixed(:,:,:,:)
     character(len = 1024) :: filename
 
@@ -1162,7 +1598,7 @@ contains
 
     do i = 1, self%gwann_distrib_num_active_images
        image = image_order(i)
-
+       do i = 1, self%
        do iuc = 1, self%gwann_distrib_chunk[image]
           phase = expi(twopi*dot_product(qvec, self%rcells_g(iuc,:)[image]))/self%gwsdeg(iuc)[image]
 
