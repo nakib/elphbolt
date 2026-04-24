@@ -315,7 +315,8 @@ contains
     real(r64), allocatable :: dummy(:)
     complex(r64), allocatable :: gwann_aux(:, :, :, :, :)
     integer(i64), allocatable :: rcells_g_aux(:, :)
-    integer(i64), allocatable :: gwsdeg_aux(:)
+    integer(i64), allocatable :: gwsdeg_aux(:, :, :)
+    real(i64), allocatable :: tmp(:), tmp_aux(:) ! dummy to save wslen
     ! EPW File names:
     character(len=*), parameter :: filename_epwdata = "epwdata.fmt"
     character(len=*), parameter :: filename_epwgwann = "epmatwp1"
@@ -420,12 +421,12 @@ contains
        close(2)
 
        allocate(self%rcells_g(self%gwann_distrib_chunk[1], 3)[*])
-       allocate(self%gwsdeg(self%gwann_distrib_chunk[1])[*])
+       allocate(self%gwsdeg(self%gwann_distrib_chunk[1], 1, 1)[*])
        self%gwsdeg = 0
 
        if(this_image() == 1) then
           allocate(rcells_g_aux(self%gwann_distrib_chunk[1], 3)) !chunk for the 1st image is the largest 
-          allocate(gwsdeg_aux(self%gwann_distrib_chunk[1]))
+          allocate(gwsdeg_aux(self%gwann_distrib_chunk[1]), 1, 1)
 
           open(1, file = filename_gwscells, status = "old")
           open(2, file = filename_gwsdeg, status = "old")
@@ -433,11 +434,11 @@ contains
           do image = 1, self%gwann_distrib_num_active_images
              do iuc = 1, self%gwann_distrib_chunk[image]
                 read(1, *) rcells_g_aux(iuc, :)
-                read(2, *) gwsdeg_aux(iuc)
+                read(2, *) gwsdeg_aux(iuc, 1, 1)
              end do
 
              self%rcells_g(:, :)[image] = rcells_g_aux(:, :)
-             self%gwsdeg(:)[image] = gwsdeg_aux(:)
+             self%gwsdeg(:, 1, 1)[image] = gwsdeg_aux(:, 1, 1)
           end do
 
           close(1)
@@ -449,48 +450,56 @@ contains
        read(1,*) self%wigparam(:), self%dims(:) 
        ! 1-nrr_k, 2-nrr_q, 3-nrr_g, 4-dims, 5-dims2
 
-       allocate(self%rcells_k_nw(3,self%nwsk))
-       allocate(self%elwsdeg_nw(self%nwsk,self%wigparam(4),self%wigparam(4)))
-       allocate(self%wslen_k(self%nwsk))
+       allocate(self%rcells_k(self%nwsk, 3))
+       allocate(self%elwsdeg(self%nwsk,self%dims(1),self%dims(1)))
+       !allocate(self%wslen_k(self%nwsk))
+       allocate(tmp(self%nwsk))
        do iuc = 1,self%nwsk
-          read(1, *) self%rcells_k_nw(:,iuc), self%wslen_k(iuc)
+          !read(1, *) self%rcells_k(iuc, :), self%wslen_k(iuc)
+          read(1, *) self%rcells_k(iuc, :), tmp(iuc)
           do juc = 1,self%dims(1)
-              read(1, *) self%elwsdeg_nw(iuc,juc,:)
+              read(1, *) self%elwsdeg(iuc,juc,:)
           end do
        end do
+       deallocate(tmp)
 
-       allocate(self%rcells_q_nw(3,self%nwsq))
-       allocate(self%phwsdeg_nw(self%nwsq,self%wigparam(5),self%wigparam(5)))
-       allocate(self%wslen_q(self%nwsq))
+       allocate(self%rcells_q(self%nwsq, 3))
+       allocate(self%phwsdeg(self%nwsq,self%dims(2),self%dims(2)))
+       !allocate(self%wslen_q(self%nwsq))
+       allocate(tmp(self%nwsq))
        do iuc = 1,self%nwsq
-          read(1, *) self%rcells_q_nw(:,iuc), self%wslen_q(iuc)
+          read(1, *) self%rcells_q(iuc, :), tmp(iuc)
           do juc = 1,self%dims(2)
-              read(1, *) self%phwsdeg_nw(iuc,juc,:)
+              read(1, *) self%phwsdeg(iuc,juc,:)
           end do
        end do
+       deallocate(tmp)
 
-       allocate(self%rcells_g_nw(3,self%gwann_distrib_chunk[1])[*])
-       allocate(self%gwsdeg_nw(self%dims(1),self%gwann_distrib_chunk[1],self%dims(2))[*])
-       allocate(self%wslen_g(self%gwann_distrib_chunk[1])[*])
-       self%gwsdeg_nw = 0
+       allocate(self%rcells_g(self%gwann_distrib_chunk[1], 3)[*])
+       allocate(self%gwsdeg(self%gwann_distrib_chunk[1], self%dims(1), self%dims(2))[*])
+       !allocate(self%wslen_g(self%gwann_distrib_chunk[1])[*])
+       allocate(tmp(self%gwann_distrib_chunk[1])[*])
+       self%gwsdeg = 0
 
-       if(this_image() == 1) then
-          allocate(rcells_g_aux_nw(3,self%gwann_distrib_chunk[1])) !chunk for the 1st image is the largest
-          allocate(gwsdeg_aux_nw(self%wigparam(4),self%gwann_distrib_chunk[1],self%wigparam(5)))
-          allocate(wslen_g_aux(self%gwann_distrib_chunk[1]))
+       if(this_image() == 1) then ! Read and distribute among all images
+          allocate(rcells_g_aux(self%gwann_distrib_chunk[1], 3)) !chunk for the 1st image is the largest
+          allocate(gwsdeg_aux(self%gwann_distrib_chunk[1], self%dims(1), self%dims(2)))
+          !allocate(wslen_g_aux(self%gwann_distrib_chunk[1]))
+          allocate(tmp_aux(self%gwann_distrib_chunk[1]))
 
           do image = 1, self%gwann_distrib_num_active_images
              do iuc = 1, self%gwann_distrib_chunk[image]
-                read(1, *) rcells_g_aux_nw(:,iuc), wslen_g_aux(iuc)
-                do juc = 1,self%wigparam(4)
-                    read(1, *) gwsdeg_aux_nw(juc,iuc,:)
+                read(1, *) rcells_g_aux(iuc, :), tmp_aux(iuc)
+                do juc = 1,self%dims(1)
+                    read(1, *) gwsdeg_aux(iuc, juc, :)
                 end do
              end do
 
-             self%rcells_g_nw(:, :)[image] = rcells_g_aux_nw(:, :)
-             self%gwsdeg_nw(:,:,:)[image] = gwsdeg_aux_nw(:,:,:)
-             self%wslen_g(:)[image] = wslen_g_aux(:)
+             self%rcells_g(:, :)[image] = rcells_g_aux(:, :)
+             self%gwsdeg(:,:,:)[image] = gwsdeg_aux(:,:,:)
+             !self%wslen_g(:)[image] = wslen_g_aux(:)
           end do
+          deallocate(tmp, tmp_aux)
 
           close(1)
        end if
@@ -1581,6 +1590,7 @@ contains
 
     !Local variables
     integer(i64) :: iuc, s, image, i, image_order(self%gwann_distrib_num_active_images)
+    integer(i64) :: ib, na
     complex(r64) ::
     complex(r64), allocatable:: gmixed(:,:,:,:)
     character(len = 1024) :: filename
@@ -1598,13 +1608,19 @@ contains
 
     do i = 1, self%gwann_distrib_num_active_images
        image = image_order(i)
-       do i = 1, self%
-       do iuc = 1, self%gwann_distrib_chunk[image]
-          phase = expi(twopi*dot_product(qvec, self%rcells_g(iuc,:)[image]))/self%gwsdeg(iuc)[image]
 
-          do s = 1, self%numbranches
-             gmixed(:,:,s,:) = gmixed(:,:,s,:) + phase*gwann(:,:,:,s,iuc)[image]
-          end do
+       ! Loop over nat and nbnds
+       nbnds = size(self%gwsdeg(1, :, 1)[1])
+       nat = size(self%gwsdeg(1, 1, :)[1])
+       do ib = 1, nbnds
+          do na = 1, nat
+             do iuc = 1, self%gwann_distrib_chunk[image]
+                phase = expi(twopi*dot_product(qvec, self%rcells_g(iuc,:)[image]))/self%gwsdeg(iuc, ib, na)[image]
+
+                do s = 1, self%numbranches
+                   gmixed(:,:,s,:) = gmixed(:,:,s,:) + phase*gwann(:,:,:,s,iuc)[image]
+                   ! replace by lapack mat mul
+                end do
        end do
     end do
 
