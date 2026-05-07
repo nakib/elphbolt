@@ -43,27 +43,6 @@ module wannier_module
 
   !external chdir
 
-  ! Defining interfaces for functions to get phases for fourier transforms
-  ! Looks messy, can omit the old formats after some time - DP
-  abstract interface
-     ! Check respective subroutines for descriptions
-     ! Template for fetching degenerecies, supports old and new formats
-     integer(i64) function get_degen_el(self, ind1, ind2, ind3)
-
-       class(wannier), intent(in) :: self
-       integer(i64), intent(in) :: ind1, ind2, ind3
-     end function get_degen_el
-     integer(i64) function get_degen_ph(self, ind1, ind2, ind3)
-
-       class(wannier), intent(in) :: self
-       integer(i64), intent(in) :: ind1, ind2, ind3
-     end function get_degen_ph
-     integer(i64) function get_degen_g(self, ind1, ind2, ind3, image)
-
-       class(wannier), intent(in) :: self
-       integer(i64), intent(in) :: ind1, ind2, ind3, image
-     end function get_degen_g
-  end interface
 
   type Wannier
      !! Standard form data related to Wannierization.
@@ -114,6 +93,7 @@ module wannier_module
      complex(r64), allocatable :: Dphwann(:, :, :)
      !! Dynamical matrix in Wannier representation.
      !complex(r64), allocatable :: gwann(:, :, :, :, :)
+     !integer(i64), allocatable :: wigparams(:), dims(:)
 
      !FOR NOW...
      integer(i64) :: gwann_distrib_num_active_images
@@ -121,9 +101,9 @@ module wannier_module
 
      ! Defining the pointers for the interface (Maybe there is a better way)
      ! Do you always define these pointers with 'pass' (self passing)
-     procedure(get_degen_el), pointer, pass :: el_degen=>null()
-     procedure(get_degen_ph), pointer, pass :: ph_degen=>null()
-     procedure(get_degen_g), pointer, pass :: g_degen=>null()
+!$!      procedure(get_degen_el), pointer, pass :: el_degen=>null()
+!$!      procedure(get_degen_ph), pointer, pass :: ph_degen=>null()
+!$!      procedure(get_degen_g), pointer, pass :: g_degen=>null()
 
      !!
 
@@ -131,13 +111,36 @@ module wannier_module
 
      !procedure :: read, el_wann, ph_wann, gkRp, gReq, g2, &
      !     plot_along_path, reshape_gwann_for_gkRp, deallocate_wannier
-     procedure :: read, plot_along_path, reshape_gwann_for_gkRp, deallocate_wannier
-     procedure, private :: read_epw_Wannier, read_exciting_Wannier, old_degen_el,&
-                        old_degen_ph, old_degen_g, new_degen_el, new_degen_ph, &
-                        new_degen_g
+     procedure :: read, el_wann, ph_wann, gkRp, gReq, g2, plot_along_path,&
+                  reshape_gwann_for_gkRp, deallocate_wannier
+     procedure, private :: read_epw_Wannier, read_exciting_Wannier, get_image_for_g 
+     !procedure, private :: old_degen_el, old_degen_ph, old_degen_g, new_degen_el,&
+     !                      new_degen_ph, new_degen_g
 
   end type Wannier
 
+  ! Defining interfaces for functions to get phases for fourier transforms
+  ! Looks messy, can omit the old formats after some time - DP
+!$!   abstract interface
+!$!      ! Check respective subroutines for descriptions
+!$!      ! Template for fetching degenerecies, supports old and new formats
+!$!      integer(i64) function get_degen_el(self, ind1, ind2, ind3)
+!$! 
+!$!        class(wannier), intent(in) :: self
+!$!        integer(i64), intent(in) :: ind1, ind2, ind3
+!$!      end function get_degen_el
+!$!      integer(i64) function get_degen_ph(self, ind1, ind2, ind3)
+!$! 
+!$!        class(wannier), intent(in) :: self
+!$!        integer(i64), intent(in) :: ind1, ind2, ind3
+!$!      end function get_degen_ph
+!$!      integer(i64) function get_degen_g(self, ind1, ind2, ind3, image)
+!$! 
+!$!        class(wannier), intent(in) :: self
+!$!        integer(i64), intent(in) :: ind1, ind2, ind3, image
+!$!      end function get_degen_g
+!$!   end interface
+!$! 
 contains
 
   subroutine read(self, num)
@@ -189,15 +192,15 @@ contains
     end select
 
     ! Set pointers for fetching degenerecies
-    if(self%old_ws) then
-       self%el_degen=>old_degen_el
-       self%ph_degen=>old_degen_ph
-       self%g_degen=>old_degen_g
-     else
-       self%el_degen=>new_degen_el
-       self%ph_degen=>new_degen_ph
-       self%g_degen=>new_degen_g
-     end if
+!$!     if(self%old_ws) then
+!$!        self%el_degen=>old_degen_el
+!$!        self%ph_degen=>old_degen_ph
+!$!        self%g_degen=>old_degen_g
+!$!      else
+!$!        self%el_degen=>new_degen_el
+!$!        self%ph_degen=>new_degen_ph
+!$!        self%g_degen=>new_degen_g
+!$!      end if
   end subroutine read
 
   subroutine read_exciting_Wannier(self, num)
@@ -355,13 +358,13 @@ contains
     type(numerics), intent(in) :: num
 
     !Local variables
-    integer(i64) :: iuc, ib, jb, image
+    integer(i64) :: iuc, juc, ib, jb, image
     real(r64) :: ef, wigparam(3), dims(2)
     real(r64), allocatable :: dummy(:)
     complex(r64), allocatable :: gwann_aux(:, :, :, :, :)
     integer(i64), allocatable :: rcells_g_aux(:, :)
-    integer(i64), allocatable :: gwsdeg_aux(:, :, :)
-    real(i64), allocatable :: tmp ! dummy to save wslen, might be useful later 
+    integer(i64), allocatable :: gwsdeg_aux(:), gwsdeg_new_aux(:, :, :)
+    !real(r64), allocatable :: tmp ! dummy to save wslen, might be useful later 
     ! EPW File names:
     character(len=*), parameter :: filename_epwdata = "epwdata.fmt"
     character(len=*), parameter :: filename_epwgwann = "epmatwp1"
@@ -494,27 +497,30 @@ contains
        open(1, file = filename_epwwigner, status = "old")
        read(1,*) wigparam(:), dims(:) 
        ! 1-nrr_k, 2-nrr_q, 3-nrr_g, 4-dims, 5-dims2
-
+       
        !! You can setup sanity checks for nrr_k == nwsk, nrr_q == nwsq and so on
-
+       if(wigparam(1) /= self%nwsk .or. wigparam(2) /= self%nwsq .or. &
+          wigparam(3) /= self%nwsg .or. dims(1) /= self%numwannbands)&
+          call exit_with_message("Dimensions mismatch..")
+       
        allocate(self%rcells_k(self%nwsk, 3))
-       allocate(self%elwsdeg_new(self%nwsk,self%dims(1),self%dims(1)))
+       allocate(self%elwsdeg_new(self%nwsk, dims(1), dims(1)))
        !allocate(self%wslen_k(self%nwsk))
        !allocate(tmp(self%nwsk))
        do iuc = 1, self%nwsk
           !read(1, *) self%rcells_k(iuc, :), self%wslen_k(iuc)
-          read(1, *) self%rcells_k(iuc, :), tmp
+          read(1, *) self%rcells_k(iuc, :)
           do juc = 1, dims(1)
               read(1, *) self%elwsdeg_new(iuc,juc,:)
           end do
        end do
 
        allocate(self%rcells_q(self%nwsq, 3))
-       allocate(self%phwsdeg_new(self%nwsq,self%dims(2),self%dims(2)))
+       allocate(self%phwsdeg_new(self%nwsq,dims(2),dims(2)))
        !allocate(self%wslen_q(self%nwsq))
        !allocate(tmp(self%nwsq))
        do iuc = 1,self%nwsq
-          read(1, *) self%rcells_q(iuc, :), tmp
+          read(1, *) self%rcells_q(iuc, :)
           do juc = 1, dims(2)
               read(1, *) self%phwsdeg_new(iuc,juc,:)
           end do
@@ -522,20 +528,20 @@ contains
        !deallocate(tmp)
 
        allocate(self%rcells_g(self%gwann_distrib_chunk[1], 3)[*])
-       allocate(self%gwsdeg_new(self%gwann_distrib_chunk[1], self%dims(1), self%dims(2))[*])
+       allocate(self%gwsdeg_new(self%gwann_distrib_chunk[1], dims(1), dims(2))[*])
        !allocate(self%wslen_g(self%gwann_distrib_chunk[1])[*])
        !allocate(tmp(self%gwann_distrib_chunk[1])[*])
        self%gwsdeg_new = 0
 
        if(this_image() == 1) then ! Read and distribute among all images
           allocate(rcells_g_aux(self%gwann_distrib_chunk[1], 3)) !chunk for the 1st image is the largest
-          allocate(gwsdeg_new_aux(self%gwann_distrib_chunk[1], self%dims(1), self%dims(2)))
+          allocate(gwsdeg_new_aux(self%gwann_distrib_chunk[1], dims(1), dims(2)))
           !allocate(wslen_g_aux(self%gwann_distrib_chunk[1]))
           !allocate(tmp_aux(self%gwann_distrib_chunk[1]))
 
           do image = 1, self%gwann_distrib_num_active_images
              do iuc = 1, self%gwann_distrib_chunk[image]
-                read(1, *) rcells_g_aux(iuc, :), tmp
+                read(1, *) rcells_g_aux(iuc, :)
                 do juc = 1, dims(1)
                     read(1, *) gwsdeg_new_aux(iuc, juc, :)
                 end do
@@ -566,7 +572,7 @@ contains
     class(wannier), intent(in) :: self
     integer(i64), intent(in) :: ind1, ind2, ind3
 
-    old_degen_el = self%phwsdeg(ind1)
+    old_degen_ph = self%phwsdeg(ind1)
   end function old_degen_ph
   
   integer(i64) function old_degen_g(self, ind1, ind2, ind3, image)
@@ -960,8 +966,8 @@ contains
     complex(r64), allocatable :: work(:)
     complex(r64) :: H(self%numwannbands,self%numwannbands), &
          dH(3,self%numwannbands,self%numwannbands)
-    integer(i64) :: ibnd1, ibnd2
-    complex(r64), allocatable :: caux(self%numwannbands,self%numwannbands)  ! initially it was a single value
+    integer(i64) :: ib1, ib2
+    complex(r64) :: caux(self%numwannbands,self%numwannbands)  ! initially it was a single value
 
     !External procedures
     external :: zheev
@@ -983,10 +989,12 @@ contains
 !$!           caux = expi(twopi*dot_product(kvecs(ik,:),self%rcells_k(iuc,:)))&
 !$!                /self%elwsdeg(iuc)
 !$!           H = H + caux*self%Hwann(iuc,:,:)
-          
-          do concurrent(ibnd1 = 1:self%numwannbands, ibnd2 = 1:self%numwannbands)
-             if(self%el_degen(iuc, ibnd1, ibnd2)/=0.0)  &
-                caux(ibnd1, ibnd2) = 1.0_r64/self%el_degen(iuc, ibnd1, ibnd2)
+          caux = (0.0_r64, 0.0_r64) 
+          do concurrent(ib1 = 1:self%numwannbands, ib2 = 1:self%numwannbands)
+             !if(self%el_degen(iuc, ib1, ib2)/=0.0)  &
+             !   caux(ib1, ib2) = 1.0_r64/self%el_degen(iuc, ib1, ib2)
+             if(self%elwsdeg_new(iuc, ib1, ib2)/=0)  &
+                caux(ib1, ib2) = 1.0_r64/self%elwsdeg_new(iuc, ib1, ib2)
           end do
           caux = caux*expi(twopi*dot_product(kvecs(ik,:),self%rcells_k(iuc,:)))
           H = H + caux*self%Hwann(iuc, :, :)
@@ -1159,7 +1167,6 @@ contains
           caux_mat(:, :) = (0.0_r64, 0.0_r64)
           do jat = 1, crys%numatoms
              do iat = 1, crys%numatoms
-                if(self%ph_degen(iuc, iat, jat)==0) cycle
                 ! all vectors in lattice coordinates
                 dist(:) = self%rcells_q(iuc, :) &
                      - crys%basis(:, iat) + crys%basis(:, jat)
@@ -1173,9 +1180,14 @@ contains
 !$!                    caux_mat((iat-1)*3+1:iat*3, (jat-1)*3+1:jat*3) = &
 !$!                         caux_mat((iat-1)*3+1:iat*3, (jat-1)*3+1:jat*3) + &
 !$!                         caux / (self%phwsdeg(iuc) * num_wrap)
-                   caux_mat((iat-1)*3+1:iat*3, (jat-1)*3+1:jat*3) = &
+                   !if(self%ph_degen(iuc, iat, jat)/=0) &
+                   !   caux_mat((iat-1)*3+1:iat*3, (jat-1)*3+1:jat*3) = &
+                   !     caux_mat((iat-1)*3+1:iat*3, (jat-1)*3+1:jat*3) + &
+                   !     caux / (self%ph_degen(iuc, iat, jat) * num_wrap)
+                   if(self%phwsdeg_new(iuc, iat, jat)/=0) &
+                      caux_mat((iat-1)*3+1:iat*3, (jat-1)*3+1:jat*3) = &
                         caux_mat((iat-1)*3+1:iat*3, (jat-1)*3+1:jat*3) + &
-                        caux / (self%ph_degen(iuc, iat, jat) * num_wrap)
+                        caux / (self%phwsdeg_new(iuc, iat, jat) * num_wrap)
                 end do
              end do
           end do
@@ -1452,10 +1464,11 @@ contains
 
     !Local variables
     integer(i64) :: ip, iws, nws, np, mp, sp, mtype
-    integer(i64) :: iat, jat
+    integer(i64) :: na
     complex(r64) :: caux, u(self%numbranches), gbloch, unm, &
-         overlap(self%numwannbands,self%numwannbands), glprefac
+         overlap(self%numwannbands,self%numwannbands), glprefac, phase
     complex(r64), allocatable :: UkpgUkdag(:, :), UkpgUkdaguq(:)
+    integer(i64) :: i, image
 
     if(wannspace /= 'el' .and. wannspace /= 'ph') then
        call exit_with_message(&
@@ -1493,29 +1506,41 @@ contains
           end do
        end do
 
-       do iws = 1, nws !over matrix elements WS cell
-          !Apply electron rotations
-          caux = 0
-          do concurrent(sp = 1:self%numbranches, np = 1:self%numwannbands, mp = 1:self%numwannbands)
-             ! do sp-> phonon branches; np-> over final electron band; 
-             ! mp-> over initial electron band
-             if(wannspace == 'ph') then
-                iat = 
-                jat = 
-                if(self%ph_degen(iws, iat, jat)/=0) &
-                caux = expi(twopi*dot_product(qvec, self%rcells_q(iws, :)))&
-                       /self%phwsdeg(iws)
-             else
-                if(self%el_degen(iws, np, mp)/=0) &
-                caux = expi(twopi*dot_product(kvec, self%rcells_k(iws,:)))&
-                       /self%elwsdeg(iws)
-             end if
-                      
-             !caux = caux + overlap(mp,np)*gmixed(np, mp, sp, iws)
-             UkpgUkdag(sp, iws) = UkpgUkdag(sp, iws) + overlap(mp,np)*gmixed(np, mp, sp, iws)
-             !   UkpgUkdag(sp, iws) = UkpgUkdag(sp, iws) + caux
-          end do
-          gbloch = gbloch + UkpgUkdaguq(iws)
+       do concurrent(iws = 1: nws, sp = 1:self%numbranches)
+          caux = (0.0_r64, 0.0_r64)
+          if(wannspace == 'ph') then
+             na = (sp - 1)/3 + 1 
+             !phase = expi(twopi*dot_product(qvec, self%rcells_q(iws, :)))
+             do i = 1, self%gwann_distrib_num_active_images
+                image = self%get_image_for_g(iws)
+                do np = 1, self%numwannbands
+                   !phase = (0.0_r64, 0.0_r64)
+                   !if(self%g_degen(iws, np, na, image) /= 0) then
+                   if(self%gwsdeg_new(iws, np, na)[image] /= 0) then
+                      !phase = expi(twopi*dot_product(qvec, self%rcells_q(iws, :)))&
+                      !             /self%g_degen(iws, np, na, image)
+                      phase = expi(twopi*dot_product(qvec, self%rcells_q(iws, :)))&
+                                   /self%gwsdeg_new(iws, np, na)[image]
+                      overlap = overlap*phase
+                      caux = caux + dot_product(overlap(:,np), gmixed(np, :, sp, iws))
+                   end if
+                end do
+             end do
+          else
+             !phase = expi(twopi*dot_product(kvec, self%rcells_k(iws,:)))
+             do concurrent(np = 1:self%numwannbands, mp = 1:self%numwannbands)
+                !phase = (0.0_r64, 0.0_r64)
+                !if(self%el_degen(iws, np, mp)/=0) then
+                if(self%elwsdeg_new(iws, np, mp)/=0) then
+                   !phase = expi(twopi*dot_product(kvec, self%rcells_k(iws,:)))&
+                   !            /self%el_degen(iws, np, mp)
+                   phase = expi(twopi*dot_product(kvec, self%rcells_k(iws,:)))&
+                               /self%elwsdeg_new(iws, np, mp)
+                   caux = caux + overlap(mp,np)*gmixed(np, mp, sp, iws)*phase
+                end if
+             end do
+          end if
+          UkpgUkdag(sp, iws) = UkpgUkdag(sp, iws) + caux
        end do
 
        do iws = 1, nws !over matrix elements WS cell
@@ -1625,8 +1650,10 @@ contains
 
     !Local variables
     integer(i64) :: iuc, image, i, image_order(self%gwann_distrib_num_active_images)
+    integer(i64) :: ib1, ib2 !ib, na 
     complex(r64) :: caux !phase(self%nwsk), caux
-    complex(r64) :: gmixed(self%numwannbands, self%numwannbands, self%numbranches, self%nwsq)
+    !complex(r64) :: gmixed(self%numwannbands, self%numwannbands, self%numbranches, self%nwsq)
+    complex(r64) :: gmixed(self%numwannbands, self%numwannbands, self%numbranches, self%nwsg)
 
     character(len = 1024) :: filename
 
@@ -1651,17 +1678,30 @@ contains
        do i = 1, self%gwann_distrib_num_active_images
           image = image_order(i)
 
-          caux = expi(twopi*dot_product(kvec, self%rcells_k(iuc,:))) ! phase(iuc)
-          do concurrent(ibnd1 = 1:self%numwannbands, ibnd2 = 1:self%numwannbands)
-             if(self%el_degen(iuc, ibnd1, ibnd2)/=0.0) then
-                caux = caux/self%el_degen(iuc, ibnd1, ibnd2)
-             else
-                caux = (0.0_r64, 0.0_r64)
-             end if
-             gmixed(ibnd1,ibnd2,:,self%gwann_distrib_start[image]:self%gwann_distrib_end[image]) = &
-                  gmixed(ibnd1,ibnd2,:,self%gwann_distrib_start[image]:self%gwann_distrib_end[image]) + &
-                  caux*gwann(ibnd1,ibnd2,:,1:self%gwann_distrib_chunk[image], iuc)[image]
+          !caux = expi(twopi*dot_product(kvec, self%rcells_k(iuc,:))) ! phase(iuc)
+          do concurrent(ib1 = 1:self%numwannbands, ib2 = 1:self%numwannbands)
+             caux = (0.0_r64, 0.0_r64)
+             !if(self%el_degen(iuc, ib1, ib2)/=0.0) &
+             !    caux = expi(twopi*dot_product(kvec, self%rcells_k(iuc,:)))&
+             !                /self%el_degen(iuc, ib1, ib2)
+             if(self%elwsdeg_new(iuc, ib1, ib2)/=0) &
+                 caux = expi(twopi*dot_product(kvec, self%rcells_k(iuc,:)))&
+                             /self%elwsdeg_new(iuc, ib1, ib2)
+
+             gmixed(ib1,ib2,:,self%gwann_distrib_start[image]:self%gwann_distrib_end[image]) = &
+                  gmixed(ib1,ib2,:,self%gwann_distrib_start[image]:self%gwann_distrib_end[image]) + &
+                  caux*gwann(ib1,ib2,:,1:self%gwann_distrib_chunk[image], iuc)[image]
           end do
+!$!           do concurrent(na = 1:self%dims(2), ib = 1:self%numwannbands)
+!$!              if(self%el_degen(iuc, ib, na, image) /= 0) &
+!$!                 caux = caux/self%el_degen(iuc, ib, na, image)
+!$!              else
+!$!                 caux = (0.0_r64, 0.0_r64)
+!$!              end if
+!$!              gmixed(ib, : , 3*(na - 1) + 1:3*na, self%gwann_distrib_start[image]:self%gwann_distrib_end[image]) = &
+!$!                   gmixed(ib, : ,3*(na - 1) + 1:3*na, self%gwann_distrib_start[image]:self%gwann_distrib_end[image]) + &
+!$!                   caux*gwann(ib, : ,3*(na - 1) + 1:3*na, 1:self%gwann_distrib_chunk[image], iuc)[image]
+!$!           end do
        end do
     end do
 
@@ -1749,9 +1789,9 @@ contains
     real(r64), intent(in) :: qvec(3)
 
     !Local variables
-    integer(i64) :: iuc, s, image, i, image_order(self%gwann_distrib_num_active_images)
-    integer(i64) :: ib, na, modes(3)
-    complex(r64) ::
+    integer(i64) :: iuc, image, i, image_order(self%gwann_distrib_num_active_images)
+    integer(i64) :: ib, na, s
+    complex(r64) :: phase
     complex(r64), allocatable:: gmixed(:,:,:,:)
     character(len = 1024) :: filename
 
@@ -1769,17 +1809,25 @@ contains
     do i = 1, self%gwann_distrib_num_active_images
        image = image_order(i)
 
-       ! Loop over nat and nbnds
-       nbnds = size(self%gwsdeg(1, :, 1)[1])
-       nat = size(self%gwsdeg(1, 1, :)[1])
-       do ib = 1, nbnds
+       do ib = 1, self%numwannbands
           do iuc = 1, self%gwann_distrib_chunk[image]
              phase = expi(twopi*dot_product(qvec, self%rcells_g(iuc,:)[image]))
 
+!$!              do na = 1, self%dims(2)
+!$!                 !na = (s - 1)/3 + 1
+!$!                 if(self%g_degen(iuc, ib, na, image) == 0) cycle
+!$!                 phase = phase/self%g_degen(iuc, ib, na, image)
+!$!                 gmixed(ib,:,3*(na - 1) + 1:3*na,:) = gmixed(ib,:,3*(na - 1) + 1:3*na,:) + phase*gwann(ib,:,:,3*(na - 1) + 1:3*na,iuc)[image]
+!$!                 ! replace by lapack mat mul
+!$!              ! call zaxpy()
+!$!              end do
              do s = 1, self%numbranches
                 na = (s - 1)/3 + 1
-                phase = phase/self%gwsdeg(iuc, ib, na)[image]
-                gmixed(ib,:,modes,:) = gmixed(ib,:,modes,:) + phase*gwann(ib,:,:,modes,iuc)[image]
+                !if(self%g_degen(iuc, ib, na, image) == 0) cycle
+                if(self%gwsdeg_new(iuc, ib, na)[image] == 0) cycle
+                !phase = phase/self%g_degen(iuc, ib, na, image)
+                phase = phase/self%gwsdeg_new(iuc, ib, na)[image]
+                gmixed(ib,:,s,:) = gmixed(ib,:,s,:) + phase*gwann(ib,:,:,s,iuc)[image]
                 ! replace by lapack mat mul
              ! call zaxpy()
              end do
@@ -1897,6 +1945,7 @@ contains
        read(1,*) k(1, :)
 
        !Calculate g(k, Rp)
+       call print_message("Computing gkRp...")
        call self%gkRp(num, 0_i64, k(1, :))
 
        !Load gmixed from file
@@ -1910,6 +1959,7 @@ contains
        !Change back to working directory
        call chdir(num%cwd)
 
+       call print_message("Computing el_wann...")
        call el_wann(self, crys, 1_i64, k, el_ens_k, el_vels_k, el_evecs_k, &
             scissor = scissor)
 
@@ -1919,6 +1969,7 @@ contains
           kppathvecs(i, :) = k(1, :) .umklapp. qpathvecs(i, :)
        end do
 
+       call print_message("Computing g2...")
        do i = 1, nqpath !Over phonon wave vectors path
           !TODO Would be great to have a progress bar here.
 
@@ -2073,4 +2124,14 @@ contains
 
     if(this_image() == 1) print*, 'New shape of gwann = ', shape(gwann)
   end subroutine reshape_gwann_for_gkRp
+
+  pure integer(i64) function get_image_for_g(self, ig)
+     ! Returns the image value according to the order
+     class(wannier), intent(in) :: self
+     integer(i64), intent(in) :: ig
+
+     get_image_for_g = self%gwann_distrib_num_active_images
+     if(this_image() + ig - 1 /= self%gwann_distrib_num_active_images) &
+       get_image_for_g = modulo(ig + this_image() - 1, self%gwann_distrib_num_active_images)
+  end function get_image_for_g
 end module wannier_module

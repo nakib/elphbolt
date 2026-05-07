@@ -155,6 +155,9 @@ program elphbolt
         call t_event%end_timer('Plots along path')
      end if
 
+     !Test - along need plot along path
+     call exit
+
      call subtitle("Calculating interactions...")
 
      if(num%phdef_Tmat) then
