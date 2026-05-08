@@ -1485,6 +1485,7 @@ contains
 
     if(ph_en == 0) then !zero out matrix elements for zero energy phonons
        g2 = 0
+       call print_message("ph_en==0 is getting triggered..")
     else
        if(wannspace == 'ph') then
           nws = self%nwsg
@@ -1546,7 +1547,8 @@ contains
        do iws = 1, nws !over matrix elements WS cell
           !Apply phonon rotation
           !(Recall that the phonon eigenvector *did not* come out pre-daggered from ph_wann_epw.)
-          UkpgUkdaguq(iws) = UkpgUkdaguq(iws) + dot_product(conjg(u),UkpgUkdag(:, iws))
+          !UkpgUkdaguq(iws) = UkpgUkdaguq(iws) + dot_product(conjg(u),UkpgUkdag(:, iws))
+          gbloch = gbloch + dot_product(conjg(u),UkpgUkdag(:, iws))
        end do
 
 !$!        do iws = 1, nws !over matrix elements WS cell
@@ -1573,6 +1575,7 @@ contains
 
        g2 = 0.5_r64*real(gbloch*conjg(gbloch))/ &
             ph_en*g2unitfactor !eV^2
+       if(g2==0) call print_message("g2 is zero..")
     end if
   end function g2
 
@@ -1705,6 +1708,8 @@ contains
        end do
     end do
 
+    if(all(abs(gmixed)==0)) call print_message("All gkRp are zero..") 
+    
     !Change to data output directory
     call chdir(trim(adjustl(num%g2dir)))
 
