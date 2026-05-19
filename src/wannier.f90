@@ -557,6 +557,7 @@ contains
     end if
 
     sync all
+    call print_message("Reading complete")
   end subroutine read_EPW_Wannier
   
   !! - This is the ugly part - !!
@@ -1485,7 +1486,7 @@ contains
 
     if(ph_en == 0) then !zero out matrix elements for zero energy phonons
        g2 = 0
-       call print_message("ph_en==0 is getting triggered..")
+       !call print_message("ph_en==0 is getting triggered..")
     else
        if(wannspace == 'ph') then
           nws = self%nwsg
@@ -1680,6 +1681,7 @@ contains
 
        do i = 1, self%gwann_distrib_num_active_images
           image = image_order(i)
+          !image = i
 
           !caux = expi(twopi*dot_product(kvec, self%rcells_k(iuc,:))) ! phase(iuc)
           do concurrent(ib1 = 1:self%numwannbands, ib2 = 1:self%numwannbands)
@@ -1687,13 +1689,13 @@ contains
              !if(self%el_degen(iuc, ib1, ib2)/=0.0) &
              !    caux = expi(twopi*dot_product(kvec, self%rcells_k(iuc,:)))&
              !                /self%el_degen(iuc, ib1, ib2)
-             if(self%elwsdeg_new(iuc, ib1, ib2)/=0) &
-                 caux = expi(twopi*dot_product(kvec, self%rcells_k(iuc,:)))&
-                             /self%elwsdeg_new(iuc, ib1, ib2)
+!$!              if(self%elwsdeg_new(iuc, ib1, ib2)/=0) &
+!$!                  caux = expi(twopi*dot_product(kvec, self%rcells_k(iuc,:)))&
+!$!                              /self%elwsdeg_new(iuc, ib1, ib2)
 
-             gmixed(ib1,ib2,:,self%gwann_distrib_start[image]:self%gwann_distrib_end[image]) = &
-                  gmixed(ib1,ib2,:,self%gwann_distrib_start[image]:self%gwann_distrib_end[image]) + &
-                  caux*gwann(ib1,ib2,:,1:self%gwann_distrib_chunk[image], iuc)[image]
+!$!              gmixed(ib1,ib2,:,self%gwann_distrib_start[image]:self%gwann_distrib_end[image]) = &
+!$!                   gmixed(ib1,ib2,:,self%gwann_distrib_start[image]:self%gwann_distrib_end[image]) + &
+!$!                   caux*gwann(ib1,ib2,:,1:self%gwann_distrib_chunk[image], iuc)[image]
           end do
 !$!           do concurrent(na = 1:self%dims(2), ib = 1:self%numwannbands)
 !$!              if(self%el_degen(iuc, ib, na, image) /= 0) &
