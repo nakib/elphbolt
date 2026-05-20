@@ -35,7 +35,7 @@ program elphbolt
   use interactions, only: calculate_gReq, calculate_gkRp, &
        calculate_eph_interaction_ibzq, calculate_eph_interaction_ibzk, &
        calculate_echimp_interaction_ibzk, calculate_3ph_interaction, &
-       calculate_3ph_interaction_perm
+       calculate_3ph_interaction_perm, calculate_3ph_phasespace
   use phonon_defect_module, only: phonon_defect
   use Green_function, only: calculate_retarded_phonon_D0
   use nano_module, only: nanostructure
@@ -139,6 +139,9 @@ program elphbolt
         allocate(bt_nano%ph_rta_rates_subs_ibz, source=bt%ph_rta_rates_subs_ibz)
      end if
 
+     !Calculate 3ph phase space
+     if(num%calculate_3ph_phasespace) call calculate_3ph_phasespace(ph, crys, num)
+
      call t_event%end_timer('Density of states and one-particle scattering rates')
 
      if(num%plot_along_path) then
@@ -240,7 +243,7 @@ program elphbolt
 !!$        call el%deallocate_eigenvecs
 !!$     end if
 
-     if(num%onlyphbte .or. num%drag) then
+     if(num%onlyphbte .or. num%drag) then        
         if(.not. (num%read_V .or. num%read_W)) then
            call t_event%start_timer('IBZ q ph-ph interactions')
 
