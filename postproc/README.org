@@ -20,3 +20,48 @@
     Above you may choose "ph" or "el" for phonons or electrons, respectively. For the latter, you may pass the chemical potential value.
 
     The results will be written in a subdirectory there called ~postproc_results~.
+
+** ~cross_plane~
+
+*** Build
+This tool uses a minimal CMake setup and depends only on the C++ standard library.
+
+To build:
+
+#+BEGIN_SRC bash
+mkdir build
+cd build
+cmake ..
+cmake --build .
+#+END_SRC
+
+*** Install
+To install the executable into the CMake source directory (i.e., alongside ~cross_plane.cpp~):
+
+#+BEGIN_SRC bash
+cmake --install .
+#+END_SRC
+
+This will place the ~cross_plane~ binary in the postproc folder.
+
+*** Run
+
+The program reads the *elphbolt* output and computes the cross-plane thermal conductivity
+using the Vermeersch model. 
+
+In the directory containing the *elphbolt* output files, execute:
+#+BEGIN_SRC bash
+cross_plane ELPHBOLT_STDOUT n[0] n[1] n[2] thickness_begin[nm] thickness_end[nm] nsteps
+#+END_SRC
+
+Where:
+
+- ~ELPHBOLT_STDOUT~ : path to the elphbolt output file
+- ~n[0] n[1] n[2]~ : transport direction vector components, that is the thin-film normal
+- ~thickness_begin[nm]~ : starting thickness in nanometers
+- ~thickness_end[nm]~ : final thickness in nanometers
+- ~nsteps~ : number of thickness sampling points
+
+The program computes the cross-plane thermal conductivity over the specified thickness range, for the given temperature on 
+the standard output file.
+
