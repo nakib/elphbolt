@@ -344,12 +344,13 @@ contains
        self%Y_OTF = Y_OTF
        self%solve_bulk = solve_bulk
        self%solve_nano = solve_nano
-       self%num_batches = num_batches
+       !self%num_batches = num_batches
        self%restart_from_batch_record = restart_from_batch_record
        self%calculate_3ph_phasespace = calculate_3ph_phasespace
     else
        self%mesh_ref = 1 !Enforce this for superconductivity mode
     end if
+    self%num_batches = num_batches
     self%use_Wannier_ifc2s = use_Wannier_ifc2s
     self%read_gk2 = read_gk2
     self%fsthick = fsthick
