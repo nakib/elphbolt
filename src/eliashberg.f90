@@ -113,9 +113,7 @@ contains
     ph_deltas = ph_deltas*el%spinnormed_dos_fermi
 
     ! Reduce ph_deltas
-    sync all
     call co_sum(ph_deltas)
-    sync all
 
     call print_message("Calculating a2F for all IBZ electrons...")
 
@@ -257,9 +255,7 @@ contains
     end if
 
     !Reduce iso_a2F_branches
-    sync all
     call co_sum(iso_a2F_branches)
-    sync all
 
     !Write isotropic a2F to file
     call chdir(num%cwd)
