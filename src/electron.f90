@@ -104,6 +104,8 @@ module electron_module
      real(r64), allocatable :: Ws_irred(:, :), Ws(:, :)
      !! Electron delta functions normalized by spinnormed_dos_fermi
 
+
+     integer, allocatable :: symmetries(:, :)
    contains
 
      procedure, public :: initialize=>read_input_and_setup, deallocate_eigenvecs
@@ -462,8 +464,10 @@ contains
     call write2file_rank2_real("el.wavevecs_ibz", self%wavevecs_irred)
 
     !Create symmetrizers of wave vector dependent vectors ShengBTE style
-    allocate(self%symmetrizers(3, 3, self%nwv))
+    allocate(self%symmetrizers(3, 3, self%nwv), self%symmetries(sym%nsymm, self%nwv))
+    print *, "NWV: ", self%nwv
     self%symmetrizers = 0.0_r64
+    self%symmetries = 0 
     do i = 1, self%nwv
        ii = self%indexlist(i)
        kk = 0
@@ -472,8 +476,10 @@ contains
              self%symmetrizers(:, :, i) = self%symmetrizers(:, :, i) + &
                   sym%crotations_orig(:, :, jj)
              kk = kk + 1
+             self%symmetries(kk, i) = jj 
           end if
        end do
+      !  if(this_image() == 1) print *, "k-point index in FBZ: ", i, "number of symmetries: ", self%symmetries(1:kk, i)
        if(kk > 1) then
           self%symmetrizers(:, :, i) = self%symmetrizers(:, :, i)/kk
        end if

@@ -35,7 +35,8 @@ program elphbolt
   use interactions, only: calculate_gReq, calculate_gkRp, &
        calculate_eph_interaction_ibzq, calculate_eph_interaction_ibzk, &
        calculate_echimp_interaction_ibzk, calculate_3ph_interaction, &
-       calculate_3ph_interaction_perm, calculate_3ph_phasespace
+       calculate_3ph_interaction_perm, calculate_3ph_phasespace, symmetrize_echimp_interaction_ibzk, &
+       symmetrize_eph_interaction_ibzk
   use phonon_defect_module, only: phonon_defect
   use Green_function, only: calculate_retarded_phonon_D0
   use nano_module, only: nanostructure
@@ -224,6 +225,9 @@ program elphbolt
         call calculate_eph_interaction_ibzk(wann, crys, el, ph, num, 'X')
 
         call t_event%end_timer('IBZ e-ph transition probabilities')
+
+        ! Symmetrize e-ph transition probabilities  
+        call symmetrize_eph_interaction_ibzk(el, num, wann, ph)
      end if
 
      if(num%need_Wannier) then
@@ -239,6 +243,9 @@ program elphbolt
            call calculate_echimp_interaction_ibzk(crys, el, num)
 
            call t_event%end_timer('e-ch. imp. interactions')
+
+           ! Symmetrize e-chimp transition probabilities
+           call symmetrize_echimp_interaction_ibzk(el, num)
         end if
      end if
 

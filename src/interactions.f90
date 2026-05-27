@@ -53,7 +53,8 @@ module interactions
        calculate_W_fromcgV2, calculate_W3ph_OTF, calculate_Y_OTF, &
        Vm2_3ph, calculate_Xee_OTF, calculate_Xee_13_OTF, &
        calculate_ph_rta_coherence_rates, calculate_3ph_interaction_perm, &
-       calculate_3ph_phasespace
+       calculate_3ph_phasespace, symmetrize_echimp_interaction_ibzk, &
+       symmetrize_eph_interaction_ibzk
 
   !external chdir, system
 
@@ -84,7 +85,8 @@ contains
     real(r64) :: prefac, overlap, Gsum, &
          Gplusq(3), eps_3x3(3, 3)
     integer :: ik1, ik2, ik3
-
+    
+   !  allocate(copy_evec_k(size(evec_k)))
     !This is [U(k')U^\dagger(k)]_nm squared
     !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
     overlap = (abs(dot_product(evec_kp, evec_k)))**2
@@ -2498,7 +2500,7 @@ contains
 
     !Local variables
     integer(i64) :: nstates_irred, istate, m, ik, ik_fbz, n, ikp, s, &
-         iq_fine, iq_coarse, index_start, index_end, chunk, count, nprocs, num_active_images, &
+         iq_fine, iq_coarse, index_start, index_end, chunk, counter, nprocs, num_active_images, &
          ibatch, num_batches, batch_range(3)
     real(r64) :: ph_ens_iq(1, ph%numbands), qlist(1, 3), &
          const, bosefac, fermi_minus_fac, fermi_plus_fac, en_ph, en_el, &
@@ -2509,6 +2511,7 @@ contains
     complex(r64) :: ph_evecs_iq(1, ph%numbands,ph%numbands)
     character(len = 1024) :: filename_g, filename_plus, filename_minus, batch_filename
     logical :: needfinephon
+    logical, allocatable :: degenerate(:) !array with flags indicating if any of the states involved into interaction is degenerate
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
     type(vec) :: k_vec, kp_vec, q_vec, q_vec_coarse
 
@@ -2532,7 +2535,7 @@ contains
        allocate(g2_istate(nprocs))
        g2_istate(:) = 0.0_r64
     end if
-
+    
     !Associate delta function procedure pointer
     delta_fn_ptr => get_delta_fn_pointer(num%tetrahedra)
 
@@ -2582,6 +2585,8 @@ contains
           write(*, "(A, I10)") " #states/image <= ", chunk
        end if
 
+       allocate(degenerate(el%nwv*wann%numwannbands*wann%numbranches)) 
+
        !Only work with the active images
        if(this_image() <= num_active_images) then
           do istate = index_start, index_end !over IBZ blocks states
@@ -2603,10 +2608,15 @@ contains
              ik_fbz = el%indexlist_irred(ik)
 
              !Electron energy
-             en_el = el%ens_irred(ik, m)
+             en_el = el%ens_irred(ik, m)    
 
              !Apply energy window to initial (IBZ blocks) electron
              if(abs(en_el - el%enref) > el%fsthick) cycle
+
+             !Set degenerate to false for all processes 
+             degenerate = .false.
+             !Check if |m, ik> is degenerate
+             if(count(abs(el%ens_irred(ik, :) - en_el) < 1.0e-4) > 1) degenerate = .true. 
 
              !Create initial electron wave vector
              k_vec = vec(ik_fbz, el%wvmesh, crys%reclattvecs)
@@ -2640,7 +2650,7 @@ contains
              end if
 
              !Initialize eligible process counter for this state
-             count = 0
+             counter = 0
 
              !Run over final (FBZ blocks) electron wave vectors
              do ikp = 1, el%nwv
@@ -2673,20 +2683,25 @@ contains
                    !Apply energy window to final electron
                    if(abs(el%ens(ikp, n) - el%enref) > el%fsthick) cycle
 
+                   !Check if |n, ikp> is degenerate
+                   if(count(abs(el%ens(ikp, :) - el%ens(ikp, n)) < 1.0e-4) > 1) then 
+                     degenerate(counter+1: counter+wann%numbranches) = .true. 
+                   end if 
+
                    !Run over phonon branches
                    do s = 1, wann%numbranches
                       !Increment g2 processes counter
-                      count = count + 1
+                      counter = counter + 1
 
                       if(key == 'g') then
                          !Calculate |g_mns(<k>,q)|^2
                          if(needfinephon) then
-                            g2_istate(count) = wann%g2(crys, k_vec%frac, q_vec%frac, &
+                            g2_istate(counter) = wann%g2(crys, k_vec%frac, q_vec%frac, &
                                  el%evecs_irred(ik, m, :), el%evecs(ikp, n, :), &
                                  ph_evecs_iq(1, s, :), ph_ens_iq(1, s), &
                                  gkRp_ik, 'ph')
                          else
-                            g2_istate(count) = wann%g2(crys, k_vec%frac, q_vec_coarse%frac, &
+                            g2_istate(counter) = wann%g2(crys, k_vec%frac, q_vec_coarse%frac, &
                                  el%evecs_irred(ik, m, :), el%evecs(ikp, n, :), &
                                  ph%evecs(iq_coarse, s, :), ph%ens(iq_coarse, s), &
                                  gkRp_ik, 'ph')
@@ -2695,8 +2710,17 @@ contains
                          !Phonon energy
                          if(needfinephon) then
                             en_ph = ph_ens_iq(1, s)
+                            !Check if |s, iq> is degenerate
+                            if(count(abs(ph_ens_iq(1, :) - en_ph) < 1.0e-4) > 1) degenerate(counter) = .true. 
+                           !  print *,  "degenerate: ", degenerate(counter), "for state with e :", en_ph, &
+                           !  "in array :", ph_ens_iq(1, :)
                          else
                             en_ph = ph%ens(iq_coarse, s)
+                            !Check if |s, iq> is degenerate
+                            if(count(abs(ph%ens(iq_coarse, :) - en_ph) < 1.0e-4) > 1) degenerate(counter) = .true.
+                           !  print *, "degenerate: ", degenerate(counter), "for state with e :", & 
+                           !  en_ph, "in array :", ph%ens(iq_coarse, :) 
+                            
                          end if
 
                          if(key == 'X') then
@@ -2734,18 +2758,18 @@ contains
 
                          !Save X+/-
                          if(en_ph >= 0.5e-3) then !Use a small phonon energy cut-off
-                            TPplus_istate(count) = g2_istate(count)*occup_fac_plus*delta_plus
-                            TPminus_istate(count) = g2_istate(count)*occup_fac_minus*delta_minus
+                            TPplus_istate(counter) = g2_istate(counter)*occup_fac_plus*delta_plus
+                            TPminus_istate(counter) = g2_istate(counter)*occup_fac_minus*delta_minus
                          end if
 
                          !Save final electron and interacting phonon states (same for + and -)
-                         istate_el(count) = mux_state(el%numbands, n, ikp)
+                         istate_el(counter) = mux_state(el%numbands, n, ikp)
                          if(needfinephon) then
                             !Write fine phonon index as negative so that the iterator
                             !knows to interpolate phonon quantities at this wave vector.
-                            istate_ph(count) = -mux_state(ph%numbands, s, iq_fine)
+                            istate_ph(counter) = -mux_state(ph%numbands, s, iq_fine)
                          else
-                            istate_ph(count) = mux_state(ph%numbands, s, iq_coarse)
+                            istate_ph(counter) = mux_state(ph%numbands, s, iq_coarse)
                          end if
                       end if
                    end do !s
@@ -2761,7 +2785,7 @@ contains
                 write (filename_g, '(I9)') istate
                 filename_g = 'gk2.istate'//trim(adjustl(filename_g))
                 open(1, file = trim(filename_g), status = 'replace', access = 'stream')
-                write(1) count
+                write(1) counter
                 write(1) g2_istate
                 close(1)
              end if
@@ -2782,8 +2806,8 @@ contains
 
              if(key /= 'g') then
                 !Multiply constant factor, unit factor, etc.
-                TPplus_istate(1:count) = const*TPplus_istate(1:count) !THz
-                TPminus_istate(1:count) = const*TPminus_istate(1:count) !THz
+                TPplus_istate(1:counter) = const*TPplus_istate(1:counter) !THz
+                TPminus_istate(1:counter) = const*TPminus_istate(1:counter) !THz
 
                 !Change to data output directory
                 call chdir(trim(adjustl(num%Xdir)))
@@ -2791,17 +2815,19 @@ contains
                 !Write data in binary format
                 !Note: this will overwrite existing data!
                 open(1, file = trim(filename_plus), status = 'replace', access = 'stream')
-                write(1) count
-                write(1) TPplus_istate(1:count)
-                write(1) istate_el(1:count)
-                write(1) istate_ph(1:count)
+                write(1) counter
+                write(1) TPplus_istate(1:counter)
+                write(1) istate_el(1:counter)
+                write(1) istate_ph(1:counter)
+                write(1) degenerate(1:counter)
                 close(1)
 
                 open(1, file = trim(filename_minus), status = 'replace', access = 'stream')
-                write(1) count
-                write(1) TPminus_istate(1:count)
-                write(1) istate_el(1:count)
-                write(1) istate_ph(1:count)
+                write(1) counter
+                write(1) TPminus_istate(1:counter)
+                write(1) istate_el(1:counter)
+                write(1) istate_ph(1:counter)
+                write(1) degenerate(1:counter)
                 close(1)
              end if
 
@@ -3300,7 +3326,7 @@ contains
 
     !Local variables
     integer(i64) :: nstates_irred, istate, m, ik, n, ikp, &
-         start, end, chunk, count, nprocs, num_active_images
+         start, end, chunk, counter, nprocs, num_active_images
     real(r64) :: const, en_el, en_el_p, delta, g2
     real(r64), allocatable :: Xchimp_istate(:)
     integer(i64), allocatable :: istate_el(:)
@@ -3311,6 +3337,7 @@ contains
     type(vec) :: kp_vec, k_vec, q_vec
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
     logical :: screening_computed
+    logical, allocatable :: degenerate(:)
 
     call print_message("Calculating e-ch. imp. transition probabilities for all IBZ electrons...")
 
@@ -3322,7 +3349,7 @@ contains
 
     !Number of processes
     nprocs = el%nstates_inwindow
-    allocate(Xchimp_istate(nprocs), istate_el(nprocs))
+    allocate(Xchimp_istate(nprocs), istate_el(nprocs), degenerate(nprocs))
     Xchimp_istate(:) = 0.0_r64
     istate_el(:) = 0_i64
 
@@ -3356,11 +3383,16 @@ contains
           !Apply energy window to initial (IBZ blocks) electron
           if(abs(en_el - el%enref) > el%fsthick) cycle
 
+          !Set degenerate to false for all processes 
+         degenerate = .false.
+         !Check if |m, ik> is degenerate
+         if(count(abs(el%ens_irred(ik, :) - en_el) < 1.0e-4) > 1) degenerate = .true. 
+
           !Initial (IBZ blocks) wave vector (crystal coords.)
           k_vec = vec(el%indexlist_irred(ik), el%wvmesh, crys%reclattvecs)
 
           !Initialize eligible process counter for this state
-          count = 0
+          counter = 0
 
           !Run over final (FBZ blocks) electron wave vectors
           do ikp = 1, el%nwv
@@ -3382,7 +3414,12 @@ contains
                 if(abs(en_el_p - el%enref) > el%fsthick) cycle
 
                 !Increment g2 processes counter
-                count = count + 1
+                counter = counter + 1
+
+                !Check if |n, ikp> is degenerate
+                   if(count(abs(el%ens(ikp, :) - en_el_p) < 1.0e-4) > 1) then 
+                     degenerate(counter) = .true. 
+                   end if 
 
                 if(.not. screening_computed &
                      .and. num%Coulomb_screening_type == 'RPA') then
@@ -3416,15 +3453,15 @@ contains
                      el%simplex_count, el%simplex_evals)
 
                 !Save Xchimp (just the out-scattering part)
-                Xchimp_istate(count) = g2*delta
+                Xchimp_istate(counter) = g2*delta
 
                 !Save final electron state
-                istate_el(count) = mux_state(el%numbands, n, ikp)
+                istate_el(counter) = mux_state(el%numbands, n, ikp)
              end do !n
           end do !ikp
 
           !Multiply constant factor, unit factor, etc.
-          Xchimp_istate(1:count) = const*Xchimp_istate(1:count) !THz
+          Xchimp_istate(1:counter) = const*Xchimp_istate(1:counter) !THz
 
           !Change to data output directory
           call chdir(trim(adjustl(num%Xdir)))
@@ -3434,9 +3471,10 @@ contains
           write (filename, '(I9)') istate
           filename = 'Xchimp.istate'//trim(adjustl(filename))
           open(1, file = trim(filename), status = 'replace', access = 'stream')
-          write(1) count
-          write(1) Xchimp_istate(1:count)
-          write(1) istate_el(1:count)
+          write(1) counter
+          write(1) Xchimp_istate(1:counter)
+          write(1) istate_el(1:counter)
+          write(1) degenerate(1:counter)
           close(1)       
 
           !Change back to working directory
@@ -3448,6 +3486,86 @@ contains
 
     sync all
   end subroutine calculate_echimp_interaction_ibzk
+
+  subroutine symmetrize_echimp_interaction_ibzk(el, num)
+   !! Subroutine to symmetrize the e-chimp transition probabilities for all IBZ electrons according to the rule:
+   !! X(k, k') = 1/|G_k|sum_{S \in G_k} X(k, S*k')  where S is the symmetry operation from the local symmetry group G_k of the correspodning k vector. 
+   type(electron), intent(in) :: el
+   type(numerics), intent(in) :: num
+
+   integer(i64) :: nprocs_echimp, nstates_irred, start, end, chunk, num_active_images, istate, m, ik, n, ikp, n_symmetries_for_ik, &
+                   i_sym, aux, iproc
+   integer(i64), allocatable :: istate_el_echimp(:)
+   real(r64), allocatable :: Xchimp_istate(:), Xchimp_istate_sym(:)
+   character(len = 1024) :: filepath_Xechimp, tag
+   real(r64) :: en_el
+   logical, allocatable :: degenerate(:)
+   
+   call print_message("Symmetrizing e-ch. imp. transition probabilities for all IBZ electrons...")
+
+   !Total number of IBZ blocks states
+   nstates_irred = el%nwv_irred*el%numbands
+
+   nprocs_echimp = el%nstates_inwindow
+   allocate(Xchimp_istate_sym(nprocs_echimp))
+
+   call distribute_points(nstates_irred, chunk, start, end, num_active_images)
+
+   if(this_image() <= num_active_images) then
+       do istate = start, end
+          ! Demux state index into band (m) and wave vector (ik) indices
+          call demux_state(istate, el%numbands, m, ik)
+             
+          ! Electron energy
+          en_el = el%ens_irred(ik, m)
+
+          ! Apply energy window to initial (IBZ blocks) electron
+          if(abs(en_el - el%enref) > el%fsthick) cycle
+
+          write(tag, '(I9)') istate
+          filepath_Xechimp = trim(adjustl(num%Xdir))//'/Xchimp.istate'//trim(adjustl(tag))
+          
+          ! Read the data
+          call read_transition_probs_e(trim(adjustl(filepath_Xechimp)), nprocs_echimp, Xchimp_istate, &  
+                                       istate_el_echimp, degenerate = degenerate)
+          
+          ! Skip symmetrization if the state is degenerate 
+          if(all(degenerate)) cycle 
+                                       
+          Xchimp_istate_sym = 0.0_r64
+          n_symmetries_for_ik = count(el%symmetries(:, ik) > 0)
+          
+          do iproc = 1, nprocs_echimp
+             ! Skip symmetrization if the final state is degenerate
+             if(degenerate(iproc)) cycle
+
+             ! Demux final state index into band (n) and wave vector (ikp) indices
+             call demux_state(istate_el_echimp(iproc), el%numbands, n, ikp)
+             
+             do i_sym = 1, n_symmetries_for_ik
+                call binsearch(el%indexlist, el%equiv_map(el%symmetries(i_sym, ik), ikp), aux)
+                Xchimp_istate_sym(iproc) = Xchimp_istate_sym(iproc) + Xchimp_istate(aux)
+             end do 
+             Xchimp_istate_sym(iproc) = Xchimp_istate_sym(iproc)/n_symmetries_for_ik 
+          end do
+          
+          ! Write the symmetrized data back to the SAME file
+          open(1, file = trim(filepath_Xechimp), status = 'replace', access = 'stream')
+          write(1) nprocs_echimp
+          write(1) Xchimp_istate_sym(1:nprocs_echimp)
+          write(1) istate_el_echimp(1:nprocs_echimp)
+          write(1) degenerate(1:nprocs_echimp)
+          close(1)
+          
+          ! Deallocate arrays for next iteration
+          deallocate(Xchimp_istate, istate_el_echimp)
+       end do
+   end if 
+  
+   deallocate(Xchimp_istate_sym)
+   sync all
+end subroutine symmetrize_echimp_interaction_ibzk
+
 
   subroutine calculate_ph_rta_rates(rta_rates_3ph, rta_rates_phe, num, crys, ph, el)
     !! Subroutine for parallel reading of the 3-ph and ph-e transition probabilities
@@ -3913,14 +4031,14 @@ contains
     !end if
   end subroutine calculate_el_rta_rates
 
-  subroutine read_transition_probs_e(filepath, N, TP, istate1, istate2)
+  subroutine read_transition_probs_e(filepath, N, TP, istate1, istate2, degenerate)
     !! Subroutine to read transition probabilities from disk for interaction processes.
 
     character(len = *), intent(in) :: filepath
     integer(i64), intent(out) :: N
     real(r64), allocatable, intent(out) :: TP(:)
     integer(i64), allocatable, intent(out), optional :: istate1(:), istate2(:)
-
+    logical, allocatable, intent(out), optional :: degenerate(:)
     !Read data
     open(1, file = trim(adjustl(filepath)), status = 'old', access = 'stream')
     read(1) N
@@ -3935,6 +4053,12 @@ contains
           allocate(istate2(N))
           if(N > 0) then
              read(1) istate2
+          end if
+       end if
+       if(present(degenerate)) then
+          allocate(degenerate(N))
+          if(N > 0) then
+            read(1) degenerate
           end if
        end if
     end if
@@ -4228,4 +4352,97 @@ contains
 !!$    !Write to file
 !!$    call write2file_rank2_real(prefix // '.W_rta_'//prefix//'defect', scatt_rates)
 !!$  end subroutine calculate_defect_scatt_rates
+
+subroutine symmetrize_eph_interaction_ibzk(el, num, wann, ph)
+   !! Subroutine to symmetrize the e-ph transition probabilities for all IBZ electrons according to the rule:
+   !! X(k, k') = 1/|G_k|sum_{S \in G_k} X(k, S*k')  where S is the symmetry operation from the local symmetry group G_k of the correspodning k vector. 
+   type(electron), intent(in) :: el
+   type(numerics), intent(in) :: num
+   type(wannier), intent(in) :: wann
+   type(phonon), intent(in) :: ph
+
+   integer(i64) :: nprocs_eph, nstates_irred, start, end, chunk, num_active_images, istate, m, ik, n, ikp, n_symmetries_for_ik, &
+                   i_sym, aux, iproc, s, q
+   integer(i64), allocatable :: istate_el_eph(:), istate_ph_eph(:)
+   real(r64), allocatable :: Xphminus(:), Xphminus_sym(:), Xphplus(:), Xphplus_sym(:)
+   character(len = 1024) :: filepath_Xphminus, filepath_Xphplus, tag
+   real(r64) :: en_el
+   logical, allocatable :: degenerate(:)
+   
+   call print_message("Symmetrizing e-ph. transition probabilities for all IBZ electrons...")
+
+   nstates_irred = el%nwv_irred*el%numbands
+   nprocs_eph = el%nstates_inwindow*wann%numbranches
+   allocate(Xphplus_sym(nprocs_eph), Xphminus_sym(nprocs_eph))
+
+   call distribute_points(nstates_irred, chunk, start, end, num_active_images)
+
+   if(this_image() <= num_active_images) then
+       do istate = start, end
+          ! Demux state index into band (m) and wave vector (ik) indices
+          call demux_state(istate, el%numbands, m, ik)
+          en_el = el%ens_irred(ik, m)
+
+          ! Only symmetrize states within the energy window around the Fermi level
+          if(abs(en_el - el%enref) > el%fsthick) cycle
+
+          write(tag, '(I9)') istate
+          filepath_Xphplus = trim(adjustl(num%Xdir))//'/Xplus.istate'//trim(adjustl(tag))
+
+          call read_transition_probs_e(trim(adjustl(filepath_Xphplus)), nprocs_eph, Xphplus, &
+               istate_el_eph, istate_ph_eph, degenerate)
+
+          ! Skip symmetrization if the state is degenerate
+          if(all(degenerate)) cycle 
+
+          filepath_Xphminus = trim(adjustl(num%Xdir))//'/Xminus.istate'//trim(adjustl(tag))
+          call read_transition_probs_e(trim(adjustl(filepath_Xphminus)), nprocs_eph, Xphminus)
+
+          Xphminus_sym = 0.0_r64
+          Xphplus_sym = 0.0_r64
+          n_symmetries_for_ik = count(el%symmetries(:, ik) > 0)
+          
+          do iproc = 1, nprocs_eph
+             ! Skip symmetrization if the final electron state or intermidiate phonon state are degenerate
+             if(degenerate(iproc)) cycle 
+             
+             ! Demux final state index into band (n) and wave vector (ikp) indices
+             call demux_state(istate_el_eph(iproc), el%numbands, n, ikp) 
+              
+             do i_sym = 1, n_symmetries_for_ik
+                call binsearch(el%indexlist, el%equiv_map(el%symmetries(i_sym, ik), ikp), aux)
+                Xphplus_sym(iproc) = Xphplus_sym(iproc) + Xphplus(aux)
+                Xphminus_sym(iproc) = Xphminus_sym(iproc) + Xphminus(aux)
+             end do 
+             
+             Xphplus_sym(iproc) = Xphplus_sym(iproc)/n_symmetries_for_ik 
+             Xphminus_sym(iproc) = Xphminus_sym(iproc)/n_symmetries_for_ik
+          end do
+          
+          !Note: this will overwrite existing data!
+                open(1, file = trim(filepath_Xphplus), status = 'replace', access = 'stream')
+                write(1) nprocs_eph
+                write(1) Xphplus_sym(1:nprocs_eph)
+                write(1) istate_el_eph(1:nprocs_eph)
+                write(1) istate_ph_eph(1:nprocs_eph)
+                write(1) degenerate(1:nprocs_eph)
+                close(1)
+
+                open(1, file = trim(filepath_Xphminus), status = 'replace', access = 'stream')
+                write(1) nprocs_eph
+                write(1) Xphminus_sym(1:nprocs_eph)
+                write(1) istate_el_eph(1:nprocs_eph)
+                write(1) istate_ph_eph(1:nprocs_eph)
+                write(1) degenerate(1:nprocs_eph)
+                close(1)
+          
+          deallocate(Xphminus, Xphplus, istate_el_eph, istate_ph_eph, degenerate)
+       end do
+   end if 
+  
+   deallocate(Xphplus_sym, Xphminus_sym)
+   sync all
+
+end subroutine symmetrize_eph_interaction_ibzk
+
 end module interactions
