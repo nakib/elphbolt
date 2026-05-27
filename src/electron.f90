@@ -479,7 +479,7 @@ contains
              self%symmetries(kk, i) = jj 
           end if
        end do
-      !  if(this_image() == 1) print *, "k-point index in FBZ: ", i, "number of symmetries: ", self%symmetries(1:kk, i)
+       !  if(this_image() == 1) print *, "k-point index in FBZ: ", i, "number of symmetries: ", self%symmetries(1:kk, i)
        if(kk > 1) then
           self%symmetrizers(:, :, i) = self%symmetrizers(:, :, i)/kk
        end if
