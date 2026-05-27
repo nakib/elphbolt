@@ -3493,8 +3493,8 @@ contains
     type(electron), intent(in) :: el
     type(numerics), intent(in) :: num
 
-    integer(i64) :: nprocs_echimp, nstates_irred, start, end, chunk, num_active_images, istate, m, ik, n, ikp, n_symmetries_for_ik, &
-         i_sym, aux, iproc
+    integer(i64) :: nprocs_echimp, nstates_irred, start, end, chunk, num_active_images, istate, m, ik, n, ikp, & 
+         n_symmetries_for_ik, i_sym, aux, iproc
     integer(i64), allocatable :: istate_el_echimp(:)
     real(r64), allocatable :: Xchimp_istate(:), Xchimp_istate_sym(:)
     character(len = 1024) :: filepath_Xechimp, tag

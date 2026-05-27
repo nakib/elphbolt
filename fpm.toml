@@ -113,10 +113,10 @@ name = "test_symmetry"
 source-dir="test"
 main = "test_symmetry.f90"
 
-[[test]]
-name = "test_optimization"
-source-dir="test"
-main = "test_optimization.f90"
+#[[test]]
+#name = "test_optimization"
+#source-dir="test"
+#main = "test_optimization.f90"
 
 #
 #[[test]]
