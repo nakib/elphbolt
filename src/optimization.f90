@@ -31,12 +31,12 @@ module optimization
 
   type :: coeffs_for_optimization
      !! Data type for storing the coefficients needed for the optimization problem. Includes the transport coefficients, temperature and symmetry elements of the system.
-     
+
      real(r64) :: T, el_sigma(3,3), el_kappa0(3,3), el_sigmaS(3,3), el_alpha(3,3), ph_kappa(3,3), &
           ph_alpha(3,3), tot_kappa(3,3), tot_alpha(3,3)
      real(r64), allocatable :: crotations(:,:,:)
   end type coeffs_for_optimization
-  
+
   ! Global variables for storing the coefficients needed for the optimization problem. These are set in bte.f90 before calling find_correction 
   ! and used in the subroutine fun to calculate the objective function and constraints for given correction matrices M_T. 
   ! global_coeffs_opp_B is used when magnetic field is on. 
@@ -169,7 +169,7 @@ contains
     !! dev: output deviation of the objective function from zero (deviation from Kelvin-Onsager relations)
     !! corr: output maximum deviation of the correction matrices M_T from identity (in %)
     !! corr_threshold: optional input threshold for maximum allowed deviation of M_T from identity (in %), default is 100%
-    
+
     real(r64), intent(out) :: result_x(:)
     real(r64), intent(out), optional :: dev, corr
     real(r64), intent(in), optional :: corr_threshold
@@ -215,10 +215,10 @@ contains
 
     !Calculate deviation of the correction matrices from identity, corr = 100*maxval|M_T - I|
     corr = 100.0*maxval(abs(result_x - reshape([(reshape(eye(3_i64) * 1.0_r64, [9]), i=1, n/9)], [n])))
-    
+
     ! Check if correction is bigger then a threshold
     if(corr > corr_threshold_actual) print *, "Warning: KO correction is too large, KO_corr[%] = ", corr, "%  &
-            You might better use a finer mesh." 
+         You might better use a finer mesh." 
 
     !Calculate deviation from identity,  dev = objective function f(x = result_x) * 100  
     call fun(solver, result_x, dev, c)

@@ -212,7 +212,7 @@ contains
        call print_message("Solving the anisotropic Migdal-Eliashberg equations...")
 
        allocate(aniso_quasi_Delta(nstates_irred, self%numqp)) !, &
-            !aniso_quasi_Z(nstates_irred, self%numqp))
+       !aniso_quasi_Z(nstates_irred, self%numqp))
     end if
 
     !Calculate for all temperatures in the provided bracket
