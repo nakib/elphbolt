@@ -1,4 +1,23 @@
+! Copyright 2020 elphbolt contributors.
+! This file is part of elphbolt <https://github.com/nakib/elphbolt>.
+!
+! elphbolt is free software: you can redistribute it and/or modify
+! it under the terms of the GNU General Public License as published by
+! the Free Software Foundation, either version 3 of the License, or
+! (at your option) any later version.
+!
+! elphbolt is distributed in the hope that it will be useful,
+! but WITHOUT ANY WARRANTY; without even the implied warranty of
+! MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+! GNU General Public License for more details.
+!
+! You should have received a copy of the GNU General Public License
+! along with elphbolt. If not, see <http://www.gnu.org/licenses/>.
+
 module optimization
+  !! Module for finding correction matrices M_T enforcing Kelvin-Onsager relations by solving an optimization problem with SLSQP
+  !! The optimization problem is defined in the subroutine fun, which calculates the objective function and constraints for given correction matrices M_T (reshaped as a vector x)
+  !! The main subroutine is find_correction, which initializes the optimization variable, sets up the SLSQP solver, and calls the optimization routine. 
   use slsqp_module, only: slsqp_solver
   use symmetry_module, only: symmetrize_3x3_tensor
   use precision, only: r128, r64, i64
@@ -11,18 +30,26 @@ module optimization
   type(slsqp_solver) :: solver
 
   type :: coeffs_for_optimization
+     !! Data type for storing the coefficients needed for the optimization problem. Includes the transport coefficients, temperature and symmetry elements of the system.
+     
      real(r64) :: T, el_sigma(3,3), el_kappa0(3,3), el_sigmaS(3,3), el_alpha(3,3), ph_kappa(3,3), &
           ph_alpha(3,3), tot_kappa(3,3), tot_alpha(3,3)
      real(r64), allocatable :: crotations(:,:,:)
   end type coeffs_for_optimization
-
+  
+  ! Global variables for storing the coefficients needed for the optimization problem. These are set in bte.f90 before calling find_correction 
+  ! and used in the subroutine fun to calculate the objective function and constraints for given correction matrices M_T. 
+  ! global_coeffs_opp_B is used when magnetic field is on. 
   type(coeffs_for_optimization) :: global_coeffs, global_coeffs_opp_B
 
 contains
 
-  ! Objective and constraint function for SLSQP
-  ! Must match the interface expected by slsqp_solver
   subroutine fun(me, x, f, c)
+    !! Subroutine for calculating the objective function and constraints for given correction matrices M_T (reshaped as a vector x).
+    !! The objective function is defined as the deviation from the Kelvin-Onsager relations, which should be minimized.
+    !! The constraints are defined as the positive semidefiniteness of a matrix L constructed from the transport coefficients, 
+    !! which ensures that the corrected transport coefficients satisfy the second law of thermodynamics.
+
     class(slsqp_solver), intent(inout) :: me
     real(r64),  intent(in) :: x(:)
     real(r64), intent(out) :: f, c(:)
@@ -42,6 +69,7 @@ contains
     allocate(M_T(n/9, 3, 3), A(n/9 + 1, 3, 3))
     do i=1,n/9
        M_T(i, :, :) = reshape(x((i-1)*9 + 1 : i*9), [3, 3])
+       !! Symmetrize M_T to ensure that the correction matrices are symmetric, which is a physical requirement for the transport coefficients.
        call symmetrize_3x3_tensor(M_T(i, :, :), global_coeffs%crotations)
     end do
     A(1, :, :) = matmul(global_coeffs%el_sigmaS, M_T(1, :, :)) ! el_sigmaS(B)@M_I^T
@@ -63,14 +91,14 @@ contains
        ! Top-left block: sigma  
        L(1:3, 1:3) = global_coeffs%el_sigma
 
-       ! Top-right block: el_sigmaS @ M_T  
-       L(1:3, 4:6) = A(1, :, :)
+       ! Top-right block: el_sigmaS @ M_T * T 
+       L(1:3, 4:6) = A(1, :, :)*global_coeffs%T
 
        ! Bottom-left block: total_alpha  
        L(4:6, 1:3) = global_coeffs%tot_alpha
 
-       ! Bottom-right block: el_kappa0 @ M_T + ph_kappa 
-       L(4:6, 4:6) = A(2, :, :) + global_coeffs%ph_kappa 
+       ! Bottom-right block: (el_kappa0 @ M_T + ph_kappa)*T
+       L(4:6, 4:6) = (A(2, :, :) + global_coeffs%ph_kappa)*global_coeffs%T
 
     elseif(n == 27) then
        ! Magnetic case with M_T = [M_I^T, M_J^T, M_F^T] 
@@ -99,20 +127,20 @@ contains
        L(1:3, 1:3) = A(3, :, :)
 
        ! Top-right block: el_sigmaS @ M_I^T 
-       L(1:3, 4:6) = A(1, :, :)
+       L(1:3, 4:6) = A(1, :, :)*global_coeffs%T
 
        ! Bottom-left block: el_alpha @ M_J^T + ph_alpha 
        L(4:6, 1:3) = matmul(global_coeffs%el_alpha, M_T(2, :, :)) + global_coeffs%ph_alpha
 
        ! Bottom-right block: el_kappa0 @ M_I^T + ph_kappa @ M_F^T 
-       L(4:6, 4:6) = A(2, :, :) + A(4, :, :)
+       L(4:6, 4:6) = (A(2, :, :) + A(4, :, :))*global_coeffs%T
     else 
        print *, "Error: Unexpected size of optimization variable x: ", n
        return
     end if
 
-    ! Compute eigenvalues
-    call compute_eigenvalues(L, eigenvalues_real, eigenvalues_imag)
+    ! Compute eigenvalues of the symmetric part of L 
+    call compute_eigenvalues((L + transpose(L))/2, eigenvalues_real, eigenvalues_imag)
 
     ! Constraint: min(real(eigenvalue)) >= 0
     c(1) = minval(eigenvalues_real)
@@ -124,25 +152,27 @@ contains
   end subroutine fun
 
   subroutine dummy_grad(me, x, g, a)
+    !! This subroutine is never called because gradient_mode=1
+    !! Just initialize outputs to avoid uninitialized variable warnings
     class(slsqp_solver), intent(inout) :: me
     real(r64), dimension(:), intent(in) :: x
     real(r64), dimension(:), intent(out) :: g
     real(r64), dimension(:,:), intent(out) :: a
 
-    ! This subroutine is never called because gradient_mode=1
-    ! Just initialize outputs to avoid uninitialized variable warnings
     g = 0.0_r64
     a = 0.0_r64
   end subroutine dummy_grad
 
   subroutine find_correction(result_x, dev, corr, corr_threshold)
-    ! Input matrices
-    ! type(coeffs_for_optimization), intent(in) :: coeffs_local
+    !! Subroutine for finding the correction matrices M_T enforcing Kelvin-Onsager relations by solving the optimization problem with SLSQP
+    !! result_x: output optimization variable containing the correction matrices M_T (reshaped as a vector)
+    !! dev: output deviation of the objective function from zero (deviation from Kelvin-Onsager relations)
+    !! corr: output maximum deviation of the correction matrices M_T from identity (in %)
+    !! corr_threshold: optional input threshold for maximum allowed deviation of M_T from identity (in %), default is 100%
+    
     real(r64), intent(out) :: result_x(:)
     real(r64), intent(out), optional :: dev, corr
     real(r64), intent(in), optional :: corr_threshold
-    ! dev = objective function f(x = result_x) * 100 
-    ! corr = 100*maxval|M_T - I|
     integer :: n, m = 2, meq = 0, i ! Two inequality constraint (positive semidefinite, eigenvalues are real)
     integer :: maxit = 1000, exit_code
     real(r64) :: feastol = 1.0e-6_r64,  c(2), corr_threshold_actual
@@ -151,6 +181,7 @@ contains
 
     n = size(result_x)
     allocate(bl(n), bu(n))
+
     ! Set bounds for M_T elements
     bl = -100.0_r64
     bu = 100.0_r64
@@ -161,9 +192,9 @@ contains
        corr_threshold_actual = 100.0_r64   ! Default value
     end if
 
-
     ! Initial guess: identity matrix (matrices)
     result_x = reshape([(reshape(eye(3_i64) * 1.0_r64, [9]), i=1, n/9)], [n])   
+
     ! Initialize solver with correct parameters
     call solver%initialize(n = n, m = m, meq = meq, max_iter = maxit, acc = feastol, f = fun, &
          g = dummy_grad, gradient_mode = 3, xl = bl, xu = bu, status_ok = status_ok, &
@@ -178,23 +209,18 @@ contains
     call solver%optimize(result_x, exit_code)
 
     if(exit_code /= 0) then
-       if(this_image() == 1) then
-          print *, "Warning: KO correction did not converge, skipping correction."
-
-       end if
+       if(this_image() == 1) print *, "Warning: KO correction did not converge, skipping correction."
        result_x = reshape([(reshape(eye(3_i64) * 1.0_r64, [9]), i=1, n/9)], [n])
     end if
 
-    !Calculate deviation from identity
+    !Calculate deviation of the correction matrices from identity, corr = 100*maxval|M_T - I|
     corr = 100.0*maxval(abs(result_x - reshape([(reshape(eye(3_i64) * 1.0_r64, [9]), i=1, n/9)], [n])))
-    if(corr > corr_threshold_actual) then
-       print *, "Warning: KO correction is too large, KO_corr[%] = ", corr, "%  &
+    
+    ! Check if correction is bigger then a threshold
+    if(corr > corr_threshold_actual) print *, "Warning: KO correction is too large, KO_corr[%] = ", corr, "%  &
             You might better use a finer mesh." 
 
-       ! corr = 0.0_r64
-       ! result_x = reshape([(reshape(eye(3_i64) * 1.0_r64, [9]), i=1, n/9)], [n])
-    end if
-
+    !Calculate deviation from identity,  dev = objective function f(x = result_x) * 100  
     call fun(solver, result_x, dev, c)
     dev = 100.0*dev
 

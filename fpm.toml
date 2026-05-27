@@ -33,12 +33,7 @@ slsqp = { git="https://github.com/jacobwilliams/slsqp.git" }
 [build]
 #By default, I will use try to use the forlapack and forblas builds from ~/.local/lib/
 #These will have been put there by the configuration step.
-<<<<<<< HEAD
 link = ["forlapack", "forblas", "gomp"]
-=======
-link = ["forlapack", "forblas"]
-#external-modules = ["lancelot_simple_double", "lancelot_simple_single"]
->>>>>>> ce3e9d6 (Version with new KO corrections)
 #
 #Alternatively, you can use your preexisting blas and lapack, or openblas,
 #or whatever other implementation by commenting out the above and uncommenting
