@@ -158,6 +158,10 @@ module numerics_module
      !! Use permutation symmetries in ph-ph?
      logical :: calculate_3ph_phasespace
      !! Calculate 3ph phasespace?
+      logical :: apply_KO_correction
+     !! Whether to apply the Kelvin-Onsager correction to the transport coefficients and response functions.
+      logical :: symmetrize_transition_rates
+     !! Whether to symmetrize transition rates to enforce symmetries of the crystal.
    contains
 
      procedure :: initialize=>read_input_and_setup, create_chempot_dirs
@@ -189,7 +193,8 @@ contains
          phbound, phdef_Tmat, onlyphbte, onlyebte, elchimp, elbound, drag, plot_along_path, &
          phthinfilm, phthinfilm_ballistic, fourph, use_Wannier_ifc2s, phiso_Tmat, &
          W_OTF, Y_OTF, solve_bulk, solve_nano, elel, &
-         restart_from_batch_record, use_perm, calculate_3ph_phasespace
+         restart_from_batch_record, use_perm, calculate_3ph_phasespace, apply_KO_correction, &
+         symmetrize_transition_rates
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
          read_V, read_W, tetrahedra, phe, phiso, phsubs, onlyphbte, onlyebte, maxiter, &
@@ -199,7 +204,7 @@ contains
          fourph, fourph_mesh_ref, use_Wannier_ifc2s, elel, Coulomb_screening_type, ncont_mesh,&
          phiso_Tmat, phiso_1B_theory, Bfield, W_OTF, Y_OTF, &
          solve_bulk, solve_nano, num_batches, restart_from_batch_record, use_perm, &
-         calculate_3ph_phasespace
+         calculate_3ph_phasespace, apply_KO_correction, symmetrize_transition_rates
 
     call subtitle("Reading numerics information...")
 
@@ -257,6 +262,8 @@ contains
     restart_from_batch_record = .false.
     use_perm = .false.
     calculate_3ph_phasespace = .false.
+    apply_KO_correction = .true.
+    symmetrize_transition_rates = .false.
     read(1, nml = numerics)
 
     if(read_W .and. W_OTF) &
@@ -359,6 +366,8 @@ contains
     self%maxiter = maxiter
     self%conv_thres = conv_thres
     self%plot_along_path = plot_along_path
+    self%apply_KO_correction = apply_KO_correction
+    self%symmetrize_transition_rates = symmetrize_transition_rates
 
     if(runlevel == 2) then
        self%ph_en_min = ph_en_min

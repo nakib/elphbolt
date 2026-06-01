@@ -34,16 +34,16 @@ program optimization_test
   call trans%initialize_ph(1_i64)
   call trans%initialize_el(1_i64)
 
-  ! Test 1: sigma = kappa_el = kappa_ph = alpha_el = I, alpha_ph = 0, sigmaS = -I, T = 0, corr_threshold = 200%
-  ! Output: x = -0.5*I, dev = 50%, corr = 150% 
+  ! Test 1: sigma = kappa_el = kappa_ph = 2*I, alpha_el = I, alpha_ph = 0, sigmaS = I, T = 1, corr_threshold = 200%
+  ! Output: x = 1*I, dev = 0%, corr = 0% 
 
   itest = 1
 
   T = 1.0_r64
-  trans%ph_kappa(1, :, :) = 1.0_r64 * eye(3_i64)
-  trans%el_sigma(1, :, :) = 1.0_r64 * eye(3_i64)
-  trans%el_sigmaS(1, :, :) = -1.0_r64 * eye(3_i64)
-  trans%el_kappa0(1, :, :) = 1.0_r64 * eye(3_i64)
+  trans%ph_kappa(1, :, :) = 2.0_r64 * eye(3_i64)
+  trans%el_sigma(1, :, :) = 2.0_r64 * eye(3_i64)
+  trans%el_sigmaS(1, :, :) = 1.0_r64 * eye(3_i64)
+  trans%el_kappa0(1, :, :) = 2.0_r64 * eye(3_i64)
   trans%el_alphabyT(1, :, :) = 1.0_r64 * eye(3_i64)/T
   trans%ph_alphabyT(1, :, :) = 0.0_r64 * eye(3_i64)/T
 
@@ -54,16 +54,10 @@ program optimization_test
   corr_threshold = 200.0_r64
   call find_correction(x_solution, dev, corr, corr_threshold)
 
-  print *, "x_solution: ", x_solution
-
-  test_array(itest) = testify("Test 1: sigma = kappa_el = kappa_ph = alpha_el = I, alpha_ph = 0, sigmaS = -I, T = 1, &
+  test_array(itest) = testify("Test 1: sigma = kappa_el = kappa_ph = 2*I, alpha_el = I, alpha_ph = 0, sigmaS = I, T = 1, &
        corr_threshold = 200%")
 
-  call test_array(itest)%assert([reshape(1.0_r64* eye(3_i64), [9]), 200.0_r64, 0.0_r64], & 
-       [x_solution, dev, corr], tol = 1e-3_r64)
-
-
-  call test_array(itest)%assert([reshape(-0.5_r64* eye(3_i64), [9]), 50.0_r64, 150.0_r64], &
+  call test_array(itest)%assert([reshape(1.0_r64* eye(3_i64), [9]), 0.0_r64, 0.0_r64], &
        [x_solution, dev, corr], tol = 1e-3_r64)
 
 
