@@ -22,6 +22,7 @@ module optimization
   use symmetry_module, only: symmetrize_3x3_tensor
   use precision, only: r128, r64, i64
   use misc, only: eye, compute_eigenvalues, F_norm
+  use numerics_module, only: numerics
 
   implicit none
 
@@ -91,13 +92,13 @@ contains
        ! Top-left block: sigma  
        L(1:3, 1:3) = global_coeffs%el_sigma
 
-       ! Top-right block: el_sigmaS @ M_T * T 
+       ! Top-right block: T*(el_sigmaS @ M_T) 
        L(1:3, 4:6) = A(1, :, :)*global_coeffs%T
 
        ! Bottom-left block: total_alpha  
        L(4:6, 1:3) = global_coeffs%tot_alpha
 
-       ! Bottom-right block: (el_kappa0 @ M_T + ph_kappa)*T
+       ! Bottom-right block: T*(el_kappa0 @ M_T + ph_kappa)
        L(4:6, 4:6) = (A(2, :, :) + global_coeffs%ph_kappa)*global_coeffs%T
 
     elseif(n == 27) then
@@ -126,13 +127,13 @@ contains
        ! Top-left block: sigma @ M_J^T 
        L(1:3, 1:3) = A(3, :, :)
 
-       ! Top-right block: el_sigmaS @ M_I^T 
+       ! Top-right block: T*(el_sigmaS @ M_I^T) 
        L(1:3, 4:6) = A(1, :, :)*global_coeffs%T
 
        ! Bottom-left block: el_alpha @ M_J^T + ph_alpha 
        L(4:6, 1:3) = matmul(global_coeffs%el_alpha, M_T(2, :, :)) + global_coeffs%ph_alpha
 
-       ! Bottom-right block: el_kappa0 @ M_I^T + ph_kappa @ M_F^T 
+       ! Bottom-right block: T*(el_kappa0 @ M_I^T + ph_kappa @ M_F^T)
        L(4:6, 4:6) = (A(2, :, :) + A(4, :, :))*global_coeffs%T
     else 
        print *, "Error: Unexpected size of optimization variable x: ", n
@@ -144,8 +145,6 @@ contains
 
     ! Constraint: min(real(eigenvalue)) >= 0
     c(1) = minval(eigenvalues_real)
-    ! Constraint: max(|imag(eigenvalue)|) = 0
-    c(2) = 1e-6 - maxval(abs(eigenvalues_imag)) 
 
     deallocate(M_T, A)
 
@@ -163,7 +162,7 @@ contains
     a = 0.0_r64
   end subroutine dummy_grad
 
-  subroutine find_correction(result_x, dev, corr, corr_threshold)
+  subroutine find_correction(num, result_x, dev, corr, corr_threshold)
     !! Subroutine for finding the correction matrices M_T enforcing Kelvin-Onsager relations by solving the optimization problem with SLSQP
     !! result_x: output optimization variable containing the correction matrices M_T (reshaped as a vector)
     !! dev: output deviation of the objective function from zero (deviation from Kelvin-Onsager relations)
@@ -173,9 +172,10 @@ contains
     real(r64), intent(out) :: result_x(:)
     real(r64), intent(out), optional :: dev, corr
     real(r64), intent(in), optional :: corr_threshold
-    integer :: n, m = 2, meq = 0, i ! Two inequality constraint (positive semidefinite, eigenvalues are real)
+    type(numerics), intent(in) :: num
+    integer :: n, m = 1, meq = 0, i ! One inequality constraint (positive semidefinite)
     integer :: maxit = 1000, exit_code
-    real(r64) :: feastol = 1.0e-6_r64,  c(2), corr_threshold_actual
+    real(r64) :: feastol = 1.0e-6_r64,  c(1), corr_threshold_actual
     real(r64), allocatable :: bl(:), bu(:)
     logical :: status_ok
 
@@ -197,21 +197,23 @@ contains
 
     ! Initialize solver with correct parameters
     call solver%initialize(n = n, m = m, meq = meq, max_iter = maxit, acc = feastol, f = fun, &
-         g = dummy_grad, gradient_mode = 3, xl = bl, xu = bu, status_ok = status_ok, &
-         gradient_delta = 1.0e-4_r64, toldx = 1.0e-6_r64, iprint = 0)
-
+         g = dummy_grad, gradient_mode = 3, xl = bl, xu = bu, status_ok = status_ok, gradient_delta = 1.0e-4_r64,iprint = 0)
+         ! gradient_delta = 1.0e-4_r64, toldx = 1.0e-6_r64, iprint = 0)
+   
     if(.not. status_ok) then
        exit_code = -1
        return 
     end if
 
-    ! Solve the optimization problem
-    call solver%optimize(result_x, exit_code)
+    if(num%apply_KO_correction) then 
+      ! Solve the optimization problem
+      call solver%optimize(result_x, exit_code)
 
-    if(exit_code /= 0) then
-       if(this_image() == 1) print *, "Warning: KO correction did not converge, skipping correction."
-       result_x = reshape([(reshape(eye(3_i64) * 1.0_r64, [9]), i=1, n/9)], [n])
-    end if
+      if(exit_code /= 0) then
+         if(this_image() == 1) print *, "Warning: KO correction did not converge, skipping correction."
+         result_x = reshape([(reshape(eye(3_i64) * 1.0_r64, [9]), i=1, n/9)], [n])
+      end if
+    end if  
 
     !Calculate deviation of the correction matrices from identity, corr = 100*maxval|M_T - I|
     corr = 100.0*maxval(abs(result_x - reshape([(reshape(eye(3_i64) * 1.0_r64, [9]), i=1, n/9)], [n])))
