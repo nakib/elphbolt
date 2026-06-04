@@ -231,7 +231,7 @@ program elphbolt
         end if 
 
         ! Symmetrize e-ph transition probabilities  
-        call symmetrize_eph_interaction_ibzk(el, num, wann, ph)
+        if (num%symmetrize_transition_rates) call symmetrize_eph_interaction_ibzk(el, num, wann, ph)
         
      end if
 
@@ -250,7 +250,7 @@ program elphbolt
            call t_event%end_timer('e-ch. imp. interactions')
 
            ! Symmetrize e-chimp transition probabilities
-           call symmetrize_echimp_interaction_ibzk(el, num)
+           if (num%symmetrize_transition_rates) call symmetrize_echimp_interaction_ibzk(el, num)
         end if
      end if
 
