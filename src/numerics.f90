@@ -162,6 +162,10 @@ module numerics_module
      !! Whether to apply the Kelvin-Onsager correction to the transport coefficients and response functions.
       logical :: symmetrize_transition_rates
      !! Whether to symmetrize transition rates to enforce symmetries of the crystal.
+      logical :: read_Y
+      !! Choose if earlier e-ph (IBZ k) transition probabilities are to be used.
+      logical :: read_X
+     !! Choose if earlier ph-e (IBZ q) transition probabilities are to be used.
    contains
 
      procedure :: initialize=>read_input_and_setup, create_chempot_dirs
@@ -194,7 +198,7 @@ contains
          phthinfilm, phthinfilm_ballistic, fourph, use_Wannier_ifc2s, phiso_Tmat, &
          W_OTF, Y_OTF, solve_bulk, solve_nano, elel, &
          restart_from_batch_record, use_perm, calculate_3ph_phasespace, apply_KO_correction, &
-         symmetrize_transition_rates
+         symmetrize_transition_rates, read_X, read_Y
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
          read_V, read_W, tetrahedra, phe, phiso, phsubs, onlyphbte, onlyebte, maxiter, &
@@ -204,7 +208,7 @@ contains
          fourph, fourph_mesh_ref, use_Wannier_ifc2s, elel, Coulomb_screening_type, ncont_mesh,&
          phiso_Tmat, phiso_1B_theory, Bfield, W_OTF, Y_OTF, &
          solve_bulk, solve_nano, num_batches, restart_from_batch_record, use_perm, &
-         calculate_3ph_phasespace, apply_KO_correction, symmetrize_transition_rates
+         calculate_3ph_phasespace, apply_KO_correction, symmetrize_transition_rates, read_X, read_Y
 
     call subtitle("Reading numerics information...")
 
@@ -221,6 +225,8 @@ contains
     read_gk2 = .false.
     read_V = .false.
     read_W = .false.
+    read_Y = .false. 
+    read_X = .false.
     tetrahedra = .false.
     phe = .false.
     phiso = .false.
@@ -329,6 +335,8 @@ contains
        self%read_gq2 = read_gq2
        self%read_V = read_V
        self%read_W = read_W
+       self%read_Y = read_Y
+       self%read_X = read_X
        self%W_OTF = W_OTF
        self%phe = phe
        self%phiso = phiso

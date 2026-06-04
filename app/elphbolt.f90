@@ -197,7 +197,7 @@ program elphbolt
         call t_event%start_timer('IBZ ph-e transition probilities')
 
         !Calculate ph-e transition probabilities
-        if(.not. num%Y_OTF) then
+        if(.not. (num%Y_OTF .or. num%read_Y)) then
            call t_event%start_timer('IBZ ph-e transition probilities')
 
            call calculate_eph_interaction_ibzq(wann, crys, el, ph, num, 'Y')
@@ -222,12 +222,17 @@ program elphbolt
         call t_event%start_timer('IBZ e-ph transition probabilities')
 
         !Calculate e-ph transition probabilities
-        call calculate_eph_interaction_ibzk(wann, crys, el, ph, num, 'X')
-
-        call t_event%end_timer('IBZ e-ph transition probabilities')
+        if (.not. num%read_X) then
+            call t_event%start_timer('IBZ e-ph transition probabilities')
+            
+            call calculate_eph_interaction_ibzk(wann, crys, el, ph, num, 'X')
+            
+            call t_event%end_timer('IBZ e-ph transition probabilities')
+        end if 
 
         ! Symmetrize e-ph transition probabilities  
         call symmetrize_eph_interaction_ibzk(el, num, wann, ph)
+        
      end if
 
      if(num%need_Wannier) then
