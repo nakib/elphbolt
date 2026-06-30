@@ -27,7 +27,7 @@ module SEPE_module
        trace, subtitle, append2file_transport_tensor, write2file_response, &
        linspace, readfile_response, write2file_spectral_tensor, subtitle, timer, &
        twonorm, write2file_rank1_real, precompute_interpolation_corners_and_weights, &
-       interpolate_using_precomputed, Jacobian, cross_product, qdist
+       interpolate_using_precomputed, Jacobian, cross_product, qdist, Bose
   use numerics_module, only: numerics
   use crystal_module, only: crystal
   use symmetry_module, only: symmetry
@@ -271,9 +271,7 @@ contains
        ! nm.eV/K for phonons, gradT-field
        ! nm.eV/K for electrons, gradT-field
        ! nm.C for electrons, E-field
-       sync all
        call co_sum(field_term)
-       sync all
     end if
   end subroutine calculate_field_term
 
@@ -583,7 +581,7 @@ contains
          ph_drag_term_T(:,:,:), ph_drag_term_E(:,:,:), &
          ph_coherence_term_T(:,:,:), ph_coherence_term_E(:,:,:), widc(:,:)
     integer(i64), allocatable :: idc(:,:) , ksint(:,:)
-    integer :: it_ph, it_el, icart
+    integer :: it_ph_occ, it_ph_coh, it_el, icart
     integer(i64) :: ik
     character(:), allocatable :: tableheader
     type(timer) :: t
@@ -649,8 +647,11 @@ contains
          ph_drag_term_T(el%nwv, el%numbands, 3), ph_drag_term_E(el%nwv, el%numbands, 3), &
          ph_coherence_term_T(el%nwv, el%numbands, 3), ph_coherence_term_E(el%nwv, el%numbands, 3))
 
+    ph_coherence_term_E = 0.0
+    ph_coherence_term_T = 0.0
+
     !Start iterator
-    do it_ph = 1, num%maxiter       
+    do it_ph_occ = 1, num%maxiter       
        !Scheme: for each step of phonon response, fully iterate the electron response.
 
        !Iterate phonon response once
@@ -672,6 +673,9 @@ contains
        call calculate_phonon_drag(num, el, ph, idc, widc, sym, self%el_rta_rates_ibz, &
             self%ph_response_T, ph_drag_term_T)
 
+       !do it_ph_coh = 1, num%maxiter
+
+       !DFG: turn this off for standard dragful BTEs limit
        !Calculate phonon coherence term that will enter the el BTE iteration cycle
        call calculate_ph_coh_term_of_el_BTE(&
             num, el, ph, idc, widc, sym, &
@@ -693,12 +697,6 @@ contains
                self%el_rta_rates_ibz, self%el_field_term_E, self%el_response_E, &
                ph_drag_term_E, ph_coherence_term_E)
 
-          !Calculate electron transport coefficients
-          call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, &
-               el%ens, el%vels, crys%volume, el%wvmesh, self%el_response_E, sym, &
-               trans%el_alphabyT, trans%el_sigma, Bfield = num%Bfield)
-          trans%el_alphabyT = trans%el_alphabyT/crys%T
-
           !delT field:
           call iterate_el_occupations_eqn(num, el, crys, &
                self%el_rta_rates_ibz, self%el_field_term_T, self%el_response_T, &
@@ -717,10 +715,11 @@ contains
           call correct_I_drag(I_drag, trace(sum(trans%ph_alphabyT, dim = 1))/crys%dim, lambda)
           self%el_response_T = I_diff + lambda*I_drag
 
-!!$          call correct_I_drag_expt(I_drag, sum(trans%ph_alphabyT, dim = 1), lambda_diag)
-!!$          self%el_response_T = I_diff + &
-!!$               I_drag*spread(spread(lambda_diag, dim = 1, ncopies = size(I_drag, 1)), &
-!!$               dim = 2, ncopies = size(I_drag, 2))
+          !Calculate electron transport coefficients
+          call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, &
+               el%ens, el%vels, crys%volume, el%wvmesh, self%el_response_E, sym, &
+               trans%el_alphabyT, trans%el_sigma, Bfield = num%Bfield)
+          trans%el_alphabyT = trans%el_alphabyT/crys%T
 
           !Calculate electron transport coefficients
           call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
@@ -745,13 +744,13 @@ contains
              el_sigma_scalar_old = el_sigma_scalar
              el_alphabyT_scalar_old = el_alphabyT_scalar
           end if
-       end do
+       end do !el occupation iterator
 
        !Calculate phonon transport scalar
        ph_kappa_scalar = trace(sum(trans%ph_kappa, dim = 1))/crys%dim
        ph_alphabyT_scalar = trace(sum(trans%ph_alphabyT, dim = 1))/crys%dim
 
-       if(it_ph == 1) then
+       if(it_ph_occ == 1) then
           !Print RTA band/branch resolved response functions
           ! Change to data output directory
           call chdir(trim(adjustl(Tdir)))
@@ -767,7 +766,7 @@ contains
 
        if(this_image() == 1) then
           write(*,"(I3, A, 1E16.8, A, 1E16.8, A, 1E16.8, A, 1E16.8, &
-               A, 1E16.8, A, 1E16.8, A, 1F6.3)") it_ph, "     ", el_kappa0_scalar, &
+               A, 1E16.8, A, 1E16.8, A, 1F6.3)") it_ph_occ, "     ", el_kappa0_scalar, &
                "      ", el_sigmaS_scalar, "     ", ph_kappa_scalar, &
                "    ", el_sigma_scalar, "        ", el_alphabyT_scalar, &
                "         ", ph_alphabyT_scalar, "           ", KO_dev
@@ -776,12 +775,12 @@ contains
        !Print out band resolved transport coefficients
        ! Change to data output directory
        call chdir(trim(adjustl(Tdir)))
-       call append2file_transport_tensor('drag_ph_kappa_', it_ph, trans%ph_kappa)
-       call append2file_transport_tensor('drag_ph_alphabyT_', it_ph, trans%ph_alphabyT)
-       call append2file_transport_tensor('drag_el_sigmaS_', it_ph, trans%el_sigmaS, el%bandlist)
-       call append2file_transport_tensor('drag_el_sigma_', it_ph, trans%el_sigma, el%bandlist)
-       call append2file_transport_tensor('drag_el_alphabyT_', it_ph, trans%el_alphabyT, el%bandlist)
-       call append2file_transport_tensor('drag_el_kappa0_', it_ph, trans%el_kappa0, el%bandlist)
+       call append2file_transport_tensor('drag_ph_kappa_', it_ph_occ, trans%ph_kappa)
+       call append2file_transport_tensor('drag_ph_alphabyT_', it_ph_occ, trans%ph_alphabyT)
+       call append2file_transport_tensor('drag_el_sigmaS_', it_ph_occ, trans%el_sigmaS, el%bandlist)
+       call append2file_transport_tensor('drag_el_sigma_', it_ph_occ, trans%el_sigma, el%bandlist)
+       call append2file_transport_tensor('drag_el_alphabyT_', it_ph_occ, trans%el_alphabyT, el%bandlist)
+       call append2file_transport_tensor('drag_el_kappa0_', it_ph_occ, trans%el_kappa0, el%bandlist)
        ! Change back to cwd
        call chdir(trim(adjustl(num%cwd)))
 
@@ -1100,7 +1099,7 @@ contains
          nprocs_3ph_plus, nprocs_3ph_minus, start, end, nprocs_phcoh
     integer(i64), allocatable :: istate2_plus(:), istate3_plus(:), &
          istate2_minus(:), istate3_minus(:), istate_el1(:), istate_el2(:)
-    real(r64) :: tau_ibz
+    real(r64) :: tau_ibz, Qcoh
     real(r64), allocatable :: Wp(:), Wm(:), Y(:), U(:), response_ph_reduce(:, :, :), &
          coherence_ph_real(:, :, :)
     character(len = 1024) :: filepath_Wm, filepath_Wp, filepath_Y, filepath_U, tag
@@ -1197,6 +1196,8 @@ contains
           if(allocated(U)) deallocate(U)
           call read_transition_probs_e(trim(adjustl(filepath_U)), nprocs_phcoh, U)
 
+          Qcoh = el%spindeg*sum(U)
+          
           !Sum over the number of equivalent q-points of the IBZ point
           do ieq = 1, ph%nequiv(iq1_ibz)
              iq1_sym = ph%ibz2fbz_map(ieq, iq1_ibz, 1) !symmetry
@@ -1242,10 +1243,8 @@ contains
              !end if             
 
              !Coherence contribution:
-             do iproc = 1, nprocs_phcoh
-                response_ph_reduce(iq1_fbz, s1, :) = response_ph_reduce(iq1_fbz, s1, :) - &
-                     el%spindeg*U(iproc)*real(coherence_ph(iq1_fbz, s1, :))
-             end do
+             response_ph_reduce(iq1_fbz, s1, :) = response_ph_reduce(iq1_fbz, s1, :) + &
+                  Qcoh*real(coherence_ph(iq1_fbz, s1, :))
 
              !Iterate BTE
              response_ph_reduce(iq1_fbz, s1, :) = field_term(iq1_fbz, s1, :) + &
@@ -1255,15 +1254,13 @@ contains
     end if
 
     !Update the response function
-    sync all
     call co_sum(response_ph_reduce)
-    sync all
     response_ph = response_ph_reduce
 
     !Symmetrize response function
     do iq1_fbz = 1, nq
        response_ph(iq1_fbz,:,:)=transpose(&
-            matmul(ph%symmetrizers(:,:,iq1_fbz),transpose(response_ph(iq1_fbz,:,:))))
+            matmul(ph%symmetrizers(:,:,iq1_fbz), transpose(response_ph(iq1_fbz,:,:))))
     end do
   end subroutine iterate_ph_occupations_eqn
 
@@ -1292,10 +1289,10 @@ contains
     !Local variables
     integer(i64) :: el_nstates_irred, chunk, istate, numbranches, s, &
          ik_ibz, m, ieq, ik_sym, ik_fbz, ikp_fbz_rot, iproc, ikp, n, nk, &
-         iq_fbz, iq_ibz, nq, numbands, &
+         iq_fbz, iq_ibz, nq, numbands, neg_iq_fbz, q_indvec(3), &
          num_active_images, start, end, nprocs
     integer(i64), allocatable :: istate_el(:), istate_ph(:)
-    real(r64) :: ph_en, coherence_rate, prefactor_denom
+    real(r64) :: ph_en, coherence_rate, prefactor_denom, occ_fac
     complex(r64) :: prefactor
     real(r64), allocatable :: Xphplus(:), Xphminus(:)
     complex(r64), allocatable :: coherence_ph_reduce(:, :, :)
@@ -1368,10 +1365,8 @@ contains
                 !Find image of final electron wave vector due to the current symmetry
                 call binsearch(el%indexlist, el%equiv_map(ik_sym, ikp), ikp_fbz_rot)
 
-                !Recall that phonons that are not on the coarser q-mesh
-                !were tagged with a negative index.
-                !Below, I only care about those q-vectors that live on the
-                !coarser q-mesh.
+                !Recall that phonons that are not on the coarser q-mesh were tagged with a negative index.
+                !Below, I only care about those q-vectors that live on the coarser q-mesh.
                 if(istate_ph(iproc) >= 0) then
                    call demux_state(istate_ph(iproc), numbranches, s, iq_fbz)
 
@@ -1380,24 +1375,36 @@ contains
                    coherence_rate = rta_coherence_rates_ibz(iq_ibz, s)
                    !Note that I don't save the ph%ens_irred to save space. 
                    ph_en = ph%ens(iq_fbz, s)
-                   !TODO: Double check if this spin DOF factor is needed. I think it is.
-                   prefactor_denom = (hbar_eVps*coherence_rate)**2 + 16.0_r64*ph_en**2
+                   
+                   occ_fac = Bose(ph_en, crys%T)
+                   occ_fac = occ_fac*(1.0_r64 + occ_fac)
+
+                   prefactor_denom = (coherence_rate)**2 + &
+                        4.0_r64*(ph_en/hbar_eVps*occ_fac)**2
 
                    !Here accumulate contribution to \mathbf{R}_{\lambda}
                    !if(prefactor /= complex_zero) then
-                   if(prefactor_denom /= 0.0_r64) then
-                      prefactor = el%spindeg* &
-                           (hbar_eVps*coherence_rate - 4.0_r64*ph_en*oneI)/prefactor_denom
+                   if(prefactor_denom /= 0.0_r64 .and. ph_en > 0.0_r64) then
+                      prefactor = &
+                           (coherence_rate - 2.0_r64*ph_en/hbar_eVps*oneI*occ_fac)&
+                           /prefactor_denom
 
                       !from the 1st term of the RHS
                       coherence_ph_reduce(iq_fbz, s, :) = coherence_ph_reduce(iq_fbz, s, :) + &
                            prefactor*(Xphplus(iproc) - Xphminus(iproc))*&
                            (response_el(ik_fbz, m, :) - response_el(ikp_fbz_rot, n, :))
 
-                      !And, similarly, accumulate the 2nd term
+                      !Below I'll need the negative q Umklapped
+                      call demux_vector(iq_fbz, q_indvec, ph%wvmesh, 0_i64)
+
+                      !Find index of -q after Umklapping
+                      neg_iq_fbz = mux_vector(modulo(-q_indvec, ph%wvmesh), ph%wvmesh, 0_i64)
+                      
+                      !Now accumulate the 2nd term.
+                      !(This does not assume odd parity of F and G.)
                       coherence_ph_reduce(iq_fbz, s, :) = coherence_ph_reduce(iq_fbz, s, :) + &
-                           prefactor*(Xphplus(iproc) - Xphminus(iproc))*&
-                           response_ph(iq_fbz, s, :)
+                           prefactor*(Xphplus(iproc)*response_ph(iq_fbz, s, :) + &
+                           Xphminus(iproc)*response_ph(neg_iq_fbz, s, :))
                    end if
                 end if
 
@@ -1476,9 +1483,9 @@ contains
     !Local variables
     integer(i64) :: nstates_irred, nprocs, chunk, istate, numbands, numbranches, &
          ik_ibz, m, ieq, ik_sym, ik_fbz, iproc, iq, s, nk, num_active_images, &
-         fineq_indvec(3), start, end, iq2inter
+         fineq_indvec(3), fineq_indvec_im(3), start, end, iq2inter, neg_iq, q_indvec(3)
     integer(i64), allocatable :: istate_el(:), istate_ph(:)
-    real(r64) :: tau_ibz, ForG(3)
+    real(r64) :: tau_ibz, ForG(3), ForG_minusq(3)
     real(r64), allocatable :: Xplus(:), Xminus(:), ph_drag_term_reduce(:, :, :)
     character(1024) :: filepath_Xminus, filepath_Xplus, tag
 
@@ -1496,7 +1503,7 @@ contains
 
     !Allocate and initialize response reduction array
     allocate(ph_drag_term_reduce(nk, numbands, 3))
-    ph_drag_term_reduce(:,:,:) = 0.0_r64
+    ph_drag_term_reduce(:, :, :) = 0.0_r64
 
     !Divide electron states among images
     call distribute_points(nstates_irred, chunk, start, end, num_active_images)
@@ -1552,21 +1559,45 @@ contains
                    call demux_vector(-iq, fineq_indvec, el%wvmesh, 0_i64)
 
                    !Find image of phonon wave vector due to the current symmetry
-                   fineq_indvec = modulo( &
+                   fineq_indvec_im = modulo( &
                         nint(matmul(sym%qrotations(:, :, ik_sym), fineq_indvec)), el%wvmesh)
 
                    !Interpolate response function on this wave vector using precomputed tabulated weights
                    !and points. I note that response_ph(:, s, :) is not contiguous in memory.
-                   iq2inter = mux_vector(fineq_indvec,el%wvmesh, 0_i64)
-                   call interpolate_using_precomputed(idc(iq2inter,:), widc(iq2inter,:),&
+                   iq2inter = mux_vector(fineq_indvec_im, el%wvmesh, 0_i64)
+                   call interpolate_using_precomputed(idc(iq2inter, :), widc(iq2inter, :),&
                         response_ph(:, s, :), ForG(:))
+
+                   !The -q part:
+                   !Find image of phonon wave vector due to the current symmetry
+                   fineq_indvec_im = modulo(-fineq_indvec_im, el%wvmesh)
+                   
+                   !Interpolate response function on this wave vector using precomputed tabulated weights
+                   !and points. I note that response_ph(:, s, :) is not contiguous in memory.
+                   iq2inter = mux_vector(fineq_indvec_im, el%wvmesh, 0_i64)
+                   call interpolate_using_precomputed(idc(iq2inter, :), widc(iq2inter, :),&
+                        response_ph(:, s, :), ForG_minusq(:))
                 else
                    !F(q) or G(q)
                    ForG(:) = response_ph(ph%equiv_map(ik_sym, iq), s, :)
+
+                   !The -q part:
+                   !Find image of phonon wave vector due to the current symmetry
+                   call demux_vector(ph%equiv_map(ik_sym, iq), q_indvec, ph%wvmesh, 0_i64)
+
+                   !Find index of -q after Umklapping
+                   neg_iq = mux_vector(modulo(-q_indvec, ph%wvmesh), ph%wvmesh, 0_i64)
+
+                   ForG_minusq(:) = response_ph(neg_iq, s, :)
                 end if
-                !Here we use the fact that F(-q) = -F(q) and G(-q) = -G(q)
+                
+!!$                !Here we use the fact that F(-q) = -F(q) and G(-q) = -G(q)
+!!$                ph_drag_term_reduce(ik_fbz, m, :) = ph_drag_term_reduce(ik_fbz, m, :) - &
+!!$                     ForG(:)*(Xplus(iproc) + Xminus(iproc))
+
+                !Let's not assume the odd parity since the coherence term is even.       
                 ph_drag_term_reduce(ik_fbz, m, :) = ph_drag_term_reduce(ik_fbz, m, :) - &
-                     ForG(:)*(Xplus(iproc) + Xminus(iproc))
+                     ForG(:)*Xplus(iproc) + ForG_minusq(:)*Xminus(iproc)
              end do
 
              !Multiply life time factor 
@@ -1613,9 +1644,11 @@ contains
          fineq_indvec(3), start, end, iq2inter
     integer(i64), allocatable :: istate_el_phcoh(:), istate_ph_phcoh(:)
     real(r64) :: tau_ibz, HorP(3)
-    real(r64), allocatable :: Omegaplus(:), Omegaminus(:), &
+    !real(r64), allocatable :: Omegaplus(:), Omegaminus(:), &
+    real(r64), allocatable :: Xplus(:), Xminus(:), &
          ph_coherence_term_reduce(:, :, :), coherence_ph_real(:, :, :)
-    character(1024) :: filepath_Omegaminus, filepath_Omegaplus, tag
+    !character(1024) :: filepath_Omegaminus, filepath_Omegaplus, tag
+    character(1024) :: filepath_Xminus, filepath_Xplus, tag
 
     !Number of electron bands
     numbands = el%numbands
@@ -1656,20 +1689,31 @@ contains
              tau_ibz = 1.0_r64/rta_rates_ibz(ik_ibz, m)
           end if
 
-          !Set Omega+ filename
+!!$          !Set Omega+ filename
+!!$          write(tag, '(I9)') istate
+!!$          filepath_Omegaplus = trim(adjustl(num%Xdir))//'/Omegaplus.istate'//trim(adjustl(tag))
+          !Set X+ filename
           write(tag, '(I9)') istate
-          filepath_Omegaplus = trim(adjustl(num%Xdir))//'/Omegaplus.istate'//trim(adjustl(tag))
+          filepath_Xplus = trim(adjustl(num%Xdir))//'/Xplus.istate'//trim(adjustl(tag))
 
-          !Read Omega+ from file
-          call read_transition_probs_e(trim(adjustl(filepath_Omegaplus)), nprocs_phcoh, Omegaplus, &
+!!$          !Read Omega+ from file
+!!$          call read_transition_probs_e(trim(adjustl(filepath_Omegaplus)), nprocs_phcoh, Omegaplus, &
+!!$               istate_el_phcoh, istate_ph_phcoh)
+          !Read X+ from file
+          call read_transition_probs_e(trim(adjustl(filepath_Xplus)), nprocs_phcoh, Xplus, &
                istate_el_phcoh, istate_ph_phcoh)
 
-          !Set Omega- filename
+!!$          !Set Omega- filename
+!!$          write(tag, '(I9)') istate
+!!$          filepath_Omegaminus = trim(adjustl(num%Xdir))//'/Omegaminus.istate'//trim(adjustl(tag))
+          !Set X- filename
           write(tag, '(I9)') istate
-          filepath_Omegaminus = trim(adjustl(num%Xdir))//'/Omegaminus.istate'//trim(adjustl(tag))
+          filepath_Xminus = trim(adjustl(num%Xdir))//'/Xminus.istate'//trim(adjustl(tag))
 
-          !Read Omega- from file
-          call read_transition_probs_e(trim(adjustl(filepath_Omegaminus)), nprocs_phcoh, Omegaminus)
+!!$          !Read Omega- from file
+!!$          call read_transition_probs_e(trim(adjustl(filepath_Omegaminus)), nprocs_phcoh, Omegaminus)
+          !Read X- from file
+          call read_transition_probs_e(trim(adjustl(filepath_Xminus)), nprocs_phcoh, Xminus)
 
           !Sum over the number of equivalent k-points of the IBZ point
           do ieq = 1, el%nequiv(ik_ibz)
@@ -1706,10 +1750,14 @@ contains
                    HorP(:) = coherence_ph_real(ph%equiv_map(ik_sym, iq), s, :)
                 end if
 
-                !(Note that below we use the fact that H and P are even in wave vector)
+                !Note that below we use the fact that H and P are even in wave vector
+                !This follows from the definition of coherence: Eq. 24 of Stefanucci & Perfetto SciPost 2023.
+!!$                ph_coherence_term_reduce(ik_fbz, m, :) = &
+!!$                     ph_coherence_term_reduce(ik_fbz, m, :) - &
+!!$                     HorP(:)*(Omegaplus(iproc) + Omegaminus(iproc))
                 ph_coherence_term_reduce(ik_fbz, m, :) = &
                      ph_coherence_term_reduce(ik_fbz, m, :) - &
-                     HorP(:)*(Omegaplus(iproc) + Omegaminus(iproc))
+                     HorP(:)*(Xplus(iproc) + Xminus(iproc))
              end do
 
              !Multiply life time factor 

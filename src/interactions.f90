@@ -3444,8 +3444,10 @@ contains
 
     integer(i64), allocatable :: istate_el(:), istate_ph(:)
     real(r64) :: Fermi_istate, occ_fac
-    real(r64), allocatable :: Omegap(:), Omegam(:), rta_rates_phe_fbz(:, :)
-    character(len = 1024) :: filepath_Omegap, filepath_Omegam, filepath_Wm, tag
+    !real(r64), allocatable :: Omegap(:), Omegam(:), rta_rates_phe_fbz(:, :)
+    real(r64), allocatable :: Xp(:), Xm(:), rta_rates_phe_fbz(:, :)
+    !character(len = 1024) :: filepath_Omegap, filepath_Omegam, filepath_Wm, tag
+    character(len = 1024) :: filepath_Xp, filepath_Xm, tag
 
     !Set output directory of transition probilities
     write(tag, "(E9.3)") crys%T
@@ -3471,20 +3473,20 @@ contains
           Fermi_istate = Fermi(el%ens_irred(ik_ibz, m), el%chempot, crys%T)
           occ_fac = Fermi_istate*(1.0_r64 - Fermi_istate)
 
-          !Set Omega+ filename
+          !Set X+ filename
           write(tag, '(I9)') istate
-          filepath_Omegap = trim(adjustl(num%Xdir))//'/Omegaplus.istate'//trim(adjustl(tag))
+          filepath_Xp = trim(adjustl(num%Xdir))//'/Xplus.istate'//trim(adjustl(tag))
 
-          !Read Omega+ from file
-          call read_transition_probs_e(trim(adjustl(filepath_Omegap)), nprocs, Omegap, &
+          !Read X+ from file
+          call read_transition_probs_e(trim(adjustl(filepath_Xp)), nprocs, Xp, &
                istate_el, istate_ph)
 
-          !Set Omega- filename
+          !Set X- filename
           write(tag, '(I9)') istate
-          filepath_Omegam = trim(adjustl(num%Xdir))//'/Omegaminus.istate'//trim(adjustl(tag))
+          filepath_Xm = trim(adjustl(num%Xdir))//'/Xminus.istate'//trim(adjustl(tag))
 
-          !Read Omega- from file
-          call read_transition_probs_e(trim(adjustl(filepath_Omegam)), nprocs, Omegam)
+          !Read X- from file
+          call read_transition_probs_e(trim(adjustl(filepath_Xm)), nprocs, Xm)
 
           !Sum over the number of equivalent k-points of the IBZ point
           do ieq = 1, el%nequiv(ik_ibz)
@@ -3511,8 +3513,11 @@ contains
                    !iq_ibz = ph%fbz2ibz_map(iq_fbz)
 
                    !Note here that I absorbed the occupation factor [f0(1 - f0)]^-1 in the Omegas earlier
+!!$                   rta_rates_phe_fbz(iq_fbz, s) = rta_rates_phe_fbz(iq_fbz, s) + &
+!!$                        el%spindeg*(Xp(iproc) - Xm(iproc))*occ_fac
+
                    rta_rates_phe_fbz(iq_fbz, s) = rta_rates_phe_fbz(iq_fbz, s) + &
-                        el%spindeg*(Omegap(iproc) - Omegam(iproc))*occ_fac
+                        (Xp(iproc) + Xm(iproc))*occ_fac
                 end if
              end do
           end do
