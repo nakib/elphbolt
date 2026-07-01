@@ -348,6 +348,10 @@ contains
     end if
 
     sync all
+    
+    !! Applying all degeneracies to epmat
+    call apply_degeneracies_old(self)
+    call print_message("Applied WS degeneracies")
   end subroutine read_exciting_Wannier
 
   subroutine read_EPW_Wannier(self, num)
@@ -558,51 +562,149 @@ contains
 
     sync all
     call print_message("Reading complete")
+
+    !! Applying all degeneracies to epmat
+    if(self%old_ws) then
+       call apply_degeneracies_old(self)
+    else
+       call apply_degeneracies_new(self)
+    end if
+    call print_message("Applied WS degeneracies")
+
   end subroutine read_EPW_Wannier
   
-  !! - This is the ugly part - !!
-  !! If you keep the pointer system !!
-  integer(i64) function old_degen_el(self, ind1, ind2, ind3)
-    class(wannier), intent(in) :: self
-    integer(i64), intent(in) :: ind1, ind2, ind3
+  subroutine apply_degeneracies_new(self)
+    !! Apply WS degeneracies to H, D & eph mat elements in Wannier representation
+    !! (Warning: modifies self%Hwann, self%Dphwann and global gwann)
+    class(wannier), intent(inout) :: self
 
-    old_degen_el = self%elwsdeg(ind1)
-  end function old_degen_el
+    !! Locals
+    integer(i64) :: ib1, ib2, s, na, i, image, iuc, iat, jat, nat
+    integer(i64) :: image_order(self%gwann_distrib_num_active_images) 
 
-  integer(i64) function old_degen_ph(self, ind1, ind2, ind3)
-    class(wannier), intent(in) :: self
-    integer(i64), intent(in) :: ind1, ind2, ind3
+    !Staggering the order of reading of gwann from the diffent images to reduce
+    !simultaneous reading of the same chunk by all images.
+    do i = 0, self%gwann_distrib_num_active_images - 1
+       image_order(i + 1) = modulo(i + this_image() - 1, self%gwann_distrib_num_active_images) + 1
+    end do
 
-    old_degen_ph = self%phwsdeg(ind1)
-  end function old_degen_ph
+    !! Applying degeneracies to eph mat elements
+    do i = 1, self%gwann_distrib_num_active_images
+       image = image_order(i)
+
+       do concurrent(ib1 = 1:self%numwannbands, iuc = 1:self%gwann_distrib_chunk[image], &
+                      s = 1:self%numbranches)
+          na = ceiling(real(s)/3.0)
+          if(self%gwsdeg_new(iuc, ib1, na)[image] /= 0) then
+             gwann(ib1,:,:,s,iuc)[image] = gwann(ib1,:,:,s,iuc)[image] &
+                                        /self%gwsdeg_new(iuc, ib1, na)[image]
+          else
+             gwann(ib1,:,:,s,iuc)[image] = 0.0_r64
+          end if
+       end do
+    end do
+    do concurrent(ib1 = 1:self%numwannbands, ib2 = 1:self%numwannbands, iuc = 1:self%nwsk)
+       if(self%elwsdeg_new(iuc, ib1, ib2) /= 0) then       
+          gwann(ib1,ib2,iuc,:,:) = gwann(ib1,ib2,iuc,:,:)/self%elwsdeg_new(iuc, ib1, ib2)
+          !! Applying degeneracies to H mat elements
+          self%Hwann(iuc, ib1, ib2) = self%Hwann(iuc, ib1, ib2)&
+                                    /self%elwsdeg_new(iuc, ib1, ib2)
+       else
+          gwann(ib1,ib2,iuc,:,:) = 0.0_r64
+          self%Hwann(iuc, ib1, ib2) = 0.0_r64
+       end if
+    end do
+    
+    !! Applying degeneracies to D mat elements
+    nat = size(self%phwsdeg_new(1, :, 1))
+    do concurrent(iat = 1:nat, jat = 1:nat, iuc = 1:self%nwsq)
+       if(self%phwsdeg_new(iuc, iat, jat) /= 0) then
+          self%Dphwann(iuc, (iat-1)*3+1:iat*3, (jat-1)*3+1:jat*3) = &
+                        self%Dphwann(iuc, (iat-1)*3+1:iat*3, (jat-1)*3+1:jat*3)&
+                        /self%phwsdeg_new(iuc, iat, jat)
+       else
+          self%Dphwann(iuc, (iat-1)*3+1:iat*3, (jat-1)*3+1:jat*3) = 0.0_r64
+       end if
+    end do
+  end subroutine apply_degeneracies_new
+
+  subroutine apply_degeneracies_old(self)
+    !! Apply WS degeneracies to H, D & eph mat elements according to old format
+    !! (Warning: modifies self%Hwann, self%Dphwann and global gwann)
+    class(wannier), intent(inout) :: self
+
+    !! Locals
+    integer(i64) :: i, image, iuc, image_order(self%gwann_distrib_num_active_images) 
+
+    !Staggering the order of reading of gwann from the diffent images to reduce
+    !simultaneous reading of the same chunk by all images.
+    do i = 0, self%gwann_distrib_num_active_images - 1
+       image_order(i + 1) = modulo(i + this_image() - 1, self%gwann_distrib_num_active_images) + 1
+    end do
+
+    !! Applying degeneracies to eph mat elements
+    do i = 1, self%gwann_distrib_num_active_images
+       image = image_order(i)
+
+       do iuc = 1, self%gwann_distrib_chunk[image]
+             gwann(:,:,:,:,iuc)[image] = gwann(:,:,:,:,iuc)[image]/self%gwsdeg(iuc)[image]
+       end do
+    end do
+    
+    do iuc = 1,self%nwsk
+       gwann(:,:,iuc,:,:) = gwann(:,:,iuc,:,:)/self%elwsdeg(iuc)
+       !! Applying degeneracies to H mat elements
+       self%Hwann(iuc, :, :) = self%Hwann(iuc, :, :)/self%elwsdeg(iuc)
+    end do
+    !! Applying degeneracies to D mat elements
+    do iuc = 1,self%nwsq
+       self%Dphwann(iuc, :, :) = self%Dphwann(iuc, :, :)/self%phwsdeg(iuc)
+    end do
+  end subroutine apply_degeneracies_old
   
-  integer(i64) function old_degen_g(self, ind1, ind2, ind3, image)
-    class(wannier), intent(in) :: self
-    integer(i64), intent(in) :: ind1, ind2, ind3, image
-
-    old_degen_g = self%gwsdeg(ind1)[image]
-  end function old_degen_g
-  
-  integer(i64) function new_degen_el(self, ind1, ind2, ind3)
-    class(wannier), intent(in) :: self
-    integer(i64), intent(in) :: ind1, ind2, ind3
-
-    new_degen_el = self%elwsdeg_new(ind1, ind2, ind3)
-  end function new_degen_el
-
-  integer(i64) function new_degen_ph(self, ind1, ind2, ind3)
-    class(wannier), intent(in) :: self
-    integer(i64), intent(in) :: ind1, ind2, ind3
-
-    new_degen_ph = self%phwsdeg_new(ind1, ind2, ind3)
-  end function new_degen_ph
-  
-  integer(i64) function new_degen_g(self, ind1, ind2, ind3, image)
-    class(wannier), intent(in) :: self
-    integer(i64), intent(in) :: ind1, ind2, ind3, image
-
-    new_degen_g = self%gwsdeg_new(ind1, ind2, ind3)[image]
-  end function new_degen_g
+!$!   !! - This is the ugly part - !!
+!$!   !! If you keep the pointer system !!
+!$!   integer(i64) function old_degen_el(self, ind1, ind2, ind3)
+!$!     class(wannier), intent(in) :: self
+!$!     integer(i64), intent(in) :: ind1, ind2, ind3
+!$! 
+!$!     old_degen_el = self%elwsdeg(ind1)
+!$!   end function old_degen_el
+!$! 
+!$!   integer(i64) function old_degen_ph(self, ind1, ind2, ind3)
+!$!     class(wannier), intent(in) :: self
+!$!     integer(i64), intent(in) :: ind1, ind2, ind3
+!$! 
+!$!     old_degen_ph = self%phwsdeg(ind1)
+!$!   end function old_degen_ph
+!$!   
+!$!   integer(i64) function old_degen_g(self, ind1, ind2, ind3, image)
+!$!     class(wannier), intent(in) :: self
+!$!     integer(i64), intent(in) :: ind1, ind2, ind3, image
+!$! 
+!$!     old_degen_g = self%gwsdeg(ind1)[image]
+!$!   end function old_degen_g
+!$!   
+!$!   integer(i64) function new_degen_el(self, ind1, ind2, ind3)
+!$!     class(wannier), intent(in) :: self
+!$!     integer(i64), intent(in) :: ind1, ind2, ind3
+!$! 
+!$!     new_degen_el = self%elwsdeg_new(ind1, ind2, ind3)
+!$!   end function new_degen_el
+!$! 
+!$!   integer(i64) function new_degen_ph(self, ind1, ind2, ind3)
+!$!     class(wannier), intent(in) :: self
+!$!     integer(i64), intent(in) :: ind1, ind2, ind3
+!$! 
+!$!     new_degen_ph = self%phwsdeg_new(ind1, ind2, ind3)
+!$!   end function new_degen_ph
+!$!   
+!$!   integer(i64) function new_degen_g(self, ind1, ind2, ind3, image)
+!$!     class(wannier), intent(in) :: self
+!$!     integer(i64), intent(in) :: ind1, ind2, ind3, image
+!$! 
+!$!     new_degen_g = self%gwsdeg_new(ind1, ind2, ind3)[image]
+!$!   end function new_degen_g
   
 !$!   integer(i64) function get_degen_el_or_ph(self, prefix, ind1, ind2, ind3)
 !$!     !! Note: This is fast way of implementing but will drive the code way slow
@@ -948,6 +1050,115 @@ contains
 !$! 
 !$!   end subroutine read_EPW_Wannier_newwigner
 
+!$!   !! Modified by DP
+!$!   subroutine el_wann(self, crys, nk, kvecs, energies, velocities, evecs, scissor)
+!$!     !! Wannier interpolate electrons on list of arb. k-vecs
+!$! 
+!$!     class(wannier), intent(in) :: self
+!$!     type(crystal), intent(in) :: crys
+!$!     integer(i64), intent(in) :: nk
+!$!     real(r64), intent(in) :: kvecs(nk,3) !Crystal coordinates
+!$!     real(r64), intent(out) :: energies(nk,self%numwannbands)
+!$!     real(r64), optional, intent(out) :: velocities(nk,self%numwannbands,3)
+!$!     complex(r64), optional, intent(out) :: evecs(nk,self%numwannbands,self%numwannbands)
+!$!     real(r64), optional, intent(in) :: scissor(self%numwannbands)
+!$! 
+!$!     !Local variables
+!$!     integer(i64) :: iuc, ib, jb, ipol, ik, nwork, tmp
+!$!     real(r64) :: rcart(3)
+!$!     real(r64),  allocatable :: rwork(:)
+!$!     complex(r64), allocatable :: work(:)
+!$!     complex(r64) :: H(self%numwannbands,self%numwannbands), &
+!$!          dH(3,self%numwannbands,self%numwannbands)
+!$!     integer(i64) :: ib1, ib2
+!$!     complex(r64) :: caux(self%numwannbands,self%numwannbands)  ! initially it was a single value
+!$! 
+!$!     !External procedures
+!$!     external :: zheev
+!$! 
+!$!     !Catch error for optional velocity calculation
+!$!     if(present(velocities) .and. .not. present(evecs)) &
+!$!          call exit_with_message("In el_wann, velocity is present but not eigenvecs.")
+!$! 
+!$!     nwork = 1
+!$!     allocate(work(nwork))
+!$!     allocate(rwork(max(1,7*self%numwannbands)))
+!$! 
+!$!     do ik = 1,nk
+!$!        !Form Hamiltonian (H) and k-derivative of H (dH) 
+!$!        !from Hwann, rcells_k, and elwsdeg
+!$!        H = 0
+!$!        dH = 0
+!$!        do iuc = 1,self%nwsk
+!$! !$!           caux = expi(twopi*dot_product(kvecs(ik,:),self%rcells_k(iuc,:)))&
+!$! !$!                /self%elwsdeg(iuc)
+!$! !$!           H = H + caux*self%Hwann(iuc,:,:)
+!$!           caux = (0.0_r64, 0.0_r64) 
+!$!           do concurrent(ib1 = 1:self%numwannbands, ib2 = 1:self%numwannbands)
+!$!              !if(self%el_degen(iuc, ib1, ib2)/=0.0)  &
+!$!              !   caux(ib1, ib2) = 1.0_r64/self%el_degen(iuc, ib1, ib2)
+!$!              if(self%elwsdeg_new(iuc, ib1, ib2)/=0)  &
+!$!                 caux(ib1, ib2) = 1.0_r64/self%elwsdeg_new(iuc, ib1, ib2)
+!$!           end do
+!$!           caux = caux*expi(twopi*dot_product(kvecs(ik,:),self%rcells_k(iuc,:)))
+!$!           H = H + caux*self%Hwann(iuc, :, :)
+!$! 
+!$! 
+!$!           if(present(velocities)) then
+!$!              rcart = matmul(crys%lattvecs,self%rcells_k(iuc,:))
+!$!              do ipol = 1,3
+!$!                 dH(ipol,:,:) = dH(ipol,:,:) + &
+!$!                      oneI*rcart(ipol)*caux*self%Hwann(iuc,:,:)
+!$!              end do
+!$!           end if
+!$!        end do
+!$! 
+!$!        !Force Hermiticity
+!$!        do ib = 1, self%numwannbands
+!$!           do jb = ib + 1, self%numwannbands
+!$!              H(ib,jb) = (H(ib,jb) + conjg(H(jb,ib)))*0.5_r64
+!$!              H(jb,ib) = H(ib,jb)
+!$!           end do
+!$!        end do
+!$! 
+!$!        !Diagonalize H
+!$!        call zheev("V", "U", self%numwannbands, H(:,:), self%numwannbands, energies(ik,:), &
+!$!             work, -1_i64, rwork, tmp)
+!$!        if(real(work(1)) > nwork) then
+!$!           nwork = nint(2*real(work(1)))
+!$!           deallocate(work)
+!$!           allocate(work(nwork))
+!$!        end if
+!$!        call zheev("V", "U", self%numwannbands, H(:,:), self%numwannbands, energies(ik,:), &
+!$!             work, nwork, rwork, tmp)
+!$! 
+!$!        !These quantities are U^dagger. See Eq. 31 or prb 76, 165108.
+!$!        if(present(evecs)) then
+!$!           evecs(ik,:,:)=transpose(H(:,:))
+!$!        end if
+!$! 
+!$!        if(present(velocities)) then
+!$!           !Calculate velocities using Feynman-Hellmann thm
+!$!           do ib = 1,self%numwannbands
+!$!              do ipol = 1,3
+!$!                 velocities(ik,ib,ipol)=real(dot_product(evecs(ik,ib,:), &
+!$!                      matmul(dH(ipol,:,:), evecs(ik,ib,:))))
+!$!              end do
+!$!           end do
+!$!        end if
+!$! 
+!$!        !energies(ik,:) = energies(ik,:)*Rydberg2radTHz !2piTHz
+!$!        energies(ik,:) = energies(ik,:)*Ryd2eV !eV
+!$!        !If present, apply the scissor operator to conduction bands
+!$!        if (present(scissor)) then
+!$!           energies(ik,:) = energies(ik,:) + scissor(:)
+!$!        end if
+!$!        if(present(velocities)) then
+!$!           velocities(ik,:,:) = velocities(ik,:,:)*Ryd2radTHz !nmTHz = Km/s
+!$!        end if
+!$!     end do !ik
+!$!   end subroutine el_wann
+
   subroutine el_wann(self, crys, nk, kvecs, energies, velocities, evecs, scissor)
     !! Wannier interpolate electrons on list of arb. k-vecs
 
@@ -965,10 +1176,8 @@ contains
     real(r64) :: rcart(3)
     real(r64),  allocatable :: rwork(:)
     complex(r64), allocatable :: work(:)
-    complex(r64) :: H(self%numwannbands,self%numwannbands), &
+    complex(r64) :: caux, H(self%numwannbands,self%numwannbands), &
          dH(3,self%numwannbands,self%numwannbands)
-    integer(i64) :: ib1, ib2
-    complex(r64) :: caux(self%numwannbands,self%numwannbands)  ! initially it was a single value
 
     !External procedures
     external :: zheev
@@ -987,19 +1196,9 @@ contains
        H = 0
        dH = 0
        do iuc = 1,self%nwsk
-!$!           caux = expi(twopi*dot_product(kvecs(ik,:),self%rcells_k(iuc,:)))&
-!$!                /self%elwsdeg(iuc)
-!$!           H = H + caux*self%Hwann(iuc,:,:)
-          caux = (0.0_r64, 0.0_r64) 
-          do concurrent(ib1 = 1:self%numwannbands, ib2 = 1:self%numwannbands)
-             !if(self%el_degen(iuc, ib1, ib2)/=0.0)  &
-             !   caux(ib1, ib2) = 1.0_r64/self%el_degen(iuc, ib1, ib2)
-             if(self%elwsdeg_new(iuc, ib1, ib2)/=0)  &
-                caux(ib1, ib2) = 1.0_r64/self%elwsdeg_new(iuc, ib1, ib2)
-          end do
-          caux = caux*expi(twopi*dot_product(kvecs(ik,:),self%rcells_k(iuc,:)))
-          H = H + caux*self%Hwann(iuc, :, :)
-
+          caux = expi(twopi*dot_product(kvecs(ik,:),self%rcells_k(iuc,:)))!&
+               !/self%elwsdeg(iuc)
+          H = H + caux*self%Hwann(iuc,:,:)
 
           if(present(velocities)) then
              rcart = matmul(crys%lattvecs,self%rcells_k(iuc,:))
@@ -1115,6 +1314,214 @@ contains
   end function ws_wrapping_vectors
 !!!!!!
 
+!$!   !! Modified by DP
+!$!   subroutine ph_wann(self, crys, nq, qvecs, energies, evecs, velocities)  
+!$!     !! Wannier interpolate phonons on list of arb. q-vec
+!$! 
+!$!     class(wannier), intent(in) :: self
+!$!     type(crystal), intent(in) :: crys
+!$!     integer(i64), intent(in) :: nq
+!$!     real(r64), intent(in) :: qvecs(nq, 3) !Crystal coordinates
+!$!     real(r64), intent(out) :: energies(nq, self%numbranches)
+!$!     real(r64), optional, intent(out) :: velocities(nq, self%numbranches, 3)
+!$!     complex(r64), intent(out), optional :: evecs(nq, self%numbranches, self%numbranches)
+!$! 
+!$!     !Local variables
+!$!     integer(i64) :: iuc, ipol, ib, jb, iq, na, nb, nwork, aux, iat, jat
+!$!     integer :: iw, num_wrap
+!$!     integer, allocatable :: wrappers(:, :)
+!$!     real(r64) :: rcart(3), dist(3)
+!$!     complex(r64) :: caux
+!$!     real(r64), allocatable :: rwork(:)
+!$!     complex(r64), allocatable :: work(:)
+!$!     real(r64) :: omega2(self%numbranches), massnorm
+!$!     complex(r64) :: dynmat(self%numbranches, self%numbranches), &
+!$!          dynmat_l(self%numbranches, self%numbranches)
+!$!     complex(r64), allocatable :: ddynmat(:, :, :), ddynmat_l(:, :, :), caux_mat(:, :)
+!$! 
+!$!     !External procedures
+!$!     external :: zheev
+!$! 
+!$!     !Catch error for optional velocity calculation
+!$!     if(present(velocities) .and. .not. present(evecs)) &
+!$!          call exit_with_message("In ph_wann, velocity is present but not eigenvecs.")
+!$! 
+!$!     nwork = 1
+!$!     allocate(work(nwork))
+!$!     allocate(rwork(max(1, 9*crys%numatoms-2)))
+!$!     allocate(caux_mat(self%numbranches, self%numbranches))
+!$! 
+!$!     if(present(velocities)) then
+!$!        allocate(ddynmat(self%numbranches, self%numbranches, 3), &
+!$!             ddynmat_l(self%numbranches, self%numbranches, 3))
+!$!     end if
+!$! 
+!$!     do iq = 1, nq
+!$!        !Form dynamical matrix
+!$!        dynmat = (0.0_r64, 0.0_r64)
+!$!        if(present(velocities)) ddynmat = (0.0_r64, 0.0_r64)
+!$! 
+!$!        do iuc = 1, self%nwsq
+!$!           !! More accurate method for interpolating the dynamical matrix compared
+!$!           !! to the original. Will formalize this later... [TODO]
+!$!           !! Thanks, Sebastian for the great pair programming experience!
+!$!           caux_mat(:, :) = (0.0_r64, 0.0_r64)
+!$!           do jat = 1, crys%numatoms
+!$!              do iat = 1, crys%numatoms
+!$!                 ! all vectors in lattice coordinates
+!$!                 dist(:) = self%rcells_q(iuc, :) &
+!$!                      - crys%basis(:, iat) + crys%basis(:, jat)
+!$!                 dist(:) = dist(:) / self%coarse_qmesh(:)
+!$!                 wrappers = ws_wrapping_vectors(crys%lattvecs, dist(:), eps = 1.0e-6_r64 )
+!$!                 num_wrap = size( wrappers, dim=2 )
+!$!                 do iw = 1, num_wrap
+!$!                    caux = expi(twopi * dot_product( qvecs(iq, :), &
+!$!                         self%rcells_q(iuc, :) + wrappers(:, iw) * self%coarse_qmesh(:) ))
+!$!                    ! same for 3 x 3 blocks
+!$! !$!                    caux_mat((iat-1)*3+1:iat*3, (jat-1)*3+1:jat*3) = &
+!$! !$!                         caux_mat((iat-1)*3+1:iat*3, (jat-1)*3+1:jat*3) + &
+!$! !$!                         caux / (self%phwsdeg(iuc) * num_wrap)
+!$!                    !if(self%ph_degen(iuc, iat, jat)/=0) &
+!$!                    !   caux_mat((iat-1)*3+1:iat*3, (jat-1)*3+1:jat*3) = &
+!$!                    !     caux_mat((iat-1)*3+1:iat*3, (jat-1)*3+1:jat*3) + &
+!$!                    !     caux / (self%ph_degen(iuc, iat, jat) * num_wrap)
+!$!                    if(self%phwsdeg_new(iuc, iat, jat)/=0) &
+!$!                       caux_mat((iat-1)*3+1:iat*3, (jat-1)*3+1:jat*3) = &
+!$!                         caux_mat((iat-1)*3+1:iat*3, (jat-1)*3+1:jat*3) + &
+!$!                         caux / (self%phwsdeg_new(iuc, iat, jat) * num_wrap)
+!$!                 end do
+!$!              end do
+!$!           end do
+!$! 
+!$!           dynmat(:, :) = dynmat(:, :) + caux_mat(:, :) * self%Dphwann(iuc, :, :)
+!$! 
+!$!           if(present(velocities)) then
+!$!              rcart = matmul(crys%lattvecs, self%rcells_q(iuc, :))
+!$! 
+!$!              do ipol = 1, 3
+!$!                 ddynmat(:, :, ipol) = ddynmat(:, :, ipol) + &
+!$!                      oneI*rcart(ipol)*caux_mat(:, :)*self%Dphwann(iuc, :, :)
+!$!              end do
+!$!           end if
+!$!        end do
+!$! 
+!$! !!$       do iuc = 1, self%nwsq
+!$! !!$          caux = expi(twopi*dot_product(qvecs(iq, :), self%rcells_q(iuc, :)))&
+!$! !!$               /self%phwsdeg(iuc)
+!$! !!$
+!$! !!$          dynmat = dynmat + caux*self%Dphwann(iuc, :, :)
+!$! !!$
+!$! !!$          if(present(velocities)) then
+!$! !!$             rcart = matmul(crys%lattvecs, self%rcells_q(iuc, :))
+!$! !!$
+!$! !!$             do ipol = 1, 3
+!$! !!$                ddynmat(:, :, ipol) = ddynmat(:, :, ipol) + &
+!$! !!$                     oneI*rcart(ipol)*caux*self%Dphwann(iuc, :, :)
+!$! !!$             end do
+!$! !!$          end if
+!$! !!$       end do
+!$! 
+!$!        !Non-analytic correction
+!$!        if(crys%polar) then
+!$!           if(present(velocities)) then
+!$!              call dyn_nonanalytic(crys, matmul(crys%reclattvecs,qvecs(iq, :))*bohr2nm, &
+!$!                   self%coarse_qmesh, dynmat_l, ddynmat_l)
+!$! 
+!$!              !Add long range part to short range part.
+!$!              !Recall that dyn_nonanalytic works & returns in Bohr length units.
+!$!              ddynmat = ddynmat + ddynmat_l*bohr2nm
+!$!           else
+!$!              call dyn_nonanalytic(crys, matmul(crys%reclattvecs, qvecs(iq, :))*bohr2nm, &
+!$!                   self%coarse_qmesh, dynmat_l)
+!$!           end if
+!$! 
+!$! !!$          if(iq == 2 .and. this_image() == 1) then
+!$! !!$             print*, 'q = ', matmul(crys%reclattvecs, qvecs(iq, :))*bohr2nm
+!$! !!$             print*, dynmat_l
+!$! !!$             call write2file_rank2_complex("dyn_lr", dynmat_l)
+!$! !!$             call exit
+!$! !!$          end if
+!$! 
+!$!           dynmat = dynmat + dynmat_l
+!$!        end if
+!$! 
+!$!        !Force Hermiticity
+!$!        do ib = 1, self%numbranches
+!$!           do jb = ib + 1, self%numbranches
+!$!              dynmat(ib, jb) = (dynmat(ib, jb) + conjg(dynmat(jb, ib)))*0.5_r64
+!$!              dynmat(jb, ib) = dynmat(ib, jb)
+!$!           end do
+!$!        end do
+!$! 
+!$!        !Mass normalize
+!$!        do na = 1, crys%numatoms
+!$!           do nb = 1, crys%numatoms
+!$!              massnorm = 1.0_r64/sqrt(crys%masses(crys%atomtypes(na))*&
+!$!                   crys%masses(crys%atomtypes(nb)))*Ryd2amu
+!$! 
+!$!              dynmat(3*(na - 1) + 1 : 3*na, 3*(nb - 1) + 1 : 3*nb) = &
+!$!                   dynmat(3*(na - 1) + 1 : 3*na, 3*(nb - 1) + 1 : 3*nb)*massnorm
+!$! 
+!$!              if(present(velocities)) then
+!$!                 ddynmat(3*(na - 1) + 1 : 3*na, 3*(nb - 1) + 1 : 3*nb, 1:3) = &
+!$!                      ddynmat(3*(na - 1) + 1 : 3*na, 3*(nb - 1) + 1 : 3*nb, 1:3)*massnorm
+!$!              end if
+!$!           end do
+!$!        end do
+!$! 
+!$!        !Diagonalize dynmat
+!$!        call zheev("V", "U", self%numbranches, dynmat(:, :), self%numbranches, omega2, work, -1_i64, rwork, aux)
+!$!        if(real(work(1)) > nwork) then
+!$!           nwork = nint(2*real(work(1)))
+!$!           deallocate(work)
+!$!           allocate(work(nwork))
+!$!        end if
+!$!        call zheev("V", "U", self%numbranches, dynmat(:, :), self%numbranches, omega2, work, nwork, rwork, aux)
+!$! 
+!$!        energies(iq, :) = sign(sqrt(abs(omega2)), omega2)
+!$! 
+!$!        !These quantities are u. See Eq. 32 or prb 76, 165108.
+!$!        if(present(evecs)) then
+!$!           evecs(iq, :, :) = transpose(dynmat(:, :))
+!$!        end if
+!$! 
+!$!        if(present(velocities)) then
+!$!           !Calculate velocities using Feynman-Hellmann thm
+!$!           do ib = 1, self%numbranches
+!$!              do ipol = 1, 3
+!$!                 velocities(iq, ib, ipol) = real(dot_product(dynmat(:, ib), &
+!$!                      matmul(ddynmat(:, :, ipol), dynmat(:, ib))))
+!$!              end do
+!$! 
+!$!              velocities(iq, ib, :) = velocities(iq, ib, :)/(2.0_r64*energies(iq, ib))
+!$!           end do
+!$!        end if
+!$! 
+!$!        !energies(iq, :) = energies(iq, :)*Rydberg2radTHz !2piTHz
+!$!        !energies(iq, :) = energies(iq, :)*Rydberg2eV*1.0e3_r64 !meV
+!$!        energies(iq, :) = energies(iq, :)*Ryd2eV !eV
+!$! 
+!$!        if(present(velocities)) then
+!$!           velocities(iq, :, :) = velocities(iq, :, :)*Ryd2radTHz !nmTHz = Km/s
+!$!        end if
+!$! 
+!$!        !Take care of gamma point.
+!$!        if(all(qvecs(iq,:) == 0)) then
+!$!           energies(iq, 1:3) = 0.0_r64
+!$!           if(present(velocities)) velocities(iq, :, :) = 0.0_r64
+!$!        end if
+!$! 
+!$!        !Handle negative energy phonons
+!$!        do ib = 1, self%numbranches
+!$!           if(energies(iq, ib) < -0.005_r64) then
+!$!              call exit_with_message('Large negative phonon energy found! Stopping!')             
+!$!           else if(energies(iq, ib) < 0 .and. energies(iq, ib) > -0.005_r64) then
+!$!              energies(iq, ib) = 0.0_r64
+!$!           end if
+!$!        end do
+!$!     end do !iq
+!$!   end subroutine ph_wann
+
   subroutine ph_wann(self, crys, nq, qvecs, energies, evecs, velocities)  
     !! Wannier interpolate phonons on list of arb. q-vec
 
@@ -1178,17 +1585,9 @@ contains
                    caux = expi(twopi * dot_product( qvecs(iq, :), &
                         self%rcells_q(iuc, :) + wrappers(:, iw) * self%coarse_qmesh(:) ))
                    ! same for 3 x 3 blocks
-!$!                    caux_mat((iat-1)*3+1:iat*3, (jat-1)*3+1:jat*3) = &
-!$!                         caux_mat((iat-1)*3+1:iat*3, (jat-1)*3+1:jat*3) + &
-!$!                         caux / (self%phwsdeg(iuc) * num_wrap)
-                   !if(self%ph_degen(iuc, iat, jat)/=0) &
-                   !   caux_mat((iat-1)*3+1:iat*3, (jat-1)*3+1:jat*3) = &
-                   !     caux_mat((iat-1)*3+1:iat*3, (jat-1)*3+1:jat*3) + &
-                   !     caux / (self%ph_degen(iuc, iat, jat) * num_wrap)
-                   if(self%phwsdeg_new(iuc, iat, jat)/=0) &
-                      caux_mat((iat-1)*3+1:iat*3, (jat-1)*3+1:jat*3) = &
+                   caux_mat((iat-1)*3+1:iat*3, (jat-1)*3+1:jat*3) = &
                         caux_mat((iat-1)*3+1:iat*3, (jat-1)*3+1:jat*3) + &
-                        caux / (self%phwsdeg_new(iuc, iat, jat) * num_wrap)
+                        caux / num_wrap !(self%phwsdeg(iuc) * num_wrap)
                 end do
              end do
           end do
@@ -1441,144 +1840,145 @@ contains
     if(present(ddyn_l)) ddyn_l = ddyn_l*fac
   end subroutine dyn_nonanalytic
 
-  real(r64) function g2(self, crys, kvec, qvec, el_evec_k, el_evec_kp, ph_evec_q, ph_en, &
-       gmixed, wannspace)
-    !! Function to calculate |g|^2.
-    !! This works with EPW real space data
-    !! kvec: electron wave vector in crystal coords
-    !! qvec: phonon wave vector in crystal coords
-    !! el_evec_k(kp): initial(final) electron eigenvector in bands m(n) 
-    !! ph_evec_q: phonon eigenvector branchs 
-    !! ph_en: phonon energy in mode (s,qvec)
-    !! gmixed: e-ph matrix element in mixed Wannier-Bloch representation
-    !! wannspace: the species that is in Wannier representation
-
-    class(wannier), intent(in) :: self
-    type(crystal), intent(in) :: crys
-
-    real(r64),intent(in) :: kvec(3), qvec(3), ph_en
-    complex(r64),intent(in) :: el_evec_k(self%numwannbands),&
-         el_evec_kp(self%numwannbands), ph_evec_q(self%numbranches), &
-         gmixed(:,:,:,:)
-    character(len = 2) :: wannspace
-    real(r64), parameter :: g2unitfactor = Ryd2eV**3*Ryd2amu
-
-    !Local variables
-    integer(i64) :: ip, iws, nws, np, mp, sp, mtype
-    integer(i64) :: na
-    complex(r64) :: caux, u(self%numbranches), gbloch, unm, &
-         overlap(self%numwannbands,self%numwannbands), glprefac, phase
-    complex(r64), allocatable :: UkpgUkdag(:, :), UkpgUkdaguq(:)
-    integer(i64) :: i, image
-
-    if(wannspace /= 'el' .and. wannspace /= 'ph') then
-       call exit_with_message(&
-            "Invalid value of wannspace in call to g2_epw. Exiting.")
-    end if
-
-    !Mass normalize the phonon matrix
-    do ip = 1, self%numbranches ! d.o.f of basis atoms
-       !demux atom type from d.o.f
-       mtype = (ip - 1)/3 + 1 
-       !normalize
-       u(ip) = ph_evec_q(ip)/sqrt(crys%masses(crys%atomtypes(mtype)))
-    end do
-
-    if(ph_en == 0) then !zero out matrix elements for zero energy phonons
-       g2 = 0
-       !call print_message("ph_en==0 is getting triggered..")
-    else
-       if(wannspace == 'ph') then
-          nws = self%nwsg
-       else
-          nws = self%nwsk
-       end if
-
-       allocate(UkpgUkdag(self%numbranches, nws), UkpgUkdaguq(nws))
-       !See Eq. 22 of prb 76, 165108.
-       UkpgUkdag = 0 !g(k,Rp) or g(Re,q) (un)rotated by the electron U^\dagger(k) and U(k') matrices
-       UkpgUkdaguq = 0 !above quantity (un)rotated by the phonon u(q) matrix
-       gbloch = 0
-
-       !Create the matrix U_nn'(k')U_m'm^\dagger(k)
-       do np = 1, self%numwannbands !over final electron band
-          do mp = 1, self%numwannbands !over initial electron band
-             !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
-             overlap(mp,np) = conjg(el_evec_kp(np))*el_evec_k(mp)
-          end do
-       end do
-
-       do concurrent(iws = 1: nws, sp = 1:self%numbranches)
-          caux = (0.0_r64, 0.0_r64)
-          if(wannspace == 'ph') then
-             na = (sp - 1)/3 + 1 
-             !phase = expi(twopi*dot_product(qvec, self%rcells_q(iws, :)))
-             do i = 1, self%gwann_distrib_num_active_images
-                image = self%get_image_for_g(iws)
-                do np = 1, self%numwannbands
-                   !phase = (0.0_r64, 0.0_r64)
-                   !if(self%g_degen(iws, np, na, image) /= 0) then
-                   if(self%gwsdeg_new(iws, np, na)[image] /= 0) then
-                      !phase = expi(twopi*dot_product(qvec, self%rcells_q(iws, :)))&
-                      !             /self%g_degen(iws, np, na, image)
-                      phase = expi(twopi*dot_product(qvec, self%rcells_q(iws, :)))&
-                                   /self%gwsdeg_new(iws, np, na)[image]
-                      overlap = overlap*phase
-                      caux = caux + dot_product(overlap(:,np), gmixed(np, :, sp, iws))
-                   end if
-                end do
-             end do
-          else
-             !phase = expi(twopi*dot_product(kvec, self%rcells_k(iws,:)))
-             do concurrent(np = 1:self%numwannbands, mp = 1:self%numwannbands)
-                !phase = (0.0_r64, 0.0_r64)
-                !if(self%el_degen(iws, np, mp)/=0) then
-                if(self%elwsdeg_new(iws, np, mp)/=0) then
-                   !phase = expi(twopi*dot_product(kvec, self%rcells_k(iws,:)))&
-                   !            /self%el_degen(iws, np, mp)
-                   phase = expi(twopi*dot_product(kvec, self%rcells_k(iws,:)))&
-                               /self%elwsdeg_new(iws, np, mp)
-                   caux = caux + overlap(mp,np)*gmixed(np, mp, sp, iws)*phase
-                end if
-             end do
-          end if
-          UkpgUkdag(sp, iws) = UkpgUkdag(sp, iws) + caux
-       end do
-
-       do iws = 1, nws !over matrix elements WS cell
-          !Apply phonon rotation
-          !(Recall that the phonon eigenvector *did not* come out pre-daggered from ph_wann_epw.)
-          !UkpgUkdaguq(iws) = UkpgUkdaguq(iws) + dot_product(conjg(u),UkpgUkdag(:, iws))
-          gbloch = gbloch + dot_product(conjg(u),UkpgUkdag(:, iws))
-       end do
-
-!$!        do iws = 1, nws !over matrix elements WS cell
-!$!           !Fourier transform to reciprocal-space
-!$!           if(wannspace == 'ph') then
-!$!              caux = expi(twopi*dot_product(qvec, self%rcells_q(iws, :)))&
-!$!                   /self%phwsdeg(iws)
-!$!           else
-!$!              caux = expi(twopi*dot_product(kvec, self%rcells_k(iws,:)))&
-!$!                   /self%elwsdeg(iws)
-!$!           end if
-!$!           gbloch = gbloch + caux*UkpgUkdaguq(iws)
+!$!   !! Modified g2 by DP
+!$!   real(r64) function g2(self, crys, kvec, qvec, el_evec_k, el_evec_kp, ph_evec_q, ph_en, &
+!$!        gmixed, wannspace)
+!$!     !! Function to calculate |g|^2.
+!$!     !! This works with EPW real space data
+!$!     !! kvec: electron wave vector in crystal coords
+!$!     !! qvec: phonon wave vector in crystal coords
+!$!     !! el_evec_k(kp): initial(final) electron eigenvector in bands m(n) 
+!$!     !! ph_evec_q: phonon eigenvector branchs 
+!$!     !! ph_en: phonon energy in mode (s,qvec)
+!$!     !! gmixed: e-ph matrix element in mixed Wannier-Bloch representation
+!$!     !! wannspace: the species that is in Wannier representation
+!$! 
+!$!     class(wannier), intent(in) :: self
+!$!     type(crystal), intent(in) :: crys
+!$! 
+!$!     real(r64),intent(in) :: kvec(3), qvec(3), ph_en
+!$!     complex(r64),intent(in) :: el_evec_k(self%numwannbands),&
+!$!          el_evec_kp(self%numwannbands), ph_evec_q(self%numbranches), &
+!$!          gmixed(:,:,:,:)
+!$!     character(len = 2) :: wannspace
+!$!     real(r64), parameter :: g2unitfactor = Ryd2eV**3*Ryd2amu
+!$! 
+!$!     !Local variables
+!$!     integer(i64) :: ip, iws, nws, np, mp, sp, mtype
+!$!     integer(i64) :: na
+!$!     complex(r64) :: caux, u(self%numbranches), gbloch, unm, &
+!$!          overlap(self%numwannbands,self%numwannbands), glprefac, phase
+!$!     complex(r64), allocatable :: UkpgUkdag(:, :), UkpgUkdaguq(:)
+!$!     integer(i64) :: i, image
+!$! 
+!$!     if(wannspace /= 'el' .and. wannspace /= 'ph') then
+!$!        call exit_with_message(&
+!$!             "Invalid value of wannspace in call to g2_epw. Exiting.")
+!$!     end if
+!$! 
+!$!     !Mass normalize the phonon matrix
+!$!     do ip = 1, self%numbranches ! d.o.f of basis atoms
+!$!        !demux atom type from d.o.f
+!$!        mtype = (ip - 1)/3 + 1 
+!$!        !normalize
+!$!        u(ip) = ph_evec_q(ip)/sqrt(crys%masses(crys%atomtypes(mtype)))
+!$!     end do
+!$! 
+!$!     if(ph_en == 0) then !zero out matrix elements for zero energy phonons
+!$!        g2 = 0
+!$!        !call print_message("ph_en==0 is getting triggered..")
+!$!     else
+!$!        if(wannspace == 'ph') then
+!$!           nws = self%nwsg
+!$!        else
+!$!           nws = self%nwsk
+!$!        end if
+!$! 
+!$!        allocate(UkpgUkdag(self%numbranches, nws), UkpgUkdaguq(nws))
+!$!        !See Eq. 22 of prb 76, 165108.
+!$!        UkpgUkdag = 0 !g(k,Rp) or g(Re,q) (un)rotated by the electron U^\dagger(k) and U(k') matrices
+!$!        UkpgUkdaguq = 0 !above quantity (un)rotated by the phonon u(q) matrix
+!$!        gbloch = 0
+!$! 
+!$!        !Create the matrix U_nn'(k')U_m'm^\dagger(k)
+!$!        do np = 1, self%numwannbands !over final electron band
+!$!           do mp = 1, self%numwannbands !over initial electron band
+!$!              !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
+!$!              overlap(mp,np) = conjg(el_evec_kp(np))*el_evec_k(mp)
+!$!           end do
 !$!        end do
-
-       if(crys%polar) then !Long-range correction
-          !This is [U(k')U^\dagger(k)]_nm, the overlap factor in the dipole correction.
-          !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
-          unm = dot_product(el_evec_kp,el_evec_k)
-          call long_range_prefac(self, crys, &
-               matmul(crys%reclattvecs,qvec)*bohr2nm,u,glprefac)
-          !gbloch = gbloch + glprefac*unm
-          gbloch = gbloch + glprefac*unm
-       end if
-
-       g2 = 0.5_r64*real(gbloch*conjg(gbloch))/ &
-            ph_en*g2unitfactor !eV^2
-       if(g2==0) call print_message("g2 is zero..")
-    end if
-  end function g2
+!$! 
+!$!        do concurrent(iws = 1: nws, sp = 1:self%numbranches)
+!$!           caux = (0.0_r64, 0.0_r64)
+!$!           if(wannspace == 'ph') then
+!$!              na = (sp - 1)/3 + 1 
+!$!              !phase = expi(twopi*dot_product(qvec, self%rcells_q(iws, :)))
+!$!              do i = 1, self%gwann_distrib_num_active_images
+!$!                 image = self%get_image_for_g(iws)
+!$!                 do np = 1, self%numwannbands
+!$!                    !phase = (0.0_r64, 0.0_r64)
+!$!                    !if(self%g_degen(iws, np, na, image) /= 0) then
+!$!                    if(self%gwsdeg_new(iws, np, na)[image] /= 0) then
+!$!                       !phase = expi(twopi*dot_product(qvec, self%rcells_q(iws, :)))&
+!$!                       !             /self%g_degen(iws, np, na, image)
+!$!                       phase = expi(twopi*dot_product(qvec, self%rcells_q(iws, :)))&
+!$!                                    /self%gwsdeg_new(iws, np, na)[image]
+!$!                       overlap = overlap*phase
+!$!                       caux = caux + dot_product(overlap(:,np), gmixed(np, :, sp, iws))
+!$!                    end if
+!$!                 end do
+!$!              end do
+!$!           else
+!$!              !phase = expi(twopi*dot_product(kvec, self%rcells_k(iws,:)))
+!$!              do concurrent(np = 1:self%numwannbands, mp = 1:self%numwannbands)
+!$!                 !phase = (0.0_r64, 0.0_r64)
+!$!                 !if(self%el_degen(iws, np, mp)/=0) then
+!$!                 if(self%elwsdeg_new(iws, np, mp)/=0) then
+!$!                    !phase = expi(twopi*dot_product(kvec, self%rcells_k(iws,:)))&
+!$!                    !            /self%el_degen(iws, np, mp)
+!$!                    phase = expi(twopi*dot_product(kvec, self%rcells_k(iws,:)))&
+!$!                                /self%elwsdeg_new(iws, np, mp)
+!$!                    caux = caux + overlap(mp,np)*gmixed(np, mp, sp, iws)*phase
+!$!                 end if
+!$!              end do
+!$!           end if
+!$!           UkpgUkdag(sp, iws) = UkpgUkdag(sp, iws) + caux
+!$!        end do
+!$! 
+!$!        do iws = 1, nws !over matrix elements WS cell
+!$!           !Apply phonon rotation
+!$!           !(Recall that the phonon eigenvector *did not* come out pre-daggered from ph_wann_epw.)
+!$!           !UkpgUkdaguq(iws) = UkpgUkdaguq(iws) + dot_product(conjg(u),UkpgUkdag(:, iws))
+!$!           gbloch = gbloch + dot_product(conjg(u),UkpgUkdag(:, iws))
+!$!        end do
+!$! 
+!$! !$!        do iws = 1, nws !over matrix elements WS cell
+!$! !$!           !Fourier transform to reciprocal-space
+!$! !$!           if(wannspace == 'ph') then
+!$! !$!              caux = expi(twopi*dot_product(qvec, self%rcells_q(iws, :)))&
+!$! !$!                   /self%phwsdeg(iws)
+!$! !$!           else
+!$! !$!              caux = expi(twopi*dot_product(kvec, self%rcells_k(iws,:)))&
+!$! !$!                   /self%elwsdeg(iws)
+!$! !$!           end if
+!$! !$!           gbloch = gbloch + caux*UkpgUkdaguq(iws)
+!$! !$!        end do
+!$! 
+!$!        if(crys%polar) then !Long-range correction
+!$!           !This is [U(k')U^\dagger(k)]_nm, the overlap factor in the dipole correction.
+!$!           !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
+!$!           unm = dot_product(el_evec_kp,el_evec_k)
+!$!           call long_range_prefac(self, crys, &
+!$!                matmul(crys%reclattvecs,qvec)*bohr2nm,u,glprefac)
+!$!           !gbloch = gbloch + glprefac*unm
+!$!           gbloch = gbloch + glprefac*unm
+!$!        end if
+!$! 
+!$!        g2 = 0.5_r64*real(gbloch*conjg(gbloch))/ &
+!$!             ph_en*g2unitfactor !eV^2
+!$!        if(g2==0) call print_message("g2 is zero..")
+!$!     end if
+!$!   end function g2
 
   subroutine long_range_prefac(self, crys, q, uqs, glprefac)
     !! Calculate the long-range correction prefactor of
@@ -1640,93 +2040,95 @@ contains
     glprefac = glprefac*fac
   end subroutine long_range_prefac
 
-  subroutine gkRp(self, num, ik, kvec)
-    !! Calculate the bloch-wannier mixed rep. e-ph matrix elements g(k,Rp),
-    !! where k is an IBZ electron wave vector and Rp is a phonon unit cell.
-    !! Note: this step *DOES NOT* perform the rotation over the Wannier bands space.
-    !!
-    !! The result will be saved to disk tagged with k-index.
-
-    class(wannier), intent(in) :: self
-    type(numerics), intent(in) :: num
-    integer(i64), intent(in) :: ik
-    real(r64), intent(in) :: kvec(3)
-
-    !Local variables
-    integer(i64) :: iuc, image, i, image_order(self%gwann_distrib_num_active_images)
-    integer(i64) :: ib1, ib2 !ib, na 
-    complex(r64) :: caux !phase(self%nwsk), caux
-    !complex(r64) :: gmixed(self%numwannbands, self%numwannbands, self%numbranches, self%nwsq)
-    complex(r64) :: gmixed(self%numwannbands, self%numwannbands, self%numbranches, self%nwsg)
-
-    character(len = 1024) :: filename
-
-    !Fourier transform to k-space
-    gmixed = 0
-
-    !Precalculate phase as an array.
-!$!     do iuc = 1,self%nwsk
-!$!        phase(iuc) = expi(twopi*dot_product(kvec, self%rcells_k(iuc,:)))
+!$!   !! Modified by DP
+!$!   subroutine gkRp(self, num, ik, kvec)
+!$!     !! Calculate the bloch-wannier mixed rep. e-ph matrix elements g(k,Rp),
+!$!     !! where k is an IBZ electron wave vector and Rp is a phonon unit cell.
+!$!     !! Note: this step *DOES NOT* perform the rotation over the Wannier bands space.
+!$!     !!
+!$!     !! The result will be saved to disk tagged with k-index.
+!$! 
+!$!     class(wannier), intent(in) :: self
+!$!     type(numerics), intent(in) :: num
+!$!     integer(i64), intent(in) :: ik
+!$!     real(r64), intent(in) :: kvec(3)
+!$! 
+!$!     !Local variables
+!$!     integer(i64) :: iuc, image, i, image_order(self%gwann_distrib_num_active_images)
+!$!     integer(i64) :: ib1, ib2 !ib, na 
+!$!     complex(r64) :: caux !phase(self%nwsk), caux
+!$!     !complex(r64) :: gmixed(self%numwannbands, self%numwannbands, self%numbranches, self%nwsq)
+!$!     complex(r64) :: gmixed(self%numwannbands, self%numwannbands, self%numbranches, self%nwsg)
+!$! 
+!$!     character(len = 1024) :: filename
+!$! 
+!$!     !Fourier transform to k-space
+!$!     gmixed = 0
+!$! 
+!$!     !Precalculate phase as an array.
+!$! !$!     do iuc = 1,self%nwsk
+!$! !$!        phase(iuc) = expi(twopi*dot_product(kvec, self%rcells_k(iuc,:)))
+!$! !$!     end do
+!$! !$!     phase = phase/self%elwsdeg
+!$! 
+!$!     !Staggering the order of reading of gwann from the diffent images to reduce
+!$!     !simultaneous reading of the same chunk by all images.
+!$!     do i = 0, self%gwann_distrib_num_active_images - 1
+!$!        image_order(i + 1) = modulo(i + this_image() - 1, self%gwann_distrib_num_active_images) + 1
 !$!     end do
-!$!     phase = phase/self%elwsdeg
-
-    !Staggering the order of reading of gwann from the diffent images to reduce
-    !simultaneous reading of the same chunk by all images.
-    do i = 0, self%gwann_distrib_num_active_images - 1
-       image_order(i + 1) = modulo(i + this_image() - 1, self%gwann_distrib_num_active_images) + 1
-    end do
-
-    do iuc = 1,self%nwsk
-       !caux = caux*expi(twopi*dot_product(kvecs(ik,:),self%rcells_k(iuc,:))) ! phase(iuc)
-
-       do i = 1, self%gwann_distrib_num_active_images
-          image = image_order(i)
-          !image = i
-
-          !caux = expi(twopi*dot_product(kvec, self%rcells_k(iuc,:))) ! phase(iuc)
-          do concurrent(ib1 = 1:self%numwannbands, ib2 = 1:self%numwannbands)
-             caux = (0.0_r64, 0.0_r64)
-             !if(self%el_degen(iuc, ib1, ib2)/=0.0) &
-             !    caux = expi(twopi*dot_product(kvec, self%rcells_k(iuc,:)))&
-             !                /self%el_degen(iuc, ib1, ib2)
-!$!              if(self%elwsdeg_new(iuc, ib1, ib2)/=0) &
-!$!                  caux = expi(twopi*dot_product(kvec, self%rcells_k(iuc,:)))&
-!$!                              /self%elwsdeg_new(iuc, ib1, ib2)
-
-!$!              gmixed(ib1,ib2,:,self%gwann_distrib_start[image]:self%gwann_distrib_end[image]) = &
-!$!                   gmixed(ib1,ib2,:,self%gwann_distrib_start[image]:self%gwann_distrib_end[image]) + &
-!$!                   caux*gwann(ib1,ib2,:,1:self%gwann_distrib_chunk[image], iuc)[image]
-          end do
-!$!           do concurrent(na = 1:self%dims(2), ib = 1:self%numwannbands)
-!$!              if(self%el_degen(iuc, ib, na, image) /= 0) &
-!$!                 caux = caux/self%el_degen(iuc, ib, na, image)
-!$!              else
-!$!                 caux = (0.0_r64, 0.0_r64)
-!$!              end if
-!$!              gmixed(ib, : , 3*(na - 1) + 1:3*na, self%gwann_distrib_start[image]:self%gwann_distrib_end[image]) = &
-!$!                   gmixed(ib, : ,3*(na - 1) + 1:3*na, self%gwann_distrib_start[image]:self%gwann_distrib_end[image]) + &
-!$!                   caux*gwann(ib, : ,3*(na - 1) + 1:3*na, 1:self%gwann_distrib_chunk[image], iuc)[image]
+!$! 
+!$!     do iuc = 1,self%nwsk
+!$!        !caux = caux*expi(twopi*dot_product(kvecs(ik,:),self%rcells_k(iuc,:))) ! phase(iuc)
+!$! 
+!$!        do i = 1, self%gwann_distrib_num_active_images
+!$!           image = image_order(i)
+!$!           !image = i
+!$! 
+!$!           !caux = expi(twopi*dot_product(kvec, self%rcells_k(iuc,:))) ! phase(iuc)
+!$!           do concurrent(ib1 = 1:self%numwannbands, ib2 = 1:self%numwannbands)
+!$!              caux = (0.0_r64, 0.0_r64)
+!$!              !if(self%el_degen(iuc, ib1, ib2)/=0.0) &
+!$!              !    caux = expi(twopi*dot_product(kvec, self%rcells_k(iuc,:)))&
+!$!              !                /self%el_degen(iuc, ib1, ib2)
+!$! !$!              if(self%elwsdeg_new(iuc, ib1, ib2)/=0) &
+!$! !$!                  caux = expi(twopi*dot_product(kvec, self%rcells_k(iuc,:)))&
+!$! !$!                              /self%elwsdeg_new(iuc, ib1, ib2)
+!$! 
+!$! !$!              gmixed(ib1,ib2,:,self%gwann_distrib_start[image]:self%gwann_distrib_end[image]) = &
+!$! !$!                   gmixed(ib1,ib2,:,self%gwann_distrib_start[image]:self%gwann_distrib_end[image]) + &
+!$! !$!                   caux*gwann(ib1,ib2,:,1:self%gwann_distrib_chunk[image], iuc)[image]
 !$!           end do
-       end do
-    end do
+!$! !$!           do concurrent(na = 1:self%dims(2), ib = 1:self%numwannbands)
+!$! !$!              if(self%el_degen(iuc, ib, na, image) /= 0) &
+!$! !$!                 caux = caux/self%el_degen(iuc, ib, na, image)
+!$! !$!              else
+!$! !$!                 caux = (0.0_r64, 0.0_r64)
+!$! !$!              end if
+!$! !$!              gmixed(ib, : , 3*(na - 1) + 1:3*na, self%gwann_distrib_start[image]:self%gwann_distrib_end[image]) = &
+!$! !$!                   gmixed(ib, : ,3*(na - 1) + 1:3*na, self%gwann_distrib_start[image]:self%gwann_distrib_end[image]) + &
+!$! !$!                   caux*gwann(ib, : ,3*(na - 1) + 1:3*na, 1:self%gwann_distrib_chunk[image], iuc)[image]
+!$! !$!           end do
+!$!        end do
+!$!     end do
+!$! 
+!$!     if(all(abs(gmixed)==0)) call print_message("All gkRp are zero..") 
+!$!     
+!$!     !Change to data output directory
+!$!     call chdir(trim(adjustl(num%g2dir)))
+!$! 
+!$!     !Write data in binary format
+!$!     !Note: this will overwrite existing data!
+!$!     write (filename, '(I9)') ik
+!$!     filename = 'gkRp.ik'//trim(adjustl(filename))
+!$!     open(1, file = trim(filename), status = 'replace', access = 'stream')
+!$!     write(1) gmixed
+!$!     close(1)
+!$! 
+!$!     !Change back to working directory
+!$!     call chdir(num%cwd)
+!$!   end subroutine gkRp
 
-    if(all(abs(gmixed)==0)) call print_message("All gkRp are zero..") 
-    
-    !Change to data output directory
-    call chdir(trim(adjustl(num%g2dir)))
-
-    !Write data in binary format
-    !Note: this will overwrite existing data!
-    write (filename, '(I9)') ik
-    filename = 'gkRp.ik'//trim(adjustl(filename))
-    open(1, file = trim(filename), status = 'replace', access = 'stream')
-    write(1) gmixed
-    close(1)
-
-    !Change back to working directory
-    call chdir(num%cwd)
-  end subroutine gkRp
-
+!$!   !! Modified by DP
 !$!   subroutine gReq(self, num, iq, qvec)
 !$!     !! Calculate the Bloch-Wannier mixed rep. e-ph matrix elements g(Re,q),
 !$!     !! where q is an IBZ phonon wave vector and Re is a phonon unit cell.
@@ -1740,7 +2142,8 @@ contains
 !$!     real(r64), intent(in) :: qvec(3)
 !$! 
 !$!     !Local variables
-!$!     integer(i64) :: iuc, s, image, i, image_order(self%gwann_distrib_num_active_images)
+!$!     integer(i64) :: iuc, image, i, image_order(self%gwann_distrib_num_active_images)
+!$!     integer(i64) :: ib, na, s
 !$!     complex(r64) :: phase
 !$!     complex(r64), allocatable:: gmixed(:,:,:,:)
 !$!     character(len = 1024) :: filename
@@ -1759,11 +2162,28 @@ contains
 !$!     do i = 1, self%gwann_distrib_num_active_images
 !$!        image = image_order(i)
 !$! 
-!$!        do iuc = 1, self%gwann_distrib_chunk[image]
-!$!           phase = expi(twopi*dot_product(qvec, self%rcells_g(iuc,:)[image]))/self%gwsdeg(iuc)[image]
+!$!        do ib = 1, self%numwannbands
+!$!           do iuc = 1, self%gwann_distrib_chunk[image]
+!$!              phase = expi(twopi*dot_product(qvec, self%rcells_g(iuc,:)[image]))
 !$! 
-!$!           do s = 1, self%numbranches
-!$!              gmixed(:,:,s,:) = gmixed(:,:,s,:) + phase*gwann(:,:,:,s,iuc)[image]
+!$! !$!              do na = 1, self%dims(2)
+!$! !$!                 !na = (s - 1)/3 + 1
+!$! !$!                 if(self%g_degen(iuc, ib, na, image) == 0) cycle
+!$! !$!                 phase = phase/self%g_degen(iuc, ib, na, image)
+!$! !$!                 gmixed(ib,:,3*(na - 1) + 1:3*na,:) = gmixed(ib,:,3*(na - 1) + 1:3*na,:) + phase*gwann(ib,:,:,3*(na - 1) + 1:3*na,iuc)[image]
+!$! !$!                 ! replace by lapack mat mul
+!$! !$!              ! call zaxpy()
+!$! !$!              end do
+!$!              do s = 1, self%numbranches
+!$!                 na = (s - 1)/3 + 1
+!$!                 !if(self%g_degen(iuc, ib, na, image) == 0) cycle
+!$!                 if(self%gwsdeg_new(iuc, ib, na)[image] == 0) cycle
+!$!                 !phase = phase/self%g_degen(iuc, ib, na, image)
+!$!                 phase = phase/self%gwsdeg_new(iuc, ib, na)[image]
+!$!                 gmixed(ib,:,s,:) = gmixed(ib,:,s,:) + phase*gwann(ib,:,:,s,iuc)[image]
+!$!                 ! replace by lapack mat mul
+!$!              ! call zaxpy()
+!$!              end do
 !$!           end do
 !$!        end do
 !$!     end do
@@ -1782,7 +2202,178 @@ contains
 !$!     !Change back to working directory
 !$!     call chdir(num%cwd)
 !$!   end subroutine gReq
-  
+
+  real(r64) function g2(self, crys, kvec, qvec, el_evec_k, el_evec_kp, ph_evec_q, ph_en, &
+       gmixed, wannspace)
+    !! Function to calculate |g|^2.
+    !! This works with EPW real space data
+    !! kvec: electron wave vector in crystal coords
+    !! qvec: phonon wave vector in crystal coords
+    !! el_evec_k(kp): initial(final) electron eigenvector in bands m(n) 
+    !! ph_evec_q: phonon eigenvector branchs 
+    !! ph_en: phonon energy in mode (s,qvec)
+    !! gmixed: e-ph matrix element in mixed Wannier-Bloch representation
+    !! wannspace: the species that is in Wannier representation
+
+    class(wannier), intent(in) :: self
+    type(crystal), intent(in) :: crys
+
+    real(r64),intent(in) :: kvec(3), qvec(3), ph_en
+    complex(r64),intent(in) :: el_evec_k(self%numwannbands),&
+         el_evec_kp(self%numwannbands), ph_evec_q(self%numbranches), &
+         gmixed(:,:,:,:)
+    character(len = 2) :: wannspace
+    real(r64), parameter :: g2unitfactor = Ryd2eV**3*Ryd2amu
+
+    !Local variables
+    integer(i64) :: ip, iws, nws, np, mp, sp, mtype
+    complex(r64) :: caux, u(self%numbranches), gbloch, unm, &
+         overlap(self%numwannbands,self%numwannbands), glprefac
+    complex(r64), allocatable :: UkpgUkdag(:, :), UkpgUkdaguq(:)
+
+    if(wannspace /= 'el' .and. wannspace /= 'ph') then
+       call exit_with_message(&
+            "Invalid value of wannspace in call to g2_epw. Exiting.")
+    end if
+
+    !Mass normalize the phonon matrix
+    do ip = 1, self%numbranches ! d.o.f of basis atoms
+       !demux atom type from d.o.f
+       mtype = (ip - 1)/3 + 1 
+       !normalize
+       u(ip) = ph_evec_q(ip)/sqrt(crys%masses(crys%atomtypes(mtype)))
+    end do
+
+    if(ph_en == 0) then !zero out matrix elements for zero energy phonons
+       g2 = 0
+    else
+       if(wannspace == 'ph') then
+          nws = self%nwsg
+       else
+          nws = self%nwsk
+       end if
+
+       allocate(UkpgUkdag(self%numbranches, nws), UkpgUkdaguq(nws))
+       !See Eq. 22 of prb 76, 165108.
+       UkpgUkdag = 0 !g(k,Rp) or g(Re,q) (un)rotated by the electron U^\dagger(k) and U(k') matrices
+       UkpgUkdaguq = 0 !above quantity (un)rotated by the phonon u(q) matrix
+       gbloch = 0
+
+       !Create the matrix U_nn'(k')U_m'm^\dagger(k)
+       do np = 1, self%numwannbands !over final electron band
+          do mp = 1, self%numwannbands !over initial electron band
+             !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
+             overlap(mp,np) = conjg(el_evec_kp(np))*el_evec_k(mp)
+          end do
+       end do
+
+       do iws = 1, nws !over matrix elements WS cell
+          !Apply electron rotations
+          do sp = 1, self%numbranches
+             caux = 0
+             do np = 1, self%numwannbands !over final electron band
+                do mp = 1, self%numwannbands !over initial electron band
+                   caux = caux + overlap(mp,np)*gmixed(np, mp, sp, iws)
+                end do
+             end do
+             UkpgUkdag(sp, iws) = UkpgUkdag(sp, iws) + caux
+          end do
+       end do
+
+       do iws = 1, nws !over matrix elements WS cell
+          !Apply phonon rotation
+          !(Recall that the phonon eigenvector *did not* come out pre-daggered from ph_wann_epw.)
+          UkpgUkdaguq(iws) = UkpgUkdaguq(iws) + dot_product(conjg(u),UkpgUkdag(:, iws))
+       end do
+
+       do iws = 1, nws !over matrix elements WS cell
+          !Fourier transform to reciprocal-space
+          if(wannspace == 'ph') then
+             caux = expi(twopi*dot_product(qvec, self%rcells_q(iws, :)))!&
+                  !/self%phwsdeg(iws)
+          else
+             caux = expi(twopi*dot_product(kvec, self%rcells_k(iws,:)))!&
+                  !/self%elwsdeg(iws)
+          end if
+          gbloch = gbloch + caux*UkpgUkdaguq(iws)
+       end do
+
+       if(crys%polar) then !Long-range correction
+          !This is [U(k')U^\dagger(k)]_nm, the overlap factor in the dipole correction.
+          !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
+          unm = dot_product(el_evec_kp,el_evec_k)
+          call long_range_prefac(self, crys, &
+               matmul(crys%reclattvecs,qvec)*bohr2nm,u,glprefac)
+          !gbloch = gbloch + glprefac*unm
+          gbloch = gbloch + glprefac*unm
+       end if
+
+       g2 = 0.5_r64*real(gbloch*conjg(gbloch))/ &
+            ph_en*g2unitfactor !eV^2
+    end if
+  end function g2
+
+  subroutine gkRp(self, num, ik, kvec)
+    !! Calculate the bloch-wannier mixed rep. e-ph matrix elements g(k,Rp),
+    !! where k is an IBZ electron wave vector and Rp is a phonon unit cell.
+    !! Note: this step *DOES NOT* perform the rotation over the Wannier bands space.
+    !!
+    !! The result will be saved to disk tagged with k-index.
+
+    class(wannier), intent(in) :: self
+    type(numerics), intent(in) :: num
+    integer(i64), intent(in) :: ik
+    real(r64), intent(in) :: kvec(3)
+
+    !Local variables
+    integer(i64) :: iuc, image, i, image_order(self%gwann_distrib_num_active_images)
+    complex(r64) :: phase(self%nwsk), caux
+    complex(r64) :: gmixed(self%numwannbands, self%numwannbands, self%numbranches, self%nwsq)
+
+    character(len = 1024) :: filename
+
+    !Fourier transform to k-space
+    gmixed = 0
+
+    !Precalculate phase as an array.
+    do iuc = 1,self%nwsk
+       phase(iuc) = expi(twopi*dot_product(kvec, self%rcells_k(iuc,:)))
+    end do
+    !phase = phase/self%elwsdeg
+
+    !Staggering the order of reading of gwann from the diffent images to reduce
+    !simultaneous reading of the same chunk by all images.
+    do i = 0, self%gwann_distrib_num_active_images - 1
+       image_order(i + 1) = modulo(i + this_image() - 1, self%gwann_distrib_num_active_images) + 1
+    end do
+
+    do iuc = 1,self%nwsk
+       caux = phase(iuc)
+
+       do i = 1, self%gwann_distrib_num_active_images
+          image = image_order(i)
+
+          gmixed(:,:,:,self%gwann_distrib_start[image]:self%gwann_distrib_end[image]) = &
+               gmixed(:,:,:,self%gwann_distrib_start[image]:self%gwann_distrib_end[image]) + &
+               caux*gwann(:,:,:,1:self%gwann_distrib_chunk[image], iuc)[image]
+       end do
+    end do
+
+    !Change to data output directory
+    call chdir(trim(adjustl(num%g2dir)))
+
+    !Write data in binary format
+    !Note: this will overwrite existing data!
+    write (filename, '(I9)') ik
+    filename = 'gkRp.ik'//trim(adjustl(filename))
+    open(1, file = trim(filename), status = 'replace', access = 'stream')
+    write(1) gmixed
+    close(1)
+
+    !Change back to working directory
+    call chdir(num%cwd)
+  end subroutine gkRp
+
   subroutine gReq(self, num, iq, qvec)
     !! Calculate the Bloch-Wannier mixed rep. e-ph matrix elements g(Re,q),
     !! where q is an IBZ phonon wave vector and Re is a phonon unit cell.
@@ -1796,8 +2387,7 @@ contains
     real(r64), intent(in) :: qvec(3)
 
     !Local variables
-    integer(i64) :: iuc, image, i, image_order(self%gwann_distrib_num_active_images)
-    integer(i64) :: ib, na, s
+    integer(i64) :: iuc, s, image, i, image_order(self%gwann_distrib_num_active_images)
     complex(r64) :: phase
     complex(r64), allocatable:: gmixed(:,:,:,:)
     character(len = 1024) :: filename
@@ -1816,28 +2406,11 @@ contains
     do i = 1, self%gwann_distrib_num_active_images
        image = image_order(i)
 
-       do ib = 1, self%numwannbands
-          do iuc = 1, self%gwann_distrib_chunk[image]
-             phase = expi(twopi*dot_product(qvec, self%rcells_g(iuc,:)[image]))
+       do iuc = 1, self%gwann_distrib_chunk[image]
+          phase = expi(twopi*dot_product(qvec, self%rcells_g(iuc,:)[image]))!/self%gwsdeg(iuc)[image]
 
-!$!              do na = 1, self%dims(2)
-!$!                 !na = (s - 1)/3 + 1
-!$!                 if(self%g_degen(iuc, ib, na, image) == 0) cycle
-!$!                 phase = phase/self%g_degen(iuc, ib, na, image)
-!$!                 gmixed(ib,:,3*(na - 1) + 1:3*na,:) = gmixed(ib,:,3*(na - 1) + 1:3*na,:) + phase*gwann(ib,:,:,3*(na - 1) + 1:3*na,iuc)[image]
-!$!                 ! replace by lapack mat mul
-!$!              ! call zaxpy()
-!$!              end do
-             do s = 1, self%numbranches
-                na = (s - 1)/3 + 1
-                !if(self%g_degen(iuc, ib, na, image) == 0) cycle
-                if(self%gwsdeg_new(iuc, ib, na)[image] == 0) cycle
-                !phase = phase/self%g_degen(iuc, ib, na, image)
-                phase = phase/self%gwsdeg_new(iuc, ib, na)[image]
-                gmixed(ib,:,s,:) = gmixed(ib,:,s,:) + phase*gwann(ib,:,:,s,iuc)[image]
-                ! replace by lapack mat mul
-             ! call zaxpy()
-             end do
+          do s = 1, self%numbranches
+             gmixed(:,:,s,:) = gmixed(:,:,s,:) + phase*gwann(:,:,:,s,iuc)[image]
           end do
        end do
     end do
