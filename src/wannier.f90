@@ -190,17 +190,6 @@ contains
             self%Wannier_engine_name
        call exit
     end select
-
-    ! Set pointers for fetching degenerecies
-!$!     if(self%old_ws) then
-!$!        self%el_degen=>old_degen_el
-!$!        self%ph_degen=>old_degen_ph
-!$!        self%g_degen=>old_degen_g
-!$!      else
-!$!        self%el_degen=>new_degen_el
-!$!        self%ph_degen=>new_degen_ph
-!$!        self%g_degen=>new_degen_g
-!$!      end if
   end subroutine read
 
   subroutine read_exciting_Wannier(self, num)
@@ -569,7 +558,7 @@ contains
     else
        call apply_degeneracies_new(self)
     end if
-    call print_message("Applied WS degeneracies")
+    call print_message("Applied WS degeneracies.")
 
   end subroutine read_EPW_Wannier
   
@@ -2551,6 +2540,223 @@ contains
 
        call print_message("Computing g2...")
        do i = 1, nqpath !Over phonon wave vectors path
+          !TODO Would be great to have a progress bar here.
+
+          !Calculate electrons at this final wave vector
+          call el_wann(self, crys, 1_i64, kppathvecs(i, :), el_ens_kp, el_vels_kp, el_evecs_kp, &
+               scissor = scissor)
+
+          !Save electron energy over the k+q points
+          el_ens_kp_all(i, :) = el_ens_kp(1, :)
+
+          do n = 1, self%numwannbands
+             do m = 1, self%numwannbands
+                do s = 1, self%numbranches
+                   !Calculate |g(k,k')|^2
+                   g2_qpath(i, s, m, n) = self%g2(crys, k, qpathvecs(i, :), &
+                        el_evecs_k(1, m, :), el_evecs_kp(1, n, :), ph_evecs_path(i, s, :), &
+                        ph_ens_path(i, s), gmixed_k, 'ph')
+                end do
+             end do
+          end do
+
+          !The gauge arbitrariness of |g| due to the band and branch degeneraries
+          !are removed below. The code below is closely following the change
+          !to elphon.f90 of Quantum Espresso by C. Verdi and S. Ponce.
+          !
+          !This modified elphon.f90 was made available during EPW's 2018
+          !ICTP/Psi-k/CECAM School on Electron-Phonon Physics from First Principles.
+          !Visit for more info: https://docs.epw-code.org/doc/School2018.html
+
+          !Average over degenerate phonon branches
+          do m = 1, self%numwannbands
+             do n = 1, self%numwannbands
+                do s = 1, self%numbranches
+                   deg_count = 0
+                   aux = 0.0_r64
+                   ph_en = ph_ens_path(i, s)
+                   do sp = 1, self%numbranches
+                      if(abs(ph_en - ph_ens_path(i, sp)) < thres) then
+                         deg_count = deg_count + 1
+                         aux = aux + g2_qpath(i, sp, m, n)
+                      end if
+                   end do
+                   g2_qpath(i, s, m, n) = aux/dble(deg_count)
+                end do
+             end do
+          end do
+
+          !Average over initial electron bands
+          do s = 1, self%numbranches
+             do n = 1, self%numwannbands
+                do m = 1, self%numwannbands
+                   deg_count = 0
+                   aux = 0.0_r64
+                   el_en = el_ens_k(1, m)
+                   do mp = 1, self%numwannbands
+                      if(abs(el_en - el_ens_k(1, mp)) < thres) then
+                         deg_count = deg_count + 1
+                         aux = aux + g2_qpath(i, s, mp, n)
+                      end if
+                   end do
+                   g2_qpath(i, s, m, n) = aux/dble(deg_count)
+                end do
+             end do
+          end do
+
+          !Average over final electron bands
+          do s = 1, self%numbranches
+             do m = 1, self%numwannbands
+                do n = 1, self%numwannbands
+                   deg_count = 0
+                   aux = 0.0_r64
+                   el_en = el_ens_kp(1, n)
+                   do np = 1, self%numwannbands
+                      if(abs(el_en - el_ens_kp(1, np)) < thres) then
+                         deg_count = deg_count + 1
+                         aux = aux + g2_qpath(i, s, m, np)
+                      end if
+                   end do
+                   g2_qpath(i, s, m, n) = aux/dble(deg_count)
+                end do
+             end do
+          end do
+       end do
+
+       !Output electron dispersions over the k+q vectors
+       write(saux,"(I0)") self%numwannbands
+       open(1, file="el.ens_k+qpath",status="replace")
+       do i = 1, nqpath
+          write(1,"("//trim(adjustl(saux))//"E20.10)") el_ens_kp_all(i,:)
+       end do
+       close(1)
+
+       !Print out |gk(m,n,s,qpath)|
+       open(1, file = 'gk_qpath',status="replace")
+       write(1,*) '   m    n    s    |gk|[eV]'
+       do i = 1, nqpath
+          do m = 1, self%numwannbands
+             do n = 1, self%numwannbands
+                do s = 1, self%numbranches
+                   write(1,"(I5, I5, I5, E20.10)") m, n, s, sqrt(g2_qpath(i, s, m, n))
+                end do
+             end do
+          end do
+       end do
+       close(1)
+    end if
+
+    sync all !This is essential for shape consistency of gwann above
+    call self%reshape_gwann_for_gkRp(revert = .true.)
+
+    sync all
+  end subroutine plot_along_path
+  
+  subroutine plot_along_path_test(self, crys, num, scissor)
+    !! Subroutine to plot bands, dispersions, e-ph matrix elements
+    !! using the Wannier interpolation method with EPW inputs.
+
+    class(wannier), intent(in) :: self
+    type(crystal), intent(in) :: crys
+    type(numerics), intent(in) :: num
+    real(r64), intent(in) :: scissor(self%numwannbands)
+
+    !Local variables
+    integer(i64) :: i, nqpath, m, n, s, deg_count, mp, np, sp, icart
+    real(r64) :: k(1, 3), kp(1, 3), thres, aux, el_en, ph_en
+    real(r64), allocatable :: qpathvecs(:,:), kppathvecs(:,:), &
+         ph_ens_path(:,:), el_ens_path(:,:), el_ens_kp(:,:), el_ens_kp_all(:,:), &
+         el_vels_kp(:,:,:), g2_qpath(:,:,:,:), el_ens_k(:,:), el_vels_k(:,:,:)
+    complex(r64), allocatable :: ph_evecs_path(:,:,:), el_evecs_kp(:,:,:), &
+         el_evecs_k(:,:,:), gmixed_q(:,:,:,:) 
+    character(len = 1024) :: filename
+    character(len=8) :: saux
+
+    call print_message("Plotting bands, dispersions, and e-ph vertex along path...")
+
+    !call self%reshape_gwann_for_gkRp
+    sync all
+
+    if(this_image() == 1) then
+
+       !Threshold used to measure degeneracy
+       thres = 1.0e-6_r64 !0.001 meV
+
+       !Read list of wavevectors in crystal coordinates
+       open(1, file = trim('highsympath.txt'), status = 'old')
+       read(1,*) nqpath
+       allocate(qpathvecs(nqpath, 3))
+       do i = 1, nqpath
+          read(1,*) qpathvecs(i, :)
+       end do
+
+       !Calculate phonon dispersions
+       allocate(ph_ens_path(nqpath, self%numbranches), &
+            ph_evecs_path(nqpath, self%numbranches, self%numbranches))
+       call ph_wann(self, crys, nqpath, qpathvecs, ph_ens_path, ph_evecs_path)
+
+       !Output phonon dispersions
+       write(saux, "(I0)") self%numbranches
+       open(1, file = "ph.ens_qpath", status="replace")
+       do i = 1, nqpath
+          write(1,"("//trim(adjustl(saux))//"E20.10)") ph_ens_path(i, :)
+       end do
+       close(1)
+
+       !Calculate electron bands
+       allocate(el_ens_path(nqpath, self%numwannbands))
+       call el_wann(self, crys, nqpath, qpathvecs, el_ens_path, scissor = scissor)
+
+       !Output electron dispersions
+       write(saux,"(I0)") self%numwannbands
+       open(1, file="el.ens_kpath",status="replace")
+       do i = 1, nqpath
+          write(1,"("//trim(adjustl(saux))//"E20.10)") el_ens_path(i, :)
+       end do
+       close(1)
+
+       allocate(el_ens_k(1, self%numwannbands), el_vels_k(1, self%numwannbands, 3),&
+            el_evecs_k(1, self%numwannbands, self%numwannbands))
+       allocate(el_ens_kp(1, self%numwannbands), el_vels_kp(1, self%numwannbands, 3),&
+            el_evecs_kp(1, self%numwannbands, self%numwannbands), &
+            el_ens_kp_all(nqpath, self%numwannbands))
+       allocate(g2_qpath(nqpath, self%numbranches, self%numwannbands, self%numwannbands))
+
+       !Read wave vector of initial electron
+       open(1, file = trim('initialk.txt'), status = 'old')
+       read(1,*) k(1, :)
+
+       !Calculate g(k, Rp)
+       !call print_message("Computing gkRp...")
+       !call self%gkRp(num, 0_i64, k(1, :))
+
+
+       call print_message("Computing el_wann...")
+       call el_wann(self, crys, 1_i64, k, el_ens_k, el_vels_k, el_evecs_k, &
+            scissor = scissor)
+
+       !All k' = k + q modulo G 
+       allocate(kppathvecs(nqpath, 3))
+       do i = 1, nqpath !Over phonon wave vectors path
+          kppathvecs(i, :) = k(1, :) .umklapp. qpathvecs(i, :)
+       end do
+       allocate(gmixed_q(self%numwannbands, self%numwannbands, self%numbranches, self%nwsk))
+
+       call print_message("Computing g2...")
+       do i = 1, nqpath !Over phonon wave vectors path
+          call self%gReq(num, i, qpathvecs(i, :))
+          !Load gmixed from file
+          !Change to data output directory
+          call chdir(trim(adjustl(num%g2dir)))
+          
+          call binsearch(ph%indexlist, kp_vec%muxed_index, iq)
+          write (filename, '(I6)') iq
+          filename = 'gReq.iq'//trim(adjustl(filename))
+          open(1, file = filename, status = "old", access = 'stream')
+          read(1) gmixed_k
+          close(1)
+          !Change back to working directory
+          call chdir(num%cwd)
           !TODO Would be great to have a progress bar here.
 
           !Calculate electrons at this final wave vector

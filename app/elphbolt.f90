@@ -153,10 +153,9 @@ program elphbolt
         call wann%plot_along_path(crys, num, el%scissor)
 
         call t_event%end_timer('Plots along path')
+        !Test - along need plot along path
+        call exit
      end if
-
-     !Test - along need plot along path
-     call exit
 
      call subtitle("Calculating interactions...")
 
