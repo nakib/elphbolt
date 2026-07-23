@@ -53,7 +53,7 @@ module interactions
        calculate_W_fromcgV2, calculate_W3ph_OTF, calculate_Y_OTF, &
        Vm2_3ph, calculate_Xee_OTF, calculate_Xee_13_OTF, &
        calculate_ph_rta_coherence_rates, calculate_3ph_interaction_perm, &
-       calculate_3ph_phasespace
+       calculate_3ph_phasespace, calculate_3ph_interaction_gpu
 
   !external chdir, system
 
@@ -1175,6 +1175,760 @@ contains
 
     sync all
   end subroutine calculate_3ph_interaction
+
+  real(r64) function Vm2_3ph_gpu_kernel(evecs, iq1, s1, iq2, s2, iq3, s3, &
+       Index_i, Index_j, Index_k, ifc3, R_j, R_k, q2_cart_all, q3_cart_all, &
+       ntrip, nwv, nb)
+    !! Device-callable function that computes the squared 3-ph interaction vertex
+    !! |V-(s1<q1>|s2q2,s3q3)|^2 for a single (s1, s2, s3) triple
+
+    !$acc routine seq
+
+    integer(i64), intent(in) :: iq1, s1, iq2, s2, iq3, s3, ntrip, nwv, nb
+    complex(r64), intent(in) :: evecs(nwv, nb, nb)
+    integer(i64), intent(in) :: Index_i(ntrip), Index_j(ntrip), Index_k(ntrip) 
+    real(r64), intent(in) :: ifc3(3, 3, 3, ntrip), R_j(3, ntrip), R_k(3, ntrip), &
+         q2_cart_all(3, nwv), q3_cart_all(3, nwv)
+    ! Local variables
+    integer(i64) :: it, a, b, c, aind, bind, cind
+    real(r64) :: phase_argument
+    complex(r64) :: aux2, aux3, phase, V0
+
+    V0 = cmplx(0.0_r64, 0.0_r64, kind=r64)
+
+    do it = 1, ntrip
+       aind = 3_i64*(Index_k(it) - 1_i64)
+       bind = 3_i64*(Index_j(it) - 1_i64)
+       cind = 3_i64*(Index_i(it) - 1_i64)
+
+       phase_argument = &
+            q2_cart_all(1, iq2)*R_j(1, it) + &
+            q2_cart_all(2, iq2)*R_j(2, it) + &
+            q2_cart_all(3, iq2)*R_j(3, it) + &
+            q3_cart_all(1, iq2)*R_k(1, it) + &
+            q3_cart_all(2, iq2)*R_k(2, it) + &
+            q3_cart_all(3, iq2)*R_k(3, it)
+
+       phase = cmplx(cos(phase_argument), -sin(phase_argument), kind=r64)
+
+       do a = 1, 3
+          aux2 = conjg(evecs(iq3, s3, a + aind))
+          do b = 1, 3
+             aux3 = aux2*conjg(evecs(iq2, s2, b + bind))
+             do c = 1, 3
+                V0 = V0 + ifc3(c, b, a, it)*evecs(iq1, s1, c + cind)*aux3*phase
+             end do
+          end do
+       end do
+    end do
+    Vm2_3ph_gpu_kernel = real(V0*conjg(V0), kind=r64)
+  end function Vm2_3ph_gpu_kernel
+
+  subroutine calculate_3ph_interaction_gpu(ph, crys, num, key)
+    !! gpu (OpenACC) accelerated driver of the 3-ph vertex and transition
+    !! probability calculator for all IBZ phonon wave vectors.
+    !! This subroutine calculates |V-(s1<q1>|s2q2,s3q3)|^2, W-(s1<q1>|s2q2,s3q3),
+    !! and W+(s1<q1>|s2q2,s3q3) for each irreducible phonon and saves the results to disk.
+    !!
+    !! key = 'V': calculates and saves |V-(s1<q1>|s2q2,s3q3)|^2.
+    !!   2 steps: filter first, then compute.
+    !!    cpu side: for the current istate1 = (s1, q1_ibz), scan every
+    !!      (q2, s2, s3) and evaluate the energy-conservation delta functions
+    !!      (momentum conservation is automatic here since q3 is derived
+    !!      directly from q1 and q2). Pack the surviving (q2, s2, s3) indices
+    !!      into a compact list.
+    !!    gpu side: launch exactly one gpu thread per surviving entry of that
+    !!      compact list to evaluate the expensive O(numtriplets) vertex
+    !!      contraction. No gpu time is spent on energetically forbidden
+    !!      processes at all.
+    !!    A surviving (q2, s2, s3) is evaluated on the gpu only once, and
+    !!    that single value is reused for both the minus and the plus
+    !!    process on the cpu side whenever both are simultaneously allowed.
+    !!
+    !! key = 'W': calculates and saves W-(s1<q1>|s2q2,s3q3) and
+    !!   W+(s1<q1>|s2q2,s3q3), reading |V-|^2 back from disk.
+    !!   Steps: dense compute, since every (q2, s2, s3) needs its delta
+    !!   function evaluated regardless, there is nothing to filter first
+    !!   here, unlike key = 'V'.  We replace the pointer with a plain branch on num%tetrahedra instead.
+    !!    gpu side: for the current istate1, compute delta_minus/delta_plus
+    !!      for every (q2, s2, s3) into dense arrays.
+    !!    cpu side: walk the same (q2, s2, s3) loop, in the same order, that
+    !!      the original cpu routine uses, so the running-counter
+    !!      compaction into Wm/Wp/istate2_*/istate3_* which must match
+    !!      the order |V-|^2 was written to disk.
+    !!
+    !! ph Phonon object
+    !! crys Crystal object
+    !! num Numerics object
+    !! key = 'V', 'W' for vertex, transition probabilitiy calculation, respectively.
+
+    type(phonon), intent(in) :: ph
+    type(crystal), intent(in) :: crys
+    type(numerics), intent(in) :: num
+    character(len = 1), intent(in) :: key
+
+    !Local variables (shared between the key = 'V' and key = 'W')
+    integer(i64) :: istate1, nstates_irred, &
+         nprocs, s1, s2, s3, iq1_ibz, iq1, iq2, iq3_minus, &
+         q1_indvec(3), q2_indvec(3), q3_minus_indvec(3), &
+         neg_iq2, neg_q2_indvec(3), num_active_images, &
+         s2s3, proc_index, ibatch, batch_range(3), nwv, nb, ntrip
+    real(r64) :: en1, en2, en3, q1(3), q3_minus(3), delta_minus, delta_plus
+    real(r64), allocatable :: Vm2_1(:), Vm2_2(:)
+    real(r64), allocatable :: q2_cart_all(:, :), q3_cart_all(:, :)
+    integer(i64), allocatable :: iq3_minus_all(:), neg_iq2_all(:)
+    integer(i64), allocatable :: chunk[:], index_start[:], index_end[:]
+    character(len = 1024) :: filename, batch_filename
+    logical, allocatable :: minus_mask(:), plus_mask(:)
+    logical :: use_tetra
+    type(resource) :: compute_resource
+    type(task_manager) :: job
+    procedure(delta_fn), pointer :: delta_fn_ptr => null()
+
+    !Local variable for key = 'V'
+    integer(i64) :: max_valid, list_count, idx
+    real(r64), allocatable :: ifc3_local(:, :, :, :), R_j_local(:, :), R_k_local(:, :)
+    integer(i64), allocatable :: Index_i_local(:), Index_j_local(:), Index_k_local(:)
+    complex(r64), allocatable :: evecs_local(:, :, :)
+    integer(i64), allocatable :: valid_iq2(:), valid_s2(:), valid_s3(:), valid_iq3minus(:)
+    logical, allocatable :: valid_has_minus(:), valid_has_plus(:)
+    real(r64), allocatable :: Vm2_valid(:)
+
+    !Local variable for key = 'W'
+    integer(i64) :: index_minus, index_plus, plus_count, minus_count
+    real(r64) :: occup_fac, const, bose2, bose3
+    real(r64), allocatable :: Wm(:), Wp(:)
+    integer(i64), allocatable :: istate2_plus(:), istate3_plus(:), istate2_minus(:), istate3_minus(:)
+    character(len = 1024) :: filename_Wm, filename_Wp
+    integer(i64) :: wvmesh_local(3)
+    integer(i64), allocatable :: simplex_map_local(:, :, :), simplex_count_local(:)
+    real(r64), allocatable :: simplex_evals_local(:, :, :), ens_local(:, :)
+    real(r64), allocatable :: delta_minus_valid(:), delta_plus_valid(:)
+
+    !for profiling the key = 'W' gpu
+    real(r64) :: t_start, t_end
+    real(r64) :: time_update_device = 0.0_r64, time_kernel = 0.0_r64, &
+         time_update_host = 0.0_r64, time_cpu_loop = 0.0_r64
+
+    if(key /= 'V' .and. key /= 'W') then
+       call exit_with_message("Invalid value of key in call to calculate_3ph_interaction_gpu. Exiting.")
+    end if
+
+    nwv = ph%nwv
+    nb = ph%numbands
+    ntrip = ph%numtriplets
+    use_tetra = num%tetrahedra
+
+    !Total number of IBZ blocks states
+    nstates_irred = ph%nwv_irred*ph%numbands
+
+    !Maximum total number of 3-phonon processes for a given initial phonon state
+    nprocs = ph%nwv*ph%numbands**2
+
+    allocate(chunk[*], index_start[*], index_end[*])
+
+    if(key == 'V') then
+       call print_message("Calculating 3-ph vertices for all IBZ phonons on the gpu...")
+
+       call compute_resource%initialize
+
+       call compute_resource%report
+
+       !Associate delta function procedure pointer
+       delta_fn_ptr => get_delta_fn_pointer(num%tetrahedra)
+
+       ! Batch record filename based on the simulation key.
+       batch_filename = trim(adjustl(num%cwd))//"/Vq2_batches"
+
+       !Allocate the process masks
+       allocate(minus_mask(nprocs), plus_mask(nprocs))
+
+       !Allocate |V^-|^2
+       allocate(Vm2_1(nprocs), Vm2_2(nprocs))
+       ! Above, we split the |V-|^2 vertices into two parts:
+       ! 1. that are non-zero when the minus-type processes are energetically allowed
+       ! 2. that are non-zero when the symmetry-related plus-type processes are energetically allowed
+
+       !Cartesian q2, fixed for the whole run (does not depend on q1).
+       allocate(q2_cart_all(3, nwv))
+       do iq2 = 1, nwv
+          q2_cart_all(:, iq2) = matmul(crys%reclattvecs, ph%wavevecs(iq2, :))
+       end do
+
+       !Per q1 quantities (recomputed once per istate1, as in the cpu version).
+       allocate(q3_cart_all(3, nwv), iq3_minus_all(nwv))
+
+       !Compact surviving processes buffers, sized to the worst case nb**2*nwv so they
+       !can be reused, unchanged in size, across every istate1.
+       max_valid = nb**2*nwv
+       allocate(valid_iq2(max_valid), valid_s2(max_valid), valid_s3(max_valid), &
+            valid_iq3minus(max_valid))
+       allocate(valid_has_minus(max_valid), valid_has_plus(max_valid))
+       allocate(Vm2_valid(max_valid))
+
+       !Distribute the total number of states across batches.
+       call job%distribute_load(nstates_irred, num%num_batches, &
+            num%restart_from_batch_record, batch_filename)
+
+       !Check whether the batch record file contains an end marker.
+       if(job%end_marker()) then
+          if(this_image() == 1) print *, 'All batches already completed.'
+          return
+       end if
+
+       !Local copies of the read-only ph arrays needed inside the OpenACC region.
+       ifc3_local = ph%ifc3
+       Index_i_local = ph%Index_i
+       Index_j_local = ph%Index_j
+       Index_k_local = ph%Index_k
+       R_j_local = ph%R_j
+       R_k_local = ph%R_k
+       evecs_local = ph%evecs
+
+       !copyin(...): keep the read-only, per-run data resident on the device for the
+       !entire batch loop below, rather than re-transferring it for every istate1.
+       !create(...): allocate space on the device for these; they get filled in via
+       !explicit update device calls per istate1 below.
+       !$acc data copyin(ifc3_local, Index_i_local, Index_j_local, Index_k_local, &
+       !$acc&             R_j_local, R_k_local, evecs_local, q2_cart_all) &
+       !$acc&      create(q3_cart_all, valid_iq2, valid_s2, valid_s3, &
+       !$acc&             valid_iq3minus, Vm2_valid)
+
+       !Starting from the next unfinished batch.
+       do ibatch = job%get_num_finished_batches() + 1, num%num_batches
+          if(this_image() == 1) then
+             write(*, '(A, I0, A, I0)') "Processing batch ", ibatch, " of ", num%num_batches
+          end if
+
+          !Get the start, end, and the size of the current batch.
+          batch_range = job%get_batch_range(ibatch)
+
+          !Distribute tasks among images and add batch dependent shift.
+          call compute_resource%balance_load(0.0_r64, batch_range(3), &
+               chunk, index_start, index_end, num_active_images)
+          index_start = index_start + batch_range(1) - 1
+          index_end = index_end + batch_range(1) - 1
+
+          if(this_image() == 1) then
+             write(*, "(A, I10)") " batch # ", ibatch
+             write(*, "(A, I10)") " #states = ", nstates_irred/num%num_batches
+             write(*, "(A, I10)") " #states/image <= ", chunk
+          end if
+
+          !Only work with the active images
+          if(this_image() <= num_active_images) then
+             !Run over first phonon IBZ states
+             do istate1 = index_start, index_end
+                !Demux state index into branch (s) and wave vector (iq) indices
+                call demux_state(istate1, ph%numbands, s1, iq1_ibz)
+
+                !Muxed index of wave vector from the IBZ index list.
+                iq1 = ph%indexlist_irred(iq1_ibz)
+
+                !Energy of phonon 1
+                en1 = ph%ens(iq1, s1)
+
+                !Initial (IBZ blocks) wave vector (crystal coords.)
+                q1 = ph%wavevecs(iq1, :)
+
+                !Convert from crystal to 0-based index vector
+                q1_indvec = nint(q1*ph%wvmesh)
+
+                !Initialize + and - process masks
+                minus_mask = .false.
+                plus_mask = .false.
+
+                !Precompute, for this q1, the folded q3_minus index and Cartesian
+                !wave vector for every q2 in the FBZ mesh. Not expensive, O(nwv), cpu-side.
+                do iq2 = 1, nwv
+                   !Convert from crystal to 0-based index vector
+                   q2_indvec = nint(ph%wavevecs(iq2, :)*ph%wvmesh)
+
+                   !Folded final phonon wave vector
+                   q3_minus_indvec = modulo(q1_indvec - q2_indvec, ph%wvmesh) !0-based index vector
+                   q3_minus = q3_minus_indvec/dble(ph%wvmesh) !crystal coords.
+
+                   !Muxed index of q3_minus
+                   iq3_minus_all(iq2) = mux_vector(q3_minus_indvec, ph%wvmesh, 0_i64)
+
+                   !Validate the mapped q3 mesh index before it is used to access phonon arrays.
+                   if(iq3_minus_all(iq2) < 1 .or. iq3_minus_all(iq2) > nwv) then
+                      write(*,*) "Bad iq3_minus:", iq3_minus_all(iq2), "nwv=", nwv, &
+                           "istate1=", istate1, "iq1=", iq1, "iq2=", iq2, &
+                           "q1_indvec=", q1_indvec, "q2_indvec=", q2_indvec, "wvmesh=", ph%wvmesh
+                   end if
+
+                   !Store the Cartesian q3 coordinates for reuse by the gpu kernel.
+                   q3_cart_all(:, iq2) = matmul(crys%reclattvecs, q3_minus)
+                end do
+
+                !cpu side: filter. Scan every (q2, s2, s3), evaluate the
+                !energy-conservation delta functions, and pack only the
+                !surviving entries into the compact valid_* buffers. No vertex
+                !(ifc3) work happens here; this pass is cheap.
+                list_count = 0
+                do iq2 = 1, nwv
+                   iq3_minus = iq3_minus_all(iq2)
+
+                   !Get index of -q2 (depends only on iq2).
+                   neg_q2_indvec = modulo(-nint(ph%wavevecs(iq2, :)*ph%wvmesh), ph%wvmesh)
+                   neg_iq2 = mux_vector(neg_q2_indvec, ph%wvmesh, 0_i64)
+
+                   do s2s3 = 1, nb**2
+                      s2 = int((s2s3 - 1)/nb) + 1 !changes slow
+                      s3 = modulo(s2s3 - 1, nb) + 1 !changes fast
+
+                      !Energy of phonon 2 and phonon 3
+                      en2 = ph%ens(iq2, s2)
+                      en3 = ph%ens(iq3_minus, s3)
+
+                      if(en1*en2*en3 == 0.0_r64) cycle
+
+                      delta_minus = delta_fn_ptr(en1 - en3, iq2, s2, ph%wvmesh, &
+                           ph%simplex_map, ph%simplex_count, ph%simplex_evals) !minus process
+
+                      delta_plus = delta_fn_ptr(en3 - en1, neg_iq2, s2, ph%wvmesh, &
+                           ph%simplex_map, ph%simplex_count, ph%simplex_evals) !plus process
+
+                      !If neither process is energetically allowed, skip.
+                      if(delta_minus <= 0.0_r64 .and. delta_plus <= 0.0_r64) cycle
+
+                      !Surviving process: record it in the compact list.
+                      list_count = list_count + 1
+                      valid_iq2(list_count) = iq2
+                      valid_s2(list_count) = s2
+                      valid_s3(list_count) = s3
+                      valid_iq3minus(list_count) = iq3_minus
+                      valid_has_minus(list_count) = (delta_minus > 0.0_r64)
+                      valid_has_plus(list_count) = (delta_plus > 0.0_r64)
+                   end do !s2s3
+                end do !iq2
+
+                !Validate the compact list before any device transfer or kernel launch.
+                if(list_count < 0_i64 .or. list_count > max_valid) then
+                   write(*,*) 'invalid list_count = ', list_count, &
+                        ', max_valid = ', max_valid, ', istate1 = ', istate1
+                   error stop
+                end if
+
+                !Check that every compact interaction index refers to a valid q-point.
+                if(list_count > 0) then
+                   if(minval(valid_iq2(1:list_count)) < 1_i64 .or. &
+                        maxval(valid_iq2(1:list_count)) > nwv) error stop 'Invalid valid_iq2'
+                   if(minval(valid_iq3minus(1:list_count)) < 1_i64 .or. &
+                        maxval(valid_iq3minus(1:list_count)) > nwv) error stop 'Invalid valid_iq3minus'
+                   if(minval(valid_s2(1:list_count)) < 1_i64 .or. &
+                        maxval(valid_s2(1:list_count)) > nb) error stop 'Invalid valid_s2'
+                   if(minval(valid_s3(1:list_count)) < 1_i64 .or. &
+                        maxval(valid_s3(1:list_count)) > nb) error stop 'Invalid valid_s3'
+                end if
+
+                !gpu side: compute. Nothing to do if this istate1 happens to
+                !have no energetically allowed processes at all.
+                if(list_count > 0) then
+                   !$acc update device(q3_cart_all, &
+                   !$acc&   valid_iq2(1:list_count), valid_s2(1:list_count), &
+                   !$acc&   valid_s3(1:list_count), valid_iq3minus(1:list_count))
+
+                   !One gpu thread per surviving process: no time is spent on
+                   !energetically forbidden (q2, s2, s3) triples at all.
+                   !$acc parallel loop gang vector &
+                   !$acc&   present(ifc3_local, Index_i_local, Index_j_local, Index_k_local, &
+                   !$acc&           R_j_local, R_k_local, evecs_local, q2_cart_all, q3_cart_all, &
+                   !$acc&           valid_iq2, valid_s2, valid_s3, valid_iq3minus, Vm2_valid)
+                   do idx = 1, list_count
+                      Vm2_valid(idx) = Vm2_3ph_gpu_kernel( evecs_local, iq1, s1, &
+                           valid_iq2(idx), valid_s2(idx), valid_iq3minus(idx), valid_s3(idx), &
+                           Index_i_local, Index_j_local, Index_k_local, ifc3_local, &
+                           R_j_local, R_k_local, q2_cart_all, q3_cart_all, ntrip, nwv, nb)
+                   end do
+
+                   !Copy just the computed results back to host memory.
+                   !$acc update host(Vm2_valid(1:list_count))
+                end if
+
+                !Reuse each compact gpu result for both minus and plus processes when applicable.
+                do idx = 1, list_count
+                   iq2 = valid_iq2(idx)
+                   s2 = valid_s2(idx)
+                   s3 = valid_s3(idx)
+
+                   !packs that (iq2, s2, s3) combination into a single index.
+                   proc_index = (iq2 - 1)*nb**2 + (s2 - 1)*nb + s3
+
+                   if(valid_has_minus(idx)) then
+                      minus_mask(proc_index) = .true.
+                      Vm2_1(proc_index) = Vm2_valid(idx)
+                   end if
+
+                   if(valid_has_plus(idx)) then
+                      plus_mask(proc_index) = .true.
+                      Vm2_2(proc_index) = Vm2_valid(idx)
+                   end if
+                end do
+
+                !Change to data output directory
+                call chdir(trim(adjustl(num%Vdir)))
+
+                !Write data in binary format
+                !Note: this will overwrite existing data!
+                write (filename, '(I9)') istate1
+                filename = 'Vm2.istate'//trim(adjustl(filename))
+                open(1, file = trim(filename), status = 'replace', access = 'stream')
+
+                write(1) count(minus_mask, kind = i64)
+                do proc_index = 1, nprocs
+                   if(minus_mask(proc_index)) write(1) Vm2_1(proc_index)
+                end do
+                write(1) count(plus_mask, kind = i64)
+                do proc_index = 1, nprocs
+                   if(plus_mask(proc_index)) write(1) Vm2_2(proc_index)
+                end do
+                close(1)
+
+                !Sidecar file: the compact (q2, s2, s3) list itself, in the
+                !exact same order Vm2_1/Vm2_2 above were written in. This is
+                !what lets the key = 'W' gpu path (below) skip the dense
+                !(nwv*nb**2) sweep entirely and operate directly on the
+                !same compact list. No need to re-derive which (q2, s2, s3)
+                !survived by re-evaluating every delta function from scratch.
+                filename = 'Vindex.istate'//trim(adjustl(filename(11:)))
+                open(1, file = trim(filename), status = 'replace', access = 'stream')
+                write(1) list_count
+                write(1) valid_iq2(1:list_count)
+                write(1) valid_s2(1:list_count)
+                write(1) valid_s3(1:list_count)
+                write(1) valid_iq3minus(1:list_count)
+                write(1) valid_has_minus(1:list_count)
+                write(1) valid_has_plus(1:list_count)
+                close(1)
+
+                !Change back to run directory
+                call chdir(trim(adjustl(num%cwd)))
+             end do !istate1
+          end if !num_active_images
+
+          sync all
+          if(this_image() == 1) call job%write_record(ibatch)
+       end do !over the batches
+
+       !$acc end data
+    end if !key == 'V'
+
+    if(key == 'W') then
+       call print_message("Calculating 3-ph transition probabilities for all IBZ phonons on the gpu...")
+
+       !Conversion factor in transition probability expression
+       const = pi/4.0_r64*hbar_eVps**5*(qe/amu)**3*1.0d-12
+
+       !Batch record filename based on the simulation key.
+       batch_filename = trim(adjustl(num%cwd_T))//"/Wq_batches"
+
+       !Allocate W- and W+
+       max_valid = nb**2*nwv
+       allocate(Wp(max_valid), Wm(max_valid))
+       allocate(istate2_plus(max_valid), istate3_plus(max_valid), &
+            istate2_minus(max_valid), istate3_minus(max_valid))
+
+       !Read back from the Vindex sidecar file instead of being computed by a cpu filter pass.
+       allocate(valid_iq2(max_valid), valid_s2(max_valid), valid_s3(max_valid), &
+            valid_iq3minus(max_valid))
+       allocate(valid_has_minus(max_valid), valid_has_plus(max_valid))
+       allocate(delta_minus_valid(max_valid), delta_plus_valid(max_valid))
+
+       !Distribute the total number of states across batches.
+       call job%distribute_load(nstates_irred, num%num_batches, &
+            num%restart_from_batch_record, batch_filename)
+
+       !Check whether the batch record file contains an end marker.
+       if(job%end_marker()) then
+          if(this_image() == 1) print *, 'All batches already completed.'
+          return
+       end if
+
+       !Local copies of everything the compact delta-function kernel needs on the device.
+       wvmesh_local = ph%wvmesh
+       simplex_map_local = ph%simplex_map
+       simplex_count_local = ph%simplex_count
+       simplex_evals_local = ph%simplex_evals
+       ens_local = ph%ens
+
+       !Index of -q2 depends only on q2, not on q1/istate1, precompute once
+       !for the whole run rather than once per istate1.
+       allocate(neg_iq2_all(nwv))
+       do iq2 = 1, nwv
+          neg_q2_indvec = modulo(-nint(ph%wavevecs(iq2, :)*ph%wvmesh), ph%wvmesh)
+          neg_iq2_all(iq2) = mux_vector(neg_q2_indvec, ph%wvmesh, 0_i64)
+       end do
+
+       !Keep the read-only, per-run data resident on the device for the entire batch loop below.
+       !$acc data copyin(wvmesh_local, simplex_map_local, simplex_count_local, &
+       !$acc&             simplex_evals_local, ens_local, neg_iq2_all) &
+       !$acc&      create(valid_iq2, valid_s2, valid_s3, valid_iq3minus, &
+       !$acc&             valid_has_minus, valid_has_plus, &
+       !$acc&             delta_minus_valid, delta_plus_valid)
+
+       !Starting from the next unfinished batch.
+       do ibatch = job%get_num_finished_batches() + 1, num%num_batches
+          if(this_image() == 1) then
+             write(*, '(A, I0, A, I0)') "Processing batch ", ibatch, " of ", num%num_batches
+          end if
+
+          !Get the start, end, and size of the current batch.
+          batch_range = job%get_batch_range(ibatch)
+
+          !Distribute tasks among images and add batch dependent shift.
+          call distribute_points(batch_range(3), chunk, index_start, index_end, num_active_images)
+          index_start = index_start + batch_range(1) - 1
+          index_end = index_end + batch_range(1) - 1
+
+          if(this_image() == 1) then
+             write(*, "(A, I10)") " batch # = ", ibatch
+             write(*, "(A, I10)") " #states = ", nstates_irred/num%num_batches
+             write(*, "(A, I10)") " #states/image <= ", chunk
+          end if
+
+          !Only work with the active images
+          if(this_image() <= num_active_images) then
+             !Run over first phonon IBZ states
+             do istate1 = index_start, index_end
+                !Load |V^-|^2 from disk for scattering rates calculation
+
+                !Change to data output directory
+                call chdir(trim(adjustl(num%Vdir)))
+
+                !Read the compact process list sidecar written by the
+                !key = 'V' gpu path for this istate1. This is what lets us
+                !skip the dense (nwv*nb**2) sweep entirely: we already
+                !know, from the V step, exactly which (q2, s2, s3) survived.
+                write (filename, '(I9)') istate1
+                filename = 'Vindex.istate'//trim(adjustl(filename))
+                open(1, file = trim(filename), status = 'old', access = 'stream', iostat = proc_index)
+
+                if(proc_index /= 0) then
+                   call exit_with_message(&
+                        "Missing Vindex sidecar file for this istate1. The compact key = 'W' &
+                        &gpu path requires V to have been (re)computed with V3offload = .true. &
+                        &first, so that the Vindex.istate* sidecar files exist. Exiting.")
+                end if
+                read(1) list_count
+                if(list_count > 0) then
+                   read(1) valid_iq2(1:list_count)
+                   read(1) valid_s2(1:list_count)
+                   read(1) valid_s3(1:list_count)
+                   read(1) valid_iq3minus(1:list_count)
+                   read(1) valid_has_minus(1:list_count)
+                   read(1) valid_has_plus(1:list_count)
+                end if
+                close(1)
+
+                !Read |V^-|^2 from disk in binary format
+                write (filename, '(I9)') istate1
+                filename = 'Vm2.istate'//trim(adjustl(filename))
+                open(1, file = trim(filename), status = 'old', access = 'stream')
+
+                read(1) minus_count
+                if(allocated(Vm2_1)) deallocate(Vm2_1)
+                allocate(Vm2_1(minus_count))
+                if(minus_count > 0) read(1) Vm2_1
+
+                read(1) plus_count
+                if(allocated(Vm2_2)) deallocate(Vm2_2)
+                allocate(Vm2_2(plus_count))
+                if(plus_count > 0) read(1) Vm2_2
+                close(1)
+
+                !Change back to working directory
+                call chdir(num%cwd)
+
+                !Demux state index into branch (s) and wave vector (iq) indices
+                call demux_state(istate1, ph%numbands, s1, iq1_ibz)
+
+                !Muxed index of wave vector from the IBZ index list.
+                !This will be used to access IBZ information from the FBZ quantities.
+                iq1 = ph%indexlist_irred(iq1_ibz)
+
+                !Energy of phonon 1
+                en1 = ph%ens(iq1, s1)
+
+                !gpu side: compact compute. One thread per surviving process
+                if(list_count > 0) then
+                   call cpu_time(t_start)
+                   !$acc update device(valid_iq2(1:list_count), valid_s2(1:list_count), &
+                   !$acc&   valid_s3(1:list_count), valid_iq3minus(1:list_count), &
+                   !$acc&   valid_has_minus(1:list_count), valid_has_plus(1:list_count))
+                   call cpu_time(t_end)
+                   time_update_device = time_update_device + (t_end - t_start)
+
+                   call cpu_time(t_start)
+                   !$acc parallel loop gang vector &
+                   !$acc&   present(wvmesh_local, simplex_map_local, simplex_count_local, &
+                   !$acc&           simplex_evals_local, ens_local, neg_iq2_all, &
+                   !$acc&           valid_iq2, valid_s2, valid_s3, valid_iq3minus, &
+                   !$acc&           valid_has_minus, valid_has_plus, &
+                   !$acc&           delta_minus_valid, delta_plus_valid)
+                   do idx = 1, list_count
+                      iq2 = valid_iq2(idx)
+                      s2 = valid_s2(idx)
+                      s3 = valid_s3(idx)
+                      iq3_minus = valid_iq3minus(idx)
+
+                      if(valid_has_minus(idx)) then
+                         if(use_tetra) then
+                            !Evaluate delta functions
+                            delta_minus_valid(idx) = delta_fn_tetra( &
+                                 en1 - ens_local(iq3_minus, s3), iq2, s2, wvmesh_local, &
+                                 simplex_map_local, simplex_count_local, simplex_evals_local) !minus process
+                         else
+                            delta_minus_valid(idx) = delta_fn_triang( &
+                                 en1 - ens_local(iq3_minus, s3), iq2, s2, wvmesh_local, &
+                                 simplex_map_local, simplex_count_local, simplex_evals_local) !minus process
+                         end if
+                      else
+                         delta_minus_valid(idx) = 0.0_r64
+                      end if
+
+                      if(valid_has_plus(idx)) then
+                         if(use_tetra) then
+                            !Evaluate delta functions
+                            delta_plus_valid(idx) = delta_fn_tetra( &
+                                 ens_local(iq3_minus, s3) - en1, neg_iq2_all(iq2), s2, &
+                                 wvmesh_local, simplex_map_local, simplex_count_local, &
+                                 simplex_evals_local) !plus process
+                         else
+                            delta_plus_valid(idx) = delta_fn_triang( &
+                                 ens_local(iq3_minus, s3) - en1, neg_iq2_all(iq2), s2, &
+                                 wvmesh_local, simplex_map_local, simplex_count_local, &
+                                 simplex_evals_local) !plus process
+                         end if
+                      else
+                         delta_plus_valid(idx) = 0.0_r64
+                      end if
+                   end do
+                   call cpu_time(t_end)
+                   time_kernel = time_kernel + (t_end - t_start)
+
+                   call cpu_time(t_start)
+                   !$acc update host(delta_minus_valid(1:list_count), delta_plus_valid(1:list_count))
+                   call cpu_time(t_end)
+                   time_update_host = time_update_host + (t_end - t_start)
+                end if
+
+                !cpu side: walk only the surviving entries.
+                call cpu_time(t_start)
+                minus_count = 0
+                plus_count = 0
+                do idx = 1, list_count
+                   iq2 = valid_iq2(idx)
+                   s2 = valid_s2(idx)
+                   s3 = valid_s3(idx)
+                   iq3_minus = valid_iq3minus(idx)
+
+                   !Energy of phonon 2
+                   en2 = ph%ens(iq2, s2)
+
+                   !Energy of phonon 3
+                   en3 = ph%ens(iq3_minus, s3)
+
+                   !Bose factor for phonon 2
+                   bose2 = Bose(en2, crys%T)
+
+                   !Bose factor for phonon 3
+                   bose3 = Bose(en3, crys%T)
+
+                   !Calculate W-:
+
+                   if(valid_has_minus(idx)) then
+                      !Non-zero process counter
+                      minus_count = minus_count + 1
+
+                      !Temperature dependent occupation factor
+                      !(bose1 + 1)*bose2*bose3/(bose1*(bose1 + 1))
+                      ! = (bose2 + bose3 + 1)
+                      occup_fac = (bose2 + bose3 + 1.0_r64)
+
+                      !Save W-
+                      Wm(minus_count) = Vm2_1(minus_count)*occup_fac* &
+                           delta_minus_valid(idx)/en1/en2/en3
+                      istate2_minus(minus_count) = mux_state(ph%numbands, s2, iq2)
+                      istate3_minus(minus_count) = mux_state(ph%numbands, s3, iq3_minus)
+                   end if
+
+                   !Calculate W+:
+
+                   if(valid_has_plus(idx)) then
+                      !Non-zero process counter
+                      plus_count = plus_count + 1
+                      neg_iq2 = neg_iq2_all(iq2)
+
+                      !Temperature dependent occupation factor
+                      !(bose1 + 1)*(bose2 + 1)*bose3/(bose1*(bose1 + 1))
+                      ! = bose2 - bose3
+                      occup_fac = (bose2 - bose3)
+
+                      !Save W+
+                      Wp(plus_count) = Vm2_2(plus_count)*occup_fac* &
+                           delta_plus_valid(idx)/en1/en2/en3
+                      istate2_plus(plus_count) = mux_state(ph%numbands, s2, neg_iq2)
+                      istate3_plus(plus_count) = mux_state(ph%numbands, s3, iq3_minus)
+                   end if
+                end do
+                call cpu_time(t_end)
+                time_cpu_loop = time_cpu_loop + (t_end - t_start)
+
+                !Multiply constant factor, unit factor, etc. 
+                !Only over the populated prefix, not the full worst case sized buffer.
+                if(minus_count > 0) Wm(1:minus_count) = const*Wm(1:minus_count) !THz
+                if(plus_count > 0) Wp(1:plus_count) = const*Wp(1:plus_count) !THz
+
+                !Write W+ and W- to disk
+                !Change to data output directory
+                call chdir(trim(adjustl(num%Wdir)))
+
+                !Write data in binary format
+                !Note: this will overwrite existing data!
+                write (filename, '(I9)') istate1
+
+                filename_Wm = 'Wm.istate'//trim(adjustl(filename))
+                open(1, file = trim(filename_Wm), status = 'replace', access = 'stream')
+                write(1) minus_count
+                write(1) Wm(1:minus_count)
+                write(1) istate2_minus(1:minus_count)
+                write(1) istate3_minus(1:minus_count)
+                close(1)
+
+                filename_Wp = 'Wp.istate'//trim(adjustl(filename))
+                open(1, file = trim(filename_Wp), status = 'replace', access = 'stream')
+                write(1) plus_count
+                write(1) Wp(1:plus_count)
+                write(1) istate2_plus(1:plus_count)
+                write(1) istate3_plus(1:plus_count)
+                close(1)
+
+                !Change back to working directory
+                call chdir(num%cwd)
+             end do !istate1
+          end if !num_active_images
+
+          sync all
+          if(this_image() == 1) call job%write_record(ibatch)
+       end do !over the batches
+
+       if(this_image() == 1) then
+          write(*,*) "W-step GPU timing summary"
+          write(*,*) "Copying compact input data to the GPU (s): ", time_update_device
+          write(*,*) "Running the GPU delta-function calculation (s): ", time_kernel
+          write(*,*) "Copying computed delta values back to the CPU (s): ", time_update_host
+          write(*,*) "Processing results and updating W on the CPU (s): ", time_cpu_loop
+       end if
+
+       !$acc end data
+    end if !key == 'W'
+
+    if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
+
+    sync all
+  end subroutine calculate_3ph_interaction_gpu
 
   subroutine calculate_3ph_interaction_perm(ph, crys, num, key)
     !! Parallel driver of the 3-ph vertex calculator for all IBZ phonon wave vectors.
