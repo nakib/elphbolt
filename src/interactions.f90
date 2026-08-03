@@ -25,6 +25,11 @@ module interactions
        precompute_interpolation_corners_and_weights, interpolate_using_precomputed, &
        create_set, coarse_grain, timer, eye, shrink, Hilbert_transform, interpolator_1d, &
        linspace, permutations, lex_less_1d, permutations, sort
+
+#ifdef _OPENACC
+  use openacc, only: acc_set_device_num, acc_get_device_num, acc_device_nvidia
+#endif
+
   use resource_module, only: resource
   use screening_module, only: spectral_head_polarizability_3d_q
   use task_manager_module, only : task_manager
@@ -1327,6 +1332,13 @@ contains
 
     allocate(chunk[*], index_start[*], index_end[*])
 
+#ifdef _OPENACC
+    !Explicitly bind every image to the single NVIDIA GPU. Device Numbe is 0.
+    call acc_set_device_num(0, acc_device_nvidia)
+
+    write(*,'(A,I0,A,I0)') 'Coarray image ', this_image(), ' uses GPU ', acc_get_device_num(acc_device_nvidia)
+#endif
+
     if(key == 'V') then
        call print_message("Calculating 3-ph vertices for all IBZ phonons on the gpu...")
 
@@ -1403,17 +1415,26 @@ contains
           !Get the start, end, and the size of the current batch.
           batch_range = job%get_batch_range(ibatch)
 
-          !Distribute tasks among images and add batch dependent shift.
-          call compute_resource%balance_load(0.0_r64, batch_range(3), &
-               chunk, index_start, index_end, num_active_images)
+          !Distribute this batch uniformly among all coarray images.
+          !All images execute their assigned work on GPU 0.
+          call distribute_points(batch_range(3), chunk, index_start, index_end, num_active_images)
           index_start = index_start + batch_range(1) - 1
-          index_end = index_end + batch_range(1) - 1
+          index_end = index_end + batch_range(1) - 1 
+          !call compute_resource%balance_load(0.0_r64, batch_range(3), &
+          !     chunk, index_start, index_end, num_active_images)
 
           if(this_image() == 1) then
              write(*, "(A, I10)") " batch # ", ibatch
              write(*, "(A, I10)") " #states = ", nstates_irred/num%num_batches
              write(*, "(A, I10)") " #states/image <= ", chunk
           end if
+
+          sync all
+
+          write(*,'(A,I0,A,I0,A,I0,A,I0)') ' Image ', this_image(), ': chunk = ', chunk, &
+               ', start = ', index_start, ', end = ', index_end
+
+          sync all
 
           !Only work with the active images
           if(this_image() <= num_active_images) then
