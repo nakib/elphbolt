@@ -103,6 +103,8 @@ module electron_module
      !! Spin-normalized density of states at the Fermi level
      real(r64), allocatable :: Ws_irred(:, :), Ws(:, :)
      !! Electron delta functions normalized by spinnormed_dos_fermi
+     logical :: save_images
+     !! Store 
 
    contains
 

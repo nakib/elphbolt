@@ -112,6 +112,8 @@ module numerics_module
      !! Type of Coulomb screening
      integer(i64) :: ncont_mesh
      !! Size of the continuous mesh needed for calculating RPA dielectric
+     logical :: save_el_images
+     !! Store and use images of electron wavevecs for a symmetry?
      logical :: elbound
      !! Use electron-boundary scattering?
      logical :: drag
@@ -189,7 +191,7 @@ contains
          phbound, phdef_Tmat, onlyphbte, onlyebte, elchimp, elbound, drag, plot_along_path, &
          phthinfilm, phthinfilm_ballistic, fourph, use_Wannier_ifc2s, phiso_Tmat, Bfield_on, &
          W_OTF, Y_OTF, solve_bulk, solve_nano, elel, &
-         restart_from_batch_record, use_perm, calculate_3ph_phasespace
+         restart_from_batch_record, use_perm, calculate_3ph_phasespace, save_el_images
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
          read_V, read_W, tetrahedra, phe, phiso, phsubs, onlyphbte, onlyebte, maxiter, &
@@ -199,7 +201,7 @@ contains
          fourph, fourph_mesh_ref, use_Wannier_ifc2s, elel, Coulomb_screening_type, ncont_mesh,&
          phiso_Tmat, phiso_1B_theory, Bfield_on, Bfield, W_OTF, Y_OTF, &
          solve_bulk, solve_nano, num_batches, restart_from_batch_record, use_perm, &
-         calculate_3ph_phasespace
+         calculate_3ph_phasespace, save_el_images
 
     call subtitle("Reading numerics information...")
 
@@ -233,6 +235,7 @@ contains
     elel = .false.
     Coulomb_screening_type = 'TF'
     ncont_mesh = 51
+    save_el_images = .false.
     elbound = .false.
     drag = .true.
     use_Wannier_ifc2s = .false.
@@ -351,6 +354,7 @@ contains
        self%elel = elel
        self%Coulomb_screening_type = trim(Coulomb_screening_type)
        self%ncont_mesh = ncont_mesh
+       self%save_el_images = save_el_images
        self%elbound = elbound
        self%drag = drag
        self%Y_OTF = Y_OTF
@@ -565,6 +569,7 @@ contains
                 write(*, "(A, I5)") "Size of continuous energy mesh: ", self%ncont_mesh
              end if
           end if
+          write(*, "(A, L)") "Save and use el images: ", self%save_el_images
           write(*, "(A, L)") "Include el-boundary interaction: ", self%elbound
           write(*, "(A, L)") "Solve bulk-BTE: ", self%solve_bulk
           write(*, "(A, L)") "Solve nano-BTE: ", self%solve_nano
