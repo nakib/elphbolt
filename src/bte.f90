@@ -1566,7 +1566,8 @@ contains
             el%wvmesh, el%indexlist, blocks = .true.)
     end if
 
-    allocate(ik1_image_array(maxval(el%nequiv)), ik3_image_array(maxval(el%nequiv)))
+    allocate(ik1_image_array(maxval(el%nequiv)))
+    if(.not.num%save_el_images) allocate(ik3_image_array(maxval(el%nequiv)))
 
     !Only work with the active images
     if(this_image() <= num_active_images) then
@@ -1629,11 +1630,13 @@ contains
                 !Number of such allowed processes
                 nprocs_ee_13 = size(Xee_13)
 
-                !Precompute image of k3 due to the all symmetries
-                do ieq = 1, el%nequiv(ik_ibz)
-                   ik_sym = el%ibz2fbz_map(ieq, ik_ibz, 1) !symmetry
-                   call binsearch(el%indexlist, el%equiv_map(ik_sym, ik3), ik3_image_array(ieq))
-                end do
+                if(.not. num%save_el_images) then
+                   !Precompute image of k3 due to the all symmetries
+                   do ieq = 1, el%nequiv(ik_ibz)
+                      ik_sym = el%ibz2fbz_map(ieq, ik_ibz, 1) !symmetry
+                      call binsearch(el%indexlist, el%equiv_map(ik_sym, ik3), ik3_image_array(ieq))
+                   end do
+                end if
 
                 !Add electron-electron scattering contribution to the self consistent term
                 do ieq = 1, el%nequiv(ik_ibz)
@@ -1642,18 +1645,25 @@ contains
 
                    !Electron 3
                    !Fetch image of k3 due to the current symmetry from precomputed list
-                   aux3 = ik3_image_array(ieq)
+                   if(.not. num%save_el_images) then
+                      aux3 = ik3_image_array(ieq)
+                   else
+                      aux3 = el%images(ieq, ik_ibz, ik3) ! is it necessary?!
+                   end if
 
                    do iproc = 1, nprocs_ee_13
-                      !Electron 2
+                      !Demux electron 2 and 4
                       call demux_state(istate_el_ee2(iproc), numbands, n2, ik2)
-                      !Find image of k2 due to the current symmetry
-                      call binsearch(el%indexlist, el%equiv_map(ik_sym, ik2), aux2)
-
-                      !Electron 4
                       call demux_state(istate_el_ee4(iproc), numbands, n4, ik4)
-                      !Find image of k4 due to the current symmetry
-                      call binsearch(el%indexlist, el%equiv_map(ik_sym, ik4), aux4)
+                      if(.not.num%save_el_images) then 
+                         !Find image of k2 due to the current symmetry
+                         call binsearch(el%indexlist, el%equiv_map(ik_sym, ik2), aux2)
+                         !Find image of k4 due to the current symmetry
+                         call binsearch(el%indexlist, el%equiv_map(ik_sym, ik4), aux4)
+                      else
+                         aux2 = el%images(ieq, ik_ibz, ik2)
+                         aux4 = el%images(ieq, ik_ibz, ik4)
+                      end if
 
                       response_el_reduce(ik_fbz, m, :) = response_el_reduce(ik_fbz, m, :) + &
                            Xee_13(iproc)*(-response_el(aux2, n2, :) + response_el(aux3, n3, :) + &
@@ -1675,8 +1685,12 @@ contains
 
                 !Self contribution:
 
-                !Find image of final electron wave vector due to the current symmetry
-                call binsearch(el%indexlist, el%equiv_map(ik_sym, ikp), aux)
+                if(.not.num%save_el_images) then
+                   !Find image of final electron wave vector due to the current symmetry
+                   call binsearch(el%indexlist, el%equiv_map(ik_sym, ikp), aux)
+                else
+                   aux = el%images(ieq, ik_ibz, ikp)
+                end if
 
                 response_el_reduce(ik_fbz, m, :) = response_el_reduce(ik_fbz, m, :) + &
                      response_el(aux, n, :)*(Xphplus(iproc) + Xphminus(iproc))
@@ -1689,8 +1703,12 @@ contains
                    call demux_state(istate_el_echimp(iproc), numbands, n, ikp)
 
                    !Self contribution:
-                   !Find image of final electron wave vector due to the current symmetry
-                   call binsearch(el%indexlist, el%equiv_map(ik_sym, ikp), aux)
+                   if(.not.num%save_el_images) then
+                      !Find image of final electron wave vector due to the current symmetry
+                      call binsearch(el%indexlist, el%equiv_map(ik_sym, ikp), aux)
+                   else
+                      aux = el%images(ieq, ik_ibz, ikp)
+                   end if   
 
                    response_el_reduce(ik_fbz, m, :) = response_el_reduce(ik_fbz, m, :) + &
                         response_el(aux, n, :) * Xchimp(iproc)
