@@ -58,7 +58,7 @@ module interactions
        calculate_W_fromcgV2, calculate_W3ph_OTF, calculate_Y_OTF, &
        Vm2_3ph, calculate_Xee_OTF, calculate_Xee_13_OTF, &
        calculate_ph_rta_coherence_rates, calculate_3ph_interaction_perm, &
-       calculate_3ph_phasespace, calculate_3ph_interaction_gpu
+       calculate_3ph_phasespace, calculate_3ph_interaction_gpu, expm1_gpu, Bose_gpu
 
   !external chdir, system
 
@@ -1181,6 +1181,34 @@ contains
     sync all
   end subroutine calculate_3ph_interaction
 
+  pure elemental real(r64) function expm1_gpu(x)
+    !! Device replacement for exp(x) - 1, for use inside gpu kernels.
+    !! Uses a Taylor series for small x since real128 is unsupported on gpu.
+
+    !$acc routine seq
+    real(r64), intent(in) :: x
+
+    if(abs(x) < 1.0e-4_r64) then
+       !Small x: x + x^2/2! + x^3/3! + x^4/4! (no cancellation).
+       expm1_gpu = x*(1.0_r64 + x*(0.5_r64 + x*(1.0_r64/6.0_r64 + x/24.0_r64)))
+    else
+       !Large x: exp(x) and 1 are no longer close, so the direct formula
+       !is already accurate in double precision.
+       expm1_gpu = exp(x) - 1.0_r64
+    end if
+  end function expm1_gpu
+
+  pure elemental real(r64) function Bose_gpu(e, T)
+    !! Device version of Bose, for use inside OpenACC kernels.
+    !! e Energy in eV
+    !! T temperature in K
+
+    !$acc routine seq
+    real(r64), intent(in) :: e, T
+
+    Bose_gpu = 1.0_r64/expm1_gpu(e/kB/T)
+  end function Bose_gpu
+
   real(r64) function Vm2_3ph_gpu_kernel(evecs, iq1, s1, iq2, s2, iq3, s3, &
        Index_i, Index_j, Index_k, ifc3, R_j, R_k, q2_cart_all, q3_cart_all, &
        ntrip, nwv, nb)
@@ -1194,6 +1222,7 @@ contains
     integer(i64), intent(in) :: Index_i(ntrip), Index_j(ntrip), Index_k(ntrip) 
     real(r64), intent(in) :: ifc3(3, 3, 3, ntrip), R_j(3, ntrip), R_k(3, ntrip), &
          q2_cart_all(3, nwv), q3_cart_all(3, nwv)
+
     ! Local variables
     integer(i64) :: it, a, b, c, aind, bind, cind
     real(r64) :: phase_argument
@@ -1253,11 +1282,11 @@ contains
     !! key = 'W': calculates and saves W-(s1<q1>|s2q2,s3q3) and
     !!   W+(s1<q1>|s2q2,s3q3), reading |V-|^2 back from disk.
     !!   Steps: dense compute, since every (q2, s2, s3) needs its delta
-    !!   function evaluated regardless, there is nothing to filter first
-    !!   here, unlike key = 'V'.  We replace the pointer with a plain branch on num%tetrahedra instead.
+    !!   function evaluated regardless, there is nothing to filter first.
+    !!   We replace the pointer with a plain branch on num%tetrahedra instead.
     !!    gpu side: for the current istate1, compute delta_minus/delta_plus
     !!      for every (q2, s2, s3) into dense arrays.
-    !!    cpu side: walk the same (q2, s2, s3) loop, in the same order, that
+    !!    cpu side: the same (q2, s2, s3) strategy that
     !!      the original cpu routine uses, so the running-counter
     !!      compaction into Wm/Wp/istate2_*/istate3_* which must match
     !!      the order |V-|^2 was written to disk.
@@ -1306,8 +1335,10 @@ contains
     integer(i64), allocatable :: istate2_plus(:), istate3_plus(:), istate2_minus(:), istate3_minus(:)
     character(len = 1024) :: filename_Wm, filename_Wp
     integer(i64) :: wvmesh_local(3)
+    real(r64) :: T_local
     integer(i64), allocatable :: simplex_map_local(:, :, :), simplex_count_local(:)
     real(r64), allocatable :: simplex_evals_local(:, :, :), ens_local(:, :)
+    real(r64), allocatable :: bose2_valid(:), bose3_valid(:)
     real(r64), allocatable :: delta_minus_valid(:), delta_plus_valid(:)
 
     !for profiling the key = 'W' gpu
@@ -1656,6 +1687,7 @@ contains
             valid_iq3minus(max_valid))
        allocate(valid_has_minus(max_valid), valid_has_plus(max_valid))
        allocate(delta_minus_valid(max_valid), delta_plus_valid(max_valid))
+       allocate(bose2_valid(max_valid), bose3_valid(max_valid))
 
        !Distribute the total number of states across batches.
        call job%distribute_load(nstates_irred, num%num_batches, &
@@ -1669,6 +1701,7 @@ contains
 
        !Local copies of everything the compact delta-function kernel needs on the device.
        wvmesh_local = ph%wvmesh
+       T_local = crys%T
        simplex_map_local = ph%simplex_map
        simplex_count_local = ph%simplex_count
        simplex_evals_local = ph%simplex_evals
@@ -1684,10 +1717,11 @@ contains
 
        !Keep the read-only, per-run data resident on the device for the entire batch loop below.
        !$acc data copyin(wvmesh_local, simplex_map_local, simplex_count_local, &
-       !$acc&             simplex_evals_local, ens_local, neg_iq2_all) &
+       !$acc&             simplex_evals_local, ens_local, neg_iq2_all, T_local) &
        !$acc&      create(valid_iq2, valid_s2, valid_s3, valid_iq3minus, &
        !$acc&             valid_has_minus, valid_has_plus, &
-       !$acc&             delta_minus_valid, delta_plus_valid)
+       !$acc&             delta_minus_valid, delta_plus_valid, &
+       !$acc&             bose2_valid, bose3_valid)
 
        !Starting from the next unfinished batch.
        do ibatch = job%get_num_finished_batches() + 1, num%num_batches
@@ -1784,15 +1818,20 @@ contains
                    call cpu_time(t_start)
                    !$acc parallel loop gang vector &
                    !$acc&   present(wvmesh_local, simplex_map_local, simplex_count_local, &
-                   !$acc&           simplex_evals_local, ens_local, neg_iq2_all, &
+                   !$acc&           simplex_evals_local, ens_local, neg_iq2_all, T_local, &
                    !$acc&           valid_iq2, valid_s2, valid_s3, valid_iq3minus, &
                    !$acc&           valid_has_minus, valid_has_plus, &
-                   !$acc&           delta_minus_valid, delta_plus_valid)
+                   !$acc&           delta_minus_valid, delta_plus_valid, &
+                   !$acc&           bose2_valid, bose3_valid)
                    do idx = 1, list_count
                       iq2 = valid_iq2(idx)
                       s2 = valid_s2(idx)
                       s3 = valid_s3(idx)
                       iq3_minus = valid_iq3minus(idx)
+
+                      !Bose factors, computed here
+                      bose2_valid(idx) = Bose_gpu(ens_local(iq2, s2), T_local)
+                      bose3_valid(idx) = Bose_gpu(ens_local(iq3_minus, s3), T_local)
 
                       if(valid_has_minus(idx)) then
                          if(use_tetra) then
@@ -1830,7 +1869,8 @@ contains
                    time_kernel = time_kernel + (t_end - t_start)
 
                    call cpu_time(t_start)
-                   !$acc update host(delta_minus_valid(1:list_count), delta_plus_valid(1:list_count))
+                   !$acc update host(delta_minus_valid(1:list_count), delta_plus_valid(1:list_count), &
+                   !$acc&            bose2_valid(1:list_count), bose3_valid(1:list_count))
                    call cpu_time(t_end)
                    time_update_host = time_update_host + (t_end - t_start)
                 end if
@@ -1851,11 +1891,12 @@ contains
                    !Energy of phonon 3
                    en3 = ph%ens(iq3_minus, s3)
 
+                   !Bose factors, precomputed on the gpu above.
                    !Bose factor for phonon 2
-                   bose2 = Bose(en2, crys%T)
+                   bose2 = bose2_valid(idx)
 
                    !Bose factor for phonon 3
-                   bose3 = Bose(en3, crys%T)
+                   bose3 = bose3_valid(idx)
 
                    !Calculate W-:
 
