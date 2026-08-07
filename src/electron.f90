@@ -103,8 +103,8 @@ module electron_module
      !! Spin-normalized density of states at the Fermi level
      real(r64), allocatable :: Ws_irred(:, :), Ws(:, :)
      !! Electron delta functions normalized by spinnormed_dos_fermi
-     logical :: save_images
-     !! Store 
+     integer(i64), allocatable :: el_images(:, :, :)
+     !! Stores electron images for all symmetries
 
    contains
 
@@ -339,6 +339,10 @@ contains
 
     !I/O related
     character(len = 1024) :: filename, numcols
+    !Image related variables
+    integer(i64) :: nstates_irred, start, end, chunk, istate, &
+      ik_sym, ieq, ik_fbz_arb, ik_ibz, num_active_images
+    integer(i64), allocatable :: el_images(:, :, :)
 
     call print_message("Energy unrestricted calculation:")
     call print_message("--------------------------------")
@@ -596,6 +600,32 @@ contains
        call fill_triangles(self%simplicial_complex, self%ens, self%simplex_evals, &
             wann, crys, self%wvmesh, self%scissor)
     end if
+    !Calculate electron images due to a symmetry
+    if(num%save_el_images) then
+       call print_message("Calculating electron images due to all possible symmetries...")
+       allocate(el_images(maxval(self%nequiv), self%nwv_irred, self%nwv))
+       el_images = 0
+       
+       !Divide electron states among images
+       call distribute_points(self%nwv_irred, chunk, start, end, num_active_images)
+
+       !Only work with the active images
+       if(this_image() <= num_active_images) then
+          !Run over electron IBZ states
+          do ik_ibz = start, end
+             do ieq = 1, self%nequiv(ik_ibz)
+                ik_sym = self%ibz2fbz_map(ieq, ik_ibz, 1) !symmetry
+
+                do ik_fbz_arb = 1, self%nwv
+                   !Find image of ik_fbz_arb due to the current symmetry
+                   call binsearch(self%indexlist, self%equiv_map(ik_sym, ik_fbz_arb), &
+                     el_images(ieq, ik_ibz, ik_fbz_arb))
+                end do
+             end do
+          end do
+       end if
+       call co_sum(el_images) 
+    end if
   end subroutine calculate_electrons
 
   subroutine apply_energy_window(nk, indexlist, energies, enref, fsthick)
@@ -639,6 +669,38 @@ contains
     nk = count
   end subroutine apply_energy_window
 
+  subroutine compute_all_image(self, aux)
+    class(electron), intent(inout) :: self
+    integer(i64), allocatable, intent(out) :: aux(:, :, :)
+
+    !locals
+    integer(i64) :: nstates_irred, start, end, chunk, istate, &
+      ik_sym, ieq, ik_fbz_arb, ik_ibz, num_active_images
+
+    allocate(aux(maxval(self%nequiv), self%nwv_irred, self%nwv))
+    aux = 0
+    
+    !Divide electron states among images
+    call distribute_points(self%nwv_irred, chunk, start, end, num_active_images)
+
+    !Only work with the active images
+    if(this_image() <= num_active_images) then
+       !Run over electron IBZ states
+       do ik_ibz = start, end
+          do ieq = 1, self%nequiv(ik_ibz)
+             ik_sym = self%ibz2fbz_map(ieq, ik_ibz, 1) !symmetry
+
+             do ik_fbz_arb = 1, self%nwv
+                !Find image of ik_fbz_arb due to the current symmetry
+                call binsearch(self%indexlist, self%equiv_map(ik_sym, ik_fbz_arb), &
+                  aux(ieq, ik_ibz, ik_fbz_arb))
+             end do
+          end do
+       end do
+    end if
+    call co_sum(aux) 
+  end subroutine compute_all_image
+  
   subroutine fbz_blocks_quantities(indexlist, energies, velocities)
     !! Subroutine to find FBZ quanties the lie within the Fermi window.
 
