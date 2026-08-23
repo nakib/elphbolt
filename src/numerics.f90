@@ -159,7 +159,7 @@ module numerics_module
      logical :: calculate_3ph_phasespace
      !! Calculate 3ph phasespace?
      logical :: V3offload
-     !! Offload the 3-ph vertex |V-|^2 calculation to the GPU via OpenACC?
+     !! Offload the 3-ph vertex |V-|^2 and transition probabilities calculation to the GPU via OpenACC?
    contains
 
      procedure :: initialize=>read_input_and_setup, create_chempot_dirs
@@ -545,7 +545,7 @@ contains
           write(*, "(A, L)") "Reuse ph-e matrix elements: ", self%read_gq2
           write(*, "(A, L)") "Reuse ph-ph matrix elements: ", self%read_V
           write(*, "(A, L)") "Reuse ph-ph transition probabilities: ", self%read_W
-          write(*, "(A, L)") "Offload 3-ph vertex calculation to GPU: ", self%V3offload
+          write(*, "(A, L)") "Offload 3-ph vertex and transition probabilities calculation to GPU: ", self%V3offload
           write(*, "(A, L)") "Calculate ph-ph transition probabilities on-the-fly: ", self%W_OTF
           write(*, "(A, L)") "Calculate ph-e interaction: ", self%phe
           write(*, "(A, L)") "Calculate ph-e transition probabilities on-the-fly: ", self%Y_OTF
