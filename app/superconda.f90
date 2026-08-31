@@ -109,12 +109,12 @@ program superconda
   call subtitle("Calculating density of states...")
 
   !Calculate electron density of states at the Fermi level
-  call calculate_el_dos_Fermi(el, num%tetrahedra)
-  !call calculate_el_dos_Fermi_Gaussian(el, crys%reclattvecs)
+  !call calculate_el_dos_Fermi(el, num%tetrahedra)
+  call calculate_el_dos_Fermi_Gaussian(el, crys%reclattvecs)
 
   !Calculate the scaled electron delta functions
-  call calculate_el_Ws(el, num%tetrahedra)
-  !call calculate_el_Ws_Gaussian(el, crys%reclattvecs)
+  !call calculate_el_Ws(el, num%tetrahedra)
+  call calculate_el_Ws_Gaussian(el, crys%reclattvecs)
 
   call t_event%end_timer('Density of states')
 

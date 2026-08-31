@@ -62,7 +62,7 @@ contains
     onebyroot12 = 1.0_r64/sqrt(12.0_r64)
 
     do dim = 1, 3
-       Qs(dim, :) = reclattvecs(dim, :)/el%wvmesh(dim)
+       Qs(dim, :) = reclattvecs(:, dim)/el%wvmesh(dim)
     end do
 
     call print_message("Calculating spin-normalized electronic density of states at Fermi level...")
@@ -151,7 +151,7 @@ contains
     onebyroot12 = 1.0_r64/sqrt(12.0_r64)
 
     do dim = 1, 3
-       Qs(dim, :) = reclattvecs(dim, :)/el%wvmesh(dim)
+       Qs(dim, :) = reclattvecs(:, dim)/el%wvmesh(dim)
     end do
 
     call print_message("Calculating DOS(Ef) normalized electron delta functions...")
