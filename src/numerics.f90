@@ -158,6 +158,8 @@ module numerics_module
      !! Use permutation symmetries in ph-ph?
      logical :: calculate_3ph_phasespace
      !! Calculate 3ph phasespace?
+     logical :: V3offload
+     !! Offload the 3-ph vertex |V-|^2 and transition probabilities calculation to the GPU via OpenACC?
    contains
 
      procedure :: initialize=>read_input_and_setup, create_chempot_dirs
@@ -189,7 +191,7 @@ contains
          phbound, phdef_Tmat, onlyphbte, onlyebte, elchimp, elbound, drag, plot_along_path, &
          phthinfilm, phthinfilm_ballistic, fourph, use_Wannier_ifc2s, phiso_Tmat, Bfield_on, &
          W_OTF, Y_OTF, solve_bulk, solve_nano, elel, &
-         restart_from_batch_record, use_perm, calculate_3ph_phasespace
+         restart_from_batch_record, use_perm, calculate_3ph_phasespace, V3offload
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
          read_V, read_W, tetrahedra, phe, phiso, phsubs, onlyphbte, onlyebte, maxiter, &
@@ -199,7 +201,7 @@ contains
          fourph, fourph_mesh_ref, use_Wannier_ifc2s, elel, Coulomb_screening_type, ncont_mesh,&
          phiso_Tmat, phiso_1B_theory, Bfield_on, Bfield, W_OTF, Y_OTF, &
          solve_bulk, solve_nano, num_batches, restart_from_batch_record, use_perm, &
-         calculate_3ph_phasespace
+         calculate_3ph_phasespace, V3offload
 
     call subtitle("Reading numerics information...")
 
@@ -258,10 +260,17 @@ contains
     restart_from_batch_record = .false.
     use_perm = .false.
     calculate_3ph_phasespace = .false.
+    V3offload = .false.
     read(1, nml = numerics)
 
     if(read_W .and. W_OTF) &
          call exit_with_message("read_W and W_OTF can't both be true. Exiting.")
+
+#ifndef _OPENACC
+    if(V3offload) then
+       call exit_with_message("V3offload = .true. requires a build with OpenACC support. Exiting.")
+    end if
+#endif
 
     if(any(qmesh <= 0) .or. fourph_mesh_ref < 1 .or. mesh_ref < 1 .or. fsthick < 0 .or. ncont_mesh < 1) then
        call exit_with_message('Bad input(s) in numerics.')
@@ -359,6 +368,7 @@ contains
        !self%num_batches = num_batches
        self%restart_from_batch_record = restart_from_batch_record
        self%calculate_3ph_phasespace = calculate_3ph_phasespace
+       self%V3offload = V3offload
     else
        self%mesh_ref = 1 !Enforce this for superconductivity mode
     end if
@@ -535,6 +545,7 @@ contains
           write(*, "(A, L)") "Reuse ph-e matrix elements: ", self%read_gq2
           write(*, "(A, L)") "Reuse ph-ph matrix elements: ", self%read_V
           write(*, "(A, L)") "Reuse ph-ph transition probabilities: ", self%read_W
+          write(*, "(A, L)") "Offload 3-ph vertex and transition probabilities calculation to GPU: ", self%V3offload
           write(*, "(A, L)") "Calculate ph-ph transition probabilities on-the-fly: ", self%W_OTF
           write(*, "(A, L)") "Calculate ph-e interaction: ", self%phe
           write(*, "(A, L)") "Calculate ph-e transition probabilities on-the-fly: ", self%Y_OTF

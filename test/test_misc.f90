@@ -10,11 +10,12 @@ program test_misc
        interpolate_using_precomputed, operator(.umklapp.), shrink, Hilbert_transform, &
        fft_next_pow2, interpolator_1d, permutations, lex_less_2d, lex_less_1d, &
        map_triplet_full_to_reduced, Jacobian, det_3x3
+  use interactions, only: expm1_gpu, Bose_gpu
 
   implicit none
 
   integer :: itest, dim, nb, nk
-  integer, parameter :: num_tests = 54
+  integer, parameter :: num_tests = 58
   type(testify) :: test_array(num_tests), tests_all
   integer(i64) :: index, quotient, remainder, int_array(5), v1(3), v2(3), &
        v1_muxed, v2_muxed, ik, ik1, ik2, ik3, ib1, ib2, ib3, wvmesh(3), &
@@ -311,6 +312,69 @@ program test_misc
        [1.0e-10*Bose(1.0e-6_r64, 1.0e8_r64), &
        Bose(1.0_r64, 1.0e-2_r64)], &
        [1.0e-10*kB*1.0e8_r64/1.0e-6_r64, 0.0_r64], &
+       tol = 1.0e-10_r64)
+
+  !Bose_gpu 
+  itest = itest + 1
+  test_array(itest) = testify("Bose_gpu")
+  call test_array(itest)%assert(&
+       [1.0e-10*Bose_gpu(1.0e-6_r64, 1.0e8_r64), &
+       Bose_gpu(1.0_r64, 1.0e-2_r64)], &
+       [1.0e-10*kB*1.0e8_r64/1.0e-6_r64, 0.0_r64], &
+       tol = 1.0e-10_r64)
+
+  !Bose_gpu vs Bose
+  itest = itest + 1
+  test_array(itest) = testify("Bose_gpu agrees with Bose")
+  call test_array(itest)%assert(&
+       [Bose_gpu(1.0e-6_r64, 300.0_r64), &
+       Bose_gpu(1.0e-4_r64, 300.0_r64), &
+       Bose_gpu(1.0e-2_r64, 300.0_r64), &
+       Bose_gpu(1.0_r64, 300.0_r64), &
+       Bose_gpu(1.0e-5_r64, 4.0_r64), &
+       Bose_gpu(1.0e-3_r64, 1000.0_r64)], &
+       [Bose(1.0e-6_r64, 300.0_r64), &
+       Bose(1.0e-4_r64, 300.0_r64), &
+       Bose(1.0e-2_r64, 300.0_r64), &
+       Bose(1.0_r64, 300.0_r64), &
+       Bose(1.0e-5_r64, 4.0_r64), &
+       Bose(1.0e-3_r64, 1000.0_r64)], &
+       tol = 1.0e-10_r64)
+
+  !expm1_gpu vs expm1
+  itest = itest + 1
+  test_array(itest) = testify("expm1_gpu agrees with expm1")
+  call test_array(itest)%assert(&
+       [expm1_gpu(1.0e-8_r64), &
+       expm1_gpu(1.0e-5_r64), &
+       expm1_gpu(5.0e-5_r64), &
+       expm1_gpu(1.0e-4_r64), &
+       expm1_gpu(5.0e-4_r64), &
+       expm1_gpu(1.0e-1_r64), &
+       expm1_gpu(1.0_r64)], &
+       [expm1(1.0e-8_r64), &
+       expm1(1.0e-5_r64), &
+       expm1(5.0e-5_r64), &
+       expm1(1.0e-4_r64), &
+       expm1(5.0e-4_r64), &
+       expm1(1.0e-1_r64), &
+       expm1(1.0_r64)], &
+       tol = 1.0e-10_r64)
+
+  !expm1_gpu 
+  itest = itest + 1
+  test_array(itest) = testify("expm1_gpu")
+  call test_array(itest)%assert(&
+       [expm1_gpu(0.0_r64), &
+       expm1_gpu(1.0_r64), &
+       expm1_gpu(-1.0_r64), &
+       expm1_gpu(log(2.0_r64)), &
+       expm1_gpu(1.0e-8_r64)], &
+       [0.0_r64, &
+       exp(1.0_r64) - 1.0_r64, &
+       1.0_r64/exp(1.0_r64) - 1.0_r64, &
+       1.0_r64, &
+       1.0e-8_r64], &
        tol = 1.0e-10_r64)
 
   !Fermi
