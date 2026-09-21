@@ -56,15 +56,20 @@ name="superconda"
 source-dir="app"
 main="superconda.f90"
 
-#[[executable]]
-#name="elphbolt_with_coherence"
-#source-dir="app"
-#main="elphbolt_with_coherence.f90"
+[[executable]]
+name="elphbolt_with_coherence"
+source-dir="app"
+main="elphbolt_with_coherence.f90"
 
 [[executable]]
 name="V3offload"
 source-dir="app"
 main="V3offload.f90"
+
+[[executable]]
+name="AFM_Dirac_runner"
+source-dir="app"
+main="AFM_Dirac_runner.f90"
 
 #[[executable]]
 #name="V3_permutations"

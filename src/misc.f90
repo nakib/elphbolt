@@ -1864,6 +1864,40 @@ contains
 
   end subroutine invert_complex_square
 
+  subroutine diagonalize_Hermitian(mat, evals)
+    !! Wrapper for lapack diagonalization of a Hermitian matrix
+
+    complex(r64), intent(inout) :: mat(:, :)
+    real(r64), intent(out) :: evals(:)
+
+    !Local variables
+    integer(i64) :: nwork, tmp, N
+    real(r64),  allocatable :: rwork(:)
+    complex(r64), allocatable :: work(:)
+
+    !External procedures
+    external :: zheev
+    
+    !Size of matrix
+    N = size(mat, 1)
+    
+    nwork = 1
+    allocate(work(nwork))
+    allocate(rwork(max(1, 7*N)))
+    
+    call zheev("V", "U", N, mat(:, :), N, evals(:), &
+         work, -1_i64, rwork, tmp)
+    
+    if(real(work(1)) > nwork) then
+       nwork = nint(2*real(work(1)))
+       deallocate(work)
+       allocate(work(nwork))
+    end if
+
+    call zheev("V", "U", N, mat(:, :), N, evals(:), &
+         work, nwork, rwork, tmp)
+  end subroutine diagonalize_Hermitian
+
   subroutine subtitle(text)
     !! Subroutine to print a subtitle.
 

@@ -55,7 +55,16 @@ module params
   !Miscellaneous
   complex(r64), parameter :: oneI = (0.0_r64, 1.0_r64)
   complex(r64), parameter :: complex_zero = (0.0_r64, 0.0_r64)
+  complex(r64), parameter:: complex_one = 1.0_r64 + 0.0_r64*oneI
   complex(r64), parameter :: twopiI = twopi*oneI
+  
+  !Pauli matrices σ_1, σ_2, and σ_3.
+  !The last index runs over the matrix type.
+  complex(r64), parameter :: &
+       sigma(2, 2, 3) = reshape([ &
+       (0.0, 0.0), (1.0, 0.0), (1.0, 0.0), (0.0, 0.0), &
+       (0.0, 0.0), (0.0, 1.0), (0.0, -1.0), (0.0, 0.0), &
+       (1.0, 0.0), (0.0, 0.0), (0.0, 0.0), (-1.0, 0.0)], [2, 2, 3])
 
   !Not parameters, but effectively behaves as parameters
   logical, private :: periodic_table_exists = .false.
