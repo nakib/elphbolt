@@ -519,6 +519,7 @@ contains
        !allocate(tmp(self%nwsq))
        do iuc = 1,self%nwsq
           read(1, *) self%rcells_q(iuc, :)
+          if (iuc == 3) print *,"3. rcells_q->", self%rcells_q(iuc, :)
           do juc = 1, dims(2)
               read(1, *) self%phwsdeg_new(iuc,juc,:)
           end do
@@ -2216,6 +2217,116 @@ contains
 !$!     call chdir(num%cwd)
 !$!   end subroutine gReq
 
+!$!   real(r64) function g2(self, crys, kvec, qvec, el_evec_k, el_evec_kp, ph_evec_q, ph_en, &
+!$!        gmixed, wannspace)
+!$!     !! Function to calculate |g|^2.
+!$!     !! This works with EPW real space data
+!$!     !! kvec: electron wave vector in crystal coords
+!$!     !! qvec: phonon wave vector in crystal coords
+!$!     !! el_evec_k(kp): initial(final) electron eigenvector in bands m(n) 
+!$!     !! ph_evec_q: phonon eigenvector branchs 
+!$!     !! ph_en: phonon energy in mode (s,qvec)
+!$!     !! gmixed: e-ph matrix element in mixed Wannier-Bloch representation
+!$!     !! wannspace: the species that is in Wannier representation
+!$! 
+!$!     class(wannier), intent(in) :: self
+!$!     type(crystal), intent(in) :: crys
+!$! 
+!$!     real(r64),intent(in) :: kvec(3), qvec(3), ph_en
+!$!     complex(r64),intent(in) :: el_evec_k(self%numwannbands),&
+!$!          el_evec_kp(self%numwannbands), ph_evec_q(self%numbranches), &
+!$!          gmixed(:,:,:,:)
+!$!     character(len = 2) :: wannspace
+!$!     real(r64), parameter :: g2unitfactor = Ryd2eV**3*Ryd2amu
+!$! 
+!$!     !Local variables
+!$!     integer(i64) :: ip, iws, nws, np, mp, sp, mtype
+!$!     complex(r64) :: caux, u(self%numbranches), gbloch, unm, &
+!$!          overlap(self%numwannbands,self%numwannbands), glprefac
+!$!     complex(r64), allocatable :: UkpgUkdag(:, :), UkpgUkdaguq(:)
+!$! 
+!$!     if(wannspace /= 'el' .and. wannspace /= 'ph') then
+!$!        call exit_with_message(&
+!$!             "Invalid value of wannspace in call to g2_epw. Exiting.")
+!$!     end if
+!$! 
+!$!     !Mass normalize the phonon matrix
+!$!     do ip = 1, self%numbranches ! d.o.f of basis atoms
+!$!        !demux atom type from d.o.f
+!$!        mtype = (ip - 1)/3 + 1 
+!$!        !normalize
+!$!        u(ip) = ph_evec_q(ip)/sqrt(crys%masses(crys%atomtypes(mtype)))
+!$!     end do
+!$! 
+!$!     if(ph_en == 0) then !zero out matrix elements for zero energy phonons
+!$!        g2 = 0
+!$!     else
+!$!        if(wannspace == 'ph') then
+!$!           nws = self%nwsg
+!$!        else
+!$!           nws = self%nwsk
+!$!        end if
+!$! 
+!$!        allocate(UkpgUkdag(self%numbranches, nws), UkpgUkdaguq(nws))
+!$!        !See Eq. 22 of prb 76, 165108.
+!$!        UkpgUkdag = 0 !g(k,Rp) or g(Re,q) (un)rotated by the electron U^\dagger(k) and U(k') matrices
+!$!        UkpgUkdaguq = 0 !above quantity (un)rotated by the phonon u(q) matrix
+!$!        gbloch = 0
+!$! 
+!$!        !Create the matrix U_nn'(k')U_m'm^\dagger(k)
+!$!        do np = 1, self%numwannbands !over final electron band
+!$!           do mp = 1, self%numwannbands !over initial electron band
+!$!              !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
+!$!              overlap(mp,np) = conjg(el_evec_kp(np))*el_evec_k(mp)
+!$!           end do
+!$!        end do
+!$! 
+!$!        do iws = 1, nws !over matrix elements WS cell
+!$!           !Apply electron rotations
+!$!           do sp = 1, self%numbranches
+!$!              caux = 0
+!$!              do np = 1, self%numwannbands !over final electron band
+!$!                 do mp = 1, self%numwannbands !over initial electron band
+!$!                    caux = caux + overlap(mp,np)*gmixed(np, mp, sp, iws)
+!$!                 end do
+!$!              end do
+!$!              UkpgUkdag(sp, iws) = UkpgUkdag(sp, iws) + caux
+!$!           end do
+!$!        end do
+!$! 
+!$!        do iws = 1, nws !over matrix elements WS cell
+!$!           !Apply phonon rotation
+!$!           !(Recall that the phonon eigenvector *did not* come out pre-daggered from ph_wann_epw.)
+!$!           UkpgUkdaguq(iws) = UkpgUkdaguq(iws) + dot_product(conjg(u),UkpgUkdag(:, iws))
+!$!        end do
+!$! 
+!$!        do iws = 1, nws !over matrix elements WS cell
+!$!           !Fourier transform to reciprocal-space
+!$!           if(wannspace == 'ph') then
+!$!              caux = expi(twopi*dot_product(qvec, self%rcells_q(iws, :)))!&
+!$!                   !/self%phwsdeg(iws)
+!$!           else
+!$!              caux = expi(twopi*dot_product(kvec, self%rcells_k(iws,:)))!&
+!$!                   !/self%elwsdeg(iws)
+!$!           end if
+!$!           gbloch = gbloch + caux*UkpgUkdaguq(iws)
+!$!        end do
+!$! 
+!$!        if(crys%polar) then !Long-range correction
+!$!           !This is [U(k')U^\dagger(k)]_nm, the overlap factor in the dipole correction.
+!$!           !(Recall that the electron eigenvectors came out daggered from el_wann_epw.)
+!$!           unm = dot_product(el_evec_kp,el_evec_k)
+!$!           call long_range_prefac(self, crys, &
+!$!                matmul(crys%reclattvecs,qvec)*bohr2nm,u,glprefac)
+!$!           !gbloch = gbloch + glprefac*unm
+!$!           gbloch = gbloch + glprefac*unm
+!$!        end if
+!$! 
+!$!        g2 = 0.5_r64*real(gbloch*conjg(gbloch))/ &
+!$!             ph_en*g2unitfactor !eV^2
+!$!     end if
+!$!   end function g2
+
   real(r64) function g2(self, crys, kvec, qvec, el_evec_k, el_evec_kp, ph_evec_q, ph_en, &
        gmixed, wannspace)
     !! Function to calculate |g|^2.
@@ -2308,6 +2419,7 @@ contains
              caux = expi(twopi*dot_product(kvec, self%rcells_k(iws,:)))!&
                   !/self%elwsdeg(iws)
           end if
+          !caux = 1.0_r64
           gbloch = gbloch + caux*UkpgUkdaguq(iws)
        end do
 
@@ -2483,6 +2595,9 @@ contains
     character(len = 1024) :: filename
     character(len=8) :: saux
 
+    integer(i64) :: ir
+    real(r64) :: gkRp_test
+
     call print_message("Plotting bands, dispersions, and e-ph vertex along path...")
 
     call self%reshape_gwann_for_gkRp
@@ -2551,6 +2666,19 @@ contains
        close(1)
        !Change back to working directory
        call chdir(num%cwd)
+
+       !! TEST
+       ! write gkRp, added along rcells q
+!$!        filename = 'gkRp_ir_added'
+!$!        open(1, file = filename, status = "replace")
+!$!        do ir = 1, self%nwsq
+!$!           gkRp_test = 0.0_r64
+!$!           do concurrent(n = 1:self%numwannbands, m=1:self%numwannbands, s=1:self%numbranches)
+!$!              gkRp_test = gkRp_test + abs(gmixed_k(n, m, s, ir))
+!$!           end do
+!$!           write(1, *) self%rcells_q(ir, :), gkRp_test
+!$!        end do
+!$!        close(1)
 
        call print_message("Computing el_wann...")
        call el_wann(self, crys, 1_i64, k, el_ens_k, el_vels_k, el_evecs_k, &
