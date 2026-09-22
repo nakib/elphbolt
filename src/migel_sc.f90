@@ -194,6 +194,7 @@ contains
          aniso_matsubara_Delta(:, :), aniso_matsubara_Z(:, :)
     complex(r64), allocatable :: iso_quasi_Delta(:), iso_quasi_Z(:), &
          aniso_quasi_Delta(:, :), aniso_quasi_Z(:, :)
+    real(r64), allocatable :: iso_quasi_invtau(:)
     integer(i64) :: iter, nstates_irred, i, istate, m, ik
     character(len = 1024) :: filename, numcols
     real(r64), parameter :: zero_plus = 1.0e-6_r64
@@ -206,12 +207,12 @@ contains
     if(self%isotropic) then
        call print_message("Solving the isotropic Migdal-Eliashberg equations...")
 
-       allocate(iso_quasi_Delta(self%numqp), iso_quasi_Z(self%numqp))
+       allocate(iso_quasi_Delta(self%numqp), iso_quasi_Z(self%numqp), iso_quasi_invtau(self%numqp))
     else
        call print_message("Solving the anisotropic Migdal-Eliashberg equations...")
 
-       allocate(aniso_quasi_Delta(nstates_irred, self%numqp), &
-            aniso_quasi_Z(nstates_irred, self%numqp))
+       allocate(aniso_quasi_Delta(nstates_irred, self%numqp)) !, &
+            !aniso_quasi_Z(nstates_irred, self%numqp))
     end if
 
     !Calculate for all temperatures in the provided bracket
@@ -287,7 +288,7 @@ contains
              norm_Delta = twonorm(aniso_matsubara_Delta)
           end if
 
-          !Zero out norm_Delata if it is smaller 1 micro eV 
+          !Zero out norm_Delta if it is smaller 1 micro eV 
           if(norm_Delta < 1.0e-6_r64) norm_Delta = 0.0_r64
 
           !Output norms every 100 iterations
@@ -310,11 +311,22 @@ contains
             write(*, "(A)") "  Performing analytic continuation..."
 
        if(self%isotropic) then
+          !Compute Delta on real axis
           iso_quasi_Delta = Pade_continued(&
                oneI*self%fermi_matsubara_ens(self%nummatsubara_upper:self%nummatsubara), &
                iso_matsubara_Delta(self%nummatsubara_upper:self%nummatsubara), self%qp_ens)
 
-          !Reduced quasiparticle density of states
+          !Compute Z on real axis
+          iso_quasi_Z = Pade_continued(&
+               oneI*self%fermi_matsubara_ens(self%nummatsubara_upper:self%nummatsubara), &
+               iso_matsubara_Z(self%nummatsubara_upper:self%nummatsubara), self%qp_ens)
+
+          !Compute inverse lifetime
+          iso_quasi_invtau = imag(iso_quasi_Z)/real(iso_quasi_Z)* &
+               (self%qp_ens**2/real(iso_quasi_Z)**2 + real(iso_quasi_Delta)**2 - real(iso_quasi_Delta)*imag(iso_quasi_Delta))/ &
+               sqrt(self%qp_ens**2/real(iso_quasi_Z)**2 + real(iso_quasi_Delta)**2)
+
+          !Compute reduced quasiparticle density of states
           !Eq. 11 of H.J. Choi et al. Physica C 385 (2003) 66–74
           quasi_dos = real((self%qp_ens + oneI*zero_plus)/ &
                sqrt((self%qp_ens + oneI*zero_plus)**2 - iso_quasi_Delta**2))
@@ -322,12 +334,31 @@ contains
           !Write quasiparticle Delta and reduced DOS as text data to file
           if(this_image() == 1) then
              call chdir(num%cwd)
+
              write (filename, '(f10.3)') T
              filename = 'iso_quasiparticle_Delta.T' // trim(adjustl(filename))
              write(numcols, "(I0)") 2
              open(1,file = trim(filename), status = 'replace')
              do i = 1, self%numqp
                 write(1, "("//trim(adjustl(numcols))//"E20.10)") iso_quasi_Delta(i)
+             end do
+             close(1)
+
+             write (filename, '(f10.3)') T
+             filename = 'iso_quasiparticle_Z.T' // trim(adjustl(filename))
+             write(numcols, "(I0)") 2
+             open(1,file = trim(filename), status = 'replace')
+             do i = 1, self%numqp
+                write(1, "("//trim(adjustl(numcols))//"E20.10)") iso_quasi_Z(i)
+             end do
+             close(1)
+
+             write (filename, '(f10.3)') T
+             filename = 'iso_quasiparticle_invtau.T' // trim(adjustl(filename))
+             write(numcols, "(I0)") 1
+             open(1,file = trim(filename), status = 'replace')
+             do i = 1, self%numqp
+                write(1, "("//trim(adjustl(numcols))//"E20.10)") iso_quasi_invtau(i)
              end do
              close(1)
 
@@ -502,9 +533,7 @@ contains
        end do
     end if
 
-    sync all
     call co_sum(Z)
-    sync all
 
     Z = 1.0_r64 + Z*pikBT
     sync all
@@ -604,9 +633,7 @@ contains
        end do
     end if
 
-    sync all
     call co_sum(Delta)
-    sync all
 
     Delta = pikBT*Delta/Z
     sync all
@@ -649,9 +676,7 @@ contains
     end if
 
     !Reduce Z
-    sync all
     call co_sum(Z)
-    sync all
 
     Z = 1.0_r64 + pikBT*Z
     sync all
@@ -700,9 +725,7 @@ contains
     end if
 
     !Reduce Delta
-    sync all
     call co_sum(Delta)
-    sync all
 
     Delta = Delta*pikBT/Z
     sync all
