@@ -33,8 +33,8 @@ contains
   subroutine initialize(self)
     class(resource), intent(out) :: self
 
-    integer :: igpus, im, iset
-    integer :: devicenum
+    !integer :: igpus, im, iset
+    integer :: devicenum, im
 #ifdef _OPENACC
     integer(acc_device_property):: property
 #endif
@@ -66,32 +66,49 @@ contains
     !self%num_gpus = acc_get_num_devices(acc_device_default)
     !
     !A way around?
-    self%num_gpus = size(hostname_set)
+    !self%num_gpus = size(hostname_set)
+    !Number of NVIDIA GPUs visible to this job/node.
+    self%num_gpus = acc_get_num_devices(acc_device_nvidia)
+    !Cannot have more GPU managers than coarray images.
+    self%num_gpus = min(self%num_gpus, num_images())
     !print*, 'Num devices: ', acc_get_num_devices(acc_device_default)
 #endif
     self%num_cpus = num_images() - self%num_gpus
 
     self%this_node = findloc(hostname_set, hostname(this_image()), 1)
-    self%gpu_manager = &
-         (this_image() == findloc(hostname, hostname_set(self%this_node), 1)) &
-         .and. self%num_gpus > 0
+    self%gpu_manager = this_image() <= self%num_gpus
+    !self%gpu_manager = &
+    !     (this_image() == findloc(hostname, hostname_set(self%this_node), 1)) &
+    !     .and. self%num_gpus > 0
 
 #ifdef _OPENACC
     if(self%gpu_manager) then
-       igpus = 0
+       !igpus = 0
+       !OpenACC GPU numbering starts at zero.
+       devicenum = this_image() - 1
+
+       !Bind this GPU-manager image to its GPU.
+       call acc_set_device_num(devicenum, acc_device_nvidia)
+
        property = acc_property_name
-       call acc_get_property_string(igpus, acc_get_device_type(), &
+       call acc_get_property_string(devicenum, acc_device_nvidia, &
             property, string)
+       !call acc_get_property_string(igpus, acc_get_device_type(), &
+       !     property, string)
        self%gpu_name = trim(string)
 
        property = acc_property_vendor
-       call acc_get_property_string(igpus, acc_get_device_type(), &
+       call acc_get_property_string(devicenum, acc_device_nvidia, &
             property, string)
+       !call acc_get_property_string(igpus, acc_get_device_type(), &
+       !     property, string)
        self%gpu_vendor = trim(string)
 
        property = acc_property_driver
-       call acc_get_property_string(igpus, acc_get_device_type(), &
+       call acc_get_property_string(devicenum, acc_device_nvidia, &
             property, string)
+       !call acc_get_property_string(igpus, acc_get_device_type(), &
+       !     property, string)
        self%gpu_driver = trim(string)
 
 !!$       do igpus = 0, self%num_gpus - 1 !Mind the 0 based indexing of openacc
