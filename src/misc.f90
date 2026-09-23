@@ -1066,8 +1066,8 @@ contains
     ! Captain's lamentation: This is when I miss not having templates
     ! in this language...
 
-    character(len=10), intent(in) :: A(:)
-    character(len=10), allocatable, intent(out) :: uniqueA(:)
+    character(len=*), intent(in) :: A(:)
+    character(len=*), allocatable, intent(out) :: uniqueA(:)
 
     !Locals
     logical :: is_unique(size(A))
@@ -1077,7 +1077,7 @@ contains
        is_unique(i) = .not. any(A(1 : i - 1) == A(i))
     end do
 
-    allocate(uniqueA(count(is_unique)))
+    allocate(character(len=len(A)) :: uniqueA(count(is_unique)))
     uniqueA = pack(A, mask = is_unique)
   end subroutine create_set_char
 
