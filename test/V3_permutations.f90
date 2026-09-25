@@ -514,10 +514,10 @@ contains
 !!$                     phases(:), ph%numtriplets, ph%numbands)
 !!$
 !!$                V2(s3, iq3_minus, s2, iq2, istate1) = aux
-             end do
-          end do
-       end do
-    end do
+             end do  !s2s3
+          end do     !s1
+       end do        !iq2
+    end do           !iq1_ibz
 
     print*, 'Number of matrix element computed = ', counter
   end subroutine calculate_3ph_interaction

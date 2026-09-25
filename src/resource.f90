@@ -143,9 +143,17 @@ contains
        !Approximate number of points per image
 !!$       load_per_gpu = gpu_load/self%num_gpus
 !!$       load_per_cpu = cpu_load/(num_active_images - self%num_gpus)
+       ! I will replace these two lines with the following
+       !load_per_gpu = ceiling(1.0*gpu_load/self%num_gpus)
+       !load_per_cpu = ceiling(1.0*cpu_load/(num_active_images - self%num_gpus))
 
-       load_per_gpu = ceiling(1.0*gpu_load/self%num_gpus)
-       load_per_cpu = ceiling(1.0*cpu_load/(num_active_images - self%num_gpus))
+       if(self%num_gpus > 0 .and. num_active_images > self%num_gpus) then
+          load_per_gpu = ceiling(1.0*gpu_load/self%num_gpus)
+          load_per_cpu = ceiling(1.0*cpu_load/(num_active_images - self%num_gpus))
+       else
+          load_per_gpu = ceiling(1.0*total_load/max(num_active_images, 1_i64))
+          load_per_cpu = load_per_gpu
+       end if
 
 !!$       print*, total_load, self%num_gpus, cpu_load, gpu_load, load_per_cpu, load_per_gpu, &
 !!$            modulo(cpu_load, num_active_images - self%num_gpus)
