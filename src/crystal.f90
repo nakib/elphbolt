@@ -66,8 +66,6 @@ module crystal_module
      !! Volume of primitive cell (nm^3).
      real(r64) :: reclattvecs(3,3)
      !! Reciprocal lattice vectors.
-     real(r64) :: volume_bz
-     !! Brillouin zone volume (nm^-3).
      real(r64) :: T
      !! Crystal temperature (K).
      logical :: VCA
@@ -289,8 +287,7 @@ contains
             cross_product(self%lattvecs(:, j), self%lattvecs(:, k))
     end do
     self%volume = abs(dot_product(self%lattvecs(:, 1),self%reclattvecs(:, 1)))
-    self%volume_bz = twopi/self%volume
-    self%reclattvecs(:,:) = self%volume_bz*self%reclattvecs(:,:)
+    self%reclattvecs(:,:) = twopi/self%volume*self%reclattvecs(:,:)
 
     !Calculate the number of atoms of each type
     num_atomtypes(:) = 0_i64
@@ -351,7 +348,6 @@ contains
        write(*,"(3(1E16.8,x))") self%reclattvecs(:,1)
        write(*,"(3(1E16.8,x))") self%reclattvecs(:,2)
        write(*,"(3(1E16.8,x))") self%reclattvecs(:,3)
-       write(*,"(A,(1E16.8,x),A)") 'Brillouin zone volume =', self%volume_bz, '1/nm^3'       
        if(self%twod) write(*,"(A)") 'System is 2d.'
 
        if(self%polar) then
