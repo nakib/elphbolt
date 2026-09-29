@@ -1,5 +1,5 @@
 module resource_module
-  !Module containing the data type for resource management.
+  !Module containing the data type for resource (cpu/gpu) management.
 
 #ifdef _OPENACC
   use openacc
@@ -15,7 +15,7 @@ module resource_module
      integer :: num_cpus
      !! Number of lonely cpus (not a gpu manager)
      integer :: num_gpus
-     !! Number of gpus
+     !! Total number of gpus across all nodes
      integer :: this_node
      !! ID of node where this image resides
      logical, allocatable :: gpu_manager[:]
@@ -33,23 +33,34 @@ contains
   subroutine initialize(self)
     class(resource), intent(out) :: self
 
-    integer :: igpus, im, iset
-    integer :: devicenum
+    !integer :: igpus, im, iset
+    integer :: devicenum, im, local_rank, local_num_images, &
+         local_num_gpus, node_gpu_contribution
 #ifdef _OPENACC
     integer(acc_device_property):: property
 #endif
 
     character*(100) :: string
-    character(len=10), allocatable :: hostname(:)[:]
-    character(len=10), allocatable :: hostname_set(:)
+    !character(len=10), allocatable :: hostname(:)[:]
+    character(len=16), allocatable :: local_hostname[:], hostname(:), &
+         hostname_set(:)
 
     allocate(self%gpu_manager[*])
 
-    allocate(hostname(num_images())[*])
-    call hostnm(hostname(this_image()))
+    allocate(local_hostname[*])
+
+    allocate(hostname(num_images()))
+    !allocate(hostname(num_images())[*])
+    !Get the hostname of this image.
+    call hostnm(local_hostname)
+    !call hostnm(hostname(this_image()))
+
+    sync all
+
+    !Collect the hostname of every image on image 1.
     if(this_image() == 1) then
        do im = 1, num_images()
-          hostname(im) = hostname(im)[im]
+          hostname(im) = local_hostname[im]
        end do
        !print*, 'hostname: ', hostname(:)
     end if
@@ -59,57 +70,121 @@ contains
 
     call create_set(hostname, hostname_set)
 
-    self%num_gpus = 0
+    self%this_node = findloc(hostname_set, hostname(this_image()), 1)
+
+    !Find the local rank of this image on its node.
+    local_rank = 0
+    local_num_images = 0
+
+    !Get number of images on the same node and the local image rank.
+    do im = 1, num_images()
+       if(hostname(im) == hostname(this_image())) then
+          local_num_images = local_num_images + 1
+
+          if(im <= this_image()) then
+             local_rank = local_rank + 1
+          end if
+       end if
+    end do
+
+    !Number of NVIDIA gpus visible to this node.
+    local_num_gpus = 0
 #ifdef _OPENACC
-    !Bug? The following returns 1 from all images, even if I throw multiple
-    !gpu-equipped nodes at the program. 
-    !self%num_gpus = acc_get_num_devices(acc_device_default)
-    !
-    !A way around?
-    self%num_gpus = size(hostname_set)
-    !print*, 'Num devices: ', acc_get_num_devices(acc_device_default)
+    local_num_gpus = acc_get_num_devices(acc_device_nvidia)
 #endif
+
+    !Cannot have more gpu managers than images on this node.
+    local_num_gpus = min(local_num_gpus, local_num_images)
+
+    !print*, 'image=', this_image(), ' node=', self%this_node, &
+    !     ' hostname=', trim(hostname(this_image())), ' local_rank=', local_rank, &
+    !     ' local_num_gpus=', local_num_gpus
+
+    !Only the first image on each node counts the gpus of the node.
+    node_gpu_contribution = 0
+
+    if(local_rank == 1) then
+       node_gpu_contribution = local_num_gpus
+    end if
+
+    !Get the total number of gpus across all nodes.
+    call co_sum(node_gpu_contribution)
+
+    self%num_gpus = node_gpu_contribution
     self%num_cpus = num_images() - self%num_gpus
 
-    self%this_node = findloc(hostname_set, hostname(this_image()), 1)
-    self%gpu_manager = &
-         (this_image() == findloc(hostname, hostname_set(self%this_node), 1)) &
-         .and. self%num_gpus > 0
+    !The first local_num_gpus images on each node are gpu managers.
+    self%gpu_manager = local_rank <= local_num_gpus
 
+    sync all
+    !    self%num_gpus = 0
+    !#ifdef _OPENACC
+    !    !Bug? The following returns 1 from all images, even if I throw multiple
+    !    !gpu-equipped nodes at the program. 
+    !    !self%num_gpus = acc_get_num_devices(acc_device_default)
+    !    !
+    !    !A way around?
+    !    !self%num_gpus = size(hostname_set)
+    !    !Number of NVIDIA GPUs visible to this job/node.
+    !    self%num_gpus = acc_get_num_devices(acc_device_nvidia)
+    !    !Cannot have more GPU managers than coarray images.
+    !    self%num_gpus = min(self%num_gpus, num_images())
+    !    !print*, 'Num devices: ', acc_get_num_devices(acc_device_default)
+    !#endif
+    !    self%num_cpus = num_images() - self%num_gpus
+    !
+    !    self%this_node = findloc(hostname_set, hostname(this_image()), 1)
+    !    self%gpu_manager = this_image() <= self%num_gpus
+    !    !self%gpu_manager = &
+    !    !     (this_image() == findloc(hostname, hostname_set(self%this_node), 1)) &
+    !    !     .and. self%num_gpus > 0
+    !
 #ifdef _OPENACC
     if(self%gpu_manager) then
-       igpus = 0
+       !igpus = 0
+       !OpenACC GPU numbering starts at zero on each node.
+       devicenum = local_rank - 1
+
+       !Bind this GPU-manager image to its local GPU.
+       call acc_set_device_num(devicenum, acc_device_nvidia)
+
        property = acc_property_name
-       call acc_get_property_string(igpus, acc_get_device_type(), &
+       call acc_get_property_string(devicenum, acc_device_nvidia, &
             property, string)
+       !call acc_get_property_string(igpus, acc_get_device_type(), &
+       !     property, string)
        self%gpu_name = trim(string)
 
        property = acc_property_vendor
-       call acc_get_property_string(igpus, acc_get_device_type(), &
+       call acc_get_property_string(devicenum, acc_device_nvidia, &
             property, string)
+       !call acc_get_property_string(igpus, acc_get_device_type(), &
+       !     property, string)
        self%gpu_vendor = trim(string)
 
        property = acc_property_driver
-       call acc_get_property_string(igpus, acc_get_device_type(), &
+       call acc_get_property_string(devicenum, acc_device_nvidia, &
             property, string)
+       !call acc_get_property_string(igpus, acc_get_device_type(), &
+       !     property, string)
        self%gpu_driver = trim(string)
 
-!!$       do igpus = 0, self%num_gpus - 1 !Mind the 0 based indexing of openacc
-!!$          property = acc_property_name
-!!$          call acc_get_property_string(igpus, acc_get_device_type(), &
-!!$               property, string)
-!!$          self%gpu_name = trim(string)
-!!$
-!!$          property = acc_property_vendor
-!!$          call acc_get_property_string(igpus, acc_get_device_type(), &
-!!$               property, string)
-!!$          self%gpu_vendor = trim(string)
-!!$
-!!$          property = acc_property_driver
-!!$          call acc_get_property_string(igpus, acc_get_device_type(), &
-!!$               property, string)
-!!$          self%gpu_driver = trim(string)
-!!$       end do
+!!!$       do igpus = 0, self%num_gpus - 1 !Mind the 0 based indexing of openacc
+!!!$          property = acc_property_name
+!!!$          call acc_get_property_string(igpus, acc_get_device_type(), &
+!!!$               property, string)
+!!!$          self%gpu_name = trim(string)
+!!!$
+!!!$          property = acc_property_vendor
+!!!$          call acc_get_property_string(igpus, acc_get_device_type(), &
+!!!$               property, string)
+!!!$          self%gpu_vendor = trim(string)
+!!!$
+!!!$          property = acc_property_driver
+!!!$          call acc_get_property_string(igpus, acc_get_device_type(), &
+!!!$               property, string)
+!!!$          self%gpu_driver = trim(string)
+!!!$       end do
     end if
 #endif
   end subroutine initialize
@@ -124,7 +199,6 @@ contains
 
     !Locals
     integer(i64) :: im, offset
-
     integer(i64) :: gpu_load, cpu_load, load_per_cpu, load_per_gpu, remainder
     integer(i64), allocatable :: activate[:]
 
