@@ -26,10 +26,6 @@ module interactions
        create_set, coarse_grain, timer, eye, shrink, Hilbert_transform, interpolator_1d, &
        linspace, permutations, lex_less_1d, permutations, sort
 
-#ifdef _OPENACC
-  use openacc, only: acc_set_device_num, acc_get_device_num, acc_get_num_devices, acc_device_nvidia
-#endif
-
   use resource_module, only: resource
   use screening_module, only: spectral_head_polarizability_3d_q
   use task_manager_module, only : task_manager
@@ -758,9 +754,9 @@ contains
     type(resource) :: compute_resource
     type(task_manager) :: job
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
-    !real(r64) :: t_cpu_istate1_start, t_cpu_istate1_end
-    !Timing 5 states spread
-    !integer(i64) :: sample_istate1(5), isample
+    real(r64) :: t_cpu_istate1_start, t_cpu_istate1_end
+    !Timing 10 states spread
+    integer(i64) :: sample_istate1(10), isample
 
     if(key /= 'V' .and. key /= 'W') then
        call exit_with_message("Invalid value of key in call to calculate_3ph_interaction. Exiting.")
@@ -841,17 +837,15 @@ contains
 
           !Only work with the active images
           if(this_image() <= num_active_images) then  
-             !do isample = 1, 5
-             !   sample_istate1(isample) = index_start + &
-             !        (isample - 1)*(index_end - index_start)/max(4_i64, 1_i64)
-             !end do
+             do isample = 1, 10
+                sample_istate1(isample) = index_start + &
+                     (isample - 1)*(index_end - index_start)/max(9_i64, 1_i64)
+             end do
 
-             !do istate1 = index_start, index_end
-             !if(this_image() == 1 .and. any(istate1 == sample_istate1)) &
-             !     call cpu_time(t_cpu_istate1_start)          
              !Run over first phonon IBZ states
              do istate1 = index_start, index_end
-                !   if(istate1 == index_start) call cpu_time(t_cpu_istate1_start)
+                if(this_image() == 1 .and. any(istate1 == sample_istate1))  &
+                     call cpu_time(t_cpu_istate1_start)
 
                 !Demux state index into branch (s) and wave vector (iq) indices
                 call demux_state(istate1, ph%numbands, s1, iq1_ibz)
@@ -961,11 +955,11 @@ contains
 
                 !Change back to run directory
                 call chdir(trim(adjustl(num%cwd)))
-                !if(this_image() == 1 .and. any(istate1 == sample_istate1)) then
-                !   call cpu_time(t_cpu_istate1_end)
-                !   !write(*, *) 'cpu timing: istate1 = ', istate1, &
-                !   !     'time = ', t_cpu_istate1_end - t_cpu_istate1_start, ' s'
-                !end if
+                if(this_image() == 1 .and. any(istate1 == sample_istate1)) then
+                   call cpu_time(t_cpu_istate1_end)
+                   !write(*, '(A, I0, A, F12.6, A)') 'cpu timing: istate1 = ', istate1, &
+                   !     'time = ', t_cpu_istate1_end - t_cpu_istate1_start, ' s'
+                end if
                 !if(istate1 == index_start) then
                 !   call cpu_time(t_cpu_istate1_end)
                 !   if(this_image() == 1) then
@@ -1337,7 +1331,6 @@ contains
     real(r64), allocatable :: q2_cart_all(:, :), q3_cart_all(:, :)
     integer(i64), allocatable :: iq3_minus_all(:), neg_iq2_all(:)
     integer(i64), allocatable :: chunk[:], index_start[:], index_end[:]
-    integer :: num_gpus_avail, my_gpu
     character(len = 1024) :: filename, batch_filename
     logical, allocatable :: minus_mask(:), plus_mask(:)
     logical :: use_tetra
@@ -1370,9 +1363,13 @@ contains
          time_update_host = 0.0_r64, time_cpu_loop = 0.0_r64
 
     !For timing istate1 to split the work between cpu and gpu
-    !real(r64) :: t_gpu_istate1_start, t_gpu_istate1_end
-    !Timing 5 states spread
-    !integer(i64) :: sample_istate1(5), isample
+    real(r64) :: t_gpu_istate1_start, t_gpu_istate1_end
+    !Timing 10 states spread
+    integer(i64) :: sample_istate1(10), isample
+    !Split CPU/GPU work.
+    real(r64) :: gpu_split
+    real(r64) :: gpu_percentage
+    real(r64), parameter :: gpu_speedup_ref = 7.9_r64, gpu_min_split = 0.70_r64
 
     !For debugging
     integer(i64) :: sum_list_count
@@ -1394,34 +1391,34 @@ contains
 
     allocate(chunk[*], index_start[*], index_end[*])
 
-#ifdef _OPENACC
-    !Find out how many gpus are actually available on this machine.
-    !On a single gpu workstation this will simply be 1.
-    !acc_get_num_devices serve to know how many GPUs to spread across.
-    num_gpus_avail = acc_get_num_devices(acc_device_nvidia)
-
-    if(num_gpus_avail < 1) then
-       call exit_with_message("No NVIDIA gpu devices found. Exiting.")
-    end if
-
-    !Assign this image to one of the available gpus. Images picks a gpu in order, wrapping 
-    !back to gpu 0 once every gpu has been assigned once.
-    !With only one gpu available (num_gpus_avail = 1), every image computes gpu 0 here.
-    my_gpu = modulo(this_image() - 1, num_gpus_avail)
-    !actually bind to that GPU.
-    call acc_set_device_num(my_gpu, acc_device_nvidia)
-    !!acc_get_device_num which GPU are you actually on now? -> confirms it worked.
-    !write(*, '(A, I0, A, I0, A, I0, A, I0)') 'Coarray image ', this_image(), &
-    !     'uses GPU', acc_get_device_num(acc_device_nvidia), &
-    !     'of', num_gpus_avail, 'available'
-#endif
-
     if(key == 'V') then
        call print_message("Calculating 3-ph vertices for all IBZ phonons on the gpu...")
 
        call compute_resource%initialize
 
+       !Estimate the GPU share from the calibrated GPU/CPU speedup.
+       if(compute_resource%num_gpus > 0 .and. compute_resource%num_cpus > 0) then
+          gpu_split = real(compute_resource%num_gpus, r64)*gpu_speedup_ref / &
+               (real(compute_resource%num_gpus, r64)*gpu_speedup_ref + &
+               real(compute_resource%num_cpus, r64))
+          gpu_split = max(gpu_split, gpu_min_split)
+       else
+          gpu_split = 1.0_r64
+       end if
+
+       gpu_percentage = 100.0_r64*gpu_split 
+
+       if(this_image() == 1) then
+          write(*,'(A,F6.2,A)') ' GPU workload = ', gpu_percentage, ' %'
+          write(*,'(A,F6.2,A)') ' CPU workload = ', &
+               100.0_r64 - gpu_percentage, ' %'
+       end if
+
        call compute_resource%report
+
+       !Report image GPU assignment and detected GPU count.
+       !write(*,'(A, I0, A, L1, A, I0)') 'image ', this_image(), 'gpu_manager=', compute_resource%gpu_manager, &
+       !     'num_gpus=', compute_resource%num_gpus
 
        !Associate delta function procedure pointer
        delta_fn_ptr => get_delta_fn_pointer(num%tetrahedra)
@@ -1490,7 +1487,9 @@ contains
 
             !Distribute this batch uniformly among all coarray images.
             !All images execute their assigned work on GPU 0.
-            call distribute_points(batch_range(3), chunk, index_start, index_end, num_active_images)
+            !call distribute_points(batch_range(3), chunk, index_start, index_end, num_active_images)
+            call compute_resource%balance_load(gpu_split, batch_range(3), &
+                 chunk, index_start, index_end, num_active_images)
             index_start = index_start + batch_range(1) - 1
             index_end = index_end + batch_range(1) - 1 
             !call compute_resource%balance_load(0.0_r64, batch_range(3), &
@@ -1511,17 +1510,15 @@ contains
 
             !Only work with the active images
             if(this_image() <= num_active_images) then
-               !do isample = 1, 5
-               !   sample_istate1(isample) = index_start + &
-               !        (isample - 1)*(index_end - index_start)/max(4_i64, 1_i64)
-               !end do
+               do isample = 1, 10
+                  sample_istate1(isample) = index_start + &
+                       (isample - 1)*(index_end - index_start)/max(9_i64, 1_i64)
+               end do
 
-               !do istate1 = index_start, index_end
-               !   if(this_image() == 1 .and. any(istate1 == sample_istate1)) &
-               !        call cpu_time(t_gpu_istate1_start)
                !Run over first phonon IBZ states
                do istate1 = index_start, index_end
-                  !   if(istate1 == index_start) call cpu_time(t_gpu_istate1_start)
+                  if(this_image() == 1 .and. any(istate1 == sample_istate1)) &
+                       call cpu_time(t_gpu_istate1_start)
 
                   !Demux state index into branch (s) and wave vector (iq) indices
                   call demux_state(istate1, ph%numbands, s1, iq1_ibz)
@@ -1608,8 +1605,9 @@ contains
                      end do !s2s3
                   end do !iq2
 
+                  ! List count check
                   !if(this_image() == 1 .and. any(istate1 == sample_istate1)) then
-                  !   write(*, *) 'list_count check: istate1 = ', istate1, &
+                  !   write(*, '(A, I0, A, I0, A, I0)') 'list_count check: istate1 = ', istate1, &
                   !        'list_count = ', list_count, '  / max possible = ', max_valid
                   !end if
 
@@ -1649,6 +1647,7 @@ contains
 
                      !One gpu thread per surviving process: no time is spent on
                      !energetically forbidden (q2, s2, s3) triples at all.
+                     !Here each gpu thread takes one idx, which means one surviving process.
                      !$acc parallel loop gang vector &
                      !$acc&   present(ifc3, Index_i, Index_j, Index_k, &
                      !$acc&           R_j, R_k, evecs, q2_cart_all, q3_cart_all, &
@@ -1665,6 +1664,8 @@ contains
                   end if
 
                   !Reuse each compact gpu result for both minus and plus processes when applicable.
+                  !idx is the position in the compact list of allowed processes for the current istate1,
+                  !it tells which surviving (q2, s2, s3) we are looking at.
                   do idx = 1, list_count
                      iq2 = valid_iq2(idx)
                      s2 = valid_s2(idx)
@@ -1723,11 +1724,12 @@ contains
 
                   !Change back to run directory
                   call chdir(trim(adjustl(num%cwd)))
-                  !if(this_image() == 1 .and. any(istate1 == sample_istate1)) then
-                  !   call cpu_time(t_gpu_istate1_end)
-                  !   write(*, *) 'gpu timing: istate1 = ', istate1, &
-                  !        'time = ', t_gpu_istate1_end - t_gpu_istate1_start, ' s'
-                  !end if
+                  if(this_image() == 1 .and. any(istate1 == sample_istate1)) then
+                     call cpu_time(t_gpu_istate1_end)
+                     !write(*, *) 'gpu timing: istate1 = ', istate1, &
+                     !     'time = ', t_gpu_istate1_end - t_gpu_istate1_start, ' s'
+                  end if
+
                   !if(istate1 == index_start) then
                   !   call cpu_time(t_gpu_istate1_end)
                   !   if(this_image() == 1) then
@@ -1915,6 +1917,8 @@ contains
                    !$acc&           valid_has_minus, valid_has_plus, &
                    !$acc&           delta_minus_valid, delta_plus_valid, &
                    !$acc&           bose2_valid, bose3_valid)
+                   !Each thread takes one idx. It computes the two Bose factors and the two delta functions 
+                   !and stores them at position idx.
                    do idx = 1, list_count
                       iq2 = valid_iq2(idx)
                       s2 = valid_s2(idx)
@@ -1928,6 +1932,7 @@ contains
                       if(valid_has_minus(idx)) then
                          if(use_tetra) then
                             !Evaluate delta functions
+                            !idx counts over all surviving of the list of energy allowed.
                             delta_minus_valid(idx) = delta_fn_tetra( &
                                  en1 - ens_local(iq3_minus, s3), iq2, s2, wvmesh_local, &
                                  simplex_map_local, simplex_count_local, simplex_evals_local) !minus process
