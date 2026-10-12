@@ -395,11 +395,11 @@ contains
             trans%el_kappa0, trans%el_sigmaS)
 
        !Enforce Kelvin-Onsager relation
-        if(.not. num%Bfield_on) then 
-           call KO_correction(el, crys, num, sym,  self, trans, KO_dev, KO_corr)
-        else
-           call KO_correction(el, crys, num, sym,  self, trans, KO_dev, KO_corr, trans_opp_B, self_opp_B)
-        end if
+       if(.not. num%Bfield_on) then 
+          call KO_correction(el, crys, num, sym,  self, trans, KO_dev, KO_corr)
+       else
+          call KO_correction(el, crys, num, sym,  self, trans, KO_dev, KO_corr, trans_opp_B, self_opp_B)
+       end if
 
        !Calculate and print electron transport scalars
        el_kappa0_scalar = trace(sum(trans%el_kappa0, dim = 1))/crys%dim
@@ -817,12 +817,12 @@ contains
                trans%el_kappa0, trans%el_sigmaS)
 
           !Enforce Kelvin-Onsager relation:
-           if(.not. num%Bfield_on) then 
-              call KO_correction(el, crys, num, sym,  self, trans, KO_dev, KO_corr, ph = ph)
-           else
-              call KO_correction(el, crys, num, sym,  self, trans, KO_dev, KO_corr, trans_opp_B, self_opp_B, ph, &
-                   ph_drag_terms_opp_B)
-           end if
+          if(.not. num%Bfield_on) then 
+             call KO_correction(el, crys, num, sym,  self, trans, KO_dev, KO_corr, ph = ph)
+          else
+             call KO_correction(el, crys, num, sym,  self, trans, KO_dev, KO_corr, trans_opp_B, self_opp_B, ph, &
+                  ph_drag_terms_opp_B)
+          end if
 
           !Calculate electron transport scalars
           el_kappa0_scalar = trace(sum(trans%el_kappa0, dim = 1))/crys%dim
@@ -1630,7 +1630,7 @@ contains
              ik_sym = el%ibz2fbz_map(ieq, ik_ibz, 1) !symmetry
              ik_fbz = ik1_image_array(ieq)
 
-          !    !Sum over scattering processes
+             !    !Sum over scattering processes
              do iproc = 1, nprocs
                 !Grab the final electron and, if needed, the interacting phonon
                 call demux_state(istate_el(iproc), numbands, n, ikp)
@@ -1660,11 +1660,11 @@ contains
              end if
 
              !B-field term
-              if(num%Bfield_on) then
-                 response_el_reduce(ik_fbz, m, :) = response_el_reduce(ik_fbz, m, :) + &
-                      Bfield_unit_factor*matmul( &
-                      Delk_response(ik_fbz, m, :, :), cross_product(el%vels(ik_fbz, m, :), num%Bfield))
-              end if
+             if(num%Bfield_on) then
+                response_el_reduce(ik_fbz, m, :) = response_el_reduce(ik_fbz, m, :) + &
+                     Bfield_unit_factor*matmul( &
+                     Delk_response(ik_fbz, m, :, :), cross_product(el%vels(ik_fbz, m, :), num%Bfield))
+             end if
 
              !Iterate BTE
              response_el_reduce(ik_fbz, m, :) = field_term(ik_fbz, m, :) + &

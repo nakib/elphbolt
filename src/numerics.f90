@@ -164,9 +164,9 @@ module numerics_module
      !! Whether to apply the Kelvin-Onsager correction to the transport coefficients and response functions.
      logical :: symmetrize_transition_rates
      !! Whether to symmetrize transition rates to enforce symmetries of the crystal.
-      logical :: read_Y
-      !! Choose if earlier e-ph (IBZ k) transition probabilities are to be used.
-      logical :: read_X
+     logical :: read_Y
+     !! Choose if earlier e-ph (IBZ k) transition probabilities are to be used.
+     logical :: read_X
      !! Choose if earlier ph-e (IBZ q) transition probabilities are to be used.
    contains
 

@@ -198,22 +198,22 @@ contains
     ! Initialize solver with correct parameters
     call solver%initialize(n = n, m = m, meq = meq, max_iter = maxit, acc = feastol, f = fun, &
          g = dummy_grad, gradient_mode = 3, xl = bl, xu = bu, status_ok = status_ok, gradient_delta = 1.0e-4_r64,iprint = 0)
-         ! gradient_delta = 1.0e-4_r64, toldx = 1.0e-6_r64, iprint = 0)
-   
+    ! gradient_delta = 1.0e-4_r64, toldx = 1.0e-6_r64, iprint = 0)
+
     if(.not. status_ok) then
        exit_code = -1
        return 
     end if
 
     if(num%apply_KO_correction) then 
-      ! Solve the optimization problem
-      call solver%optimize(result_x, exit_code)
+       ! Solve the optimization problem
+       call solver%optimize(result_x, exit_code)
 
-      if(exit_code /= 0) then
-         if(this_image() == 1) print *, "Warning: KO correction did not converge, skipping correction."
-         result_x = reshape([(reshape(eye(3_i64) * 1.0_r64, [9]), i=1, n/9)], [n])
-      end if
-    end if  
+       if(exit_code /= 0) then
+          if(this_image() == 1) print *, "Warning: KO correction did not converge, skipping correction."
+          result_x = reshape([(reshape(eye(3_i64) * 1.0_r64, [9]), i=1, n/9)], [n])
+       end if
+    end if
 
     !Calculate deviation of the correction matrices from identity, corr = 100*maxval|M_T - I|
     corr = 100.0*maxval(abs(result_x - reshape([(reshape(eye(3_i64) * 1.0_r64, [9]), i=1, n/9)], [n])))
