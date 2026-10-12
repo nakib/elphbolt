@@ -599,8 +599,8 @@ contains
           !Note that fortran does not short-circuit logical expression chains
           if(present(Bfield)) then
              if(any(Bfield /= 0.0_r64)) then
-                call symmetrize_3x3_tensor_noTR(trans_coeff_hc(ib, :, :), sym%crotations, Bfield)
-                if(A_cc /= 0.0_r64) call symmetrize_3x3_tensor_noTR(trans_coeff_cc(ib, :, :), sym%crotations, Bfield)
+                call symmetrize_3x3_tensor_noTR(trans_coeff_hc(ib, :, :), sym%crotations_orig, Bfield)
+                if(A_cc /= 0.0_r64) call symmetrize_3x3_tensor_noTR(trans_coeff_cc(ib, :, :), sym%crotations_orig, Bfield)
              end if
           else
              call symmetrize_3x3_tensor(trans_coeff_hc(ib, :, :), sym%crotations)

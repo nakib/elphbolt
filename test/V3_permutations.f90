@@ -63,7 +63,7 @@ program V3_permutations
   call num%initialize(crys)
 
   !Calculate crystal and BZ symmetries
-  call sym%calculate_symmetries(crys, num%qmesh)
+  call sym%calculate_symmetries(crys, num%qmesh, num%use_TR)
 
   !Calculate phonons
   call ph%initialize(crys, sym, num)

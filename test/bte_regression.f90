@@ -51,7 +51,7 @@ program bte_regression
   call num%initialize(crys)
 
   !Calculate crystal and BZ symmetries
-  call sym%calculate_symmetries(crys, num%qmesh)
+  call sym%calculate_symmetries(crys, num%qmesh, num%use_TR)
 
   !Test symmetries
   if(this_image() == 1) then

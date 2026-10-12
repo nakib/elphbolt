@@ -38,20 +38,25 @@ module symmetry_module
      integer(i64) :: nsymm
      !! Number of spacegroup symmetries.
      integer(i64) :: nsymm_rot
-     !! Number of rotations.
+     !! Number of rotations (including time-reversed ones if use_TR is true).
+     logical :: use_TR = .true.
+     !! Is time-reversal symmetry included in the rotations list?
      integer(i64), allocatable :: rotations_orig(:,:,:)
      !! Rotations without time-reversal, real space, crystal coordinates.
      real(r64), allocatable :: crotations_orig(:,:,:)
      !! Rotations without time-reversal, real space, Cartesian coordinates.
      real(r64), allocatable :: qrotations_orig(:,:,:)
      !! Rotations without time-reversal, reciprocal space, crystal coordinates.
-     !And with time-reversal (time reversed sector is the 2nd half of last axis):
+     !And with time-reversal, if use_TR is true (time reversed sector is the 2nd half of last axis).
+     !If use_TR is false, the following are identical to the above "_orig" arrays:
      integer(i64), allocatable :: rotations(:,:,:) 
      !! Rotations with time-reversal, real space, crystal coordinates.
      real(r64), allocatable :: crotations(:,:,:)
      !! Rotations with time-reversal, real space, Cartesian coordinates.
      real(r64), allocatable :: qrotations(:,:,:)
      !! Rotations with time-reversal, reciprocal space, crystal coordinates.
+     logical, allocatable :: is_TR(:)
+     !! Is the rotation (in the above list) a time-reversed one?
      character(len=10) :: international
      !! Spacegroup in Hermann–Mauguin (or international) notation.
 
@@ -63,7 +68,7 @@ module symmetry_module
 
 contains
 
-  subroutine calculate_symmetries(self, crys, mesh)
+  subroutine calculate_symmetries(self, crys, mesh, use_TR)
     !! Subroutine to generate the symmetry related data for a given crystal.
     !!
     !! This subroutine closely follows parts of config.f90 of the ShengBTE code.
@@ -71,12 +76,14 @@ contains
     class(symmetry), intent(out) :: self
     type(crystal), intent(in) :: crys
     integer(i64), intent(in) :: mesh(3)
+    logical, intent(in), optional :: use_TR
+    !! Include time-reversal symmetry? Default is true.
 
     !Internal variables:
     integer(i64) :: i, ii, jj, kk, ll, info, nq, nlen
     integer(i64) :: P(3)
     integer(i64), allocatable :: rtmp(:,:,:), local_equiv_map(:,:)
-    logical, allocatable :: valid(:)
+    logical, allocatable :: valid(:), is_TR_tmp(:)
     real(r64), allocatable :: crtmp(:,:,:), qrtmp(:,:,:)
     real(r64), allocatable :: translations(:,:), ctranslations(:,:)
     real(r64) :: tmp1(3, 3), tmp2(3, 3), tmp3(3, 3)
@@ -88,6 +95,9 @@ contains
     external :: dgesv
 
     call subtitle("Analyzing symmetry...")
+
+    self%use_TR = .true.
+    if(present(use_TR)) self%use_TR = use_TR
 
     !Number of points in wave vector mesh
     nq = product(mesh)
@@ -101,8 +111,12 @@ contains
     ! Number of symmetry operations
     self%nsymm = symdataset%n_operations
 
-    ! Double the above to take time reversal symetry (TRS) into account.
-    self%nsymm_rot = 2*self%nsymm
+    ! Double the above to take time reversal symetry (TRS) into account, if requested.
+    if(self%use_TR) then
+       self%nsymm_rot = 2*self%nsymm
+    else
+       self%nsymm_rot = self%nsymm
+    end if
 
     ! Allocate internal symmetry related data
     allocate(self%rotations(3,3,self%nsymm_rot),self%crotations(3,3,self%nsymm_rot),&
@@ -115,7 +129,7 @@ contains
        self%rotations_orig(:, :, i) = transpose(symdataset%rotations(:, :, i))
     end do
 
-    ! Set Just the front half
+    ! Set just the front half
     self%rotations(:, :, 1:self%nsymm) = self%rotations_orig
 
     ! Set the translations
@@ -129,6 +143,7 @@ contains
        write(*, "(A, A)") "Crystal symmetry group = ", self%international
        write(*, "(A, I3)") "Spacegroup number = ", symdataset%spacegroup_number
        write(*, "(A, I5)") "Number of crystal symmetries (without time-reversal) = ", self%nsymm
+       write(*, "(A, L2)") "Time-reversal symmetry included = ", self%use_TR
     end if
 
     !Set symmetry operations in Cartesian basis.
@@ -154,9 +169,16 @@ contains
     self%qrotations(:,:,1:self%nsymm) = self%qrotations_orig
 
     !Fill the second half of the rotation matrix list using TRS.
-    self%rotations(:,:,self%nsymm+1:2*self%nsymm) = -self%rotations_orig(:,:,1:self%nsymm)
-    self%qrotations(:,:,self%nsymm+1:2*self%nsymm) = -self%qrotations_orig(:,:,1:self%nsymm)
-    self%crotations(:,:,self%nsymm+1:2*self%nsymm) = -self%crotations_orig(:,:,1:self%nsymm)
+    if(self%use_TR) then
+       self%rotations(:,:,self%nsymm+1:2*self%nsymm) = -self%rotations_orig(:,:,1:self%nsymm)
+       self%qrotations(:,:,self%nsymm+1:2*self%nsymm) = -self%qrotations_orig(:,:,1:self%nsymm)
+       self%crotations(:,:,self%nsymm+1:2*self%nsymm) = -self%crotations_orig(:,:,1:self%nsymm)
+    end if
+
+    !Flag the time-reversed rotations.
+    allocate(self%is_TR(self%nsymm_rot))
+    self%is_TR = .false.
+    if(self%use_TR) self%is_TR(self%nsymm + 1:2*self%nsymm) = .true.
 
     !Find rotations that are either duplicated or incompatible with mesh.
     allocate(local_equiv_map(self%nsymm_rot,nq))
@@ -185,7 +207,7 @@ contains
           end if
        end do
     end do
-    if(this_image() == 1 .and. ll == 0) then
+    if(this_image() == 1 .and. ll /= 0) then
        write(*, "(A, I5)") "Number of duplicated rotations to be discarded = ", ll
     end if
 
@@ -195,6 +217,7 @@ contains
        allocate(rtmp(3,3,self%nsymm_rot - ll - jj))
        allocate(crtmp(3,3,self%nsymm_rot - ll - jj))
        allocate(qrtmp(3,3,self%nsymm_rot - ll - jj))
+       allocate(is_TR_tmp(self%nsymm_rot - ll - jj))
        kk = 0
        do ii = 1,self%nsymm_rot
           if(valid(ii)) then
@@ -202,12 +225,14 @@ contains
              rtmp(:,:,kk) = self%rotations(:,:,ii)
              crtmp(:,:,kk) = self%crotations(:,:,ii)
              qrtmp(:,:,kk) = self%qrotations(:,:,ii)
+             is_TR_tmp(kk) = self%is_TR(ii)
           end if
        end do
        self%nsymm_rot = self%nsymm_rot - ll - jj
        call move_alloc(rtmp,self%rotations)
        call move_alloc(crtmp,self%crotations)
        call move_alloc(qrtmp,self%qrotations)
+       call move_alloc(is_TR_tmp,self%is_TR)
     end if
   end subroutine calculate_symmetries
 
@@ -515,6 +540,8 @@ contains
   subroutine symmetrize_3x3_tensor_noTR(tensor, crotations, Bfield)
     !! Symmetrize a 3x3 tensor in the presence of a B-field.
     !! Note: Only for B-field of the form [0 0 Bz]
+    !! The crotations passed in must not contain time-reversed operations,
+    !! e.g. crotations_orig of the symmetry object.
 
     real(r64), intent(inout) :: tensor(3, 3)
     real(r64), intent(in) :: crotations(:, :, :)
@@ -522,7 +549,7 @@ contains
     integer :: irot, nrots, i
     real(r64) :: aux(3,3)
 
-    nrots = size(crotations(1, 1, :))/2
+    nrots = size(crotations(1, 1, :))
 
     aux = 0.0_r64
     do irot = 1, nrots

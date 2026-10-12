@@ -53,7 +53,7 @@ program elphbolt_with_coherence
   call num%initialize(crys)
 
   !Calculate crystal and BZ symmetries
-  call sym%calculate_symmetries(crys, num%qmesh)
+  call sym%calculate_symmetries(crys, num%qmesh, num%use_TR)
 
   sync all
   call t_event%end_timer('Initialization')

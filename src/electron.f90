@@ -28,6 +28,8 @@ module electron_module
   use delta, only: form_tetrahedra_3d, fill_tetrahedra_3d, &
        form_triangles, fill_triangles
 
+  use model_hamiltonian_module, only: AFM_Dirac
+
   implicit none
 
   private
@@ -318,6 +320,291 @@ contains
     end if
   end subroutine read_input_and_setup
 
+  subroutine calculate_electrons_model(self, model, crys, sym, num)
+    !! Calculate electron energy window restricted wave vector meshes
+    !! and the electronic properties on them
+
+    class(electron), intent(inout) :: self
+    type(AFM_Dirac), intent(in) :: model
+    type(crystal), intent(in) :: crys
+    type(symmetry), intent(in) :: sym
+    type(numerics), intent(in) :: num
+
+    !Some utitlity variables
+    integer(i64) :: i, l, s, il, ii, jj, kk, ib, count, istate, aux, numbands
+    real(r64), allocatable :: el_ens_tmp(:, :), el_vels_tmp(:, :, :)
+
+    !Switch for mesh utilites with or without energy restriction
+    logical :: blocks
+
+    !I/O related
+    character(len = 1024) :: filename, numcols
+
+    call print_message("Energy unrestricted calculation:")
+    call print_message("--------------------------------")
+
+    !Set initial FBZ total number of wave vectors
+    self%nwv = product(self%wvmesh)
+
+    !The electronic mesh setup proceeds in multiple steps:
+    ! 1. Calculate full electron wave vector mesh
+    call print_message("Calculating FBZ...")
+    blocks = .false.
+    call calculate_wavevectors_full(self%wvmesh, self%wavevecs, blocks)
+
+    ! 2. Calculate the IBZ
+    call print_message("Calculating IBZ and IBZ -> FBZ mappings...")
+    call find_irred_wedge(self%wvmesh, self%nwv_irred, self%wavevecs_irred, &
+         self%indexlist_irred, self%nequiv, sym%nsymm_rot, sym%qrotations, &
+         self%ibz2fbz_map, self%equiv_map, blocks)
+
+    ! 3. Calculate IBZ quantities
+    call print_message("Calculating IBZ energies...")
+    !call wann%el_wann(crys, self%nwv_irred, self%wavevecs_irred, self%ens_irred, &
+    !     self%vels_irred, self%evecs_irred,self%scissor)
+    call model%get_electrons(self%wavevecs_irred, crys%reclattvecs, &
+         self%ens_irred, self%evecs_irred, self%vels_irred, .true.)
+
+    !Note that the number of bands is private to the AFM model.
+    numbands = size(self%ens_irred, 1)
+    
+    ! 4. Map out FBZ quantities from IBZ ones
+    call print_message("Mapping out FBZ energies...")
+    allocate(self%indexlist(self%nwv), self%ens(self%nwv, numbands), &
+         self%vels(self%nwv, numbands, 3))
+
+    do i = 1, self%nwv_irred !an irreducible point
+       do l = 1, self%nequiv(i) !number of equivalent points of i
+          il = self%ibz2fbz_map(l, i, 2) ! (i, l) -> il
+          s = self%ibz2fbz_map(l, i, 1) ! mapping rotation
+
+          !index list
+          self%indexlist(il) = il
+
+          !energy
+          self%ens(il,:) = self%ens_irred(i,:)
+
+          !velocity
+          do ib = 1, numbands
+             !here use real space (Cartesian) rotations
+             self%vels(il, ib, :) = matmul(sym%crotations(:, :, s), self%vels_irred(i, ib, :))
+          end do
+       end do
+    end do
+
+    if(.not. self%metallic) then
+       if(num%runlevel == 0) then !Calculate chemical potentials for
+          !the given temperatures and concentrations
+          if(crys%twod) then
+             call calculate_chempot(self, crys%volume, self%dopingtype, self%Tlist, self%conclist, &
+                  crys%thickness)
+          else
+             call calculate_chempot(self, crys%volume, self%dopingtype, self%Tlist, self%conclist)
+          end if
+          call exit_with_message("Chemical potentials calculated. Runlevel 0 finished. Exiting.")
+       else !Calculate carrier concentration for non-metals
+          call print_message("Calculating carrier concentrations...")
+          if(crys%twod) then
+             call calculate_carrier_conc(self, crys%T, crys%volume, crys%thickness)
+          else
+             call calculate_carrier_conc(self, crys%T, crys%volume)
+          end if
+       end if
+    end if
+
+    call print_message("Transport energy window restricted calculation:")
+    call print_message("-----------------------------------------------")
+
+    ! 5. Find energy window restricted FBZ blocks.
+    !    After this step, self%nwv, self%indexlist will refer
+    !    to the energy restricted mesh.
+    call print_message("Calculating Fermi window restricted FBZ blocks...")
+    call apply_energy_window(self%nwv, self%indexlist, self%ens, self%enref, self%fsthick)
+
+    ! 6. Sort index list and related quanties of FBZ blocks
+    call print_message("Sorting FBZ blocks index list...")
+    call sort(self%indexlist)
+
+    ! 7. Get FBZ blocks wave vectors, energies, velocities and eigenvectors.
+    !    After this step, self%wavevecs, self%ens, self%vels, and self%evecs
+    !    will refer to the energy restricted mesh.
+    call print_message("Calcutating FBZ blocks quantities...")
+
+    !wave vectors
+    deallocate(self%wavevecs)
+
+    blocks = .true.
+    call calculate_wavevectors_full(self%wvmesh, self%wavevecs, blocks, self%indexlist) !wave vectors
+
+    !Print electron FBZ mesh
+    call write2file_rank2_real("el.wavevecs_fbz", self%wavevecs)
+
+    !energies and velocities
+    call fbz_blocks_quantities(self%indexlist, self%ens, self%vels)
+
+    !Get FBZ blocks eigenvectors from direct calculations since we are
+    !not getting these from IBZ quantities via symmetry rotations
+    allocate(self%evecs(self%nwv, numbands, numbands))
+    allocate(el_ens_tmp(self%nwv, numbands), el_vels_tmp(self%nwv, numbands, 3))
+    !call wann%el_wann(crys, self%nwv, self%wavevecs, el_ens_tmp, el_vels_tmp, &
+    !     self%evecs,self%scissor)
+    call model%get_electrons(self%wavevecs, crys%reclattvecs, &
+         el_ens_tmp, self%evecs, el_vels_tmp, .true.)
+    deallocate(el_ens_tmp, el_vels_tmp) !free up memory
+
+    ! 8. Find IBZ of energy window restricted blocks
+    !    After this step, self%nwv_irred, self%indexlist_irred, 
+    !    self%wavevecs_irred, self%nequiv, and self%ibz2fbz_map
+    !    will refer to the energy restricted mesh 
+    call print_message("Calculating IBZ blocks...")
+    deallocate(self%wavevecs_irred, self%indexlist_irred, self%nequiv, &
+         self%ibz2fbz_map, self%equiv_map)
+    blocks = .true.
+    call find_irred_wedge(self%wvmesh, self%nwv_irred, self%wavevecs_irred, &
+         self%indexlist_irred, self%nequiv, sym%nsymm_rot, sym%qrotations, &
+         self%ibz2fbz_map, self%equiv_map, blocks, self%indexlist)
+
+    !Print electron IBZ mesh
+    call write2file_rank2_real("el.wavevecs_ibz", self%wavevecs_irred)
+
+    !Create symmetrizers of wave vector dependent vectors ShengBTE style
+    allocate(self%symmetrizers(3, 3, self%nwv))
+    self%symmetrizers = 0.0_r64
+    do i = 1, self%nwv
+       ii = self%indexlist(i)
+       kk = 0
+       do jj = 1, sym%nsymm_rot
+          if(sym%is_TR(jj)) cycle !Only unitary operations
+          if(self%equiv_map(jj, i) == ii) then
+             self%symmetrizers(:, :, i) = self%symmetrizers(:, :, i) + &
+                  sym%crotations(:, :, jj)
+             kk = kk + 1
+          end if
+       end do
+       if(kk > 1) then
+          self%symmetrizers(:, :, i) = self%symmetrizers(:, :, i)/kk
+       end if
+    end do
+
+    ! 9. Get IBZ blocks energies, velocities, and eigen vectors.
+    call print_message("Calcutating IBZ blocks quantities...")
+    deallocate(self%ens_irred, self%vels_irred, self%evecs_irred)
+    allocate(self%ens_irred(self%nwv_irred, numbands), &
+         self%vels_irred(self%nwv_irred, numbands, 3), &
+         self%evecs_irred(self%nwv_irred, numbands, numbands))
+    !call wann%el_wann(crys, self%nwv_irred, self%wavevecs_irred, self%ens_irred, &
+    !     self%vels_irred, self%evecs_irred,self%scissor)
+    call model%get_electrons(self%wavevecs_irred, crys%reclattvecs, &
+         self%ens_irred, self%evecs_irred, self%vels_irred, .true.)
+
+    ! 10. Calculate the number of FBZ blocks electronic states
+    !     available for scattering
+    self%nstates_inwindow = 0
+    do i = 1, self%nwv !over FBZ blocks
+       do ib = 1, numbands !bands
+          if(abs(self%ens(i, ib) - self%enref) <= self%fsthick) &
+               self%nstates_inwindow = self%nstates_inwindow + 1
+       end do
+    end do
+    if(this_image() == 1) write(*, "(A, I10)") &
+         " Number of energy restricted FBZ blocks states = ", self%nstates_inwindow
+
+    ! 11. Create FBZ blocks to IBZ blocks map
+    call print_message("Calculating FBZ -> IBZ mappings...")
+    call create_fbz2ibz_map(self%fbz2ibz_map,self%nwv,self%nwv_irred, &
+         self%indexlist,self%nequiv,self%ibz2fbz_map)
+    if(this_image() == 1) then
+       open(1, file = "el.fbz2ibz_map", status = "replace")
+       do i = 1, self%nwv
+          write(1, "(I10)") self%fbz2ibz_map(i)
+       end do
+       close(1)
+    end if
+
+    do i = 1, self%nwv_irred !IBZ
+       do l = 1, self%nequiv(i) !number of equivalent points of i
+          il = self%ibz2fbz_map(l, i, 2) ! (i, l) -> il
+          s = self%ibz2fbz_map(l, i, 1) ! symmetry
+          call binsearch(self%indexlist, il, aux)
+
+          !energy
+          self%ens(aux,:) = self%ens_irred(i,:)
+
+          !velocity
+          do ib = 1, numbands
+             !here use real space (Cartesian) rotations
+             self%vels(aux, ib, :) = matmul(sym%crotations(:, :, s), self%vels_irred(i, ib, :))
+          end do
+          self%vels(aux,:,:) = transpose(&
+               matmul(self%symmetrizers(:,:,aux),transpose(self%vels(aux,:,:))))
+       end do
+    end do
+
+    ! 12. Calculate the number of IBZ electronic states available for scattering
+    self%nstates_irred_inwindow = 0
+    do istate = 1, self%nwv_irred*numbands
+       !Demux state index into band (ib) and wave vector (i) indices
+       call demux_state(istate, numbands, ib, i)
+       if(abs(self%ens_irred(i, ib) - self%enref) <= self%fsthick) then 
+          self%nstates_irred_inwindow = self%nstates_irred_inwindow + 1
+       end if
+    end do
+    if(this_image() == 1) write(*, "(A, I10)") " Number of energy restricted IBZ blocks states = ", &
+         self%nstates_irred_inwindow
+
+    !Calculate list of IBZ in-window states = (wave vector index, band index)
+    allocate(self%IBZ_inwindow_states(self%nstates_irred_inwindow,2))
+    count = 0
+    do istate = 1, self%nwv_irred*numbands
+       !Demux state index into band (ib) and wave vector (i) indices
+       call demux_state(istate, numbands, ib, i)
+       if(abs(self%ens_irred(i, ib) - self%enref) <= self%fsthick) then
+          count = count + 1
+          self%IBZ_inwindow_states(count,:) = [i, ib]
+       end if
+    end do
+
+    !Write IBZ in-window states as text data to file
+    if(this_image() == 1) then
+       call chdir(num%cwd)
+       filename = 'el.inwindow_states_ibz'
+       write(numcols,"(I0)") 2
+       open(1,file=trim(filename),status='replace')
+       write(1,*) "#k-vec index     band index"
+       do i = 1, self%nstates_irred_inwindow
+          write(1,"("//trim(adjustl(numcols))//"I10)") self%IBZ_inwindow_states(i,:)
+       end do
+       close(1)
+    end if
+    !Deallocating this here since this is not used later in the program
+    deallocate(self%IBZ_inwindow_states)
+
+    !Print out irreducible electron energies and velocities
+    call write2file_rank2_real("el.ens_ibz", self%ens_irred)
+    call write2file_rank3_real("el.vels_ibz", self%vels_irred)
+
+    !Print out full BZ electron energies and velocities
+    call write2file_rank2_real("el.ens_fbz", self%ens)
+    call write2file_rank3_real("el.vels_fbz", self%vels)
+
+    !Calculate electron simplicial complex
+    if(num%tetrahedra) then
+       call print_message("Calculating electron mesh tetrahedra...")
+       call form_tetrahedra_3d(self%nwv, self%wvmesh, &
+            self%simplicial_complex, self%simplex_count, &
+            self%simplex_map, .true., self%indexlist)
+       call fill_tetrahedra_3d(self%simplicial_complex, self%ens, self%simplex_evals, &
+            model, crys, self%wvmesh)!, self%scissor)
+    else
+       call print_message("Calculating electron mesh triangles...")
+       call form_triangles(self%nwv, self%wvmesh, &
+            self%simplicial_complex, self%simplex_count, &
+            self%simplex_map, .true., self%indexlist)
+       call fill_triangles(self%simplicial_complex, self%ens, self%simplex_evals, &
+            model, crys, self%wvmesh)!, self%scissor)
+    end if
+  end subroutine calculate_electrons_model
+  
   subroutine calculate_electrons(self, wann, crys, sym, num)
     !! Calculate electron energy window restricted wave vector meshes
     !! and the electronic properties on them
@@ -467,10 +754,11 @@ contains
     do i = 1, self%nwv
        ii = self%indexlist(i)
        kk = 0
-       do jj = 1, sym%nsymm
+       do jj = 1, sym%nsymm_rot
+          if(sym%is_TR(jj)) cycle !Only unitary operations
           if(self%equiv_map(jj, i) == ii) then
              self%symmetrizers(:, :, i) = self%symmetrizers(:, :, i) + &
-                  sym%crotations_orig(:, :, jj)
+                  sym%crotations(:, :, jj)
              kk = kk + 1
           end if
        end do

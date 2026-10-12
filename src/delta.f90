@@ -20,6 +20,7 @@ module delta
   use precision, only: r64, i64
   use crystal_module, only: crystal
   use wannier_module, only: wannier
+  use model_hamiltonian_module, only: AFM_Dirac
   use misc, only: exit_with_message, print_message, demux_vector, mux_vector, &
        binsearch, sort
 
@@ -622,27 +623,28 @@ contains
     end do
   end subroutine form_tetrahedra_3d
 
-  subroutine fill_tetrahedra_3d(tetra, evals, tetra_evals, wann, crys, wvmesh, scissor)
+  subroutine fill_tetrahedra_3d(tetra, evals, tetra_evals, hamiltonian_source, crys, wvmesh, scissor)
     !! Populate the (sorted along the vertices) eigenvalues on all the vertices of the tetrahedra
     !!
     !! tetra List of the tetrahedra vertices
     !! evals List of eigenvalues 
     !! tetra_evals Tetrahedra populated with the eigenvalues
-    !! wann Wannier data type
+    !! hamiltonian_source Wannier or model Hamiltonian data type (used for on-the-fly vertices)
     !! crys Crystal data type
     !! wvmesh Wave vector mesh
 
     integer(i64), intent(in) :: tetra(:, :)
     real(r64), intent(in) :: evals(:, :)
     real(r64), allocatable, intent(out) :: tetra_evals(:, :, :)
-    type(wannier), intent(in), optional :: wann
+    class(*), intent(in), optional :: hamiltonian_source
     type(crystal), intent(in), optional :: crys
     integer(i64), intent(in), optional :: wvmesh(3)
     real(r64), intent(in), optional :: scissor(:)
 
     !Locals
     integer(i64) :: iv, it, ib, numbands, aux, numtetra, k_intvec(3)
-    real(r64), allocatable :: energies(:, :)
+    real(r64), allocatable :: energies(:, :), model_evals(:, :), model_vels(:, :, :)
+    complex(r64), allocatable :: model_evecs(:, :, :)
     real(r64) :: k_frac(1, 3)
 
     ! Calculate dimensions
@@ -651,7 +653,7 @@ contains
 
     ! Allocations
     allocate(tetra_evals(numtetra, numbands, 4))
-    if(present(wann)) allocate(energies(1, numbands))
+    if(present(hamiltonian_source)) allocate(energies(1, numbands))
 
     ! Loop over all tetrahedra and vertices
     do it = 1, numtetra
@@ -663,7 +665,18 @@ contains
              call demux_vector(-aux, k_intvec, wvmesh, 1_i64)
              k_frac(1, :) = real(k_intvec, r64)/wvmesh
 
-             call wann%el_wann(crys, 1_i64, k_frac, energies, scissor = scissor)
+             if(.not. present(hamiltonian_source)) &
+                  call exit_with_message("Hamiltonian source of on-the-fly eigenvalues not provided.")
+             select type(hamiltonian_source)
+             type is(wannier)
+                call hamiltonian_source%el_wann(crys, 1_i64, k_frac, energies, scissor = scissor)
+             type is(AFM_Dirac)
+                call hamiltonian_source%get_electrons(k_frac, crys%reclattvecs, &
+                     model_evals, model_evecs, model_vels, .true.)
+                energies(1, :) = model_evals(1, :)
+             class default
+                call exit_with_message("Unsupported hamiltonian_source type for on-the-fly eigenvalues.")
+             end select
 
              tetra_evals(it, :, iv) = energies(1, :)
           else !Use pre-calculated eigenvalue
@@ -791,27 +804,28 @@ contains
     end do
   end subroutine form_triangles
 
-  subroutine fill_triangles(triang, evals, triang_evals, wann, crys, wvmesh, scissor)
+  subroutine fill_triangles(triang, evals, triang_evals, hamiltonian_source, crys, wvmesh, scissor)
     !! Populate the (sorted along the vertices) eigenvalues on all the vertices of the triangles
     !!
     !! triang List of the triangle vertices
     !! evals List of eigenvalues 
     !! triang_evals Triangles populated with the eigenvalues
-    !! wann Wannier data type
+    !! hamiltonian_source Wannier or model Hamiltonian data type (used for on-the-fly vertices)
     !! crys Crystal data type
     !! wvmesh Wave vector mesh
 
     integer(i64), intent(in) :: triang(:, :)
     real(r64), intent(in) :: evals(:, :)
     real(r64), allocatable, intent(out) :: triang_evals(:, :, :)
-    type(wannier), intent(in), optional :: wann
+    class(*), intent(in), optional :: hamiltonian_source
     type(crystal), intent(in), optional :: crys
     integer(i64), intent(in), optional :: wvmesh(3)
     real(r64), intent(in), optional :: scissor(:)
 
     !Local variables
     integer(i64) :: iv, it, ib, numbands, aux, numtriangs, k_intvec(3)
-    real(r64), allocatable :: energies(:, :)
+    real(r64), allocatable :: energies(:, :), model_evals(:, :), model_vels(:, :, :)
+    complex(r64), allocatable :: model_evecs(:, :, :)
     real(r64) :: k_frac(1, 3)
 
     numtriangs = size(triang(:, 1))
@@ -819,7 +833,7 @@ contains
 
     !Allocations
     allocate(triang_evals(numtriangs, numbands, 3))
-    if(present(wann)) allocate(energies(1, numbands))
+    if(present(hamiltonian_source)) allocate(energies(1, numbands))
 
     do it = 1, numtriangs !Run over triangles
        do iv = 1, 3 !Run over vertices
@@ -830,7 +844,18 @@ contains
              call demux_vector(-aux, k_intvec, wvmesh, 1_i64)
              k_frac(1, :) = real(k_intvec, r64)/wvmesh
 
-             call wann%el_wann(crys, 1_i64, k_frac, energies, scissor = scissor)
+             if(.not. present(hamiltonian_source)) &
+                  call exit_with_message("Hamiltonian_Source of on-the-fly eigenvalues not provided.")
+             select type(hamiltonian_source)
+             type is(wannier)
+                call hamiltonian_source%el_wann(crys, 1_i64, k_frac, energies, scissor = scissor)
+             type is(AFM_Dirac)
+                call hamiltonian_source%get_electrons(k_frac, crys%reclattvecs, &
+                     model_evals, model_evecs, model_vels, .true.)
+                energies(1, :) = model_evals(1, :)
+             class default
+                call exit_with_message("Unsupported hamiltonian_source type for on-the-fly eigenvalues.")
+             end select
 
              triang_evals(it, :, iv) = energies(1, :)
           else !Use pre-calculated eigenvalue

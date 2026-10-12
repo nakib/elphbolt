@@ -156,6 +156,8 @@ module numerics_module
      !! Use old batch processing records for restarts?
      logical :: use_perm
      !! Use permutation symmetries in ph-ph?
+     logical :: use_TR
+     !! Use time-reversal symmetry?
    contains
 
      procedure :: initialize=>read_input_and_setup, create_chempot_dirs
@@ -187,7 +189,7 @@ contains
          phbound, phdef_Tmat, onlyphbte, onlyebte, elchimp, elbound, drag, plot_along_path, &
          phthinfilm, phthinfilm_ballistic, fourph, use_Wannier_ifc2s, phiso_Tmat, Bfield_on, &
          W_OTF, Y_OTF, solve_bulk, solve_nano, elel, &
-         restart_from_batch_record, use_perm
+         restart_from_batch_record, use_perm, use_TR
 
     namelist /numerics/ qmesh, mesh_ref, fsthick, datadumpdir, read_gq2, read_gk2, &
          read_V, read_W, tetrahedra, phe, phiso, phsubs, onlyphbte, onlyebte, maxiter, &
@@ -196,7 +198,7 @@ contains
          ph_mfp_npts, ph_abs_q_npts, phthinfilm, phthinfilm_ballistic, &
          fourph, fourph_mesh_ref, use_Wannier_ifc2s, elel, Coulomb_screening_type, ncont_mesh,&
          phiso_Tmat, phiso_1B_theory, Bfield_on, Bfield, W_OTF, Y_OTF, &
-         solve_bulk, solve_nano, num_batches, restart_from_batch_record, use_perm
+         solve_bulk, solve_nano, num_batches, restart_from_batch_record, use_perm, use_TR
 
     call subtitle("Reading numerics information...")
 
@@ -254,6 +256,7 @@ contains
     num_batches = 1
     restart_from_batch_record = .false.
     use_perm = .false.
+    use_TR = .true.
     read(1, nml = numerics)
 
     if(read_W .and. W_OTF) &
@@ -317,6 +320,7 @@ contains
 
     self%Bfield_on = Bfield_on
     self%Bfield = Bfield
+    self%use_TR = use_TR
 
     self%qmesh = qmesh
     self%runlevel = runlevel
@@ -576,6 +580,8 @@ contains
        write(*, "(A, 1E16.8)") "BTE/Migdal-Eliashberg equations convergence threshold = ", self%conv_thres
        write(*, "(A, L)") "B-field is on: ", self%Bfield_on
        if(self%Bfield_on) write(*, "(A, 3E16.8)") "B-field  = ", self%Bfield
+
+       write(*, "(A, L)") "Use time-reversal: ", self%use_TR
     end if
     sync all
   end subroutine read_input_and_setup

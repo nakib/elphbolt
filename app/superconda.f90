@@ -65,7 +65,7 @@ program superconda
   sync all
 
   !Calculate crystal and BZ symmetries
-  call sym%calculate_symmetries(crys, num%qmesh)
+  call sym%calculate_symmetries(crys, num%qmesh, num%use_TR)
 
   !Read EPW Wannier data
   call wann%read(num)

@@ -258,11 +258,12 @@ contains
        symmetrizers_chunk = 0.0_r64
        do iq = start, end
           kk = 0
-          do jj = 1, sym%nsymm
+          do jj = 1, sym%nsymm_rot
+             if(sym%is_TR(jj)) cycle !Only unitary operations
              if(self%equiv_map(jj, iq) == iq) then
                 symmetrizers_chunk(:, :, iq - start + 1) = &
                      symmetrizers_chunk(:, :, iq - start + 1) + &
-                     sym%crotations_orig(:, :, jj)
+                     sym%crotations(:, :, jj)
                 kk = kk + 1
              end if
           end do
