@@ -36,7 +36,8 @@ program elphbolt
        calculate_eph_interaction_ibzq, calculate_eph_interaction_ibzk, &
        calculate_echimp_interaction_ibzk, calculate_3ph_interaction, &
        calculate_3ph_interaction_perm, calculate_3ph_phasespace, &
-       calculate_3ph_interaction_gpu
+       calculate_3ph_interaction_gpu,symmetrize_echimp_interaction_ibzk, &
+       symmetrize_eph_interaction_ibzk
   use phonon_defect_module, only: phonon_defect
   use Green_function, only: calculate_retarded_phonon_D0
   use nano_module, only: nanostructure
@@ -69,8 +70,13 @@ program elphbolt
   !Set up numerics data
   call num%initialize(crys)
 
+
   !Calculate crystal and BZ symmetries
-  call sym%calculate_symmetries(crys, num%qmesh)
+  if(num%Bfield_on) then
+     call sym%calculate_symmetries(crys, num%qmesh, num%Bfield)
+  else
+     call sym%calculate_symmetries(crys, num%qmesh)
+  end if
 
   sync all
   call t_event%end_timer('Initialization')
@@ -192,7 +198,7 @@ program elphbolt
         call t_event%start_timer('IBZ ph-e transition probilities')
 
         !Calculate ph-e transition probabilities
-        if(.not. num%Y_OTF) then
+        if(.not. (num%Y_OTF .or. num%read_Y)) then
            call t_event%start_timer('IBZ ph-e transition probilities')
 
            call calculate_eph_interaction_ibzq(wann, crys, el, ph, num, 'Y')
@@ -217,9 +223,17 @@ program elphbolt
         call t_event%start_timer('IBZ e-ph transition probabilities')
 
         !Calculate e-ph transition probabilities
-        call calculate_eph_interaction_ibzk(wann, crys, el, ph, num, 'X')
+        if (.not. num%read_X) then
+           call t_event%start_timer('IBZ e-ph transition probabilities')
 
-        call t_event%end_timer('IBZ e-ph transition probabilities')
+           call calculate_eph_interaction_ibzk(wann, crys, el, ph, num, 'X')
+
+           call t_event%end_timer('IBZ e-ph transition probabilities')
+        end if
+
+        ! Symmetrize e-ph transition probabilities  
+        if (num%symmetrize_transition_rates) call symmetrize_eph_interaction_ibzk(el, num, wann, ph)
+
      end if
 
      if(num%need_Wannier) then
@@ -235,6 +249,9 @@ program elphbolt
            call calculate_echimp_interaction_ibzk(crys, el, num)
 
            call t_event%end_timer('e-ch. imp. interactions')
+
+           ! Symmetrize e-chimp transition probabilities
+           if (num%symmetrize_transition_rates) call symmetrize_echimp_interaction_ibzk(el, num)
         end if
      end if
 

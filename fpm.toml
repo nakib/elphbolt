@@ -25,9 +25,10 @@ fhash = {path = "thirdparty/fhash"}
 
 #Use local copy from thirdparty directory
 spglib = {path = "thirdparty/spglib"}
-
 #Pull from github
 fftpack = { git = "https://github.com/fortran-lang/fftpack.git" }
+slsqp = { git="https://github.com/jacobwilliams/slsqp.git" }
+
 
 [build]
 #By default, I will use try to use the forlapack and forblas builds from ~/.local/lib/
@@ -40,7 +41,7 @@ link = ["forlapack", "forblas", "gomp"]
 #link = ["blas", "lapack"]
 #link = ["openblas"]
 
-external-modules = ["openacc"]
+external-modules = ["openacc", "lancelot_simple_double", "lancelot_simple_single"]
 auto-tests = false
 
 [install]
@@ -74,7 +75,7 @@ main="V3offload.f90"
 #[[executable]]
 #name = "screening_comparison"
 #source-dir="src"
-#main = "screening_comparison.f90"
+#main = "screening_co#!/bin/bash
 
 [[test]]
 name = "test_misc"
@@ -110,6 +111,11 @@ main = "test_task_manager.f90"
 name = "test_symmetry"
 source-dir="test"
 main = "test_symmetry.f90"
+
+#[[test]]
+#name = "test_optimization"
+#source-dir="test"
+#main = "test_optimization.f90"
 
 #
 #[[test]]

@@ -25,7 +25,8 @@ module bte_module
        trace, subtitle, append2file_transport_tensor, write2file_response, &
        linspace, readfile_response, write2file_spectral_tensor, subtitle, timer, &
        twonorm, write2file_rank1_real, precompute_interpolation_corners_and_weights, &
-       interpolate_using_precomputed, Jacobian, cross_product, qdist
+       interpolate_using_precomputed, Jacobian, cross_product, qdist, det_3x3, &
+       solve_transposed_dgesv, solve_matrix_equation_iteratively, eye, F_norm
   use numerics_module, only: numerics
   use crystal_module, only: crystal
   use nano_module, only: nanostructure
@@ -39,13 +40,16 @@ module bte_module
        calculate_Xee_13_OTF
   use bz_sums, only: calculate_transport_coeff, calculate_spectral_transport_coeff, &
        calculate_cumulative_transport_coeff
+  use optimization, only: find_correction, coeffs_for_optimization, global_coeffs, global_coeffs_opp_B
+
+  use vector_allreps_module, only: vec=>vector_allreps
 
   implicit none
 
   !external system, chdir
 
   private
-  public bte
+  public bte, fill_coeff, transport_coeffs
 
   type bte
      !! Data and procedures related to the BTE.
@@ -332,7 +336,7 @@ contains
     !! writes to disk. It should be kept private to this data type unless made safer.
 
     class(bte), intent(inout) :: self !Mutation alert!
-    type(numerics), intent(in) :: num
+    type(numerics), intent(in) :: num 
     type(crystal), intent(in) :: crys
     type(symmetry), intent(in) :: sym
     type(electron), intent(in) :: el
@@ -340,10 +344,15 @@ contains
 
     !Locals
     real(r64) :: el_kappa0_scalar, el_kappa0_scalar_old, el_alphabyT_scalar, el_alphabyT_scalar_old, &
-         el_sigma_scalar, el_sigma_scalar_old, el_sigmaS_scalar, el_sigmaS_scalar_old
+         el_sigma_scalar, el_sigma_scalar_old, el_sigmaS_scalar, el_sigmaS_scalar_old, KO_dev, KO_corr
     type(timer) :: t
     integer :: it_el, icart
     type(transport_coeffs) :: trans
+
+    !Response functions and transport coefficients for -B field
+    !These are needed to enforce Onsager reciprocity in the presence of a B-field.
+    type(transport_coeffs) :: trans_opp_B
+    type(bte) :: self_opp_B  
 
     call trans%initialize_el(el%numbands)
 
@@ -356,9 +365,16 @@ contains
     self%el_response_T = self%el_field_term_T
     self%el_response_E = self%el_field_term_E
 
+    !If magnetic field is on, initialize response functions and transport coefficients for -B field
+    !to be used in enforcing Onsager reciprocity.
+    if(num%Bfield_on) then
+       self_opp_B = self 
+       call trans_opp_B%initialize_el(el%numbands)
+    end if
+
     if(this_image() == 1) then
        write(*,*) "iter    k0_el[W/m/K]        sigmaS[A/m/K]", &
-            "         sigma[1/Ohm/m]      alpha_el/T[A/m/K]"
+            "         sigma[1/Ohm/m]      alpha_el/T[A/m/K]         KO dev.[%]         KO corr.[%]"
     end if
 
     do it_el = 1, num%maxiter
@@ -369,21 +385,21 @@ contains
        !Calculate electron transport coefficients
        call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, &
             el%ens, el%vels, crys%volume, el%wvmesh, self%el_response_E, sym, &
-            trans%el_alphabyT, trans%el_sigma, Bfield = num%Bfield)
+            trans%el_alphabyT, trans%el_sigma)
        trans%el_alphabyT = trans%el_alphabyT/crys%T
 
-       !   !delT field:
-       !   call iterate_bte_el(num, el, crys, &
-       !        self%el_rta_rates_ibz, self%el_field_term_T, self%el_response_T)
-       !Enforce Kelvin-Onsager relation
-       do icart = 1, 3
-          self%el_response_T(:,:,icart) = (el%ens(:,:) - el%chempot)/qe/crys%T*&
-               self%el_response_E(:,:,icart)
-       end do
-
+       call iterate_bte_el(num, el, crys, &
+            self%el_rta_rates_ibz, self%el_field_term_T, self%el_response_T)
        call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
             el%ens, el%vels, crys%volume, el%wvmesh, self%el_response_T, sym, &
-            trans%el_kappa0, trans%el_sigmaS, Bfield = num%Bfield)
+            trans%el_kappa0, trans%el_sigmaS)
+
+       !Enforce Kelvin-Onsager relation
+       if(.not. num%Bfield_on) then 
+          call KO_correction(el, crys, num, sym,  self, trans, KO_dev, KO_corr)
+       else
+          call KO_correction(el, crys, num, sym,  self, trans, KO_dev, KO_corr, trans_opp_B, self_opp_B)
+       end if
 
        !Calculate and print electron transport scalars
        el_kappa0_scalar = trace(sum(trans%el_kappa0, dim = 1))/crys%dim
@@ -391,9 +407,9 @@ contains
        el_sigma_scalar = trace(sum(trans%el_sigma, dim = 1))/crys%dim
        el_alphabyT_scalar = trace(sum(trans%el_alphabyT, dim = 1))/crys%dim
        if(this_image() == 1) then
-          write(*,"(I3, A, 1E16.8, A, 1E16.8, A, 1E16.8, A, 1E16.8)") it_el, &
+          write(*,"(I3, A, 1E16.8, A, 1E16.8, A, 1E16.8, A, 1E16.8, A, 1F16.1, A, 1F16.1)") it_el, &
                "    ", el_kappa0_scalar, "     ", el_sigmaS_scalar, &
-               "     ", el_sigma_scalar, "     ", el_alphabyT_scalar
+               "     ", el_sigma_scalar, "     ", el_alphabyT_scalar, "     ", KO_dev, "     ", KO_corr
        end if
 
        !Print out band resolved transport coefficients
@@ -405,6 +421,8 @@ contains
        call append2file_transport_tensor('nodrag_el_kappa0_', it_el, trans%el_kappa0, el%bandlist)
        ! Change back to cwd
        call chdir(trim(adjustl(num%cwd)))
+
+       !||k_{n+1} - k_n|| = \sum_{ij} (a_ij)^2 
 
        !Check convergence
        if(converged(el_kappa0_scalar_old, el_kappa0_scalar, num%conv_thres) .and. &
@@ -585,7 +603,7 @@ contains
     !Locals
     real(r64) :: ph_kappa_scalar, ph_kappa_scalar_old, ph_alphabyT_scalar, ph_alphabyT_scalar_old
     type(timer) :: t
-    integer :: it_ph
+    integer :: it_ph, i
     type(transport_coeffs) :: trans
 
     call trans%initialize_ph(ph%numbands)
@@ -659,32 +677,40 @@ contains
     real(r64) :: ph_kappa_scalar, ph_kappa_scalar_old, ph_alphabyT_scalar, ph_alphabyT_scalar_old, &
          el_kappa0_scalar, el_kappa0_scalar_old, el_alphabyT_scalar, el_alphabyT_scalar_old, &
          el_sigma_scalar, el_sigma_scalar_old, el_sigmaS_scalar, el_sigmaS_scalar_old, KO_dev, &
-         lambda, lambda_diag(3), tot_alphabyT_scalar
-    real(r64), allocatable :: I_diff(:,:,:), I_drag(:,:,:), &
-         ph_drag_term_T(:,:,:), ph_drag_term_E(:,:,:), widc(:,:)
-    integer(i64), allocatable :: idc(:,:) , ksint(:,:)
-    integer :: it_ph, it_el, icart
+         KO_corr, tot_alphabyT_scalar
+    real(r64), allocatable :: I_diff(:, :, :), I_drag(:, :, :), &
+         ph_drag_term_T(:, :, :), ph_drag_term_E(:, :, :), widc(:, :)
+    integer(i64), allocatable :: idc(:, :) , ksint(:, :)
+    integer :: it_ph, it_el, icart, i
     integer(i64) :: ik
     character(:), allocatable :: tableheader
     type(timer) :: t
     type(transport_coeffs) :: trans
+
+    !Response functions and transport coefficients for -B field
+    !These are needed to enforce Onsager reciprocity in the presence of a B-field.
+    type(transport_coeffs) :: trans_opp_B
+    type(bte) :: self_opp_B  
+    real(r64), allocatable ::  ph_drag_terms_opp_B(:, :, :, :)  
+    type(numerics) :: num_opp_B
 
     call trans%initialize_el(el%numbands)
     call trans%initialize_ph(ph%numbands)
 
     call t%start_timer('Coupled e-ph BTEs')
 
-    allocate(widc(product(el%wvmesh),6), idc(product(el%wvmesh),9), &
-         ksint(product(el%wvmesh),3))
+    allocate(widc(product(el%wvmesh), 6), idc(product(el%wvmesh), 9), &
+         ksint(product(el%wvmesh), 3))
     do ik = 1, size(ksint,1)
-       call demux_vector(ik, ksint(ik,:), el%wvmesh, 0_i64)
+       call demux_vector(ik, ksint(ik, :), el%wvmesh, 0_i64)
     end do
     call precompute_interpolation_corners_and_weights(ph%wvmesh,  &
          el%mesh_ref_array, ksint, idc, widc)
 
-    tot_alphabyT_scalar = el_alphabyT_scalar + ph_alphabyT_scalar
-    KO_dev = 100.0_r64*abs(&
-         (el_sigmaS_scalar - tot_alphabyT_scalar)/tot_alphabyT_scalar)
+    !      !Old definition of KO_dev 
+    !      tot_alphabyT_scalar = el_alphabyT_scalar + ph_alphabyT_scalar
+    !     KO_dev = 100.0_r64*abs(&
+    !          (el_sigmaS_scalar - tot_alphabyT_scalar)/tot_alphabyT_scalar)
 
     ! We need to compute the RTA values again (that is relatively cheap)
     call calculate_transport_coeff('ph', 'T', crys%T, 1_i64, 0.0_r64, ph%ens, ph%vels, &
@@ -715,36 +741,60 @@ contains
     if(this_image() == 1) then
        tableheader = "iter     k0_el[W/m/K]         sigmaS[A/m/K]         k_ph[W/m/K]"&
             //"         sigma[1/Ohm/m]         alpha_el/T[A/m/K]         alpha_ph/T[A/m/K]"&
-            //"         KO dev.[%]"
+            //"         KO dev.[%]         KO corr.[%]"
        write(*,*) trim(tableheader)
     end if
-
     !These will be needed below
-    allocate(I_drag(el%nwv, el%numbands, 3), I_diff(el%nwv, el%numbands, 3), &
-         ph_drag_term_T(el%nwv, el%numbands, 3), ph_drag_term_E(el%nwv, el%numbands, 3))
+    allocate(ph_drag_term_T(el%nwv, el%numbands, 3), ph_drag_term_E(el%nwv, el%numbands, 3))
 
+    !Allocate drag terms, transport coefficients and response for the opposite magnetic field
+    if(num%Bfield_on) then
+       allocate(ph_drag_terms_opp_B(2, el%nwv, el%numbands, 3))
+       num_opp_B = num
+       num_opp_B%Bfield = -num%Bfield
+       self_opp_B = self
+       call trans_opp_B%initialize_el(el%numbands)
+       call trans_opp_B%initialize_ph(ph%numbands)
+    end if
     !Start iterator
     do it_ph = 1, num%maxiter       
        !Scheme: for each step of phonon response, fully iterate the electron response.
-
        !Iterate phonon response once          
        call iterate_bte_ph(crys%T, num, crys, ph, el, self%ph_rta_rates_ibz, &
             self%ph_field_term_T, self%ph_response_T, self%el_response_T)
        call iterate_bte_ph(crys%T, num, crys, ph, el, self%ph_rta_rates_ibz, &
             self%ph_field_term_E, self%ph_response_E, self%el_response_E)
-
        !Calculate phonon transport coefficients
        call calculate_transport_coeff('ph', 'T', crys%T, 1_i64, 0.0_r64, ph%ens, ph%vels, &
             crys%volume, ph%wvmesh, self%ph_response_T, sym, trans%ph_kappa, trans%dummy)
        call calculate_transport_coeff('ph', 'E', crys%T, 1_i64, 0.0_r64, ph%ens, ph%vels, &
             crys%volume, ph%wvmesh, self%ph_response_E, sym, trans%ph_alphabyT, trans%dummy)
        trans%ph_alphabyT = trans%ph_alphabyT/crys%T
-
        !Calculate phonon drag term for the current phBTE iteration.
        call calculate_phonon_drag(num, el, ph, idc, widc, sym, self%el_rta_rates_ibz, &
             self%ph_response_E, ph_drag_term_E)
        call calculate_phonon_drag(num, el, ph, idc, widc, sym, self%el_rta_rates_ibz, &
             self%ph_response_T, ph_drag_term_T)
+
+       !Calculate response for the opposite magnetic field if B-field is on
+       if(num%Bfield_on) then
+          !Self term 
+          call iterate_bte_ph(crys%T, num_opp_B, crys, ph, el, self_opp_B%ph_rta_rates_ibz, &
+               self_opp_B%ph_field_term_T, self_opp_B%ph_response_T, self_opp_B%el_response_T)
+          call iterate_bte_ph(crys%T, num_opp_B, crys, ph, el, self_opp_B%ph_rta_rates_ibz, &
+               self_opp_B%ph_field_term_E, self_opp_B%ph_response_E, self_opp_B%el_response_E)
+          !Calculate phonon transport coefficients
+          call calculate_transport_coeff('ph', 'T', crys%T, 1_i64, 0.0_r64, ph%ens, ph%vels, &
+               crys%volume, ph%wvmesh, self_opp_B%ph_response_T, sym, trans_opp_B%ph_kappa, trans_opp_B%dummy)
+          call calculate_transport_coeff('ph', 'E', crys%T, 1_i64, 0.0_r64, ph%ens, ph%vels, &
+               crys%volume, ph%wvmesh, self_opp_B%ph_response_E, sym, trans_opp_B%ph_alphabyT, trans_opp_B%dummy)
+          trans_opp_B%ph_alphabyT = trans_opp_B%ph_alphabyT/crys%T
+          !Drag term 
+          call calculate_phonon_drag(num_opp_B, el, ph, idc, widc, sym, self%el_rta_rates_ibz, &
+               self_opp_B%ph_response_T, ph_drag_terms_opp_B(1,:,:,:))
+          call calculate_phonon_drag(num_opp_B, el, ph, idc, widc, sym, self%el_rta_rates_ibz, &
+               self_opp_B%ph_response_E, ph_drag_terms_opp_B(2,:,:,:))          
+       end if
 
        !Iterate electron response all the way
        do it_el = 1, num%maxiter
@@ -755,31 +805,24 @@ contains
           !Calculate electron transport coefficients
           call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, &
                el%ens, el%vels, crys%volume, el%wvmesh, self%el_response_E, sym, &
-               trans%el_alphabyT, trans%el_sigma, Bfield = num%Bfield)
+               trans%el_alphabyT, trans%el_sigma)
           trans%el_alphabyT = trans%el_alphabyT/crys%T
 
           !delT field:
           call iterate_bte_el(num, el, crys, &
                self%el_rta_rates_ibz, self%el_field_term_T, self%el_response_T, ph_drag_term_T)
-          !Enforce Kelvin-Onsager relation:
-          !Fix "diffusion" part
-          do icart = 1, 3
-             I_diff(:,:,icart) = (el%ens(:,:) - el%chempot)/qe/crys%T*&
-                  self%el_response_E(:,:,icart)
-          end do
-          !Correct "drag" part
-          I_drag = self%el_response_T - I_diff
-          call correct_I_drag(I_drag, trace(sum(trans%ph_alphabyT, dim = 1))/crys%dim, lambda)
-          self%el_response_T = I_diff + lambda*I_drag
-!!$          call correct_I_drag_expt(I_drag, sum(trans%ph_alphabyT, dim = 1), lambda_diag)
-!!$          self%el_response_T = I_diff + &
-!!$               I_drag*spread(spread(lambda_diag, dim = 1, ncopies = size(I_drag, 1)), &
-!!$               dim = 2, ncopies = size(I_drag, 2))
 
-          !Calculate electron transport coefficients
           call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
                el%ens, el%vels, crys%volume, el%wvmesh, self%el_response_T, sym, &
-               trans%el_kappa0, trans%el_sigmaS, Bfield = num%Bfield)
+               trans%el_kappa0, trans%el_sigmaS)
+
+          !Enforce Kelvin-Onsager relation:
+          if(.not. num%Bfield_on) then 
+             call KO_correction(el, crys, num, sym,  self, trans, KO_dev, KO_corr, ph = ph)
+          else
+             call KO_correction(el, crys, num, sym,  self, trans, KO_dev, KO_corr, trans_opp_B, self_opp_B, ph, &
+                  ph_drag_terms_opp_B)
+          end if
 
           !Calculate electron transport scalars
           el_kappa0_scalar = trace(sum(trans%el_kappa0, dim = 1))/crys%dim
@@ -815,16 +858,18 @@ contains
           call chdir(trim(adjustl(num%cwd)))
        end if
 
-       tot_alphabyT_scalar = el_alphabyT_scalar + ph_alphabyT_scalar
-       KO_dev = 100.0_r64*abs(&
-            (el_sigmaS_scalar - tot_alphabyT_scalar)/tot_alphabyT_scalar)
+       !        !Old definition of KO_dev 
+       !      tot_alphabyT_scalar = el_alphabyT_scalar + ph_alphabyT_scalar
+       !     KO_dev = 100.0_r64*abs(&
+       !          (el_sigmaS_scalar - tot_alphabyT_scalar)/tot_alphabyT_scalar)
+
 
        if(this_image() == 1) then
           write(*,"(I3, A, 1E16.8, A, 1E16.8, A, 1E16.8, A, 1E16.8, &
-               A, 1E16.8, A, 1E16.8, A, 1F6.3)") it_ph, "     ", el_kappa0_scalar, &
+               A, 1E16.8, A, 1E16.8, A, 1F16.1, A, 1F16.1)") it_ph, "     ", el_kappa0_scalar, &
                "      ", el_sigmaS_scalar, "     ", ph_kappa_scalar, &
                "    ", el_sigma_scalar, "        ", el_alphabyT_scalar, &
-               "         ", ph_alphabyT_scalar, "           ", KO_dev
+               "         ", ph_alphabyT_scalar, "           ", KO_dev, "     ", KO_corr
        end if
 
        !Print out band resolved transport coefficients
@@ -860,97 +905,13 @@ contains
     end do
 
     !Don't need these anymore
-    deallocate(I_drag, I_diff, ph_drag_term_T, ph_drag_term_E)
+    deallocate(ph_drag_term_T, ph_drag_term_E)
     deallocate(widc, idc, ksint)
 
     call t%end_timer('Coupled e-ph BTEs')
 
     sync all
 
-  contains
-
-    subroutine correct_I_drag(I_drag, constraint, lambda)
-      !! Subroutine to find scaling correction to I_drag.
-
-      real(r64), intent(in) :: I_drag(:, :, :), constraint
-      real(r64), intent(out) :: lambda
-
-      !Internal variables
-      integer(i64) :: it, maxiter
-      real(r64) :: a, b, sigmaS(size(I_drag(1, :, 1)), 3, 3),&
-           thresh, sigmaS_scalar, dummy(size(I_drag(1, :, 1)), 3, 3)
-
-      a = 0.0_r64 !lower bound
-      b = 2.0_r64 !upper bound
-
-      maxiter = 100 !maximum number of iterations to try
-      thresh = 1.0e-6_r64 !convergence threshold
-
-      do it = 1, maxiter
-         lambda = 0.5_r64*(a + b)
-         !Calculate electron transport coefficients
-         call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
-              el%ens, el%vels, crys%volume, el%wvmesh, lambda*I_drag, sym, &
-              dummy, sigmaS)         
-         sigmaS_scalar = trace(sum(sigmaS, dim = 1))/crys%dim
-
-         if(abs(sigmaS_scalar - constraint) < thresh) then
-            exit
-         else if(abs(sigmaS_scalar) < abs(constraint)) then
-            a = lambda
-         else
-            b = lambda
-         end if
-      end do
-    end subroutine correct_I_drag
-
-    subroutine correct_I_drag_expt(I_drag, constraint, lambda)
-      !! Subroutine to find scaling correction to I_drag.
-      !
-      ! This generalized the previous one by considering each
-      ! diagonal element separately. [NOT FULLY TESTED!]
-
-      real(r64), intent(in) :: I_drag(:, :, :), constraint(3, 3)
-      real(r64), intent(out) :: lambda(3)
-
-      !Internal variables
-      integer(i64) :: it, maxiter, j
-      real(r64) :: a(3), b(3), sigmaS(size(I_drag(1, :, 1)), 3, 3), &
-           thresh, sigmaS_mat(3, 3), dummy(size(I_drag(1, :, 1)), 3, 3)
-      logical :: flag_conv
-
-      a = [0, 0, 0]*0.0_r64 !lower bound
-      b = [2, 2, 2]*1.0_r64 !upper bound
-
-      maxiter = 100 !maximum number of iterations to try
-      thresh = 1.0e-6_r64 !convergence threshold
-
-      do it = 1, maxiter
-         lambda = 0.5_r64*(a + b)
-
-         !Calculate electron transport coefficients
-         call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
-              el%ens, el%vels, crys%volume, el%wvmesh, &
-              I_drag*spread(spread(lambda, dim = 1, ncopies = size(I_drag, 1)), dim = 2, ncopies = size(I_drag, 2)), &
-              sym, dummy, sigmaS)
-         sigmaS_mat = sum(sigmaS, dim = 1)
-
-         flag_conv = .true.
-         do j = 1,3 
-            if(abs(sigmaS_mat(j, j) - constraint(j, j)) < thresh) then
-               cycle  
-            else if(abs(sigmaS_mat(j, j)) < abs(constraint(j, j))) then
-               a(j) = lambda(j)
-            else
-               b(j) = lambda(j)
-            end if
-
-            flag_conv = .false.
-         end do
-
-         if(flag_conv) exit
-      end do
-    end subroutine correct_I_drag_expt
   end subroutine dragfull_ephbtes
 
   subroutine calculate_field_term(species, field, nequiv, ibz2fbz_map, &
@@ -1663,12 +1624,13 @@ contains
              end do
           end if
 
+          ! end if
           !Sum over the number of equivalent k-points of the IBZ point
           do ieq = 1, el%nequiv(ik_ibz)
              ik_sym = el%ibz2fbz_map(ieq, ik_ibz, 1) !symmetry
              ik_fbz = ik1_image_array(ieq)
 
-             !Sum over scattering processes
+             !    !Sum over scattering processes
              do iproc = 1, nprocs
                 !Grab the final electron and, if needed, the interacting phonon
                 call demux_state(istate_el(iproc), numbands, n, ikp)
@@ -1682,7 +1644,7 @@ contains
                      response_el(aux, n, :)*(Xphplus(iproc) + Xphminus(iproc))
              end do
 
-             !Add charged impurity contribution to the self consistent term
+             !    Add charged impurity contribution to the self consistent term
              if(num%elchimp) then
                 do iproc = 1, nprocs_echimp
                    !Grab the final electron and, if needed, the interacting phonon
@@ -1706,7 +1668,8 @@ contains
 
              !Iterate BTE
              response_el_reduce(ik_fbz, m, :) = field_term(ik_fbz, m, :) + &
-                  response_el_reduce(ik_fbz, m, :)*tau_ibz
+                  response_el_reduce(ik_fbz, m, :)*tau_ibz 
+
           end do
        end do
     end if
@@ -1720,15 +1683,14 @@ contains
        response_el(:,:,:) = response_el(:,:,:) + ph_drag_term(:,:,:)
     end if
 
-    !TODO The following has to be generalized in the presence of a B-field
+    !In the presence of a B-field local symmetrizer of each k-point is reduced significantly 
+    !Thus symmetrization of the response function does not make much sense.  
     if(.not. num%Bfield_on) then
        !Symmetrize response function
        do ik_fbz = 1, nk
           response_el(ik_fbz, :, :) = transpose(&
                matmul(el%symmetrizers(:, :, ik_fbz), transpose(response_el(ik_fbz, :, :))))
        end do
-    else
-       !TODO
     end if
   end subroutine iterate_bte_el
 
@@ -1877,6 +1839,212 @@ contains
        if(abs(newval - oldval)/abs(oldval) < thres) converged = .True.
     end if
   end function converged
+
+  ! program test_dgesv
+  !     implicit none
+  !     integer, parameter :: n = 3, nrhs = 1
+  !     real(8) :: A(n,n), B(n,nrhs), X(n,nrhs)
+  !     integer :: i, info
+  !     integer, allocatable :: ipiv(:)
+  !     real(8), allocatable :: A_copy(:,:)
+
+  !     ! Example: Solve 3x + y + z = 5
+  !     !          x + 3y + z = 4
+  !     !          x + y + 3z = 3
+
+  !     ! Initialize matrix A
+  !     A = reshape([3.0d0, 1.0d0, 1.0d0, &
+  !                  1.0d0, 3.0d0, 1.0d0, &
+  !                  1.0d0, 1.0d0, 3.0d0], [n, n])
+
+  !     ! Initialize RHS B
+  !     B = reshape([5.0d0, 4.0d0, 3.0d0], [n, nrhs])
+
+  !     ! Make a copy (DGESV destroys A)
+  !     allocate(A_copy(n,n), ipiv(n))
+  !     A_copy = A
+  !     X = B  ! X will be overwritten with solution
+
+  !     ! Call DGESV
+  !     call dgesv(n, nrhs, A_copy, n, ipiv, X, n, info)
+
+  !     ! Check for errors
+  !     if (info /= 0) then
+  !         print *, "Error: info = ", info
+  !         stop
+  !     end if
+
+  !     ! Print solution
+  !     print *, "Solution X:"
+  !     do i = 1, n
+  !         print *, X(i,1)
+  !     end do
+
+  !     ! Verify: should be [1.5, 1.0, 0.5]
+  !     print *, "Verification A*X:"
+  !     print *, matmul(A, X)
+
+  ! end program test_dgesv
+
+  subroutine fill_coeff(a, T, b)
+    implicit none
+    type(transport_coeffs), intent(in) :: a
+    type(coeffs_for_optimization), intent(inout) :: b
+    real(r64), intent(in) :: T
+
+    b%T = T
+    b%el_alpha = sum(a%el_alphabyT*T, dim = 1)
+    b%el_sigma = sum(a%el_sigma, dim = 1)
+    b%el_sigmaS = sum(a%el_sigmaS, dim = 1)
+    b%el_kappa0 = sum(a%el_kappa0, dim = 1)
+
+    if (allocated(a%ph_kappa)) then
+       b%ph_alpha = sum(a%ph_alphabyT*T, dim = 1)
+       b%ph_kappa = sum(a%ph_kappa, dim = 1)
+    else 
+       b%ph_kappa = 0.0_r64
+       b%ph_alpha = 0.0_r64
+    end if
+  end subroutine fill_coeff
+
+  subroutine KO_correction(el, crys, num, sym,  self, trans, KO_dev, KO_corr, trans_opp_B, self_opp_B, ph, ph_drag_terms_opp_B)
+    !! Subroutine to calculate and apply the Kelvin-Onsager correction with/without a B-field.
+    !! el Electron object
+    !! crys Crystal object
+    !! num Numerics object
+    !! sym Symmetry object
+    !! self BTE solution for +B field
+    !! trans Transport coefficients for +B field
+    !! KO_dev Deviation of the corrected transport coefficients from Kelvin-Onsager relations
+    !! KO_corr Maximum deviation of the corrections from identity, devided to the maximum element of the corrected matrix 
+    !! self_opp_B BTE solution for -B field, optinal
+    !! trans_opp_B Transport coefficients for -B field, optinal
+    !! ph Phonon object, optinal
+    !! ph_drag_terms_opp_B Phonon drag terms for -B field (1 for gradT, 2 for E), optinal
+
+    type(electron), intent(in) :: el
+    type(crystal), intent(in) :: crys
+    type(numerics), intent(in) :: num
+    type(symmetry), intent(in) :: sym
+    class(bte), intent(inout) :: self
+    real(r64), intent(out) ::  KO_dev, KO_corr
+    class(bte), intent(inout), optional :: self_opp_B
+    type(phonon), intent(in), optional :: ph
+    real(r64), intent(in), optional ::  ph_drag_terms_opp_B(:, :, :, :)
+    class(transport_coeffs), intent(inout) :: trans
+    class(transport_coeffs), intent(inout), optional :: trans_opp_B
+    type(numerics) :: num_local
+    real(r64) :: dummy_coeff(2, 3,3)
+    real(r64), allocatable :: correction_matrix(:)
+
+    KO_dev  = 0.0_r64
+    KO_corr = 0.0_r64
+
+    !  Copy transport coefficients into global_coeffs for the correction calculation
+    call fill_coeff(trans, crys%T, global_coeffs)
+
+    if(num%Bfield_on) then 
+       !Magnetic case
+       num_local = num
+       num_local%Bfield = -num_local%Bfield
+
+       if(.not. allocated(global_coeffs%crotations)) then
+          allocate(global_coeffs%crotations(3, 3, sym%nsymm_Bfield))
+          global_coeffs%crotations = sym%crotations_Bfield
+       end if
+
+       if(.not. present(ph_drag_terms_opp_B)) then
+          !Dragless case, no phonon contributions
+          !Compute -B field responses
+          call iterate_bte_el(num_local, el, crys, &
+               self%el_rta_rates_ibz, self%el_field_term_E, self_opp_B%el_response_E)
+          call iterate_bte_el(num_local, el, crys, &
+               self%el_rta_rates_ibz, self%el_field_term_T, self_opp_B%el_response_T)
+       else
+          !Dragful case, include phonon contributions
+          !Compute -B field responses
+          call iterate_bte_el(num_local, el, crys, self%el_rta_rates_ibz, &
+               self%el_field_term_E, self_opp_B%el_response_E, ph_drag_terms_opp_B(2, :, :, :))
+          call iterate_bte_el(num_local, el, crys, self%el_rta_rates_ibz, &
+               self%el_field_term_T, self_opp_B%el_response_T, ph_drag_terms_opp_B(1, :, :, :))
+
+          !Calculate phonon transport coefficients
+          !ph_kappa(-B)
+          call calculate_transport_coeff('ph', 'T', crys%T, 1_i64, 0.0_r64, ph%ens, ph%vels, &
+               crys%volume, ph%wvmesh, self_opp_B%ph_response_T, sym,&
+               trans_opp_B%ph_kappa, trans_opp_B%dummy)
+          !ph_alphabyT(-B)
+          call calculate_transport_coeff('ph', 'E', crys%T, 1_i64, 0.0_r64, ph%ens, ph%vels, &
+               crys%volume, ph%wvmesh, self_opp_B%ph_response_E, sym, &
+               trans_opp_B%ph_alphabyT, trans_opp_B%dummy)
+          trans_opp_B%ph_alphabyT = trans_opp_B%ph_alphabyT/crys%T
+       end if
+       !Calculate electron transport coefficients for -B field
+       !sigma(-B), alphabyT_el(-B)
+       call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, &
+            el%ens, el%vels, crys%volume, el%wvmesh, self_opp_B%el_response_E, sym, &
+            trans_opp_B%el_alphabyT, trans_opp_B%el_sigma)
+       trans_opp_B%el_alphabyT = trans_opp_B%el_alphabyT/crys%T
+       !el_kappa0(-B), el_sigmaS(-B)
+       call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
+            el%ens, el%vels, crys%volume, el%wvmesh, self_opp_B%el_response_T, sym, &
+            trans_opp_B%el_kappa0, trans_opp_B%el_sigmaS)
+
+       !  Copy transport coefficients for -B field into global_coeffs_opp_B for the correction calculation
+       call fill_coeff(trans_opp_B, crys%T, global_coeffs_opp_B)
+       allocate(correction_matrix(27))
+
+       ! Correction_matrix = [M_I^T, M_J^T,M_F^T] 
+       call find_correction(num, correction_matrix, KO_dev, KO_corr)
+       if(allocated(trans%ph_kappa)) then
+          call apply_correction(self%ph_response_T, trans%ph_kappa, trans%dummy, correction_matrix(19:27))
+       end if
+       call apply_correction(self%el_response_T, trans%el_kappa0, trans%el_sigmaS, correction_matrix(1:9))
+       call apply_correction(self%el_response_E, trans%el_sigma, trans%el_alphabyT, correction_matrix(10:18))        
+    else 
+       !Non-magnetic case
+       if(.not. allocated(global_coeffs%crotations)) then
+          allocate(global_coeffs%crotations(3, 3, sym%nsymm))
+          global_coeffs%crotations = sym%crotations
+       end if
+       allocate(correction_matrix(9))
+       ! Correction_matrix = [M_I^T] 
+       call find_correction(num, correction_matrix, KO_dev, KO_corr)
+       call apply_correction(self%el_response_T, trans%el_kappa0, trans%el_sigmaS, correction_matrix)
+
+    end if
+    deallocate(correction_matrix)
+  end subroutine KO_correction
+
+  subroutine apply_correction(response,  coeff1, coeff2, correction_matrix)
+    !! Subroutine to update transport coefficients and correspodning linear response function with given correction matrix according to the following rule:
+    !! response = M@response 
+    !! coeff1 = coeff1@M^T
+    !! coeff2 = coeff2@M^T
+    !! response Linear response function to be corrected
+    !! coeff1 First transport coefficient to be corrected, e.g. kappa0 for gradT field, sigma for E-field
+    !! coeff2 Second transport coefficient to be corrected, e.g. sigmaS for gradT field, alphabyT for E-field
+    !! correction_matrix 3x3 correction matrix, which is the transpose of the M matrix in the main text (reshaped as a vector).
+
+    real(r64), intent(in) :: correction_matrix(9)
+    real(r64), intent(inout) :: response(:, :, :), coeff1(:, :, :), coeff2(:, :, :)
+    real(r64):: KO_corr_T(3,3) 
+    integer(i64) :: i, j
+
+    ! Reshape correction matrix into 3x3 form. Here it is noted that the correction matrix is the transpose of the M matrix
+    KO_corr_T = reshape(correction_matrix, [3, 3])
+
+    !Apply correction
+    do j = 1, size(response, 2) ! looping over numbands 
+       ! Apply correction to response function
+       do i = 1, size(response, 1) ! looping over nwv 
+          response(i, j, :) = matmul(transpose(KO_corr_T), response(i, j, :))
+       end do
+       ! Apply to coefficients
+       coeff1(j, :, :) = matmul(coeff1(j, :, :), KO_corr_T)
+       coeff2(j, :, :) = matmul(coeff2(j, :, :), KO_corr_T)
+    end do
+  end subroutine apply_correction
 
   !TODO: Move this to the Julia script.
   subroutine post_process(self, num, crys, sym, ph, el)
