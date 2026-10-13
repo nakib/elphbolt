@@ -30,6 +30,7 @@ module interactions
   use task_manager_module, only : task_manager
 
   use wannier_module, only: wannier
+  use model_hamiltonian_module, only: AFM_Dirac
   use crystal_module, only: crystal
   use electron_module, only: electron
   use phonon_module, only: phonon
@@ -1842,7 +1843,7 @@ contains
     sync all
   end subroutine calculate_gkRp
 
-  subroutine calculate_eph_interaction_ibzq(wann, crys, el, ph, num, key)
+  subroutine calculate_eph_interaction_ibzq(hamiltonian_source, crys, el, ph, num, key)
     !! Parallel driver of g2(q,k) over IBZ phonon states.
     !!
     !! This subroutine will calculate the full Bloch rep. matrix elements for
@@ -1851,12 +1852,15 @@ contains
     !! This list will be written to disk in files tagged with the muxed state index.
     !!
     !! key = 'g', 'Y' for vertex, transition probability calculation, respectively.
+    !!
+    !! hamiltonian_source is either a wannier (g from g(Re,q) on disk) or an
+    !! AFM_Dirac model (g computed directly in Bloch space).
     !
     !In the FBZ and IBZ blocks a wave vector was retained when at least one
     !band belonged within the energy window. Here the bands outside the energy
     !window will be skipped in the calculation as they are irrelevant for transport.
 
-    type(wannier), intent(in) :: wann
+    class(*), intent(in) :: hamiltonian_source
     type(crystal), intent(in) :: crys
     type(electron), intent(in) :: el
     type(phonon), intent(in) :: ph
@@ -1871,7 +1875,7 @@ contains
     integer(i64), allocatable :: istate1(:), istate2(:)
     real(r64) :: en_ph, en_el, en_elp, const, delta, &
          bose1, invboseplus1, invboseboseplus1, fermi1, fermi2, occup_fac
-    real(r64), allocatable :: g2_istate(:), TP_istate(:)
+    real(r64), allocatable :: g2_istate(:), TP_istate(:), g2_model(:, :)
     complex(r64), allocatable :: gReq_iq(:,:,:,:)
     character(len = 1024) :: filename, batch_filename
     procedure(delta_fn), pointer :: delta_fn_ptr => null()
@@ -1890,10 +1894,14 @@ contains
 
     !Allocate and initialize gReq_iq and g2_istate
     if(key == 'g') then
-       allocate(gReq_iq(wann%numwannbands, wann%numwannbands, wann%numbranches, wann%nwsk))
+       select type(hamiltonian_source)
+       type is(wannier)
+          allocate(gReq_iq(hamiltonian_source%numwannbands, hamiltonian_source%numwannbands, &
+               hamiltonian_source%numbranches, hamiltonian_source%nwsk))
+       end select
 
        !Maximum length of g2_istate
-       nprocs = el%nstates_inwindow*ph%numbands
+       nprocs = el%nstates_inwindow*max(el%numbands, ph%numbands)
        allocate(g2_istate(nprocs))
        g2_istate(:) = 0.0_r64
     end if
@@ -1954,15 +1962,18 @@ contains
              call demux_state(istate, ph%numbands, s, iq)
 
              if(key == 'g') then
-                !Load gReq(iq) here for use inside the loops below
-                call chdir(trim(adjustl(num%g2dir)))
-                write (filename, '(I6)') iq
-                filename = 'gReq.iq'//trim(adjustl(filename))
+                select type(hamiltonian_source)
+                type is(wannier)
+                   !Load gReq(iq) here for use inside the loops below
+                   call chdir(trim(adjustl(num%g2dir)))
+                   write (filename, '(I6)') iq
+                   filename = 'gReq.iq'//trim(adjustl(filename))
 
-                open(1,file=filename,status="old",access='stream')
-                read(1) gReq_iq
-                close(1)
-                call chdir(num%cwd)
+                   open(1,file=filename,status="old",access='stream')
+                   read(1) gReq_iq
+                   close(1)
+                   call chdir(num%cwd)
+                end select
              end if
 
              !Get the muxed index of FBZ wave vector from the IBZ index list
@@ -2034,6 +2045,15 @@ contains
                 call binsearch(el%indexlist, kp_vec%muxed_index, ikp_window)
                 if(ikp_window < 0) cycle
 
+                !For the model, get |g|^2 for all band pairs at once
+                if(key == 'g') then
+                   select type(hamiltonian_source)
+                   type is(AFM_Dirac)
+                      g2_model = hamiltonian_source%g2(q_vec%frac, el%evecs(ik, :, :), &
+                           el%evecs(ikp_window, :, :), crys%reclattvecs)
+                   end select
+                end if
+
                 !Run over initial electron bands
                 do m = 1, el%numbands                
                    !Energy of initial electron
@@ -2066,11 +2086,16 @@ contains
 
                       if(key == 'g') then
                          !Calculate |g_mns(k,<q>)|^2
-                         g2_istate(count) = wann%g2(crys, &
-                              k_vec%frac, q_vec%frac, &
-                              el%evecs(ik, m, :), el%evecs(ikp_window, n, :), &
-                              ph%evecs(iq_fbz, s, :), &
-                              ph%ens(iq_fbz, s), gReq_iq, 'el')
+                         select type(hamiltonian_source)
+                         type is(wannier)
+                            g2_istate(count) = hamiltonian_source%g2(crys, &
+                                 k_vec%frac, q_vec%frac, &
+                                 el%evecs(ik, m, :), el%evecs(ikp_window, n, :), &
+                                 ph%evecs(iq_fbz, s, :), &
+                                 ph%ens(iq_fbz, s), gReq_iq, 'el')
+                         type is(AFM_Dirac)
+                            g2_istate(count) = g2_model(m, n)
+                         end select
                       end if
 
                       if(key == 'Y') then                   
@@ -2167,12 +2192,15 @@ contains
     sync all
 
     if(key == 'g') then
-       !Delete the gReq disk data
-       if(this_image() == 1) then
-          call chdir(trim(adjustl(num%g2dir)))
-          call system('rm gReq.*')
-          call chdir(num%cwd)
-       end if
+       select type(hamiltonian_source)
+       type is(wannier)
+          !Delete the gReq disk data
+          if(this_image() == 1) then
+             call chdir(trim(adjustl(num%g2dir)))
+             call system('rm gReq.*')
+             call chdir(num%cwd)
+          end if
+       end select
     end if
 
     if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
@@ -2343,7 +2371,7 @@ contains
     if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
   end subroutine calculate_Y_OTF
 
-  subroutine calculate_eph_interaction_ibzk(wann, crys, el, ph, num, key)
+  subroutine calculate_eph_interaction_ibzk(hamiltonian_source, crys, el, ph, num, key)
     !! Parallel driver of g2(k,q) over IBZ electron states.
     !!
     !! This subroutine will calculate the full Bloch rep. matrix elements for
@@ -2352,12 +2380,15 @@ contains
     !! This list will be written to disk in files tagged with the muxed state index.
     !!
     !! key = 'g', 'X' for vertex, transition probability calculation, respectively.
+    !!
+    !! hamiltonian_source is either a wannier (g from g(k,Rp) on disk) or an
+    !! AFM_Dirac model (g computed directly in Bloch space).
     !
     !In the FBZ and IBZ blocks a wave vector was retained when at least one
     !band belonged within the energy window. Here the bands outside the energy
     !window will be skipped in the calculation as they are irrelevant for transport.
 
-    type(wannier), intent(in) :: wann
+    class(*), intent(in) :: hamiltonian_source
     type(crystal), intent(in) :: crys
     type(electron), intent(in) :: el
     type(phonon), intent(in) :: ph
@@ -2372,7 +2403,8 @@ contains
     real(r64) :: ph_ens_iq(1, ph%numbands), qlist(1, 3), &
          const, bosefac, fermi_minus_fac, fermi_plus_fac, en_ph, en_el, &
          delta_plus, delta_minus, occup_fac_plus, occup_fac_minus
-    real(r64), allocatable :: g2_istate(:), TPplus_istate(:), TPminus_istate(:)
+    real(r64), allocatable :: g2_istate(:), TPplus_istate(:), TPminus_istate(:), &
+         g2_model(:, :), model_ph_ens(:)
     integer(i64), allocatable :: istate_el(:), istate_ph(:)
     complex(r64), allocatable :: gkRp_ik(:, :, :, :)
     complex(r64) :: ph_evecs_iq(1, ph%numbands,ph%numbands)
@@ -2394,10 +2426,14 @@ contains
 
     !Allocate and initialize gkRp_ik and g2_istate
     if(key == 'g') then
-       allocate(gkRp_ik(wann%numwannbands,wann%numwannbands,wann%numbranches,wann%nwsq))
+       select type(hamiltonian_source)
+       type is(wannier)
+          allocate(gkRp_ik(hamiltonian_source%numwannbands,hamiltonian_source%numwannbands, &
+               hamiltonian_source%numbranches,hamiltonian_source%nwsq))
+       end select
 
        !Length of g2_istate
-       nprocs = el%nstates_inwindow*wann%numbranches
+       nprocs = el%nstates_inwindow*ph%numbands
        allocate(g2_istate(nprocs))
        g2_istate(:) = 0.0_r64
     end if
@@ -2409,7 +2445,7 @@ contains
     const = twopi/hbar_eVps
 
     !Total number of IBZ blocks states
-    nstates_irred = el%nwv_irred*wann%numwannbands
+    nstates_irred = el%nwv_irred*el%numbands
 
     !Select the appropriate batch record filename based on the simulation key.
     select case(key)
@@ -2455,17 +2491,20 @@ contains
        if(this_image() <= num_active_images) then
           do istate = index_start, index_end !over IBZ blocks states
              !Demux state index into band (m) and wave vector (ik) indices
-             call demux_state(istate, wann%numwannbands, m, ik)
+             call demux_state(istate, el%numbands, m, ik)
 
              if(key == 'g') then
-                !Load gkRp(ik) here for use inside the loops below
-                call chdir(trim(adjustl(num%g2dir)))
-                write (filename_g, '(I6)') ik
-                filename_g = 'gkRp.ik'//trim(adjustl(filename_g))
-                open(1,file=filename_g,status="old",access='stream')
-                read(1) gkRp_ik
-                close(1)
-                call chdir(num%cwd)
+                select type(hamiltonian_source)
+                type is(wannier)
+                   !Load gkRp(ik) here for use inside the loops below
+                   call chdir(trim(adjustl(num%g2dir)))
+                   write (filename_g, '(I6)') ik
+                   filename_g = 'gkRp.ik'//trim(adjustl(filename_g))
+                   open(1,file=filename_g,status="old",access='stream')
+                   read(1) gkRp_ik
+                   close(1)
+                   call chdir(num%cwd)
+                end select
              end if
 
              !Get the muxed index of FBZ wave vector from the IBZ index list
@@ -2531,35 +2570,61 @@ contains
 
                    !Calculate the fine mesh phonon.
                    qlist(1, :) = q_vec%frac
-                   call wann%ph_wann(crys, 1_i64, qlist, ph_ens_iq, ph_evecs_iq)
+                   select type(hamiltonian_source)
+                   type is(wannier)
+                      call hamiltonian_source%ph_wann(crys, 1_i64, qlist, ph_ens_iq, ph_evecs_iq)
+                   type is(AFM_Dirac)
+                      call hamiltonian_source%get_phonons(qlist, crys%reclattvecs, model_ph_ens)
+                      ph_ens_iq(1, :) = model_ph_ens(1)
+                      ph_evecs_iq = (1.0_r64, 0.0_r64)
+                   end select
                 else !Get the q vector represented in the (coarser) phonon mesh
                    q_vec_coarse = vec_change_grid(q_vec, ph%wvmesh)
                    iq_coarse = q_vec_coarse%muxed_index
                 end if
 
+                !For the model, get |g|^2 for all band pairs at once
+                if(key == 'g') then
+                   select type(hamiltonian_source)
+                   type is(AFM_Dirac)
+                      if(needfinephon) then
+                         g2_model = hamiltonian_source%g2(q_vec%frac, el%evecs_irred(ik, :, :), &
+                              el%evecs(ikp, :, :), crys%reclattvecs)
+                      else
+                         g2_model = hamiltonian_source%g2(q_vec_coarse%frac, el%evecs_irred(ik, :, :), &
+                              el%evecs(ikp, :, :), crys%reclattvecs)
+                      end if
+                   end select
+                end if
+
                 !Run over final electron bands
-                do n = 1, wann%numwannbands
+                do n = 1, el%numbands
                    !Apply energy window to final electron
                    if(abs(el%ens(ikp, n) - el%enref) > el%fsthick) cycle
 
                    !Run over phonon branches
-                   do s = 1, wann%numbranches
+                   do s = 1, ph%numbands
                       !Increment g2 processes counter
                       count = count + 1
 
                       if(key == 'g') then
                          !Calculate |g_mns(<k>,q)|^2
-                         if(needfinephon) then
-                            g2_istate(count) = wann%g2(crys, k_vec%frac, q_vec%frac, &
-                                 el%evecs_irred(ik, m, :), el%evecs(ikp, n, :), &
-                                 ph_evecs_iq(1, s, :), ph_ens_iq(1, s), &
-                                 gkRp_ik, 'ph')
-                         else
-                            g2_istate(count) = wann%g2(crys, k_vec%frac, q_vec_coarse%frac, &
-                                 el%evecs_irred(ik, m, :), el%evecs(ikp, n, :), &
-                                 ph%evecs(iq_coarse, s, :), ph%ens(iq_coarse, s), &
-                                 gkRp_ik, 'ph')
-                         end if
+                         select type(hamiltonian_source)
+                         type is(wannier)
+                            if(needfinephon) then
+                               g2_istate(count) = hamiltonian_source%g2(crys, k_vec%frac, q_vec%frac, &
+                                    el%evecs_irred(ik, m, :), el%evecs(ikp, n, :), &
+                                    ph_evecs_iq(1, s, :), ph_ens_iq(1, s), &
+                                    gkRp_ik, 'ph')
+                            else
+                               g2_istate(count) = hamiltonian_source%g2(crys, k_vec%frac, q_vec_coarse%frac, &
+                                    el%evecs_irred(ik, m, :), el%evecs(ikp, n, :), &
+                                    ph%evecs(iq_coarse, s, :), ph%ens(iq_coarse, s), &
+                                    gkRp_ik, 'ph')
+                            end if
+                         type is(AFM_Dirac)
+                            g2_istate(count) = g2_model(m, n)
+                         end select
                       else
                          !Phonon energy
                          if(needfinephon) then
@@ -2690,12 +2755,15 @@ contains
     if(associated(delta_fn_ptr)) nullify(delta_fn_ptr)
 
     if(key == 'g') then
-       !Delete the gkRp disk data
-       if(this_image() == 1) then
-          call chdir(trim(adjustl(num%g2dir)))
-          call system('rm gkRp.*')
-          call chdir(num%cwd)
-       endif
+       select type(hamiltonian_source)
+       type is(wannier)
+          !Delete the gkRp disk data
+          if(this_image() == 1) then
+             call chdir(trim(adjustl(num%g2dir)))
+             call system('rm gkRp.*')
+             call chdir(num%cwd)
+          endif
+       end select
     end if
     sync all
   end subroutine calculate_eph_interaction_ibzk

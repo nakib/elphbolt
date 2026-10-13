@@ -24,7 +24,8 @@ module symmetry_module
   use crystal_module, only : crystal
 
   use iso_c_binding
-  use spglib_f08, only: SpglibDataset, spg_get_dataset
+  use spglib_f08, only: SpglibDataset, spg_get_dataset, &
+       SpglibMagneticDataset, spg_get_magnetic_dataset
 
   implicit none
 
@@ -68,16 +69,29 @@ module symmetry_module
 
 contains
 
-  subroutine calculate_symmetries(self, crys, mesh, use_TR)
+  subroutine calculate_symmetries(self, crys, mesh, use_TR, magmoms)
     !! Subroutine to generate the symmetry related data for a given crystal.
     !!
     !! This subroutine closely follows parts of config.f90 of the ShengBTE code.
+    !!
+    !! If use_TR is true (default), the space group of the structure is used and
+    !! each operation is doubled by its time-reversed partner.
+    !! If use_TR is false and magmoms is not provided, only the space group
+    !! operations are used.
+    !! If use_TR is false and magmoms is provided, the magnetic space group
+    !! from spglib is used. Each of its operations carries its own
+    !! time-reversal flag: an operation with the flag set acts on wave vectors
+    !! as k -> -R k and is stored with the negated rotation, just like the
+    !! time-reversed partners above.
 
     class(symmetry), intent(out) :: self
     type(crystal), intent(in) :: crys
     integer(i64), intent(in) :: mesh(3)
     logical, intent(in), optional :: use_TR
     !! Include time-reversal symmetry? Default is true.
+    real(r64), intent(in), optional :: magmoms(:, :)
+    !! Cartesian axial vector (magnetic moment) on each basis atom. Shape (3, numatoms).
+    !! Only used if use_TR is false.
 
     !Internal variables:
     integer(i64) :: i, ii, jj, kk, ll, info, nq, nlen
@@ -88,6 +102,12 @@ contains
     real(r64), allocatable :: translations(:,:), ctranslations(:,:)
     real(r64) :: tmp1(3, 3), tmp2(3, 3), tmp3(3, 3)
     type(spglibdataset) :: symdataset
+    type(SpglibMagneticDataset) :: magdataset
+    logical :: use_magnetic
+    logical, allocatable :: op_TR(:), TR_flag_spglib(:)
+    integer(i64), allocatable :: order(:)
+    integer(i64) :: iorder, nops
+    real(r64), allocatable :: all_translations(:, :)
     integer(kind = C_INT) :: numatoms_cint
     integer(kind = C_INT) :: atomtypes_cint(crys%numatoms)
 
@@ -99,6 +119,16 @@ contains
     self%use_TR = .true.
     if(present(use_TR)) self%use_TR = use_TR
 
+    use_magnetic = .false.
+    if(present(magmoms)) then
+       if(self%use_TR) then
+          if(this_image() == 1) print*, &
+               "Magnetic moments provided but use_TR is true. Ignoring the moments."
+       else
+          use_magnetic = .true.
+       end if
+    end if
+
     !Number of points in wave vector mesh
     nq = product(mesh)
 
@@ -109,7 +139,54 @@ contains
 
     !Grab subset of symmetry info from spglib data set
     ! Number of symmetry operations
-    self%nsymm = symdataset%n_operations
+    nops = symdataset%n_operations
+
+    !Operations of the magnetic space group, if requested
+    allocate(TR_flag_spglib(nops))
+    TR_flag_spglib = .false.
+    if(use_magnetic) then
+       if(size(magmoms, 1) /= 3 .or. size(magmoms, 2) /= crys%numatoms) &
+            call exit_with_message("magmoms should have shape (3, numatoms). Exiting.")
+       
+       magdataset = spg_get_magnetic_dataset(transpose(crys%lattvecs), crys%basis, &
+            atomtypes_cint, reshape(magmoms, [3*crys%numatoms]), 1_C_INT, &
+            numatoms_cint, 1_C_INT, 1.0e-5_r64)
+
+       nops = magdataset%n_operations
+
+       deallocate(TR_flag_spglib)
+
+       allocate(TR_flag_spglib(nops))
+       TR_flag_spglib = (magdataset%time_reversals == 1)
+    end if
+
+    !Order the operations so that the unitary ones come before the time-reversed
+    !ones. order(i) is the index, in spglib's list, of the i-th operation in our list.
+    allocate(order(nops))
+
+    iorder = 0
+
+    do i = 1, nops
+       if(.not. TR_flag_spglib(i)) then
+          iorder = iorder + 1
+          order(iorder) = i
+       end if
+    end do
+
+    do i = 1, nops
+       if(TR_flag_spglib(i)) then
+          iorder = iorder + 1
+          order(iorder) = i
+       end if
+    end do
+
+    !op_TR(i) is the time-reversal flag of the i-th operation in our list.
+    allocate(op_TR(nops))
+    do i = 1, nops
+       op_TR(i) = TR_flag_spglib(order(i))
+    end do
+
+    self%nsymm = nops
 
     ! Double the above to take time reversal symetry (TRS) into account, if requested.
     if(self%use_TR) then
@@ -126,14 +203,23 @@ contains
 
     ! Mind the difference in convention between spglib and this code
     do i = 1, self%nsymm
-       self%rotations_orig(:, :, i) = transpose(symdataset%rotations(:, :, i))
+       if(use_magnetic) then
+          self%rotations_orig(:, :, i) = transpose(magdataset%rotations(:, :, order(i)))
+       else
+          self%rotations_orig(:, :, i) = transpose(symdataset%rotations(:, :, order(i)))
+       end if
     end do
 
     ! Set just the front half
     self%rotations(:, :, 1:self%nsymm) = self%rotations_orig
 
     ! Set the translations
-    translations = symdataset%translations
+    if(use_magnetic) then
+       all_translations = magdataset%translations
+    else
+       all_translations = symdataset%translations
+    end if
+    translations = all_translations(:, order)
 
     ! Set the international symbol
     self%international = trim(adjustl(symdataset%international_symbol))
@@ -144,6 +230,9 @@ contains
        write(*, "(A, I3)") "Spacegroup number = ", symdataset%spacegroup_number
        write(*, "(A, I5)") "Number of crystal symmetries (without time-reversal) = ", self%nsymm
        write(*, "(A, L2)") "Time-reversal symmetry included = ", self%use_TR
+       if(use_magnetic) write(*, "(A, I5, A, I5)") &
+            "Magnetic space group: number of operations = ", self%nsymm, &
+            ", of which time-reversed = ", count(op_TR)
     end if
 
     !Set symmetry operations in Cartesian basis.
@@ -175,10 +264,22 @@ contains
        self%crotations(:,:,self%nsymm+1:2*self%nsymm) = -self%crotations_orig(:,:,1:self%nsymm)
     end if
 
+    !Magnetic space group operations that come with time reversal act as -R on k.
+    if(use_magnetic) then
+       do i = 1, self%nsymm
+          if(op_TR(i)) then
+             self%rotations(:, :, i) = -self%rotations_orig(:, :, i)
+             self%qrotations(:, :, i) = -self%qrotations_orig(:, :, i)
+             self%crotations(:, :, i) = -self%crotations_orig(:, :, i)
+          end if
+       end do
+    end if
+
     !Flag the time-reversed rotations.
     allocate(self%is_TR(self%nsymm_rot))
     self%is_TR = .false.
     if(self%use_TR) self%is_TR(self%nsymm + 1:2*self%nsymm) = .true.
+    if(use_magnetic) self%is_TR = op_TR
 
     !Find rotations that are either duplicated or incompatible with mesh.
     allocate(local_equiv_map(self%nsymm_rot,nq))

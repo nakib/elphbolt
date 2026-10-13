@@ -115,11 +115,13 @@ module electron_module
 
 contains
 
-  subroutine read_input_and_setup(self, wann, crys, sym, num)
+  subroutine read_input_and_setup(self, hamiltonian_source, crys, sym, num)
     !! Read input file and setup groundstate electronic system.
+    !!
+    !! hamiltonian_source is either a wannier or an AFM_Dirac model.
 
     class(electron), intent(out) :: self
-    type(wannier), intent(in) :: wann
+    class(*), intent(in) :: hamiltonian_source
     type(crystal), intent(in) :: crys
     type(symmetry), intent(in) :: sym
     type(numerics), intent(in) :: num
@@ -132,6 +134,9 @@ contains
     logical :: metallic
     character(len = 6) :: concunits
     character(len = 1) :: dopingtype
+    integer(i64) :: numbands_source
+    real(r64), allocatable :: ens_probe(:, :), vels_probe(:, :, :)
+    complex(r64), allocatable :: evecs_probe(:, :, :)
 
     namelist /electrons/ enref, spindeg, numbands, &
          indlowband, indhighband, metallic, chempot, Zn, Zp, &
@@ -189,9 +194,21 @@ contains
        call exit_with_message(&
             'Scissor operator must be positive.')
     end if
-    if(numbands .ne. wann%numwannbands ) then
+    !Number of bands of the Hamiltonian source
+    select type(hamiltonian_source)
+    type is(wannier)
+       numbands_source = hamiltonian_source%numwannbands
+    type is(AFM_Dirac)
+       !The number of bands is private to the model. Probe it at one wave vector.
+       call hamiltonian_source%get_electrons(reshape([0.0_r64, 0.0_r64, 0.0_r64], [1, 3]), &
+            crys%reclattvecs, ens_probe, evecs_probe, vels_probe, .true.)
+       numbands_source = size(ens_probe, 2)
+    class default
+       call exit_with_message('Unknown Hamiltonian source for electrons.')
+    end select
+    if(numbands .ne. numbands_source) then
        call exit_with_message(&
-            'Number of wannier bands is not correct.')
+            'Number of electronic bands is not correct.')
     end if
     if(num%runlevel == 0) then
        if(numT <= 0 .or. numconc <= 0) then
@@ -252,10 +269,10 @@ contains
     self%fsthick = num%fsthick
 
     !Computing the shift in energy due to scissor operator
-    allocate(self%scissor(wann%numwannbands))
+    allocate(self%scissor(numbands))
     self%scissor(:) = 0.0_r64
     if (.not. metallic .and. self%indlowconduction > self%indhighvalence) then
-       self%scissor(self%indlowconduction:wann%numwannbands) = scissor
+       self%scissor(self%indlowconduction:numbands) = scissor
     end if
 
     !Print out information.
@@ -280,7 +297,12 @@ contains
     end if
 
     !Calculate electrons
-    call calculate_electrons(self, wann, crys, sym, num)
+    select type(hamiltonian_source)
+    type is(wannier)
+       call calculate_electrons(self, hamiltonian_source, crys, sym, num)
+    type is(AFM_Dirac)
+       call calculate_electrons_model(self, hamiltonian_source, crys, sym, num)
+    end select
 
     !Set total number of charged impurities
     if(.not. self%metallic) then
@@ -366,7 +388,7 @@ contains
          self%ens_irred, self%evecs_irred, self%vels_irred, .true.)
 
     !Note that the number of bands is private to the AFM model.
-    numbands = size(self%ens_irred, 1)
+    numbands = size(self%ens_irred, 2)
     
     ! 4. Map out FBZ quantities from IBZ ones
     call print_message("Mapping out FBZ energies...")

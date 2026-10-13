@@ -21,7 +21,10 @@ program elphbolt_with_coherence
   use symmetry_module, only: symmetry
   use electron_module, only: electron
   use phonon_module, only: phonon
-  use wannier_module, only: wannier
+  !use wannier_module, only: wannier
+  use model_hamiltonian_module, only: AFM_Dirac
+  use precision, only: r64, i64
+  use misc, only: eye
   use sepe_module, only: sepe
   use bz_sums, only: calculate_dos, calculate_qTF, calculate_el_dos_fermi, calculate_el_Ws
   use interactions, only: calculate_gReq, calculate_gkRp, &
@@ -33,11 +36,22 @@ program elphbolt_with_coherence
   type(numerics) :: num
   type(crystal) :: crys
   type(symmetry) :: sym
-  type(wannier) :: wann
+  !type(wannier) :: wann
+  type(AFM_Dirac) :: model
   type(electron) :: el
   type(phonon) :: ph
   type(sepe) :: sep
   type(timer) :: t_all, t_event
+
+  !Model parameters
+  real(r64), parameter :: a = 0.2863444_r64 !nm. In-plane lattice constant of Mn2Au
+  real(r64), parameter :: t = 0.1_r64 !eV
+  real(r64), parameter :: lambda = 1.5_r64*t !eV
+  real(r64), parameter :: Neel(3) = 0.6_r64*t*[1.0_r64, 0.0_r64, 0.0_r64] !eV
+  real(r64), parameter :: vs = 5.0_r64 !nm/ps
+  real(r64), parameter :: Mion = (2*54.938_r64 + 196.96657_r64)/3.0_r64 !amu
+  real(r64), parameter :: Dadp = 3.0_r64 !eV
+  real(r64) :: lattvecs(3, 3), basis(3, 2), magmoms(3, 6), magmoms_AB(3, 2)
 
   !Print banner and other information
   call welcome
@@ -51,37 +65,59 @@ program elphbolt_with_coherence
 
   !Set up numerics data
   call num%initialize(crys)
+     
+  !Set up the model. The 2D square lattice with the two sublattices A and B.
+  lattvecs = a*eye(3_i64)
+  lattvecs(:, 3) = 0.0_r64
+  basis(:, 1) = [0.0_r64, 0.0_r64, 0.0_r64]
+  basis(:, 2) = [0.5_r64, 0.5_r64, 0.0_r64]
+  call model%initialize(a, t, lambda, Neel, vs, Mion, Dadp, lattvecs, basis)
 
-  !Calculate crystal and BZ symmetries
-  call sym%calculate_symmetries(crys, num%qmesh, num%use_TR)
+  if(this_image() == 1) then
+     call model%print_info
+  end if
+  sync all
+
+  !Calculate crystal and BZ symmetries. The symmetries come from the 3D magnetic
+  !structure in the input file, which has to list the atoms in the order
+  !Mn, Mn, Mn, Mn, Au, Au with the Mn layers carrying +N, -N, +N, -N going up in z.
+  magmoms_AB = model%get_magmoms()
+  magmoms(:, 1) = magmoms_AB(:, 1)
+  magmoms(:, 2) = magmoms_AB(:, 2)
+  magmoms(:, 3) = magmoms_AB(:, 1)
+  magmoms(:, 4) = magmoms_AB(:, 2)
+  magmoms(:, 5:6) = 0.0_r64
+  call sym%calculate_symmetries(crys, num%qmesh, num%use_TR, magmoms)
 
   sync all
   call t_event%end_timer('Initialization')
 
-  if(num%need_Wannier) then
-     call t_event%start_timer('Wannier')
-
-     !Read EPW Wannier data
-     call wann%read(num)
-
-     call t_event%end_timer('Wannier')
+!!$  if(num%need_Wannier) then
+!!$     call t_event%start_timer('Wannier')
+!!$
+!!$     !Read EPW Wannier data
+!!$     call wann%read(num)
+!!$
+!!$     call t_event%end_timer('Wannier')
 
      call t_event%start_timer('Electrons')
 
      !Calculate electrons
-     call el%initialize(wann, crys, sym, num)
+     !call el%initialize(wann, crys, sym, num)
+     call el%initialize(model, crys, sym, num)
 
      call t_event%end_timer('Electrons')
-  end if
+!!$  end if
 
   call t_event%start_timer('Phonons')
 
   !Calculate phonons
-  if(num%use_Wannier_ifc2s) then
-     call ph%initialize(crys, sym, num, wann)
-  else
-     call ph%initialize(crys, sym, num)
-  end if
+  !if(num%use_Wannier_ifc2s) then
+  !   call ph%initialize(crys, sym, num, wann)
+  !else
+  !   call ph%initialize(crys, sym, num)
+  !end if
+  call ph%initialize_model(crys, sym, num, model)
 
   call t_event%end_timer('Phonons')
 
@@ -111,16 +147,16 @@ program elphbolt_with_coherence
 
      call t_event%end_timer('Density of states and one-particle scattering rates')
 
-     if(num%plot_along_path) then
-        call t_event%start_timer('Plots along path')
-
-        call subtitle("Plotting along high-symmetry path...")
-
-        !Plot electron bands, phonon dispersions, and g along path.
-        call wann%plot_along_path(crys, num, el%scissor)
-
-        call t_event%end_timer('Plots along path')
-     end if
+!!$     if(num%plot_along_path) then
+!!$        call t_event%start_timer('Plots along path')
+!!$
+!!$        call subtitle("Plotting along high-symmetry path...")
+!!$
+!!$        !Plot electron bands, phonon dispersions, and g along path.
+!!$        call wann%plot_along_path(crys, num, el%scissor)
+!!$
+!!$        call t_event%end_timer('Plots along path')
+!!$     end if
 
      call subtitle("Calculating interactions...")
 
@@ -132,10 +168,11 @@ program elphbolt_with_coherence
            call t_event%start_timer('IBZ q e-ph interactions')
 
            !Calculate mixed Bloch-Wannier space e-ph vertex g(Re,q)
-           call calculate_gReq(wann, ph, num)
+           !call calculate_gReq(wann, ph, num)
 
            !Calculate Bloch space e-ph vertex g(k,q) for IBZ q
-           call calculate_eph_interaction_ibzq(wann, crys, el, ph, num, 'g')
+           !call calculate_eph_interaction_ibzq(wann, crys, el, ph, num, 'g')
+           call calculate_eph_interaction_ibzq(model, crys, el, ph, num, 'g')
 
            call t_event%end_timer('IBZ q e-ph interactions')
         end if
@@ -146,7 +183,8 @@ program elphbolt_with_coherence
         if(.not. num%Y_OTF) then
            call t_event%start_timer('IBZ ph-e transition probilities')
 
-           call calculate_eph_interaction_ibzq(wann, crys, el, ph, num, 'Y')
+           !call calculate_eph_interaction_ibzq(wann, crys, el, ph, num, 'Y')
+           call calculate_eph_interaction_ibzq(model, crys, el, ph, num, 'Y')
 
            call t_event%end_timer('IBZ ph-e transition probilities')
         end if
@@ -154,7 +192,8 @@ program elphbolt_with_coherence
         !Calculate ph-e coherence transition probabilities
         call t_event%start_timer('IBZ ph-e Us')
 
-        call calculate_eph_interaction_ibzq(wann, crys, el, ph, num, 'U')
+        !call calculate_eph_interaction_ibzq(wann, crys, el, ph, num, 'U')
+        call calculate_eph_interaction_ibzq(model, crys, el, ph, num, 'U')
 
         call t_event%end_timer('IBZ ph-e Us')
      end if
@@ -164,10 +203,11 @@ program elphbolt_with_coherence
            call t_event%start_timer('IBZ k e-ph interactions')
 
            !Calculate mixed Bloch-Wannier space e-ph vertex g(k,Rp)
-           call calculate_gkRp(wann, el, num)
+           !call calculate_gkRp(wann, el, num)
 
            !Calculate Bloch space e-ph vertex g(k,q) for IBZ k
-           call calculate_eph_interaction_ibzk(wann, crys, el, ph, num, 'g')
+           !call calculate_eph_interaction_ibzk(wann, crys, el, ph, num, 'g')
+           call calculate_eph_interaction_ibzk(model, crys, el, ph, num, 'g')
 
            call t_event%end_timer('IBZ k e-ph interactions')
         end if
@@ -175,7 +215,8 @@ program elphbolt_with_coherence
         call t_event%start_timer('IBZ e-ph transition probabilities')
 
         !Calculate e-ph transition probabilities
-        call calculate_eph_interaction_ibzk(wann, crys, el, ph, num, 'X')
+        !call calculate_eph_interaction_ibzk(wann, crys, el, ph, num, 'X')
+        call calculate_eph_interaction_ibzk(model, crys, el, ph, num, 'X')
 
         call t_event%end_timer('IBZ e-ph transition probabilities')
 
@@ -188,46 +229,46 @@ program elphbolt_with_coherence
 !!$        call t_event%end_timer('IBZ e-ph Omegas^+/-')
      end if
 
-     if(num%need_Wannier) then
-        !Deallocate Wannier quantities
-        call wann%deallocate_wannier(num)
-     end if
+     !if(num%need_Wannier) then
+     !   !Deallocate Wannier quantities
+     !   call wann%deallocate_wannier(num)
+     !end if
 
-     if(num%onlyebte .or. num%drag) then
-        if(num%elchimp) then
-           call t_event%start_timer('e-ch. imp. interactions')
-
-           !Calculate e-ch. imp. transition probabilities
-           call calculate_echimp_interaction_ibzk(crys, el, num)
-
-           call t_event%end_timer('e-ch. imp. interactions')
-        end if
-     end if
-
-     if(num%onlyphbte .or. num%drag) then
-        if(.not. (num%read_V .or. num%read_W)) then
-           call t_event%start_timer('IBZ q ph-ph interactions')
-
-           !Calculate ph-ph vertex
-           call calculate_3ph_interaction(ph, crys, num, 'V')
-
-           call t_event%end_timer('IBZ q ph-ph interactions')
-        end if
-
-        if(.not. num%W_OTF) then
-           call t_event%start_timer('IBZ ph-ph scattering rates')
-
-           !Calculate ph-ph transition probabilities
-           call calculate_3ph_interaction(ph, crys, num, 'W')
-
-           call t_event%end_timer('IBZ ph-ph scattering rates')
-        end if
-     end if
-
-     if(num%onlyphbte .or. num%drag) then
-        !After this point the phonon eigenvectors and other quantities are not needed
-        call ph%deallocate_phonon_quantities
-     end if
+!!$     if(num%onlyebte .or. num%drag) then
+!!$        if(num%elchimp) then
+!!$           call t_event%start_timer('e-ch. imp. interactions')
+!!$
+!!$           !Calculate e-ch. imp. transition probabilities
+!!$           call calculate_echimp_interaction_ibzk(crys, el, num)
+!!$
+!!$           call t_event%end_timer('e-ch. imp. interactions')
+!!$        end if
+!!$     end if
+!!$
+!!$     if(num%onlyphbte .or. num%drag) then
+!!$        if(.not. (num%read_V .or. num%read_W)) then
+!!$           call t_event%start_timer('IBZ q ph-ph interactions')
+!!$
+!!$           !Calculate ph-ph vertex
+!!$           call calculate_3ph_interaction(ph, crys, num, 'V')
+!!$
+!!$           call t_event%end_timer('IBZ q ph-ph interactions')
+!!$        end if
+!!$
+!!$        if(.not. num%W_OTF) then
+!!$           call t_event%start_timer('IBZ ph-ph scattering rates')
+!!$
+!!$           !Calculate ph-ph transition probabilities
+!!$           call calculate_3ph_interaction(ph, crys, num, 'W')
+!!$
+!!$           call t_event%end_timer('IBZ ph-ph scattering rates')
+!!$        end if
+!!$     end if
+!!$
+!!$     if(num%onlyphbte .or. num%drag) then
+!!$        !After this point the phonon eigenvectors and other quantities are not needed
+!!$        call ph%deallocate_phonon_quantities
+!!$     end if
 
      !Solve SEPEs
      if(num%solve_bulk) then

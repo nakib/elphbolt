@@ -20,7 +20,7 @@ module phonon_module
   !! Module containing type and procedures related to the phononic properties.
 
   use precision, only: r64, i64
-  use params, only: bohr2nm, pi, twopi, Ryd2eV, oneI, complex_zero
+  use params, only: bohr2nm, pi, twopi, Ryd2eV, oneI, complex_zero, complex_one
   use particle_module, only: particle
   use misc, only: print_message, subtitle, expi, distribute_points, &
        write2file_rank2_real, exit_with_message, create_set, coarse_grain, &
@@ -31,6 +31,7 @@ module phonon_module
   use delta, only: form_tetrahedra_3d, fill_tetrahedra_3d, form_triangles, &
        fill_triangles, delta_fn, get_delta_fn_pointer
   use wannier_module, only: Wannier, dyn_nonanalytic
+  use model_hamiltonian_module, only: AFM_Dirac
 
   implicit none
 
@@ -90,7 +91,7 @@ module phonon_module
 
    contains
 
-     procedure, public :: initialize, deallocate_phonon_quantities
+     procedure, public :: initialize, initialize_model, deallocate_phonon_quantities
      procedure, private :: calculate_phonons, read_ifc2, read_ifc3, &
           phonon_espresso_precompute, phonon_espresso
 
@@ -139,6 +140,29 @@ contains
     end if
   end subroutine initialize
 
+  subroutine initialize_model(self, crys, sym, num, model)
+    !! Initialize the phonon data type and calculate ground state phonon
+    !! properties from a model Hamiltonian. No force constants are read.
+
+    class(phonon), intent(out) :: self
+    type(crystal), intent(in) :: crys
+    type(symmetry), intent(in) :: sym
+    type(numerics), intent(in) :: num
+    type(AFM_Dirac), intent(in) :: model
+
+    call subtitle("Setting up phonons from model...")
+
+    !The model has a single acoustic branch.
+    self%numbands = 1
+    !Set wave vector mesh
+    self%wvmesh = num%qmesh
+    !Set number of phonon wave vectors
+    self%nwv = product(self%wvmesh(:))
+
+    !Calculate harmonic properties
+    call calculate_phonons(self, crys, sym, num, model)
+  end subroutine initialize_model
+
   subroutine deallocate_phonon_quantities(self)
     !! Deallocate the electron eigenvectors
 
@@ -158,14 +182,17 @@ contains
     sync all
   end subroutine deallocate_phonon_quantities
 
-  subroutine calculate_phonons(self, crys, sym, num, wann)
+  subroutine calculate_phonons(self, crys, sym, num, hamiltonian_source)
     !! Calculate phonon quantities on the FBZ and IBZ meshes.
+    !! The FBZ quantities come from the Wannier interpolation or the model
+    !! Hamiltonian, if hamiltonian_source is of type wannier or AFM_Dirac,
+    !! respectively. Otherwise, they come from the force constants.
 
     class(phonon), intent(inout) :: self
     type(crystal), intent(in) :: crys
     type(symmetry), intent(in) :: sym
     type(numerics), intent(in) :: num
-    type(wannier), intent(in), optional :: wann
+    class(*), intent(in), optional :: hamiltonian_source
 
     !Local variables
     integer(i64) :: i, iq, ii, jj, kk, l, il, s, ib, im, chunk, &
@@ -177,8 +204,24 @@ contains
     !Switch for mesh utilites with or without energy restriction
     logical :: blocks
     character(len = 1024) :: numcols
+    real(r64), allocatable :: model_ens(:), model_vels(:, :)
+    logical :: use_model, use_wann
 
     blocks = .false.
+
+    !Find the type of the Hamiltonian source
+    use_model = .false.
+    use_wann = .false.
+    if(present(hamiltonian_source)) then
+       select type(hamiltonian_source)
+       type is(AFM_Dirac)
+          use_model = .true.
+       type is(wannier)
+          use_wann = .true.
+       class default
+          call exit_with_message("Unsupported hamiltonian_source type for phonons. Exiting.")
+       end select
+    end if
 
     call print_message("Calculating phonon FBZ quantities...")
 
@@ -207,9 +250,22 @@ contains
     !Only work with the active images
     if(this_image() <= num_active_images) then
        !Calculate FBZ phonon quantities
-       if(num%use_Wannier_ifc2s .and. present(wann)) then
-          call wann%ph_wann(crys, chunk, self%wavevecs(start:end, :), &
-               ens_chunk, evecs_chunk, vels_chunk)
+       if(use_model) then
+          select type(hamiltonian_source)
+          type is(AFM_Dirac)
+             call hamiltonian_source%get_phonons(self%wavevecs(start:end, :), &
+                  crys%reclattvecs, model_ens, model_vels)
+          end select
+          ens_chunk(1:end - start + 1, 1) = model_ens
+          vels_chunk(1:end - start + 1, 1, :) = model_vels
+          !Single branch, so trivial eigenvectors
+          evecs_chunk(1:end - start + 1, 1, 1) = complex_one
+       else if(num%use_Wannier_ifc2s .and. use_wann) then
+          select type(hamiltonian_source)
+          type is(wannier)
+             call hamiltonian_source%ph_wann(crys, chunk, self%wavevecs(start:end, :), &
+                  ens_chunk, evecs_chunk, vels_chunk)
+          end select
        else
           select case (self%ifc2_engine)
           case('phonopy')
