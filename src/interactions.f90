@@ -2940,7 +2940,7 @@ contains
        allocate(gReq_iq(wann%numwannbands, wann%numwannbands, wann%numbranches, wann%nwsk))
 
        !Maximum length of g2_istate
-       nprocs = el%nstates_inwindow*ph%numbands
+       nprocs = el%nstates_inwindow*el%numbands
        allocate(g2_istate(nprocs))
        g2_istate(:) = 0.0_r64
     end if
