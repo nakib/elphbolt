@@ -2041,4 +2041,55 @@ contains
        end if
     end do
   end function interpolator_1d
+
+  ! Compute eigenvalues of symmetric matrix using LAPACK
+  subroutine compute_eigenvalues(A, eigenvalues_real, eigenvalues_imag)
+    real(r64), intent(in), dimension(:,:) :: A
+    real(r64), intent(out), dimension(:) :: eigenvalues_real, eigenvalues_imag
+    integer :: n, info, lwork
+    real(r64), allocatable :: work(:)
+    real(r64), allocatable :: A_copy(:, :)
+    real(r64), allocatable :: VL(:, :), VR(:, :)
+
+    n = size(A, 1)
+
+    ! Allocate copy of A, since DGEEV overwrites input
+    allocate(A_copy(n, n))
+    A_copy = A
+
+    ! Allocate dummy eigenvector matrices (not needed)
+    allocate(VL(1, 1), VR(1, 1))
+
+    ! Query optimal workspace
+    allocate(work(1))
+    lwork = -1
+    call dgeev('N', 'N', n, A_copy, n, eigenvalues_real, eigenvalues_imag, &
+         VL, 1, VR, 1, work, lwork, info)
+    if (info /= 0) then
+       print *, "DGEEV workspace query failed with info = ", info
+       return
+    end if
+
+    lwork = int(work(1))
+    deallocate(work)
+    allocate(work(lwork))
+
+    ! Compute eigenvalues
+    call dgeev('N', 'N', n, A_copy, n, eigenvalues_real, eigenvalues_imag, &
+         VL, 1, VR, 1, work, lwork, info)
+
+    if (info /= 0) then
+       print *, "DGEEV failed with info = ", info
+    end if
+
+    deallocate(work, A_copy, VL, VR)
+
+  end subroutine compute_eigenvalues
+
+  function F_norm(A) result(norm)
+    real(r64), intent(in) :: A(:, :)
+    real(r64) :: norm
+
+    norm = sqrt(sum(A**2))
+  end function F_norm
 end module misc

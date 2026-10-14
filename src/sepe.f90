@@ -27,11 +27,12 @@ module SEPE_module
        trace, subtitle, append2file_transport_tensor, write2file_response, &
        linspace, readfile_response, write2file_spectral_tensor, subtitle, timer, &
        twonorm, write2file_rank1_real, precompute_interpolation_corners_and_weights, &
-       interpolate_using_precomputed, Jacobian, cross_product, qdist, Bose
+       interpolate_using_precomputed, Jacobian, cross_product, qdist, Bose, Fermi
   use numerics_module, only: numerics
   use crystal_module, only: crystal
   use symmetry_module, only: symmetry
   use phonon_module, only: phonon
+  use model_hamiltonian_module, only: AFM_Dirac
   use electron_module, only: electron
   use interactions, only: calculate_ph_rta_rates, read_transition_probs_e, &
        calculate_el_rta_rates, calculate_bound_scatt_rates, calculate_thinfilm_scatt_rates, &
@@ -39,6 +40,7 @@ module SEPE_module
        calculate_Xee_13_OTF, calculate_ph_rta_coherence_rates
   use bz_sums, only: calculate_transport_coeff, calculate_spectral_transport_coeff, &
        calculate_cumulative_transport_coeff
+  use optimization, only: find_correction, coeffs_for_optimization, global_coeffs
 
   implicit none
 
@@ -46,7 +48,7 @@ module SEPE_module
   public sepe
 
   type sepe
-     !! Data and procedures related to the BTE.
+     !! Data and procedures related to the SEPE.
 
      real(r64), allocatable :: ph_rta_rates_iso_ibz(:,:)
      !! Phonon RTA scattering rates on the IBZ due to isotope scattering.
@@ -144,7 +146,7 @@ contains
          self%el_alphabyT(el_numbands, 3, 3), self%el_kappa0(el_numbands, 3, 3))
   end subroutine allocate_el_transport_coeffs
 
-  subroutine sepe_driver(self, num, crys, sym, ph, el)
+  subroutine sepe_driver(self, num, crys, sym, ph, el, model)
     !! Subroutine to orchestrate the SEPE calculations.
     !!
     !! self SEPE object
@@ -153,6 +155,8 @@ contains
     !! sym Symmertry object
     !! ph Phonon object
     !! el Electron object
+    !! model [Optional] Model Hamiltonian. If given, the 3-ph scattering is
+    !!       treated in the relaxation time approximation with the model rates.
 
     class(sepe), intent(inout) :: self
     type(numerics), intent(in) :: num
@@ -160,12 +164,13 @@ contains
     type(symmetry), intent(in) :: sym
     type(phonon), intent(in) :: ph
     type(electron), intent(in), optional :: el
+    type(AFM_Dirac), intent(in), optional :: model
 
     call subtitle("Calculating SEPEs...")
 
     !Phonon RTA
     if(.not. num%onlyebte) &
-         call dragless_phbte_RTA(num%cwd_T, self, num, crys, sym, ph, el)
+         call dragless_phbte_RTA(num%cwd_T, self, num, crys, sym, ph, el, model)
 
     !Electron RTA
     if(.not. num%onlyphbte) &
@@ -173,7 +178,7 @@ contains
 
     !Dragful electron-phonon BTEs
     if(num%drag) &
-         call dragfull_ephbtes(num%cwd_T, self, num, crys, sym, ph, el)
+         call dragfull_ephbtes(num%cwd_T, self, num, crys, sym, ph, el, model)
   end subroutine sepe_driver
 
   subroutine calculate_field_term(species, field, nequiv, ibz2fbz_map, &
@@ -275,7 +280,7 @@ contains
     end if
   end subroutine calculate_field_term
 
-  subroutine dragless_phbte_RTA(Tdir, self, num, crys, sym, ph, el)
+  subroutine dragless_phbte_RTA(Tdir, self, num, crys, sym, ph, el, model)
     !! Dragless phonon BTE calculator in the relaxation time approximation.
     !! It is impure as it mutates the phonon sector of the bte data type and
     !! writes to disk. It should be kept private to this data type unless made safer.
@@ -286,6 +291,7 @@ contains
     type(symmetry), intent(in) :: sym
     type(phonon), intent(in) :: ph
     type(electron), intent(in) :: el
+    type(AFM_Dirac), intent(in), optional :: model
     character(*), intent(in) :: Tdir
 
     !Locals
@@ -305,9 +311,9 @@ contains
 
     ! 3-phonon and, optionally, phonon-electron 
     if(num%phe) then
-       call calculate_ph_rta_rates(self%ph_rta_rates_3ph_ibz, self%ph_rta_rates_phe_ibz, num, crys, ph, el)
+       call calculate_ph_rta_rates(self%ph_rta_rates_3ph_ibz, self%ph_rta_rates_phe_ibz, num, crys, ph, el, model)
     else
-       call calculate_ph_rta_rates(self%ph_rta_rates_3ph_ibz, self%ph_rta_rates_phe_ibz, num, crys, ph)
+       call calculate_ph_rta_rates(self%ph_rta_rates_3ph_ibz, self%ph_rta_rates_phe_ibz, num, crys, ph, model = model)
     end if
 
     ! 4-ph scattering rates
@@ -559,7 +565,7 @@ contains
     sync all
   end subroutine dragless_ebte_RTA
 
-  subroutine dragfull_ephbtes(Tdir, self, num, crys, sym, ph, el)
+  subroutine dragfull_ephbtes(Tdir, self, num, crys, sym, ph, el, model)
     !! Dragful electron-phonon BTEs calculator.
     !! It is impure as it mutates the the bte data type and
     !! writes to disk. It should be kept private to this data type unless made safer.
@@ -570,13 +576,14 @@ contains
     type(symmetry), intent(in) :: sym
     type(phonon), intent(in) :: ph
     type(electron), intent(in) :: el
+    type(AFM_Dirac), intent(in), optional :: model
     character(*), intent(in) :: Tdir
 
     !Locals
     real(r64) :: ph_kappa_scalar, ph_kappa_scalar_old, ph_alphabyT_scalar, ph_alphabyT_scalar_old, &
          el_kappa0_scalar, el_kappa0_scalar_old, el_alphabyT_scalar, el_alphabyT_scalar_old, &
-         el_sigma_scalar, el_sigma_scalar_old, el_sigmaS_scalar, el_sigmaS_scalar_old, KO_dev, &
-         lambda, lambda_diag(3), tot_alphabyT_scalar
+         el_sigma_scalar, el_sigma_scalar_old, el_sigmaS_scalar, el_sigmaS_scalar_old, &
+         lambda, lambda_diag(3), tot_alphabyT_scalar, KO_dev, KO_corr
     real(r64), allocatable :: I_diff(:,:,:), I_drag(:,:,:), &
          ph_drag_term_T(:,:,:), ph_drag_term_E(:,:,:), &
          ph_coherence_term_T(:,:,:), ph_coherence_term_E(:,:,:), widc(:,:)
@@ -636,6 +643,10 @@ contains
     call print_message("----------------------------------")
 
     if(this_image() == 1) then
+!!$       tableheader = "iter     k0_el[W/m/K]         sigmaS[A/m/K]         k_ph[W/m/K]"&
+!!$            //"         sigma[1/Ohm/m]         alpha_el/T[A/m/K]         alpha_ph/T[A/m/K]"&
+!!$            //"         KO dev.[%]         KO corr.[%]"
+!!$       write(*,*) trim(tableheader)
        tableheader = "iter     k0_el[W/m/K]         sigmaS[A/m/K]         k_ph[W/m/K]"&
             //"         sigma[1/Ohm/m]         alpha_el/T[A/m/K]         alpha_ph/T[A/m/K]"&
             //"         KO dev.[%]"
@@ -656,9 +667,9 @@ contains
 
        !Iterate phonon response once
        call iterate_ph_occupations_eqn(crys%T, num, crys, ph, el, self%ph_rta_rates_ibz, &
-            self%ph_field_term_T, self%ph_response_T, self%el_response_T, self%ph_coherence_T)
+            self%ph_field_term_T, self%ph_response_T, self%el_response_T, self%ph_coherence_T, model)
        call iterate_ph_occupations_eqn(crys%T, num, crys, ph, el, self%ph_rta_rates_ibz, &
-            self%ph_field_term_E, self%ph_response_E, self%el_response_E, self%ph_coherence_E)
+            self%ph_field_term_E, self%ph_response_E, self%el_response_E, self%ph_coherence_E, model)
 
        !Calculate phonon transport coefficients
        call calculate_transport_coeff('ph', 'T', crys%T, 1_i64, 0.0_r64, ph%ens, ph%vels, &
@@ -689,7 +700,8 @@ contains
             self%ph_rta_coherence_rates_ibz, self%ph_response_T, self%el_response_T, self%ph_coherence_T)
        call iterate_ph_coherence_eqn(num, crys, ph, el, &
             self%ph_rta_coherence_rates_ibz, self%ph_response_E, self%el_response_E, self%ph_coherence_E)
-
+       !!
+       
        !Iterate electron response all the way
        do it_el = 1, num%maxiter
           !E field:
@@ -701,19 +713,20 @@ contains
           call iterate_el_occupations_eqn(num, el, crys, &
                self%el_rta_rates_ibz, self%el_field_term_T, self%el_response_T, &
                ph_drag_term_T, ph_coherence_term_T)
-          !Enforce Kelvin-Onsager relation:
-          !Fix "diffusion" part
-          do icart = 1, 3
-             I_diff(:,:,icart) = (el%ens(:,:) - el%chempot)/qe/crys%T*&
-                  self%el_response_E(:,:,icart)
-          end do
 
-          !TODO: How to generalize the following to include the coherence term?
-
-          !Correct "drag" part
-          I_drag = self%el_response_T - I_diff
-          call correct_I_drag(I_drag, trace(sum(trans%ph_alphabyT, dim = 1))/crys%dim, lambda)
-          self%el_response_T = I_diff + lambda*I_drag
+!!$          !Enforce Kelvin-Onsager relation (Elena's method):
+!!$          call KO_correction(el, crys, num, sym,  self, trans, KO_dev, KO_corr, ph = ph)
+!!$
+!!$          !My old method
+!!$          !Fix "diffusion" part
+!!$          do icart = 1, 3
+!!$             I_diff(:,:,icart) = (el%ens(:,:) - el%chempot)/qe/crys%T*&
+!!$                  self%el_response_E(:,:,icart)
+!!$          end do
+!!$          !Correct "drag" part
+!!$          I_drag = self%el_response_T - I_diff
+!!$          call correct_I_drag(I_drag, trace(sum(trans%ph_alphabyT, dim = 1))/crys%dim, lambda)
+!!$          self%el_response_T = I_diff + lambda*I_drag
 
           !Calculate electron transport coefficients
           call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, &
@@ -764,6 +777,14 @@ contains
        KO_dev = 100.0_r64*abs(&
             (el_sigmaS_scalar - tot_alphabyT_scalar)/tot_alphabyT_scalar)
 
+!!$       if(this_image() == 1) then
+!!$          write(*,"(I3, A, 1E16.8, A, 1E16.8, A, 1E16.8, A, 1E16.8, &
+!!$               A, 1E16.8, A, 1E16.8, A, 1F16.1, A, 1F16.1)") it_ph_occ, "     ", el_kappa0_scalar, &
+!!$               "      ", el_sigmaS_scalar, "     ", ph_kappa_scalar, &
+!!$               "    ", el_sigma_scalar, "        ", el_alphabyT_scalar, &
+!!$               "         ", ph_alphabyT_scalar, "           ", KO_dev, "     ", KO_corr
+!!$       end if
+!!$       
        if(this_image() == 1) then
           write(*,"(I3, A, 1E16.8, A, 1E16.8, A, 1E16.8, A, 1E16.8, &
                A, 1E16.8, A, 1E16.8, A, 1F6.3)") it_ph_occ, "     ", el_kappa0_scalar, &
@@ -1069,7 +1090,7 @@ contains
   end subroutine iterate_el_occupations_eqn
 
   subroutine iterate_ph_occupations_eqn(T, num, crys, ph, el, rta_rates_ibz, &
-       field_term, response_ph, response_el, coherence_ph)
+       field_term, response_ph, response_el, coherence_ph, model)
     !! Subroutine to iterate the phonon occupations equation one step.
     !! 
     !! T Temperature in K
@@ -1082,6 +1103,8 @@ contains
     !! response_ph Phonon response function
     !! response_el Electron response function
     !! coherence_ph Phonon coherence term
+    !! model [Optional] Model Hamiltonian. If given, 3-ph scattering is in the
+    !!       relaxation time approximation and has no in-scattering term.
 
     type(phonon), intent(in) :: ph
     type(electron), intent(in) :: el
@@ -1091,6 +1114,7 @@ contains
     real(r64), intent(in) :: response_el(:, :, :)
     complex(r64), intent(in) :: coherence_ph(:, :, :)
     real(r64), intent(inout) :: response_ph(:, :, :)
+    type(AFM_Dirac), intent(in), optional :: model
 
     !Local variables
     integer(i64) :: nstates_irred, chunk, istate1, numbranches, s1, &
@@ -1146,30 +1170,39 @@ contains
              tau_ibz = 1.0_r64/rta_rates_ibz(iq1_ibz, s1)
           end if
 
-          if(num%W_OTF) then
-             call calculate_W3ph_OTF(ph, num, istate1, T, &
-                  Wm, Wp, istate2_plus, istate3_plus, istate2_minus, istate3_minus)
-             nprocs_3ph_plus = size(Wp); nprocs_3ph_minus = size(Wm)
+          if(present(model)) then
+             !Model case: 3-ph is in the RTA, so there are no 3-ph in-scattering processes.
+             nprocs_3ph_plus = 0; nprocs_3ph_minus = 0
+             if(allocated(Wp)) deallocate(Wp, istate2_plus, istate3_plus)
+             if(allocated(Wm)) deallocate(Wm, istate2_minus, istate3_minus)
+             allocate(Wp(0), istate2_plus(0), istate3_plus(0), &
+                  Wm(0), istate2_minus(0), istate3_minus(0))
           else
-             !Set W+ filename
-             filepath_Wp = trim(adjustl(num%Wdir))//'/Wp.istate'//trim(adjustl(tag))
+             if(num%W_OTF) then
+                call calculate_W3ph_OTF(ph, num, istate1, T, &
+                     Wm, Wp, istate2_plus, istate3_plus, istate2_minus, istate3_minus)
+                nprocs_3ph_plus = size(Wp); nprocs_3ph_minus = size(Wm)
+             else
+                !Set W+ filename
+                filepath_Wp = trim(adjustl(num%Wdir))//'/Wp.istate'//trim(adjustl(tag))
 
-             !Read W+ from file
-             if(allocated(Wp)) deallocate(Wp)
-             if(allocated(istate2_plus)) deallocate(istate2_plus)
-             if(allocated(istate3_plus)) deallocate(istate3_plus)
-             call read_transition_probs_e(trim(adjustl(filepath_Wp)), nprocs_3ph_plus, Wp, &
-                  istate2_plus, istate3_plus)
+                !Read W+ from file
+                if(allocated(Wp)) deallocate(Wp)
+                if(allocated(istate2_plus)) deallocate(istate2_plus)
+                if(allocated(istate3_plus)) deallocate(istate3_plus)
+                call read_transition_probs_e(trim(adjustl(filepath_Wp)), nprocs_3ph_plus, Wp, &
+                     istate2_plus, istate3_plus)
 
-             !Set W- filename
-             filepath_Wm = trim(adjustl(num%Wdir))//'/Wm.istate'//trim(adjustl(tag))
+                !Set W- filename
+                filepath_Wm = trim(adjustl(num%Wdir))//'/Wm.istate'//trim(adjustl(tag))
 
-             !Read W- from file
-             if(allocated(Wm)) deallocate(Wm)
-             if(allocated(istate2_minus)) deallocate(istate2_minus)
-             if(allocated(istate3_minus)) deallocate(istate3_minus)
-             call read_transition_probs_e(trim(adjustl(filepath_Wm)), nprocs_3ph_minus, Wm, &
-                  istate2_minus, istate3_minus)
+                !Read W- from file
+                if(allocated(Wm)) deallocate(Wm)
+                if(allocated(istate2_minus)) deallocate(istate2_minus)
+                if(allocated(istate3_minus)) deallocate(istate3_minus)
+                call read_transition_probs_e(trim(adjustl(filepath_Wm)), nprocs_3ph_minus, Wm, &
+                     istate2_minus, istate3_minus)
+             end if
           end if
 
           !if(present(response_el)) then
@@ -1292,7 +1325,7 @@ contains
          iq_fbz, iq_ibz, nq, numbands, neg_iq_fbz, q_indvec(3), &
          num_active_images, start, end, nprocs
     integer(i64), allocatable :: istate_el(:), istate_ph(:)
-    real(r64) :: ph_en, coherence_rate, prefactor_denom, occ_fac
+    real(r64) :: ph_en, coherence_rate, prefactor_denom, occ_fac, fermi_fac
     complex(r64) :: prefactor
     real(r64), allocatable :: Xphplus(:), Xphminus(:)
     complex(r64), allocatable :: coherence_ph_reduce(:, :, :)
@@ -1352,6 +1385,11 @@ contains
           call read_transition_probs_e(trim(adjustl(filepath_Xphminus)), nprocs, &
                Xphminus)
 
+          !The stored X's have the factor f0(1 - f0) of the initial electron divided out.
+          !Put it back, as in the definition of X+/- in Eq. 4 of the derivation.
+          fermi_fac = Fermi(el%ens_irred(ik_ibz, m), el%chempot, crys%T)*&
+               (1.0_r64 - Fermi(el%ens_irred(ik_ibz, m), el%chempot, crys%T))
+
           !Sum over the number of equivalent k-points of the IBZ point
           do ieq = 1, el%nequiv(ik_ibz)
              ik_sym = el%ibz2fbz_map(ieq, ik_ibz, 1) !symmetry
@@ -1369,6 +1407,9 @@ contains
                 !Below, I only care about those q-vectors that live on the coarser q-mesh.
                 if(istate_ph(iproc) >= 0) then
                    call demux_state(istate_ph(iproc), numbranches, s, iq_fbz)
+
+                   !Rotate the phonon like the ibz electron state was rotated.
+                   iq_fbz = ph%equiv_map(ik_sym, iq_fbz)
 
                    !Compute the prefactor
                    iq_ibz = ph%fbz2ibz_map(iq_fbz)
@@ -1391,7 +1432,7 @@ contains
 
                       !from the 1st term of the RHS
                       coherence_ph_reduce(iq_fbz, s, :) = coherence_ph_reduce(iq_fbz, s, :) + &
-                           prefactor*(Xphplus(iproc) - Xphminus(iproc))*&
+                           prefactor*fermi_fac*(Xphplus(iproc) - Xphminus(iproc))*&
                            (response_el(ik_fbz, m, :) - response_el(ikp_fbz_rot, n, :))
 
                       !Below I'll need the negative q Umklapped
@@ -1403,7 +1444,7 @@ contains
                       !Now accumulate the 2nd term.
                       !(This does not assume odd parity of F and G.)
                       coherence_ph_reduce(iq_fbz, s, :) = coherence_ph_reduce(iq_fbz, s, :) + &
-                           prefactor*(Xphplus(iproc)*response_ph(iq_fbz, s, :) + &
+                           prefactor*fermi_fac*(Xphplus(iproc)*response_ph(iq_fbz, s, :) + &
                            Xphminus(iproc)*response_ph(neg_iq_fbz, s, :))
                    end if
                 end if
@@ -1447,7 +1488,17 @@ contains
 
     !Update the response function
     call co_sum(coherence_ph_reduce)
-    coherence_ph = coherence_ph_reduce
+    !coherence_ph = coherence_ph_reduce
+
+    !The coherence is even in q by definition: H(q) = H(-q), P(q) = P(-q).
+    !Remove the part of it that is odd in q. This part is zero for exact transition
+    !probabilities, but a numerical delta function leaves a small remainder.
+    do iq_fbz = 1, nq
+       call demux_vector(iq_fbz, q_indvec, ph%wvmesh, 0_i64)
+       neg_iq_fbz = mux_vector(modulo(-q_indvec, ph%wvmesh), ph%wvmesh, 0_i64)
+       coherence_ph(iq_fbz, :, :) = 0.5_r64*(coherence_ph_reduce(iq_fbz, :, :) + &
+            coherence_ph_reduce(neg_iq_fbz, :, :))
+    end do
 
     !Symmetrize response function
     do iq_fbz = 1, nq
@@ -1757,7 +1808,7 @@ contains
 !!$                     HorP(:)*(Omegaplus(iproc) + Omegaminus(iproc))
                 ph_coherence_term_reduce(ik_fbz, m, :) = &
                      ph_coherence_term_reduce(ik_fbz, m, :) - &
-                     HorP(:)*(Xplus(iproc) + Xminus(iproc))
+                     HorP(:)*(Xplus(iproc) - Xminus(iproc))
              end do
 
              !Multiply life time factor 
@@ -1771,6 +1822,166 @@ contains
     call co_sum(ph_coherence_term_reduce)
     ph_coherence_term = ph_coherence_term_reduce
   end subroutine calculate_ph_coh_term_of_el_BTE
+  
+  subroutine fill_coeff(a, T, b)
+    implicit none
+    type(transport_coeffs), intent(in) :: a
+    type(coeffs_for_optimization), intent(inout) :: b
+    real(r64), intent(in) :: T
+
+    b%T = T
+    b%el_alpha = sum(a%el_alphabyT*T, dim = 1)
+    b%el_sigma = sum(a%el_sigma, dim = 1)
+    b%el_sigmaS = sum(a%el_sigmaS, dim = 1)
+    b%el_kappa0 = sum(a%el_kappa0, dim = 1)
+
+    if (allocated(a%ph_kappa)) then
+       b%ph_alpha = sum(a%ph_alphabyT*T, dim = 1)
+       b%ph_kappa = sum(a%ph_kappa, dim = 1)
+    else 
+       b%ph_kappa = 0.0_r64
+       b%ph_alpha = 0.0_r64
+    end if
+  end subroutine fill_coeff
+  
+  subroutine KO_correction(el, crys, num, sym,  self, trans, KO_dev, KO_corr, trans_opp_B, self_opp_B, ph, ph_drag_terms_opp_B)
+    !! Subroutine to calculate and apply the Kelvin-Onsager correction with/without a B-field.
+    !! el Electron object
+    !! crys Crystal object
+    !! num Numerics object
+    !! sym Symmetry object
+    !! self BTE solution for +B field
+    !! trans Transport coefficients for +B field
+    !! KO_dev Deviation of the corrected transport coefficients from Kelvin-Onsager relations
+    !! KO_corr Maximum deviation of the corrections from identity, devided to the maximum element of the corrected matrix 
+    !! self_opp_B BTE solution for -B field, optinal
+    !! trans_opp_B Transport coefficients for -B field, optinal
+    !! ph Phonon object, optinal
+    !! ph_drag_terms_opp_B Phonon drag terms for -B field (1 for gradT, 2 for E), optinal
+
+    type(electron), intent(in) :: el
+    type(crystal), intent(in) :: crys
+    type(numerics), intent(in) :: num
+    type(symmetry), intent(in) :: sym
+    class(sepe), intent(inout) :: self
+    real(r64), intent(out) ::  KO_dev, KO_corr
+    class(sepe), intent(inout), optional :: self_opp_B
+    type(phonon), intent(in), optional :: ph
+    real(r64), intent(in), optional ::  ph_drag_terms_opp_B(:, :, :, :)
+    class(transport_coeffs), intent(inout) :: trans
+    class(transport_coeffs), intent(inout), optional :: trans_opp_B
+    type(numerics) :: num_local
+    real(r64) :: dummy_coeff(2, 3,3)
+    real(r64), allocatable :: correction_matrix(:)
+
+    KO_dev  = 0.0_r64
+    KO_corr = 0.0_r64
+
+    !  Copy transport coefficients into global_coeffs for the correction calculation
+    call fill_coeff(trans, crys%T, global_coeffs)
+
+!!$    if(num%Bfield_on) then 
+!!$       !Magnetic case
+!!$       num_local = num
+!!$       num_local%Bfield = -num_local%Bfield
+!!$
+!!$       if(.not. allocated(global_coeffs%crotations)) then
+!!$          allocate(global_coeffs%crotations(3, 3, sym%nsymm_Bfield))
+!!$          global_coeffs%crotations = sym%crotations_Bfield
+!!$       end if
+!!$
+!!$       if(.not. present(ph_drag_terms_opp_B)) then
+!!$          !Dragless case, no phonon contributions
+!!$          !Compute -B field responses
+!!$          call iterate_bte_el(num_local, el, crys, &
+!!$               self%el_rta_rates_ibz, self%el_field_term_E, self_opp_B%el_response_E)
+!!$          call iterate_bte_el(num_local, el, crys, &
+!!$               self%el_rta_rates_ibz, self%el_field_term_T, self_opp_B%el_response_T)
+!!$       else
+!!$          !Dragful case, include phonon contributions
+!!$          !Compute -B field responses
+!!$          call iterate_bte_el(num_local, el, crys, self%el_rta_rates_ibz, &
+!!$               self%el_field_term_E, self_opp_B%el_response_E, ph_drag_terms_opp_B(2, :, :, :))
+!!$          call iterate_bte_el(num_local, el, crys, self%el_rta_rates_ibz, &
+!!$               self%el_field_term_T, self_opp_B%el_response_T, ph_drag_terms_opp_B(1, :, :, :))
+!!$
+!!$          !Calculate phonon transport coefficients
+!!$          !ph_kappa(-B)
+!!$          call calculate_transport_coeff('ph', 'T', crys%T, 1_i64, 0.0_r64, ph%ens, ph%vels, &
+!!$               crys%volume, ph%wvmesh, self_opp_B%ph_response_T, sym,&
+!!$               trans_opp_B%ph_kappa, trans_opp_B%dummy)
+!!$          !ph_alphabyT(-B)
+!!$          call calculate_transport_coeff('ph', 'E', crys%T, 1_i64, 0.0_r64, ph%ens, ph%vels, &
+!!$               crys%volume, ph%wvmesh, self_opp_B%ph_response_E, sym, &
+!!$               trans_opp_B%ph_alphabyT, trans_opp_B%dummy)
+!!$          trans_opp_B%ph_alphabyT = trans_opp_B%ph_alphabyT/crys%T
+!!$       end if
+!!$       !Calculate electron transport coefficients for -B field
+!!$       !sigma(-B), alphabyT_el(-B)
+!!$       call calculate_transport_coeff('el', 'E', crys%T, el%spindeg, el%chempot, &
+!!$            el%ens, el%vels, crys%volume, el%wvmesh, self_opp_B%el_response_E, sym, &
+!!$            trans_opp_B%el_alphabyT, trans_opp_B%el_sigma)
+!!$       trans_opp_B%el_alphabyT = trans_opp_B%el_alphabyT/crys%T
+!!$       !el_kappa0(-B), el_sigmaS(-B)
+!!$       call calculate_transport_coeff('el', 'T', crys%T, el%spindeg, el%chempot, &
+!!$            el%ens, el%vels, crys%volume, el%wvmesh, self_opp_B%el_response_T, sym, &
+!!$            trans_opp_B%el_kappa0, trans_opp_B%el_sigmaS)
+!!$
+!!$       !  Copy transport coefficients for -B field into global_coeffs_opp_B for the correction calculation
+!!$       call fill_coeff(trans_opp_B, crys%T, global_coeffs_opp_B)
+!!$       allocate(correction_matrix(27))
+!!$
+!!$       ! Correction_matrix = [M_I^T, M_J^T,M_F^T] 
+!!$       call find_correction(num, correction_matrix, KO_dev, KO_corr)
+!!$       if(allocated(trans%ph_kappa)) then
+!!$          call apply_correction(self%ph_response_T, trans%ph_kappa, trans%dummy, correction_matrix(19:27))
+!!$       end if
+!!$       call apply_correction(self%el_response_T, trans%el_kappa0, trans%el_sigmaS, correction_matrix(1:9))
+!!$       call apply_correction(self%el_response_E, trans%el_sigma, trans%el_alphabyT, correction_matrix(10:18))        
+!!$    else 
+       !Non-magnetic case
+       if(.not. allocated(global_coeffs%crotations)) then
+          allocate(global_coeffs%crotations(3, 3, sym%nsymm))
+          global_coeffs%crotations = sym%crotations
+       end if
+       allocate(correction_matrix(9))
+       ! Correction_matrix = [M_I^T] 
+       call find_correction(num, correction_matrix, KO_dev, KO_corr)
+       call apply_correction(self%el_response_T, trans%el_kappa0, trans%el_sigmaS, correction_matrix)
+
+!!$    end if
+    deallocate(correction_matrix)
+  end subroutine KO_correction
+
+  subroutine apply_correction(response,  coeff1, coeff2, correction_matrix)
+    !! Subroutine to update transport coefficients and correspodning linear response function with given correction matrix according to the following rule:
+    !! response = M@response 
+    !! coeff1 = coeff1@M^T
+    !! coeff2 = coeff2@M^T
+    !! response Linear response function to be corrected
+    !! coeff1 First transport coefficient to be corrected, e.g. kappa0 for gradT field, sigma for E-field
+    !! coeff2 Second transport coefficient to be corrected, e.g. sigmaS for gradT field, alphabyT for E-field
+    !! correction_matrix 3x3 correction matrix, which is the transpose of the M matrix in the main text (reshaped as a vector).
+
+    real(r64), intent(in) :: correction_matrix(9)
+    real(r64), intent(inout) :: response(:, :, :), coeff1(:, :, :), coeff2(:, :, :)
+    real(r64):: KO_corr_T(3,3) 
+    integer(i64) :: i, j
+
+    ! Reshape correction matrix into 3x3 form. Here it is noted that the correction matrix is the transpose of the M matrix
+    KO_corr_T = reshape(correction_matrix, [3, 3])
+
+    !Apply correction
+    do j = 1, size(response, 2) ! looping over numbands 
+       ! Apply correction to response function
+       do i = 1, size(response, 1) ! looping over nwv 
+          response(i, j, :) = matmul(transpose(KO_corr_T), response(i, j, :))
+       end do
+       ! Apply to coefficients
+       coeff1(j, :, :) = matmul(coeff1(j, :, :), KO_corr_T)
+       coeff2(j, :, :) = matmul(coeff2(j, :, :), KO_corr_T)
+    end do
+  end subroutine apply_correction
 
   pure logical function converged(oldval, newval, thres)
     !! Function to check if newval is the same as oldval

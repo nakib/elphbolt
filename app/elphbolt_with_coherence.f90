@@ -272,11 +272,11 @@ program elphbolt_with_coherence
 
      !Solve SEPEs
      if(num%solve_bulk) then
-        if(num%onlyphbte .and. .not. num%phe) then
-           call sep%solve_sepe(num, crys, sym, ph)
-        else
-           call sep%solve_sepe(num, crys, sym, ph, el)
-        end if
+        !if(num%onlyphbte .and. .not. num%phe) then
+        !   call sep%solve_sepe(num, crys, sym, ph, model = model)
+        !else
+           call sep%solve_sepe(num, crys, sym, ph, el, model)
+        !end if
      end if
   case(2) !BTE Post-processing case
 !!$     call subtitle("Post-processing...")

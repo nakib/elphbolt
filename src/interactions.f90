@@ -1546,7 +1546,8 @@ contains
          ibatch, num_batches, batch_range(3)
     integer(i64), allocatable :: istate1(:), istate2(:)
     real(r64) :: en_ph, en_el, en_elp, const, delta, &
-         bose1, invboseplus1, invboseboseplus1, fermi1, fermi2, occup_fac
+         bose1, invboseplus1, invboseboseplus1, fermi1, fermi2, occup_fac, en_ph_minus
+    integer(i64) :: neg_iq_fbz, qv_neg(3)
     real(r64), allocatable :: g2_istate(:), TP_istate(:), g2_model(:, :)
     complex(r64), allocatable :: gReq_iq(:,:,:,:)
     character(len = 1024) :: filename, batch_filename
@@ -1654,6 +1655,11 @@ contains
              !Energy of phonon
              en_ph = ph%ens(iq_fbz, s)
 
+             !Energy of the phonon at -q. Without assuming time-reversal symmetry => w(-q) /= w(q).
+             call demux_vector(iq_fbz, qv_neg, ph%wvmesh, 0_i64)
+             neg_iq_fbz = mux_vector(modulo(-qv_neg, ph%wvmesh), ph%wvmesh, 0_i64)
+             en_ph_minus = ph%ens(neg_iq_fbz, s)
+
              !Create phonon wave vector
              q_vec = vec(iq_fbz, ph%wvmesh, crys%reclattvecs)
 
@@ -1667,14 +1673,14 @@ contains
              end if
 
              !1/Bose/(1 + Bose) for phonon
-             if(key == 'U') then
-                if(en_ph /= 0.0_r64) then
-                   bose1 = Bose(en_ph, crys%T)
-                   invboseboseplus1 = 1.0_r64/bose1/(1.0_r64 + bose1)
-                else
-                   invboseboseplus1 = 0.0_r64
-                end if
-             end if
+             !if(key == 'U') then
+                !if(en_ph /= 0.0_r64) then
+                !   bose1 = Bose(en_ph, crys%T)
+                !   invboseboseplus1 = 1.0_r64/bose1/(1.0_r64 + bose1)
+                !else
+                !   invboseboseplus1 = 0.0_r64
+                !end if
+             !end if
 
              !Load g2_istate from disk for scattering rates calculation
              if(key /= 'g') then
@@ -1742,7 +1748,8 @@ contains
 
                    if(key == 'U') then
                       fermi1 = Fermi(en_el, el%chempot, crys%T)
-                      fermi2 = Fermi(en_el - en_ph, el%chempot, crys%T)
+                      !fermi2 = Fermi(en_el - en_ph, el%chempot, crys%T)
+                      fermi2 = Fermi(en_el - en_ph_minus, el%chempot, crys%T)
                    end if
 
                    !Run over final electron bands
@@ -1790,11 +1797,14 @@ contains
 
                       if(key == 'U') then                   
                          !Evaluate delta function
-                         delta = delta_fn_ptr(en_elp + en_ph, ik, m, el%wvmesh, &
+                         !delta = delta_fn_ptr(en_elp + en_ph, ik, m, el%wvmesh, &
+                         !     el%simplex_map, el%simplex_count, el%simplex_evals)
+                         delta = delta_fn_ptr(en_elp + en_ph_minus, ik, m, el%wvmesh, &
                               el%simplex_map, el%simplex_count, el%simplex_evals)
 
                          !Temperature dependent occupation factor
-                         occup_fac = (fermi1 - fermi2)*invboseboseplus1
+                         !occup_fac = (fermi1 - fermi2)*n0(1 + n0)*invboseboseplus1
+                         occup_fac = fermi2 - fermi1
 
                          !Save U
                          if(en_ph >= 0.5e-3) then !Use a small phonon energy cut-off
@@ -2074,7 +2084,10 @@ contains
          ibatch, num_batches, batch_range(3)
     real(r64) :: ph_ens_iq(1, ph%numbands), qlist(1, 3), &
          const, bosefac, fermi_minus_fac, fermi_plus_fac, en_ph, en_el, &
-         delta_plus, delta_minus, occup_fac_plus, occup_fac_minus
+         delta_plus, delta_minus, occup_fac_plus, occup_fac_minus, &
+         ph_ens_iq_minus(1, ph%numbands), en_ph_minus, bosefac_minus
+    integer(i64) :: neg_iq_coarse, qv_neg(3)
+    complex(r64) :: ph_evecs_iq_minus(1, ph%numbands, ph%numbands)
     real(r64), allocatable :: g2_istate(:), TPplus_istate(:), TPminus_istate(:), &
          g2_model(:, :), model_ph_ens(:)
     integer(i64), allocatable :: istate_el(:), istate_ph(:)
@@ -2250,9 +2263,23 @@ contains
                       ph_ens_iq(1, :) = model_ph_ens(1)
                       ph_evecs_iq = (1.0_r64, 0.0_r64)
                    end select
+
+                   !Phonon energies at -q. Without assuming time-reversal symmetry => w(-q) /= w(q).
+                   qlist(1, :) = -q_vec%frac
+                   select type(hamiltonian_source)
+                   type is(wannier)
+                      call hamiltonian_source%ph_wann(crys, 1_i64, qlist, ph_ens_iq_minus, ph_evecs_iq_minus)
+                   type is(AFM_Dirac)
+                      call hamiltonian_source%get_phonons(qlist, crys%reclattvecs, model_ph_ens)
+                      ph_ens_iq_minus(1, :) = model_ph_ens(1)
+                   end select
                 else !Get the q vector represented in the (coarser) phonon mesh
                    q_vec_coarse = vec_change_grid(q_vec, ph%wvmesh)
                    iq_coarse = q_vec_coarse%muxed_index
+
+                   !Index of -q on the phonon mesh
+                   call demux_vector(iq_coarse, qv_neg, ph%wvmesh, 0_i64)
+                   neg_iq_coarse = mux_vector(modulo(-qv_neg, ph%wvmesh), ph%wvmesh, 0_i64)
                 end if
 
                 !For the model, get |g|^2 for all band pairs at once
@@ -2301,24 +2328,34 @@ contains
                          !Phonon energy
                          if(needfinephon) then
                             en_ph = ph_ens_iq(1, s)
+                            en_ph_minus = ph_ens_iq_minus(1, s)
                          else
                             en_ph = ph%ens(iq_coarse, s)
+                            en_ph_minus = ph%ens(neg_iq_coarse, s)
                          end if
 
                          if(key == 'X') then
-                            !Bose and Fermi factors
+                            !Bose and Fermi factors. The absorption (+) process involves the phonon
+                            !q and the emission (-) process the phonon -q.
                             if(en_ph /= 0.0_r64) then
                                bosefac = Bose(en_ph, crys%T)
                             else
                                bosefac = 0.0_r64
                             end if
+                            if(en_ph_minus /= 0.0_r64) then
+                               bosefac_minus = Bose(en_ph_minus, crys%T)
+                            else
+                               bosefac_minus = 0.0_r64
+                            end if
                             fermi_plus_fac = Fermi(en_el + en_ph, el%chempot, crys%T)
-                            fermi_minus_fac = Fermi(en_el - en_ph, el%chempot, crys%T)
+                            !fermi_minus_fac = Fermi(en_el - en_ph, el%chempot, crys%T)
+                            fermi_minus_fac = Fermi(en_el - en_ph_minus, el%chempot, crys%T)
 
                             !Temperature dependent occupation factors
                             occup_fac_plus = bosefac + fermi_plus_fac
 
-                            occup_fac_minus = 1.0_r64 + bosefac - fermi_minus_fac
+                            !occup_fac_minus = 1.0_r64 + bosefac - fermi_minus_fac
+                            occup_fac_minus = 1.0_r64 + bosefac_minus - fermi_minus_fac
                          end if
 
                          if(key == 'O') then
@@ -2335,14 +2372,20 @@ contains
                          !Evaulate delta function
                          delta_plus = delta_fn_ptr(en_el + en_ph, ikp, n, el%wvmesh, el%simplex_map, &
                               el%simplex_count, el%simplex_evals)
-                         delta_minus = delta_fn_ptr(en_el - en_ph, ikp, n, el%wvmesh, el%simplex_map, &
+                         !delta_minus = delta_fn_ptr(en_el - en_ph, ikp, n, el%wvmesh, el%simplex_map, &
+                         !     el%simplex_count, el%simplex_evals)
+                         delta_minus = delta_fn_ptr(en_el - en_ph_minus, ikp, n, el%wvmesh, el%simplex_map, &
                               el%simplex_count, el%simplex_evals)
 
                          !Save X+/-
-                         if(en_ph >= 0.5e-3) then !Use a small phonon energy cut-off
-                            TPplus_istate(count) = g2_istate(count)*occup_fac_plus*delta_plus
-                            TPminus_istate(count) = g2_istate(count)*occup_fac_minus*delta_minus
-                         end if
+                         !if(en_ph >= 0.5e-3) then !Use a small phonon energy cut-off
+                         !   TPplus_istate(count) = g2_istate(count)*occup_fac_plus*delta_plus
+                         !   TPminus_istate(count) = g2_istate(count)*occup_fac_minus*delta_minus
+                         !end if
+                         if(en_ph >= 0.5e-3) & !Use a small phonon energy cut-off
+                              TPplus_istate(count) = g2_istate(count)*occup_fac_plus*delta_plus
+                         if(en_ph_minus >= 0.5e-3) &
+                              TPminus_istate(count) = g2_istate(count)*occup_fac_minus*delta_minus
 
                          !Save final electron and interacting phonon states (same for + and -)
                          istate_el(count) = mux_state(el%numbands, n, ikp)
@@ -3058,10 +3101,13 @@ contains
     sync all
   end subroutine calculate_echimp_interaction_ibzk
 
-  subroutine calculate_ph_rta_rates(rta_rates_3ph, rta_rates_phe, num, crys, ph, el)
+  subroutine calculate_ph_rta_rates(rta_rates_3ph, rta_rates_phe, num, crys, ph, el, model)
     !! Subroutine for parallel reading of the 3-ph and ph-e transition probabilities
     !! from disk and calculating the relaxation time approximation (RTA)
     !! scattering rates for the 3-ph and ph-e channels.
+    !!
+    !! If a model is given, the 3-ph rates come from the model and no 3-ph
+    !! transition probabilities are read.
 
     real(r64), allocatable, intent(out) :: rta_rates_3ph(:,:)
     real(r64), allocatable, intent(out) :: rta_rates_phe(:,:)
@@ -3069,6 +3115,7 @@ contains
     type(crystal), intent(in) :: crys
     type(phonon), intent(in) :: ph
     type(electron), intent(in), optional :: el
+    type(AFM_Dirac), intent(in), optional :: model
 
     !Local variables
     integer(i64) :: nstates_irred, istate, nprocs_3ph_plus, nprocs_3ph_minus, &
@@ -3101,38 +3148,43 @@ contains
           !Set file tag
           write(tag, '(I9)') istate
 
-          if(num%W_OTF) then
-             call calculate_W3ph_OTF(ph, num, istate, crys%T, Wm, Wp)
-
-             do iproc = 1, size(Wp)
-                rta_rates_3ph(iq, s) = rta_rates_3ph(iq, s) + Wp(iproc)
-             end do
-
-             do iproc = 1, size(Wm)
-                rta_rates_3ph(iq, s) = rta_rates_3ph(iq, s) + 0.5_r64*Wm(iproc)
-             end do
+          if(present(model)) then
+             !Model case: no 3-ph transition probabilities to read.
+             rta_rates_3ph(iq, s) = model%ph_rate_3ph(ph%ens(ph%indexlist_irred(iq), s), crys%T)
           else
-             !Set W+ filename
-             filepath_Wp = trim(adjustl(num%Wdir))//'/Wp.istate'//trim(adjustl(tag))
+             if(num%W_OTF) then
+                call calculate_W3ph_OTF(ph, num, istate, crys%T, Wm, Wp)
 
-             !Read W+ from file
-             if(allocated(W)) deallocate(W)
-             call read_transition_probs_e(trim(adjustl(filepath_Wp)), nprocs_3ph_plus, W)
+                do iproc = 1, size(Wp)
+                   rta_rates_3ph(iq, s) = rta_rates_3ph(iq, s) + Wp(iproc)
+                end do
 
-             do iproc = 1, nprocs_3ph_plus
-                rta_rates_3ph(iq, s) = rta_rates_3ph(iq, s) + W(iproc) 
-             end do
+                do iproc = 1, size(Wm)
+                   rta_rates_3ph(iq, s) = rta_rates_3ph(iq, s) + 0.5_r64*Wm(iproc)
+                end do
+             else
+                !Set W+ filename
+                filepath_Wp = trim(adjustl(num%Wdir))//'/Wp.istate'//trim(adjustl(tag))
 
-             !Set W- filename
-             filepath_Wm = trim(adjustl(num%Wdir))//'/Wm.istate'//trim(adjustl(tag))
+                !Read W+ from file
+                if(allocated(W)) deallocate(W)
+                call read_transition_probs_e(trim(adjustl(filepath_Wp)), nprocs_3ph_plus, W)
 
-             !Read W- from file
-             if(allocated(W)) deallocate(W)
-             call read_transition_probs_e(trim(adjustl(filepath_Wm)), nprocs_3ph_minus, W)
+                do iproc = 1, nprocs_3ph_plus
+                   rta_rates_3ph(iq, s) = rta_rates_3ph(iq, s) + W(iproc) 
+                end do
 
-             do iproc = 1, nprocs_3ph_minus
-                rta_rates_3ph(iq, s) = rta_rates_3ph(iq, s) + 0.5_r64*W(iproc)
-             end do
+                !Set W- filename
+                filepath_Wm = trim(adjustl(num%Wdir))//'/Wm.istate'//trim(adjustl(tag))
+
+                !Read W- from file
+                if(allocated(W)) deallocate(W)
+                call read_transition_probs_e(trim(adjustl(filepath_Wm)), nprocs_3ph_minus, W)
+
+                do iproc = 1, nprocs_3ph_minus
+                   rta_rates_3ph(iq, s) = rta_rates_3ph(iq, s) + 0.5_r64*W(iproc)
+                end do
+             end if
           end if
 
           if(present(el)) then
@@ -3179,7 +3231,7 @@ contains
     !Local variables
     integer(i64) :: nstates_irred, istate, nprocs_plus, nprocs_minus, &
          nprocs_phe, iproc, chunk, num_active_images, start, end, &
-         ieq, ik_ibz, iq_fbz, iq_ibz, s, m, n, nprocs!, &
+         ieq, ik_ibz, iq_fbz, iq_ibz, s, m, n, nprocs, ik_sym!, &
     !ik_sym, ikp, ikp_fbz_rot!, ik_fbz, iq_fbz, iq_ibz, &
 
     integer(i64), allocatable :: istate_el(:), istate_ph(:)
@@ -3231,6 +3283,7 @@ contains
           !Sum over the number of equivalent k-points of the IBZ point
           do ieq = 1, el%nequiv(ik_ibz)
              !ik_sym = el%ibz2fbz_map(ieq, ik_ibz, 1) !symmetry
+             ik_sym = el%ibz2fbz_map(ieq, ik_ibz, 1) !symmetry
              !call binsearch(el%indexlist, el%ibz2fbz_map(ieq, ik_ibz, 2), ik_fbz)
 
              !Sum over scattering processes
@@ -3249,6 +3302,9 @@ contains
                 !coarser q-mesh.
                 if(istate_ph(iproc) >= 0) then
                    call demux_state(istate_ph(iproc), ph%numbands, s, iq_fbz)
+
+                   !Rotate phonon q.
+                   iq_fbz = ph%equiv_map(ik_sym, iq_fbz)
 
                    !iq_ibz = ph%fbz2ibz_map(iq_fbz)
 

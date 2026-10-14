@@ -28,6 +28,7 @@ spglib = {path = "thirdparty/spglib"}
 
 #Pull from github
 fftpack = { git = "https://github.com/fortran-lang/fftpack.git" }
+slsqp = { git="https://github.com/jacobwilliams/slsqp.git" }
 
 [build]
 #By default, I will use try to use the forlapack and forblas builds from ~/.local/lib/

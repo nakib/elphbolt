@@ -94,7 +94,9 @@ contains
 
     do itk = 1, num !Run over tetrahedra
        it = tetramap(1, ik, itk) !Grab tetrahedron
-       iv = tetramap(2, ik, itk) !Grab vertex
+       !Old: this is the label of the vertex in the tetrahedron, not its place in the sorted energies
+       !iv = tetramap(2, ik, itk) !Grab vertex
+       iv = nint(tetra_evals(it, ib, 4 + tetramap(2, ik, itk))) !Grab sorted position of vertex
 
        !Grab vertex energies
        e1 = tetra_evals(it, ib, 1)
@@ -265,7 +267,9 @@ contains
 
     do itk = 1, num !Run over tetrahedra
        it = tetramap(1, ik, itk) !Grab tetrahedron
-       iv = tetramap(2, ik, itk) !Grab vertex
+       !Old: this is the label of the vertex in the tetrahedron, not its place in the sorted energies
+       !iv = tetramap(2, ik, itk) !Grab vertex
+       iv = nint(tetra_evals(it, ib, 4 + tetramap(2, ik, itk))) !Grab sorted position of vertex
 
        !Grab vertex energies
        e0 = tetra_evals(it, ib, 1)
@@ -642,17 +646,19 @@ contains
     real(r64), intent(in), optional :: scissor(:)
 
     !Locals
-    integer(i64) :: iv, it, ib, numbands, aux, numtetra, k_intvec(3)
+    integer(i64) :: iv, it, ib, numbands, aux, numtetra, k_intvec(3), jv, pos
     real(r64), allocatable :: energies(:, :), model_evals(:, :), model_vels(:, :, :)
     complex(r64), allocatable :: model_evecs(:, :, :)
-    real(r64) :: k_frac(1, 3)
+    real(r64) :: k_frac(1, 3), e_unsorted(4), e_sorted(4)
 
     ! Calculate dimensions
     numtetra = size(tetra, 1)
     numbands = size(evals, 2)
 
     ! Allocations
-    allocate(tetra_evals(numtetra, numbands, 4))
+    !Slots 1-4 will hold the sorted vertex energies. Slots 5-8 will hold the position
+    !of each (unsorted) vertex of the tetrahedron in the sorted list.
+    allocate(tetra_evals(numtetra, numbands, 8))
     if(present(hamiltonian_source)) allocate(energies(1, numbands))
 
     ! Loop over all tetrahedra and vertices
@@ -688,7 +694,18 @@ contains
     ! Sort eigenvalues for each tetrahedron vertex
     do it = 1, numtetra	 	
        do ib = 1, numbands
-          call sort(tetra_evals(it, ib, :))
+          !Sort the energies and keep track of where each vertex goes.
+          e_unsorted = tetra_evals(it, ib, 1:4)
+          do iv = 1, 4
+             pos = 1
+             do jv = 1, 4
+                if(e_unsorted(jv) < e_unsorted(iv) .or. &
+                     (e_unsorted(jv) == e_unsorted(iv) .and. jv < iv)) pos = pos + 1
+             end do
+             e_sorted(pos) = e_unsorted(iv)
+             tetra_evals(it, ib, 4 + iv) = real(pos, r64)
+          end do
+          tetra_evals(it, ib, 1:4) = e_sorted
        end do
     end do
   end subroutine fill_tetrahedra_3d
@@ -823,16 +840,18 @@ contains
     real(r64), intent(in), optional :: scissor(:)
 
     !Local variables
-    integer(i64) :: iv, it, ib, numbands, aux, numtriangs, k_intvec(3)
+    integer(i64) :: iv, it, ib, numbands, aux, numtriangs, k_intvec(3), jv, pos
     real(r64), allocatable :: energies(:, :), model_evals(:, :), model_vels(:, :, :)
     complex(r64), allocatable :: model_evecs(:, :, :)
-    real(r64) :: k_frac(1, 3)
+    real(r64) :: k_frac(1, 3), e_unsorted(3), e_sorted(3)
 
     numtriangs = size(triang(:, 1))
     numbands = size(evals(1, :))
 
     !Allocations
-    allocate(triang_evals(numtriangs, numbands, 3))
+    !Slots 1-3 will hold the sorted vertex energies. Slots 4-6 will hold the position
+    !of each (unsorted) vertex of the triangle in the sorted list.
+    allocate(triang_evals(numtriangs, numbands, 6))
     if(present(hamiltonian_source)) allocate(energies(1, numbands))
 
     do it = 1, numtriangs !Run over triangles
@@ -866,7 +885,18 @@ contains
 
     do it = 1, numtriangs
        do ib = 1, numbands
-          call sort(triang_evals(it, ib, :))
+          !Sort the energies and keep track of where each vertex goes.
+          e_unsorted = triang_evals(it, ib, 1:3)
+          do iv = 1, 3
+             pos = 1
+             do jv = 1, 3
+                if(e_unsorted(jv) < e_unsorted(iv) .or. &
+                     (e_unsorted(jv) == e_unsorted(iv) .and. jv < iv)) pos = pos + 1
+             end do
+             e_sorted(pos) = e_unsorted(iv)
+             triang_evals(it, ib, 3 + iv) = real(pos, r64)
+          end do
+          triang_evals(it, ib, 1:3) = e_sorted
        end do
     end do
   end subroutine fill_triangles
@@ -906,7 +936,9 @@ contains
 
     do itk = 1, num !Run over triangles
        it = triangmap(1, ik, itk) !Grab triangle
-       iv = triangmap(2, ik, itk) !Grab vertex
+       !Old: this is the label of the vertex in the triangle, not its place in the sorted energies
+       !iv = triangmap(2, ik, itk) !Grab vertex
+       iv = nint(triang_evals(it, ib, 3 + triangmap(2, ik, itk))) !Grab sorted position of vertex
 
        !Grab vertex energies
        e1 = triang_evals(it, ib, 1)
