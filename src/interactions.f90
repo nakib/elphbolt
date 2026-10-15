@@ -1727,8 +1727,10 @@ contains
                 if(key == 'g') then
                    select type(hamiltonian_source)
                    type is(AFM_Dirac)
-                      g2_model = hamiltonian_source%g2(q_vec%frac, el%evecs(ik, :, :), &
-                           el%evecs(ikp_window, :, :), crys%reclattvecs)
+                      !g2_model = hamiltonian_source%g2(q_vec%frac, el%evecs(ik, :, :), &
+                      !     el%evecs(ikp_window, :, :), crys%reclattvecs)
+                      g2_model = hamiltonian_source%g2(el%wavevecs(ik, :), el%wavevecs(ikp_window, :), &
+                           el%evecs(ik, :, :), el%evecs(ikp_window, :, :), crys%reclattvecs)
                    end select
                 end if
 
@@ -2286,13 +2288,15 @@ contains
                 if(key == 'g') then
                    select type(hamiltonian_source)
                    type is(AFM_Dirac)
-                      if(needfinephon) then
-                         g2_model = hamiltonian_source%g2(q_vec%frac, el%evecs_irred(ik, :, :), &
-                              el%evecs(ikp, :, :), crys%reclattvecs)
-                      else
-                         g2_model = hamiltonian_source%g2(q_vec_coarse%frac, el%evecs_irred(ik, :, :), &
-                              el%evecs(ikp, :, :), crys%reclattvecs)
-                      end if
+                      !if(needfinephon) then
+                      !   g2_model = hamiltonian_source%g2(q_vec%frac, el%evecs_irred(ik, :, :), &
+                      !        el%evecs(ikp, :, :), crys%reclattvecs)
+                      !else
+                      !   g2_model = hamiltonian_source%g2(q_vec_coarse%frac, el%evecs_irred(ik, :, :), &
+                      !        el%evecs(ikp, :, :), crys%reclattvecs)
+                      !end if
+                      g2_model = hamiltonian_source%g2(el%wavevecs_irred(ik, :), el%wavevecs(ikp, :), &
+                           el%evecs_irred(ik, :, :), el%evecs(ikp, :, :), crys%reclattvecs)
                    end select
                 end if
 
