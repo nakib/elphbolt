@@ -70,6 +70,10 @@ module wannier_module
      !! Real space cell locations for phonons.
      !integer(i64), allocatable :: rcells_g(:, :)
      integer(i64), allocatable :: rcells_g(:, :)[:]
+     integer(i64), allocatable :: rcells_g_all(:, :)
+     !! Real space cell locations for electron-phonon vertex, gathered from all images
+     !! in the same global order as the last index of gwann/gmixed. Note that this
+     !! order is, in general, different from that of rcells_q.
      !! Real space cell locations for electron-phonon vertex.     
      integer(i64), allocatable :: elwsdeg(:)
      !! Real space cell multiplicity for electrons.
@@ -337,9 +341,13 @@ contains
     end if
 
     sync all
-    
+
+    !Exciting uses the same cells for phonons and the e-ph vertex.
+    allocate(self%rcells_g_all(self%nwsq, 3))
+    self%rcells_g_all = self%rcells_q
+
     !! Applying all degeneracies to epmat
-    call apply_degeneracies_old(self)
+    call divide_by_degeneracy_old(self)
     call print_message("Applied WS degeneracies")
   end subroutine read_exciting_Wannier
 
@@ -351,8 +359,11 @@ contains
     type(numerics), intent(in) :: num
 
     !Local variables
-    integer(i64) :: iuc, juc, ib, jb, image
-    real(r64) :: ef, wigparam(3), dims(2)
+    integer(i64) :: iuc, juc, ib, jb, image, iend, slab, ig, s, na
+    real(r64) :: ef, wigparam(3), dims(2), invg
+    real(r64), allocatable :: invdeg_k_old(:), invdeg_k_new(:, :, :), invdeg_g_vec(:)
+    integer(i64), allocatable :: gdeg_old_all(:), gdeg_new_all(:, :, :)
+    integer(i64) :: goff
     real(r64), allocatable :: dummy(:)
     complex(r64), allocatable :: gwann_aux(:, :, :, :, :)
     integer(i64), allocatable :: rcells_g_aux(:, :)
@@ -406,38 +417,6 @@ contains
     call distribute_points(self%nwsg, self%gwann_distrib_chunk, self%gwann_distrib_start, &
          self%gwann_distrib_end, self%gwann_distrib_num_active_images)
 
-    if(.not. num%read_gk2 .or. .not. num%read_gq2 .or. &
-         num%plot_along_path) then
-
-       allocate(gwann(self%numwannbands,self%numwannbands,self%nwsk,&
-            self%numbranches, self%gwann_distrib_chunk[1])[*])
-       gwann = 0.0_r64
-
-       print*,"Chonk=> ",self%gwann_distrib_chunk[1]
-       !Below, image 1 will read Wannierized g(Re,Rp) and distribute to all images.
-       if(this_image() == 1) then
-          call print_message("Reading Wannier rep. e-ph vertex and distributing...")
-
-          open(1, file = filename_epwgwann, status = 'old', access = 'stream')
-
-          allocate(gwann_aux(self%numwannbands,self%numwannbands,self%nwsk,&
-               self%numbranches,self%gwann_distrib_chunk[1])) !chunk for the 1st image is the largest
-          gwann_aux = 0.0_r64
-
-          do image = 1, self%gwann_distrib_num_active_images
-             read(1) gwann_aux(:, :, :, :, 1:self%gwann_distrib_chunk[image])
-
-             gwann(:,:,:,:,:)[image] = gwann_aux(:,:,:,:,:)
-          end do
-
-          close(1)
-       end if
-
-       sync all
-
-       if(this_image() == 1) deallocate(gwann_aux)
-    end if
-
     !Read cell maps of q, k, g meshes.
     if(self%old_ws) then
        call print_message("Reading Wannier cells and multiplicities (old representation)...")
@@ -470,17 +449,21 @@ contains
        if(this_image() == 1) then
           allocate(rcells_g_aux(self%gwann_distrib_chunk[1], 3)) !chunk for the 1st image is the largest 
           allocate(gwsdeg_aux(self%gwann_distrib_chunk[1]))
+          allocate(gdeg_old_all(self%nwsg)) !Full list, kept on image 1 for the e-ph vertex
 
           open(1, file = filename_gwscells, status = "old")
           open(2, file = filename_gwsdeg, status = "old")
 
+          goff = 0
           do image = 1, self%gwann_distrib_num_active_images
              !print*,"nrcells_g=>", self%gwann_distrib_chunk[image]
              do iuc = 1, self%gwann_distrib_chunk[image]
                 !print *,"iuc =>", iuc
                 read(1, *) rcells_g_aux(iuc, :)
                 read(2, *) gwsdeg_aux(iuc)
+                gdeg_old_all(goff + iuc) = gwsdeg_aux(iuc)
              end do
+             goff = goff + self%gwann_distrib_chunk[image]
 
              self%rcells_g(:, :)[image] = rcells_g_aux(:, :)
              self%gwsdeg(:)[image] = gwsdeg_aux(:)
@@ -535,16 +518,20 @@ contains
        if(this_image() == 1) then ! Read and distribute among all images
           allocate(rcells_g_aux(self%gwann_distrib_chunk[1], 3)) !chunk for the 1st image is the largest
           allocate(gwsdeg_new_aux(self%gwann_distrib_chunk[1], dims(1), dims(2)))
+          allocate(gdeg_new_all(self%nwsg, dims(1), dims(2))) !Full list, kept on image 1 for the e-ph vertex
           !allocate(wslen_g_aux(self%gwann_distrib_chunk[1]))
           !allocate(tmp_aux(self%gwann_distrib_chunk[1]))
 
+          goff = 0
           do image = 1, self%gwann_distrib_num_active_images
              do iuc = 1, self%gwann_distrib_chunk[image]
                 read(1, *) rcells_g_aux(iuc, :)
                 do juc = 1, dims(1)
                     read(1, *) gwsdeg_new_aux(iuc, juc, :)
                 end do
+                gdeg_new_all(goff + iuc, :, :) = gwsdeg_new_aux(iuc, :, :)
              end do
+             goff = goff + self%gwann_distrib_chunk[image]
 
              self%rcells_g(:, :)[image] = rcells_g_aux(:, :)
              self%gwsdeg_new(:,:,:)[image] = gwsdeg_new_aux(:,:,:)
@@ -558,58 +545,141 @@ contains
     sync all
     call print_message("Reading complete")
 
-    !! Applying all degeneracies to epmat
+    !Gather the e-ph vertex cells from all images in global order. The order of
+    !these cells is, in general, different from that of the phonon cells (rcells_q).
+    allocate(self%rcells_g_all(self%nwsg, 3))
+    do image = 1, self%gwann_distrib_num_active_images
+       self%rcells_g_all(self%gwann_distrib_start[image]:self%gwann_distrib_end[image], :) = &
+            self%rcells_g(1:self%gwann_distrib_chunk[image], :)[image]
+    end do
+
+    !Read the Wannier representation e-ph vertex and distribute it to all images. The WS
+    !degeneracies are applied to the vertex while it sits in the read buffer of image 1,
+    !i.e., before it is sent out. This needs the cell multiplicities, hence it comes after
+    !they have been read. Cells with zero multiplicity are zeroed out.
+    if(.not. num%read_gk2 .or. .not. num%read_gq2 .or. &
+         num%plot_along_path) then
+
+       allocate(gwann(self%numwannbands,self%numwannbands,self%nwsk,&
+            self%numbranches, self%gwann_distrib_chunk[1])[*])
+       gwann = 0.0_r64
+
+       !Below, image 1 will read Wannierized g(Re,Rp) and distribute to all images.
+       if(this_image() == 1) then
+          call print_message("Reading Wannier rep. e-ph vertex and distributing...")
+
+          open(1, file = filename_epwgwann, status = 'old', access = 'stream')
+
+          allocate(gwann_aux(self%numwannbands,self%numwannbands,self%nwsk,&
+               self%numbranches,self%gwann_distrib_chunk[1])) !chunk for the 1st image is the largest
+          gwann_aux = 0.0_r64
+
+          !Inverse of the electron cell multiplicities
+          if(self%old_ws) then
+             allocate(invdeg_k_old(self%nwsk))
+             do iuc = 1, self%nwsk
+                invdeg_k_old(iuc) = 0.0_r64
+                if(self%elwsdeg(iuc) /= 0) invdeg_k_old(iuc) = 1.0_r64/real(self%elwsdeg(iuc), r64)
+             end do
+          else
+             allocate(invdeg_k_new(self%numwannbands, self%numwannbands, self%nwsk))
+             do iuc = 1, self%nwsk
+                do ib = 1, self%numwannbands
+                   do jb = 1, self%numwannbands
+                      invdeg_k_new(ib, jb, iuc) = 0.0_r64
+                      if(self%elwsdeg_new(iuc, ib, jb) /= 0) &
+                           invdeg_k_new(ib, jb, iuc) = 1.0_r64/real(self%elwsdeg_new(iuc, ib, jb), r64)
+                   end do
+                end do
+             end do
+             allocate(invdeg_g_vec(self%numwannbands))
+          end if
+
+          !Number of g cells per coarray transfer. Keep each transfer well below 2 GB
+          !since the MPI byte count is a 32-bit integer.
+          slab = max(1_i64, 2_i64**29/(16_i64*self%numwannbands**2*self%nwsk*self%numbranches))
+
+          goff = 0
+          do image = 1, self%gwann_distrib_num_active_images
+             read(1) gwann_aux(:, :, :, :, 1:self%gwann_distrib_chunk[image])
+
+             !Apply the multiplicities to this chunk. goff is the global index offset of
+             !the e-ph cells of this chunk.
+             if(self%old_ws) then
+                do ig = 1, self%gwann_distrib_chunk[image]
+                   invg = 0.0_r64
+                   if(gdeg_old_all(goff + ig) /= 0) invg = 1.0_r64/real(gdeg_old_all(goff + ig), r64)
+                   do s = 1, self%numbranches
+                      do iuc = 1, self%nwsk
+                         gwann_aux(:, :, iuc, s, ig) = gwann_aux(:, :, iuc, s, ig)&
+                              *(invdeg_k_old(iuc)*invg)
+                      end do
+                   end do
+                end do
+             else
+                do ig = 1, self%gwann_distrib_chunk[image]
+                   do s = 1, self%numbranches
+                      na = (s - 1)/3 + 1
+                      do ib = 1, self%numwannbands
+                         invdeg_g_vec(ib) = 0.0_r64
+                         if(gdeg_new_all(goff + ig, ib, na) /= 0) &
+                              invdeg_g_vec(ib) = 1.0_r64/real(gdeg_new_all(goff + ig, ib, na), r64)
+                      end do
+                      do iuc = 1, self%nwsk
+                         do jb = 1, self%numwannbands
+                            gwann_aux(:, jb, iuc, s, ig) = gwann_aux(:, jb, iuc, s, ig)&
+                                 *invdeg_k_new(:, jb, iuc)*invdeg_g_vec(:)
+                         end do
+                      end do
+                   end do
+                end do
+             end if
+
+             do iuc = 1, self%gwann_distrib_chunk[image], slab
+                iend = min(iuc + slab - 1, self%gwann_distrib_chunk[image])
+                gwann(:,:,:,:,iuc:iend)[image] = gwann_aux(:,:,:,:,iuc:iend)
+             end do
+
+             goff = goff + self%gwann_distrib_chunk[image]
+          end do
+
+          close(1)
+       end if
+
+       sync all
+
+       if(this_image() == 1) deallocate(gwann_aux)
+    end if
+
+    !! Applying the degeneracies to H and D
     if(self%old_ws) then
-       call apply_degeneracies_old(self)
+       call divide_by_degeneracy_HD_old(self)
     else
-       call apply_degeneracies_new(self)
+       call divide_by_degeneracy_HD_new(self)
     end if
     call print_message("Applied WS degeneracies.")
 
   end subroutine read_EPW_Wannier
   
-  subroutine apply_degeneracies_new(self)
-    !! Apply WS degeneracies to H, D & eph mat elements in Wannier representation
-    !! (Warning: modifies self%Hwann, self%Dphwann and global gwann)
+  subroutine divide_by_degeneracy_HD_new(self)
+    !! Apply WS degeneracies to H & D in Wannier representation (new format).
+    !! (Warning: modifies self%Hwann and self%Dphwann. The e-ph vertex is treated while it
+    !! is read in read_EPW_Wannier.)
     class(wannier), intent(inout) :: self
 
     !! Locals
-    integer(i64) :: ib1, ib2, s, na, i, image, iuc, iat, jat, nat
-    integer(i64) :: image_order(self%gwann_distrib_num_active_images) 
+    integer(i64) :: ib1, ib2, iuc, iat, jat, nat
 
-    !Staggering the order of reading of gwann from the diffent images to reduce
-    !simultaneous reading of the same chunk by all images.
-    do i = 0, self%gwann_distrib_num_active_images - 1
-       image_order(i + 1) = modulo(i + this_image() - 1, self%gwann_distrib_num_active_images) + 1
-    end do
-
-    !! Applying degeneracies to eph mat elements
-    do i = 1, self%gwann_distrib_num_active_images
-       image = image_order(i)
-
-       do concurrent(ib1 = 1:self%numwannbands, iuc = 1:self%gwann_distrib_chunk[image], &
-                      s = 1:self%numbranches)
-          na = ceiling(real(s)/3.0)
-          if(self%gwsdeg_new(iuc, ib1, na)[image] /= 0) then
-             gwann(ib1,:,:,s,iuc)[image] = gwann(ib1,:,:,s,iuc)[image] &
-                                        /self%gwsdeg_new(iuc, ib1, na)[image]
-          else
-             gwann(ib1,:,:,s,iuc)[image] = 0.0_r64
-          end if
-       end do
-    end do
+    !! Applying degeneracies to H mat elements
     do concurrent(ib1 = 1:self%numwannbands, ib2 = 1:self%numwannbands, iuc = 1:self%nwsk)
-       if(self%elwsdeg_new(iuc, ib1, ib2) /= 0) then       
-          gwann(ib1,ib2,iuc,:,:) = gwann(ib1,ib2,iuc,:,:)/self%elwsdeg_new(iuc, ib1, ib2)
-          !! Applying degeneracies to H mat elements
+       if(self%elwsdeg_new(iuc, ib1, ib2) /= 0) then
           self%Hwann(iuc, ib1, ib2) = self%Hwann(iuc, ib1, ib2)&
                                     /self%elwsdeg_new(iuc, ib1, ib2)
        else
-          gwann(ib1,ib2,iuc,:,:) = 0.0_r64
           self%Hwann(iuc, ib1, ib2) = 0.0_r64
        end if
     end do
-    
+
     !! Applying degeneracies to D mat elements
     nat = size(self%phwsdeg_new(1, :, 1))
     do concurrent(iat = 1:nat, jat = 1:nat, iuc = 1:self%nwsq)
@@ -621,44 +691,19 @@ contains
           self%Dphwann(iuc, (iat-1)*3+1:iat*3, (jat-1)*3+1:jat*3) = 0.0_r64
        end if
     end do
-  end subroutine apply_degeneracies_new
+  end subroutine divide_by_degeneracy_HD_new
 
-  subroutine apply_degeneracies_old(self)
-    !! Apply WS degeneracies to H, D & eph mat elements according to old format
-    !! (Warning: modifies self%Hwann, self%Dphwann and global gwann)
+  subroutine divide_by_degeneracy_HD_old(self)
+    !! Apply WS degeneracies to H & D in Wannier representation (old format).
+    !! (Warning: modifies self%Hwann and self%Dphwann. The e-ph vertex is treated while it
+    !! is read in read_EPW_Wannier.)
     class(wannier), intent(inout) :: self
 
     !! Locals
-    integer(i64) :: i, ik, nk, image, iuc, image_order(self%gwann_distrib_num_active_images) 
+    integer(i64) :: iuc
 
-    !Staggering the order of reading of gwann from the diffent images to reduce
-    !simultaneous reading of the same chunk by all images.
-    do i = 0, self%gwann_distrib_num_active_images - 1
-       image_order(i + 1) = modulo(i + this_image() - 1, self%gwann_distrib_num_active_images) + 1
-    end do
-
-    nk =  size(gwann(:,1,1,1,1)[1])
-    !! Applying degeneracies to eph mat elements
-    do i = 1, self%gwann_distrib_num_active_images
-       image = image_order(i)
-       do iuc = 1, self%gwann_distrib_chunk[image]
-          if(self%gwsdeg(iuc)[image]/=0) then
-             gwann(:,:,:,:,iuc)[image] = gwann(:,:,:,:,iuc)[image]/self%gwsdeg(iuc)[image]
-          else
-             do ik = 1, nk   ! otherwise throws segmt error
-                gwann(ik,:,:,:,iuc)[image] = 0.0_r64
-             end do
-          end if
-       end do
-    end do
-    
+    !! Applying degeneracies to H mat elements
     do iuc = 1,self%nwsk
-       if(self%elwsdeg(iuc)/=0) then
-          gwann(:,:,iuc,:,:) = gwann(:,:,iuc,:,:)/self%elwsdeg(iuc)
-       else
-          gwann(:,:,iuc,:,:) = 0.0_r64
-       end if
-       !! Applying degeneracies to H mat elements
        if(self%elwsdeg(iuc)/=0) then
           self%Hwann(iuc, :, :) = self%Hwann(iuc, :, :)/self%elwsdeg(iuc)
        else
@@ -673,7 +718,38 @@ contains
           self%Dphwann(iuc, :, :) = 0.0_r64
        end if
     end do
-  end subroutine apply_degeneracies_old
+  end subroutine divide_by_degeneracy_HD_old
+
+  subroutine divide_by_degeneracy_old(self)
+    !! Apply WS degeneracies to H, D & eph mat elements according to old format.
+    !! Used by the exciting reader, where the e-ph vertex is already distributed.
+    !! (Warning: modifies self%Hwann, self%Dphwann and global gwann)
+    class(wannier), intent(inout) :: self
+
+    !! Locals
+    integer(i64) :: iuc
+
+    !! Each image works on its own chunk of gwann only.
+    do iuc = 1, self%gwann_distrib_chunk
+       if(self%gwsdeg(iuc)/=0) then
+          gwann(:,:,:,:,iuc) = gwann(:,:,:,:,iuc)/self%gwsdeg(iuc)
+       else
+          gwann(:,:,:,:,iuc) = 0.0_r64
+       end if
+    end do
+
+    do iuc = 1,self%nwsk
+       if(self%elwsdeg(iuc)/=0) then
+          gwann(:,:,iuc,:,:) = gwann(:,:,iuc,:,:)/self%elwsdeg(iuc)
+       else
+          gwann(:,:,iuc,:,:) = 0.0_r64
+       end if
+    end do
+
+    call divide_by_degeneracy_HD_old(self)
+
+    sync all
+  end subroutine divide_by_degeneracy_old
   
 !$!   !! - This is the ugly part - !!
 !$!   !! If you keep the pointer system !!
@@ -2413,7 +2489,8 @@ contains
        do iws = 1, nws !over matrix elements WS cell
           !Fourier transform to reciprocal-space
           if(wannspace == 'ph') then
-             caux = expi(twopi*dot_product(qvec, self%rcells_q(iws, :)))!&
+             !Note: iws indexes the e-ph vertex cells, whose order differs from that of rcells_q.
+             caux = expi(twopi*dot_product(qvec, self%rcells_g_all(iws, :)))!&
                   !/self%phwsdeg(iws)
           else
              caux = expi(twopi*dot_product(kvec, self%rcells_k(iws,:)))!&
@@ -2561,14 +2638,15 @@ contains
     class(wannier), intent(inout) :: self
     type(numerics), intent(in) :: num
 
-    deallocate(self%rcells_k, self%rcells_q, self%rcells_g, self%Hwann, self%Dphwann)
+    deallocate(self%rcells_k, self%rcells_q, self%rcells_g, self%rcells_g_all, &
+         self%Hwann, self%Dphwann)
+    
     if(self%old_ws) then
        deallocate(self%elwsdeg, self%phwsdeg, self%gwsdeg)
     else
        deallocate(self%elwsdeg_new, self%phwsdeg_new, self%gwsdeg_new)
     end if
-            
-
+    
     if(.not. num%read_gk2 .and. .not. num%read_gq2 .or. &
          num%plot_along_path) then
        deallocate(gwann)
